@@ -109,7 +109,9 @@ public static partial class TemplateGenerationEndpoints
         CopyIfPresent(error.Metadata, extensions, "mediaType");
         CopyIfPresent(error.Metadata, extensions, "tier");
         CopyIfPresent(error.Metadata, extensions, "estimatedWaitSeconds");
+        CopyIfPresent(error.Metadata, extensions, "estimatedTotalSeconds");
         CopyIfPresent(error.Metadata, extensions, "maxAllowedWaitSeconds");
+        CopyIfPresent(error.Metadata, extensions, "maxAllowedTotalSeconds");
         CopyIfPresent(error.Metadata, extensions, "retryAfterSeconds");
         CopyIfPresent(error.Metadata, extensions, "canRetry");
         CopyIfPresent(error.Metadata, extensions, "canUpgradeForPriority");

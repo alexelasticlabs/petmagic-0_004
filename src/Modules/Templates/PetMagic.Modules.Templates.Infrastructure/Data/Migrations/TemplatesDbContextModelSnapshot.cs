@@ -116,12 +116,12 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                     b.Property<int>("PreviousRefundAttemptCount")
                         .HasColumnType("integer");
 
+                    b.Property<DateTime?>("PreviousRefundLastAttemptedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("PreviousRefundLastErrorCode")
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
-
-                    b.Property<DateTime?>("PreviousRefundLastAttemptedAtUtc")
-                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Reason")
                         .HasMaxLength(500)
@@ -134,12 +134,12 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("GenerationId", "CreatedAtUtc")
-                        .HasDatabaseName("IX_tagrrr_GenerationId_CreatedAtUtc");
-
                     b.HasIndex("ActorUserId", "IdempotencyKey")
                         .IsUnique()
                         .HasDatabaseName("UX_tagrrr_ActorUserId_IdempotencyKey");
+
+                    b.HasIndex("GenerationId", "CreatedAtUtc")
+                        .HasDatabaseName("IX_tagrrr_GenerationId_CreatedAtUtc");
 
                     b.ToTable("templates_admin_generation_refund_retry_receipts", (string)null);
                 });
@@ -450,6 +450,10 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                     b.Property<DateTime?>("ModeratedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("ModerationComment")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<DateTime?>("ModerationLeaseClaimedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -458,10 +462,6 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
 
                     b.Property<Guid?>("ModerationLeaseOwnerUserId")
                         .HasColumnType("uuid");
-
-                    b.Property<string>("ModerationComment")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
 
                     b.Property<string>("ModerationStatus")
                         .IsRequired()
@@ -489,9 +489,6 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
 
                     b.HasIndex("ModerationStatus", "CreatedAtUtc");
 
-                    b.HasIndex("ModerationStatus", "ModerationLeaseExpiresAtUtc", "CreatedAtUtc")
-                        .HasDatabaseName("IX_templates_analytics_events_moderation_lease");
-
                     b.HasIndex("TemplateId", "CountryCode");
 
                     b.HasIndex("TemplateId", "CreatedAtUtc");
@@ -499,6 +496,9 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                     b.HasIndex("TemplateId", "DeviceClass");
 
                     b.HasIndex("TemplateId", "Source");
+
+                    b.HasIndex("ModerationStatus", "ModerationLeaseExpiresAtUtc", "CreatedAtUtc")
+                        .HasDatabaseName("IX_templates_analytics_events_moderation_lease");
 
                     b.HasIndex("TemplateId", "EventType", "CreatedAtUtc");
 
@@ -663,6 +663,126 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                         .HasDatabaseName("IX_tgbc_Status_LastAttemptedAtUtc_CreatedAtUtc");
 
                     b.ToTable("templates_generation_billing_commands", (string)null);
+                });
+
+            modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateGenerationControlPolicy", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("AdmissionEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("ApplicationHardCeiling")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("BaseGlobalMaxConcurrentGenerations")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("BaseImageMaxConcurrentGenerations")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("BaseImageProtectedConcurrentGenerations")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("BaseImageReservedConcurrentGenerations")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("BaseVideoBorrowMaxConcurrentGenerations")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("BaseVideoMaxConcurrentGenerations")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("BaseVideoPreprocessingMaxConcurrentGenerations")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("BaseVideoReservedConcurrentGenerations")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("ConfirmedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("ConfirmedFalConcurrencyLimit")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("LastReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("ReservedHeadroom")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(1L);
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAdminUserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UpdatedAtUtc")
+                        .HasDatabaseName("IX_tgcp_UpdatedAtUtc");
+
+                    b.ToTable("templates_generation_control_policy", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_tgcp_BaseProfile", "\"BaseGlobalMaxConcurrentGenerations\" > 0 AND \"BaseImageReservedConcurrentGenerations\" > 0 AND \"BaseImageProtectedConcurrentGenerations\" > 0 AND \"BaseImageMaxConcurrentGenerations\" > 0 AND \"BaseVideoReservedConcurrentGenerations\" > 0 AND \"BaseVideoMaxConcurrentGenerations\" > 0 AND \"BaseVideoBorrowMaxConcurrentGenerations\" > 0 AND \"BaseVideoPreprocessingMaxConcurrentGenerations\" > 0");
+
+                            t.HasCheckConstraint("CK_tgcp_ProviderCapacity", "\"ConfirmedFalConcurrencyLimit\" > 0 AND \"ReservedHeadroom\" >= 0 AND \"ReservedHeadroom\" < \"ConfirmedFalConcurrencyLimit\" AND \"ApplicationHardCeiling\" > 0");
+
+                            t.HasCheckConstraint("CK_tgcp_Revision", "\"Revision\" > 0");
+                        });
+                });
+
+            modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateGenerationControlPolicyCommandReceipt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ActorUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<long>("PolicyRevision")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("RequestHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ResponseJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActorUserId", "IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("UX_tgcr_ActorUserId_IdempotencyKey");
+
+                    b.HasIndex("PolicyRevision", "CreatedAtUtc")
+                        .HasDatabaseName("IX_tgcr_PolicyRevision_CreatedAtUtc");
+
+                    b.ToTable("templates_generation_control_receipts", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_tgcr_PolicyRevision", "\"PolicyRevision\" > 0");
+                        });
                 });
 
             modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateGenerationFeedback", b =>
@@ -948,7 +1068,15 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
 
+                    b.Property<int>("MediaImportAttemptCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
                     b.Property<DateTime?>("MediaImportCompletedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("MediaImportNextAttemptAtUtc")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime?>("MotionGenerationCompletedAtUtc")
@@ -983,6 +1111,9 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                     b.Property<string>("NormalizedImageUrl")
                         .HasMaxLength(2048)
                         .HasColumnType("character varying(2048)");
+
+                    b.Property<DateTime?>("OriginalImportedAtUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<double?>("OutputVideoDurationSeconds")
                         .HasColumnType("double precision");
@@ -1020,6 +1151,9 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                     b.Property<string>("PreprocessingProviderStatusUrl")
                         .HasMaxLength(2048)
                         .HasColumnType("character varying(2048)");
+
+                    b.Property<DateTime?>("PreviewImportedAtUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("PromptAfterVariation")
                         .HasMaxLength(2000)
@@ -1156,6 +1290,9 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
 
+                    b.Property<DateTime?>("WatermarkImportedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("WatermarkedResultUrl")
                         .HasMaxLength(2048)
                         .HasColumnType("character varying(2048)");
@@ -1215,6 +1352,10 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                     b.HasIndex("Status", "LockedAtUtc")
                         .HasDatabaseName("IX_templates_generation_jobs_Status_LockedAtUtc");
 
+                    b.HasIndex("Status", "MediaImportNextAttemptAtUtc")
+                        .HasDatabaseName("IX_tgj_ImportingMedia_NextAttempt")
+                        .HasFilter("\"Status\" = 10");
+
                     b.HasIndex("Status", "ProviderStatusCheckedAtUtc")
                         .HasDatabaseName("IX_tgj_Status_ProviderStatusCheckedAtUtc");
 
@@ -1268,6 +1409,145 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                         .HasDatabaseName("IX_tgj_UserId_Hidden_Status_CreatedAt_Id");
 
                     b.ToTable("templates_generation_jobs", (string)null);
+                });
+
+            modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateGenerationProviderAttempt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("CancelAttemptCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("CompletedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("GenerationJobId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsBorrowedCapacity")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("LastErrorCode")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime?>("LockedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LockedBy")
+                        .IsConcurrencyToken()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime?>("NextPollAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Ordinal")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("PollAttemptCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("ProcessingDeadlineAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ProviderCancelUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<DateTime?>("ProviderCompletedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ProviderRequestId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("ProviderResponseUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<string>("ProviderStatusUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<DateTime>("ReconciliationDeadlineAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Stage")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("State")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("SubmissionDeadlineAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("SubmissionTokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int>("SubmitAttemptCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("SubmittedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(0L);
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SubmissionTokenHash")
+                        .IsUnique()
+                        .HasDatabaseName("UX_tgpa_SubmissionTokenHash");
+
+                    b.HasIndex("GenerationJobId", "CreatedAtUtc")
+                        .HasDatabaseName("IX_tgpa_JobId_CreatedAtUtc");
+
+                    b.HasIndex("Provider", "ProviderRequestId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_tgpa_Provider_RequestId")
+                        .HasFilter("\"ProviderRequestId\" IS NOT NULL");
+
+                    b.HasIndex("State", "LockedAtUtc")
+                        .HasDatabaseName("IX_tgpa_State_LockedAtUtc")
+                        .HasFilter("\"State\" IN (1, 2, 3, 4, 5)");
+
+                    b.HasIndex("State", "NextPollAtUtc")
+                        .HasDatabaseName("IX_tgpa_State_NextPollAtUtc")
+                        .HasFilter("\"State\" IN (1, 2, 3, 4, 5)");
+
+                    b.HasIndex("GenerationJobId", "Stage", "Ordinal")
+                        .IsUnique()
+                        .HasDatabaseName("UX_tgpa_JobId_Stage_Ordinal");
+
+                    b.ToTable("templates_generation_provider_attempts", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_tgpa_AttemptCounts", "\"SubmitAttemptCount\" >= 0 AND \"PollAttemptCount\" >= 0 AND \"CancelAttemptCount\" >= 0");
+
+                            t.HasCheckConstraint("CK_tgpa_Deadlines", "\"SubmissionDeadlineAtUtc\" <= \"ProcessingDeadlineAtUtc\" AND \"ProcessingDeadlineAtUtc\" <= \"ReconciliationDeadlineAtUtc\"");
+
+                            t.HasCheckConstraint("CK_tgpa_Ordinal", "\"Ordinal\" > 0");
+
+                            t.HasCheckConstraint("CK_tgpa_TokenHash", "length(\"SubmissionTokenHash\") = 64");
+                        });
                 });
 
             modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateGenerationWatermarkUnlock", b =>
@@ -1671,6 +1951,178 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                     b.ToTable("templates_of_the_day_settings", (string)null);
                 });
 
+            modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateProviderRuntimeSnapshot", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("BalanceState")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("CheckedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("ConsecutiveFailures")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal?>("CurrentBalanceUsd")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)");
+
+                    b.Property<string>("LastErrorCode")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime?>("LastSuccessfulAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime?>("RefreshLeaseExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("RefreshLeaseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("StatusChangedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Provider")
+                        .IsUnique()
+                        .HasDatabaseName("UX_tprs_Provider");
+
+                    b.HasIndex("RefreshLeaseExpiresAtUtc")
+                        .HasDatabaseName("IX_tprs_RefreshLeaseExpiresAtUtc");
+
+                    b.ToTable("templates_provider_runtime_snapshots", (string)null);
+                });
+
+            modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateProviderWebhookInbox", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("CallbackTokenHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeadLetteredAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DeduplicationKey")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int>("FailureCount")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("GenerationJobId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("LastErrorCode")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime?>("LockedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LockedBy")
+                        .IsConcurrencyToken()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime>("NextAttemptAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PayloadJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("ProcessedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid?>("ProviderAttemptId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ProviderRequestId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime>("ReceivedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("SignatureVerifiedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CallbackTokenHash")
+                        .HasDatabaseName("IX_tpwbi_CallbackTokenHash")
+                        .HasFilter("\"CallbackTokenHash\" IS NOT NULL");
+
+                    b.HasIndex("GenerationJobId")
+                        .HasDatabaseName("IX_tpwbi_GenerationJobId");
+
+                    b.HasIndex("ProviderAttemptId")
+                        .HasDatabaseName("IX_tpwbi_ProviderAttemptId");
+
+                    b.HasIndex("ProviderRequestId")
+                        .HasDatabaseName("IX_tpwbi_ProviderRequestId")
+                        .HasFilter("\"ProviderRequestId\" IS NOT NULL");
+
+                    b.HasIndex("Provider", "DeduplicationKey")
+                        .IsUnique()
+                        .HasDatabaseName("UX_tpwbi_Provider_Dedupe");
+
+                    b.HasIndex("Status", "NextAttemptAtUtc")
+                        .HasDatabaseName("IX_tpwbi_Status_NextAttemptAtUtc")
+                        .HasFilter("\"Status\" IN (1, 4)");
+
+                    b.HasIndex("Status", "UpdatedAtUtc")
+                        .HasDatabaseName("IX_tpwbi_Terminal_UpdatedAtUtc")
+                        .HasFilter("\"Status\" IN (3, 5)");
+
+                    b.ToTable("templates_provider_webhook_inbox", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_tpwbi_AttemptCount", "\"AttemptCount\" >= 0");
+
+                            t.HasCheckConstraint("CK_tpwbi_FailureCount", "\"FailureCount\" >= 0");
+                        });
+                });
+
             modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplatePushDeviceToken", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1756,6 +2208,9 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<long?>("AppliedPolicyRevision")
+                        .HasColumnType("bigint");
+
                     b.Property<string>("Checksum")
                         .IsRequired()
                         .HasMaxLength(64)
@@ -1770,8 +2225,23 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<int?>("GenerationDispatchConcurrency")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("GenerationMaintenanceConcurrency")
+                        .HasColumnType("integer");
+
+                    b.Property<bool?>("GenerationSchedulerV2Enabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastProgressAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTime>("LastSeenAtUtc")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("MediaImportConcurrency")
+                        .HasColumnType("integer");
 
                     b.Property<string>("MismatchDetails")
                         .HasMaxLength(1000)
@@ -1784,6 +2254,9 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
+
+                    b.Property<int?>("ProviderReconciliationConcurrency")
+                        .HasColumnType("integer");
 
                     b.Property<DateTime>("StartedAtUtc")
                         .HasColumnType("timestamp with time zone");
@@ -1959,6 +2432,17 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                     b.Navigation("Template");
                 });
 
+            modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateGenerationProviderAttempt", b =>
+                {
+                    b.HasOne("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateGenerationJob", "GenerationJob")
+                        .WithMany("ProviderAttempts")
+                        .HasForeignKey("GenerationJobId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("GenerationJob");
+                });
+
             modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateGenerationWatermarkUnlock", b =>
                 {
                     b.HasOne("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateGenerationJob", "GenerationJob")
@@ -1998,6 +2482,23 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                     b.Navigation("Template");
                 });
 
+            modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateProviderWebhookInbox", b =>
+                {
+                    b.HasOne("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateGenerationJob", "GenerationJob")
+                        .WithMany("ProviderWebhookEvents")
+                        .HasForeignKey("GenerationJobId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateGenerationProviderAttempt", "ProviderAttempt")
+                        .WithMany("WebhookEvents")
+                        .HasForeignKey("ProviderAttemptId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("GenerationJob");
+
+                    b.Navigation("ProviderAttempt");
+                });
+
             modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.Pet", b =>
                 {
                     b.Navigation("Photos");
@@ -2007,7 +2508,16 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                 {
                     b.Navigation("MediaRecords");
 
+                    b.Navigation("ProviderAttempts");
+
+                    b.Navigation("ProviderWebhookEvents");
+
                     b.Navigation("WatermarkUnlocks");
+                });
+
+            modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateGenerationProviderAttempt", b =>
+                {
+                    b.Navigation("WebhookEvents");
                 });
 
             modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateItem", b =>

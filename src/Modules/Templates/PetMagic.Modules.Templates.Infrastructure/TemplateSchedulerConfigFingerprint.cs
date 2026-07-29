@@ -42,6 +42,7 @@ public static class TemplateSchedulerConfigFingerprint
     {
         return new SortedDictionary<string, object?>(StringComparer.Ordinal)
         {
+            ["generationSchedulerV2Enabled"] = options.GenerationSchedulerV2Enabled,
             ["admission"] = new SortedDictionary<string, object?>(StringComparer.Ordinal)
             {
                 ["cancelQueuedGenerationEnabled"] = options.CancelQueuedGenerationEnabled,
@@ -52,17 +53,7 @@ public static class TemplateSchedulerConfigFingerprint
             },
             ["concurrency"] = new SortedDictionary<string, object?>(StringComparer.Ordinal)
             {
-                ["falProviderConcurrencyLimit"] = options.FalProviderConcurrencyLimit,
-                ["falProviderReservedConcurrency"] = options.FalProviderReservedConcurrency,
-                ["globalMaxConcurrentGenerations"] = options.GlobalMaxConcurrentGenerations,
-                ["imageMaxConcurrentGenerations"] = options.ImageMaxConcurrentGenerations,
-                ["imageProtectedConcurrentGenerations"] = options.ImageProtectedConcurrentGenerations,
-                ["imageReservedConcurrentGenerations"] = options.ImageReservedConcurrentGenerations,
                 ["maxAiProviderRequestsPerMinute"] = options.MaxAiProviderRequestsPerMinute,
-                ["maxConcurrentJobsPerWorker"] = options.MaxConcurrentJobsPerWorker,
-                ["videoMaxConcurrentGenerations"] = options.VideoMaxConcurrentGenerations,
-                ["videoPreprocessingMaxConcurrentGenerations"] = options.VideoPreprocessingMaxConcurrentGenerations,
-                ["videoReservedConcurrentGenerations"] = options.VideoReservedConcurrentGenerations
             },
             ["elasticBorrowing"] = new SortedDictionary<string, object?>(StringComparer.Ordinal)
             {
@@ -71,7 +62,6 @@ public static class TemplateSchedulerConfigFingerprint
                 ["borrowedVideoMaxAgeSeconds"] = options.BorrowedVideoMaxAgeSeconds,
                 ["borrowingPriorityTiers"] = NormalizeCsvSet(options.BorrowingPriorityTiers),
                 ["enableElasticLaneBorrowing"] = options.EnableElasticLaneBorrowing,
-                ["videoBorrowMaxConcurrentGenerations"] = options.VideoBorrowMaxConcurrentGenerations,
                 ["videoBorrowReleaseMode"] = NormalizeText(options.VideoBorrowReleaseMode)
             },
             ["estimates"] = new SortedDictionary<string, object?>(StringComparer.Ordinal)
@@ -105,12 +95,9 @@ public static class TemplateSchedulerConfigFingerprint
                 ["maxGenerationAttempts"] = options.MaxGenerationAttempts,
                 ["maxRefundAttempts"] = options.MaxRefundAttempts,
                 ["orphanQueuedJobTimeoutMilliseconds"] = options.OrphanQueuedJobTimeoutMilliseconds,
+                ["providerReconciliationClaimLeaseMilliseconds"] = options.ProviderReconciliationClaimLeaseMilliseconds,
                 ["refundRetryDelayMilliseconds"] = options.RefundRetryDelayMilliseconds,
                 ["staleProcessingRecoveryDelayMilliseconds"] = options.StaleProcessingRecoveryDelayMilliseconds
-            },
-            ["worker"] = new SortedDictionary<string, object?>(StringComparer.Ordinal)
-            {
-                ["generationWorkerPollIntervalMilliseconds"] = options.GenerationWorkerPollIntervalMilliseconds
             },
             ["waitThresholds"] = new SortedDictionary<string, object?>(StringComparer.Ordinal)
             {

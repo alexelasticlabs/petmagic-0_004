@@ -212,6 +212,16 @@ internal static class TemplateGenerationMetrics
         unit: "{error}",
         description: "Number of fal provider rate limit responses.");
 
+    private static readonly Counter<long> ProviderWebhookDeadLetteredTotal = Meter.CreateCounter<long>(
+        "generation_provider_webhook_dead_lettered_total",
+        unit: "{event}",
+        description: "Number of provider webhook inbox events moved to dead-letter after exhausting reconciliation retries.");
+
+    private static readonly Counter<long> ProviderWebhookInboxCleanedTotal = Meter.CreateCounter<long>(
+        "generation_provider_webhook_inbox_cleaned_total",
+        unit: "{event}",
+        description: "Number of terminal provider webhook inbox events removed by retention cleanup.");
+
     private static readonly Histogram<double> FalProviderQueueWaitSeconds = Meter.CreateHistogram<double>(
         "fal_provider_queue_wait_seconds",
         unit: "s",
@@ -610,6 +620,19 @@ internal static class TemplateGenerationMetrics
             1,
             new KeyValuePair<string, object?>("stage", stage),
             new KeyValuePair<string, object?>("model", string.IsNullOrWhiteSpace(model) ? "unknown" : model));
+    }
+
+    public static void RecordProviderWebhookDeadLettered(string provider, string errorCode)
+    {
+        ProviderWebhookDeadLetteredTotal.Add(
+            1,
+            new KeyValuePair<string, object?>("provider", string.IsNullOrWhiteSpace(provider) ? "unknown" : provider),
+            new KeyValuePair<string, object?>("error_code", string.IsNullOrWhiteSpace(errorCode) ? "unknown" : errorCode));
+    }
+
+    public static void RecordProviderWebhookInboxCleaned(int deletedCount)
+    {
+        ProviderWebhookInboxCleanedTotal.Add(Math.Max(0, deletedCount));
     }
 
     public static void RecordFalProviderQueueWait(string mediaType, string stage, string? model, DateTime? submittedAtUtc)

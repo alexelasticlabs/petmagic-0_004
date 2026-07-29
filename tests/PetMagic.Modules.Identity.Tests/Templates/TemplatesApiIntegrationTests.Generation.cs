@@ -1,6 +1,6 @@
 using System.Net;
-using System.Net.Http.Json;
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 
@@ -18,6 +18,29 @@ namespace PetMagic.Modules.Identity.Tests.Templates;
 
 public sealed partial class TemplatesApiIntegrationTests
 {
+    [Fact]
+    public async Task FalWebhook_ShouldAcceptOfficialSnakeCaseRequestId()
+    {
+        await using var application = await TestApplication.CreateAsync(
+            startGenerationWorker: false,
+            acceptFalWebhookSignatures: true);
+        using var request = new HttpRequestMessage(
+            HttpMethod.Post,
+            "/api/templates/provider/fal/webhook");
+        request.Headers.TryAddWithoutValidation("X-Fal-Webhook-Request-Id", "fal-request-1");
+        request.Content = new StringContent(
+            """{"request_id":"fal-request-1","status":"OK","payload":{"images":[]}}""",
+            Encoding.UTF8,
+            "application/json");
+
+        using var response = await application.Client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await ReadJsonAsync<FalProviderWebhookResponse>(response);
+        Assert.Equal("fal-request-1", body.RequestId);
+        Assert.Equal("scheduler_disabled", body.Result);
+    }
+
     [Fact]
     public async Task GenerationStatusContract_ShouldReturnNamedStatusesAcrossStatusHistoryAndRealtime()
     {
@@ -698,10 +721,10 @@ public sealed partial class TemplatesApiIntegrationTests
     }
 
     [Fact]
-    public async Task GenerationCreate_ShouldReturnStructuredWaitTooLongProblemBeforeCharge()
+    public async Task GenerationCreate_ShouldReturnStructuredCompletionEtaProblemBeforeCharge_WhenWaitFitsButTotalExceedsSla()
     {
         await using var application = await TestApplication.CreateAsync(
-            freeImageMaxEstimatedWaitSeconds: 30,
+            freeImageMaxEstimatedWaitSeconds: 90,
             startGenerationWorker: false);
 
         var created = await CreateActiveImageTemplateAsync(
@@ -751,8 +774,10 @@ public sealed partial class TemplatesApiIntegrationTests
         Assert.Equal("GENERATION_WAIT_TOO_LONG", root.GetProperty("code").GetString());
         Assert.Equal("image", root.GetProperty("mediaType").GetString());
         Assert.Equal("free", root.GetProperty("tier").GetString());
-        Assert.Equal(45, root.GetProperty("estimatedWaitSeconds").GetInt32());
-        Assert.Equal(30, root.GetProperty("maxAllowedWaitSeconds").GetInt32());
+        Assert.Equal(30, root.GetProperty("estimatedWaitSeconds").GetInt32());
+        Assert.Equal(150, root.GetProperty("estimatedTotalSeconds").GetInt32());
+        Assert.Equal(90, root.GetProperty("maxAllowedWaitSeconds").GetInt32());
+        Assert.Equal(90, root.GetProperty("maxAllowedTotalSeconds").GetInt32());
         Assert.Equal(30, root.GetProperty("retryAfterSeconds").GetInt32());
         Assert.True(root.GetProperty("canRetry").GetBoolean());
         Assert.True(root.GetProperty("canUpgradeForPriority").GetBoolean());

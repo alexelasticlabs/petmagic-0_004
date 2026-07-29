@@ -19,6 +19,12 @@ internal sealed partial class TemplateGenerationJobProcessor
             .Where(x => TemplateGenerationJobStatusSets.Processing.Contains(x.Status)
                 && x.InputSourceType != TemplateGenerationQaFixtures.InputSourceType
                 && (x.ChargedAtUtc != null || x.UserId == TemplateGenerationService.AdminTestUserId)
+                && (providerAttemptStore == null || !x.ProviderAttempts.Any(attempt =>
+                    attempt.State == TemplateGenerationProviderAttemptState.SubmitReserved
+                    || attempt.State == TemplateGenerationProviderAttemptState.Submitting
+                    || attempt.State == TemplateGenerationProviderAttemptState.ProviderQueued
+                    || attempt.State == TemplateGenerationProviderAttemptState.ProviderProcessing
+                    || attempt.State == TemplateGenerationProviderAttemptState.SubmissionUnknown))
                 && x.LockedAtUtc != null
                 && x.LockedAtUtc <= staleThreshold)
             .OrderBy(x => x.LockedAtUtc)
@@ -105,17 +111,29 @@ internal sealed partial class TemplateGenerationJobProcessor
         bool allowImage,
         bool allowNativeVideo,
         bool allowBorrowedVideo,
+        bool allowVideoPreprocessing,
         CancellationToken cancellationToken)
     {
         return string.Equals(dbContext.Database.ProviderName, NpgsqlProviderName, StringComparison.Ordinal)
-            ? ClaimNextPostgresAsync(allowImage, allowNativeVideo, allowBorrowedVideo, cancellationToken)
-            : ClaimNextTrackedAsync(allowImage, allowNativeVideo, allowBorrowedVideo, cancellationToken);
+            ? ClaimNextPostgresAsync(
+                allowImage,
+                allowNativeVideo,
+                allowBorrowedVideo,
+                allowVideoPreprocessing,
+                cancellationToken)
+            : ClaimNextTrackedAsync(
+                allowImage,
+                allowNativeVideo,
+                allowBorrowedVideo,
+                allowVideoPreprocessing,
+                cancellationToken);
     }
 
     private async Task<TemplateGenerationJob?> ClaimNextPostgresAsync(
         bool allowImage,
         bool allowNativeVideo,
         bool allowBorrowedVideo,
+        bool allowVideoPreprocessing,
         CancellationToken cancellationToken)
     {
         var now = DateTime.UtcNow;
@@ -123,9 +141,14 @@ internal sealed partial class TemplateGenerationJobProcessor
         var borrowPrivileged = IsBorrowingTierAllowed(TemplateGenerationQueue.TierPrivileged);
         var borrowPremium = IsBorrowingTierAllowed(TemplateGenerationQueue.TierPremium);
         var borrowFree = IsBorrowingTierAllowed(TemplateGenerationQueue.TierFree);
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync(
+            "SELECT pg_advisory_xact_lock({0})",
+            [QueueFairnessAdvisoryLockKey],
+            cancellationToken);
         var claimedIds = await dbContext.Database.SqlQueryRaw<Guid>(
             """
-            UPDATE templates_generation_jobs
+            UPDATE templates_generation_jobs AS claimed
             SET "Status" = {1},
                 "AttemptCount" = "AttemptCount" + 1,
                 "LastAttemptAtUtc" = {2},
@@ -146,40 +169,51 @@ internal sealed partial class TemplateGenerationJobProcessor
                 "LastErrorCode" = NULL,
                 "LastErrorMessage" = NULL
             WHERE "Id" = (
-                SELECT "Id"
-                FROM templates_generation_jobs
-                WHERE "Status" = {0}
-                    AND "InputSourceType" <> 'qa_fixture'
-                    AND ("ChargedAtUtc" IS NOT NULL OR "UserId" = {4})
-                    AND "AttemptCount" < {3}
-                    AND ("NextAttemptEarliestAtUtc" IS NULL OR "NextAttemptEarliestAtUtc" <= {2})
+                SELECT candidate."Id"
+                FROM templates_generation_jobs AS candidate
+                WHERE candidate."Status" = {0}
+                    AND candidate."InputSourceType" <> 'qa_fixture'
+                    AND (candidate."ChargedAtUtc" IS NOT NULL OR candidate."UserId" = {4})
+                    AND candidate."AttemptCount" < {3}
+                    AND (candidate."NextAttemptEarliestAtUtc" IS NULL OR candidate."NextAttemptEarliestAtUtc" <= {2})
                     AND (
-                        ({6} AND "QueueMediaType" = 'image')
-                        OR ("QueueMediaType" = 'video' AND (
-                            {7}
-                            OR ({8} AND (
-                                ("QueueTier" = 'admin' AND {9})
-                                OR ("QueueTier" = 'privileged' AND {10})
-                                OR ("QueueTier" = 'premium' AND {11})
-                                OR ("QueueTier" = 'free' AND {12})
+                        ({6} AND candidate."QueueMediaType" = 'image')
+                        OR (candidate."QueueMediaType" = 'video'
+                            AND ({19}
+                                OR (candidate."NormalizedImageUrl" IS NOT NULL
+                                    AND candidate."PreprocessingCompletedAtUtc" IS NOT NULL))
+                            AND (
+                                {7}
+                                OR ({8} AND (
+                                    (candidate."QueueTier" = 'admin' AND {9})
+                                    OR (candidate."QueueTier" = 'privileged' AND {10})
+                                    OR (candidate."QueueTier" = 'premium' AND {11})
+                                    OR (candidate."QueueTier" = 'free' AND {12})
+                                ))
                             ))
-                        ))
                     )
                 ORDER BY (
-                    CASE "QueueTier"
+                    CASE candidate."QueueTier"
                         WHEN 'admin' THEN {13}
                         WHEN 'privileged' THEN {14}
                         WHEN 'premium' THEN {15}
                         ELSE {16}
                     END
-                    + FLOOR(GREATEST(0, EXTRACT(EPOCH FROM ({2} - "QueuedAtUtc"))) / {17})::int * {18}
+                    + FLOOR(GREATEST(0, EXTRACT(EPOCH FROM ({2} - candidate."QueuedAtUtc"))) / {17})::int * {18}
                 ) DESC,
-                "QueuedAtUtc",
-                "Id"
-                FOR UPDATE SKIP LOCKED
+                (
+                    SELECT MAX(history."LastAttemptAtUtc")
+                    FROM templates_generation_jobs AS history
+                    WHERE history."UserId" = candidate."UserId"
+                        AND history."QueueTier" = candidate."QueueTier"
+                        AND history."LastAttemptAtUtc" IS NOT NULL
+                ) ASC NULLS FIRST,
+                candidate."QueuedAtUtc",
+                candidate."Id"
+                FOR UPDATE OF candidate SKIP LOCKED
                 LIMIT 1
             )
-            RETURNING "Id" AS "Value"
+            RETURNING claimed."Id" AS "Value"
             """,
             (int)TemplateGenerationStatus.Queued,
             (int)TemplateGenerationStatus.Processing,
@@ -199,8 +233,10 @@ internal sealed partial class TemplateGenerationJobProcessor
             options.PremiumQueuePriorityScore,
             options.FreeQueuePriorityScore,
             options.QueuePriorityAgingIntervalSeconds,
-            options.QueuePriorityAgingBoost)
+            options.QueuePriorityAgingBoost,
+            allowVideoPreprocessing)
             .ToListAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
         var claimedId = claimedIds.FirstOrDefault();
         if (claimedId == Guid.Empty)
@@ -221,6 +257,7 @@ internal sealed partial class TemplateGenerationJobProcessor
         bool allowImage,
         bool allowNativeVideo,
         bool allowBorrowedVideo,
+        bool allowVideoPreprocessing,
         CancellationToken cancellationToken)
     {
         var now = DateTime.UtcNow;
@@ -234,12 +271,41 @@ internal sealed partial class TemplateGenerationJobProcessor
                 && (x.NextAttemptEarliestAtUtc == null || x.NextAttemptEarliestAtUtc <= now)
                 && ((allowImage && x.QueueMediaType == TemplateGenerationQueue.MediaTypeImage)
                     || (x.QueueMediaType == TemplateGenerationQueue.MediaTypeVideo
+                        && (allowVideoPreprocessing
+                            || (x.NormalizedImageUrl != null && x.PreprocessingCompletedAtUtc != null))
                         && (allowNativeVideo
                             || (allowBorrowedVideo && IsBorrowingTierAllowed(x.QueueTier))))))
             .ToArrayAsync(cancellationToken);
 
+        if (candidates.Length == 0)
+        {
+            return null;
+        }
+
+        var candidateUserIds = candidates
+            .Select(candidate => candidate.UserId)
+            .Distinct()
+            .ToArray();
+        var recentClaims = await dbContext.TemplateGenerationJobs
+            .AsNoTracking()
+            .Where(job => candidateUserIds.Contains(job.UserId)
+                && job.LastAttemptAtUtc != null)
+            .GroupBy(job => new { job.UserId, job.QueueTier })
+            .Select(group => new
+            {
+                group.Key.UserId,
+                group.Key.QueueTier,
+                LastClaimedAtUtc = group.Max(job => job.LastAttemptAtUtc)
+            })
+            .ToArrayAsync(cancellationToken);
+        var lastClaimedByUserAndTier = recentClaims.ToDictionary(
+            claim => (claim.UserId, TemplateGenerationQueue.NormalizeTier(claim.QueueTier)),
+            claim => claim.LastClaimedAtUtc);
+
         var job = candidates
             .OrderByDescending(x => TemplateGenerationQueue.ResolvePriorityScore(x, now, options))
+            .ThenBy(x => lastClaimedByUserAndTier.GetValueOrDefault(
+                (x.UserId, TemplateGenerationQueue.NormalizeTier(x.QueueTier))))
             .ThenBy(x => x.QueuedAtUtc)
             .ThenBy(x => x.Id)
             .FirstOrDefault();
@@ -412,7 +478,8 @@ internal sealed partial class TemplateGenerationJobProcessor
         PetMagic.BuildingBlocks.Results.Error error,
         CancellationToken cancellationToken)
     {
-        if (string.Equals(error.Code, TemplatesErrors.AiProviderTransientFailure.Code, StringComparison.Ordinal)
+        if ((string.Equals(error.Code, TemplatesErrors.AiProviderTransientFailure.Code, StringComparison.Ordinal)
+                || string.Equals(error.Code, TemplatesErrors.AiProviderRateLimited.Code, StringComparison.Ordinal))
             && job.AttemptCount < options.MaxGenerationAttempts)
         {
             return await RequeueForTransientSubmitFailureAsync(job, error, cancellationToken);
@@ -431,6 +498,12 @@ internal sealed partial class TemplateGenerationJobProcessor
             .Where(x => x.Status == TemplateGenerationStatus.Queued
                 && x.InputSourceType != TemplateGenerationQaFixtures.InputSourceType
                 && (x.ChargedAtUtc != null || x.UserId == TemplateGenerationService.AdminTestUserId)
+                && (providerAttemptStore == null || !x.ProviderAttempts.Any(attempt =>
+                    attempt.State == TemplateGenerationProviderAttemptState.SubmitReserved
+                    || attempt.State == TemplateGenerationProviderAttemptState.Submitting
+                    || attempt.State == TemplateGenerationProviderAttemptState.ProviderQueued
+                    || attempt.State == TemplateGenerationProviderAttemptState.ProviderProcessing
+                    || attempt.State == TemplateGenerationProviderAttemptState.SubmissionUnknown))
                 && x.AttemptCount >= options.MaxGenerationAttempts)
             .OrderBy(x => x.QueuedAtUtc)
             .FirstOrDefaultAsync(cancellationToken);
@@ -448,9 +521,47 @@ internal sealed partial class TemplateGenerationJobProcessor
         return true;
     }
 
-    private async Task<GlobalConcurrencyLease?> TryAcquireGlobalConcurrencyLeaseAsync(CancellationToken cancellationToken)
+    private async Task<TemplateGenerationConcurrencyProfile?> ResolveSchedulerProfileAsync(
+        CancellationToken cancellationToken)
     {
-        var maxConcurrentGenerations = options.GlobalMaxConcurrentGenerations;
+        if (runtimePolicyProvider is not null)
+        {
+            var runtimePolicy = await runtimePolicyProvider.GetRuntimePolicyAsync(cancellationToken);
+            if (!runtimePolicy.AdmissionEnabled)
+            {
+                return null;
+            }
+
+            if (options.GenerationSchedulerV2Enabled)
+            {
+                return runtimePolicy.EffectiveProfile;
+            }
+        }
+
+        var imageReserved = options.ImageReservedConcurrentGenerations > 0
+            ? options.ImageReservedConcurrentGenerations
+            : options.ImageMaxConcurrentGenerations;
+        var imageProtected = options.ImageProtectedConcurrentGenerations > 0
+            ? options.ImageProtectedConcurrentGenerations
+            : imageReserved;
+        var videoReserved = options.VideoReservedConcurrentGenerations > 0
+            ? options.VideoReservedConcurrentGenerations
+            : options.VideoMaxConcurrentGenerations;
+        return new TemplateGenerationConcurrencyProfile(
+            options.GlobalMaxConcurrentGenerations,
+            imageReserved,
+            imageProtected,
+            options.ImageMaxConcurrentGenerations,
+            videoReserved,
+            options.VideoMaxConcurrentGenerations,
+            Math.Max(0, options.VideoBorrowMaxConcurrentGenerations),
+            options.VideoPreprocessingMaxConcurrentGenerations);
+    }
+
+    private async Task<GlobalConcurrencyLease?> TryAcquireGlobalConcurrencyLeaseAsync(
+        int maxConcurrentGenerations,
+        CancellationToken cancellationToken)
+    {
         if (maxConcurrentGenerations <= 0)
         {
             return GlobalConcurrencyLease.Noop;
@@ -504,25 +615,41 @@ internal sealed partial class TemplateGenerationJobProcessor
         return null;
     }
 
-    private async Task<MediaConcurrencyLeases> TryAcquireMediaConcurrencyLeasesAsync(CancellationToken cancellationToken)
+    private async Task<MediaConcurrencyLeases> TryAcquireMediaConcurrencyLeasesAsync(
+        TemplateGenerationConcurrencyProfile profile,
+        CancellationToken cancellationToken)
     {
         var snapshot = await BuildSchedulerCapacitySnapshotAsync(cancellationToken);
         TemplateGenerationMetrics.RecordSchedulerCapacitySnapshot(
             snapshot.ActiveImage,
             snapshot.ActiveVideo,
-            ResolveVideoReservedConcurrency(),
-            ResolveImageProtectedConcurrency());
+            profile.VideoReservedConcurrentGenerations,
+            profile.ImageProtectedConcurrentGenerations);
 
-        if (snapshot.ActiveGlobal >= options.GlobalMaxConcurrentGenerations)
+        if (snapshot.ActiveGlobal >= profile.GlobalMaxConcurrentGenerations)
         {
             TemplateGenerationMetrics.RecordSchedulerNoSlotSkip("active_global");
             return MediaConcurrencyLeases.Empty;
         }
 
-        var allowImage = snapshot.ActiveImage < options.ImageMaxConcurrentGenerations;
-        var allowNativeVideo = snapshot.ActiveVideo < ResolveVideoReservedConcurrency();
+        var missingGuaranteedVideoSlots = snapshot.QueuedVideo > 0
+            ? Math.Max(0, profile.VideoReservedConcurrentGenerations - snapshot.ActiveVideo)
+            : 0;
+        var imagePreservesVideoGuarantee = snapshot.ActiveGlobal + 1
+            <= profile.GlobalMaxConcurrentGenerations - missingGuaranteedVideoSlots;
+        var allowImage = snapshot.ActiveImage < profile.ImageMaxConcurrentGenerations
+            && imagePreservesVideoGuarantee;
+        if (!allowImage && snapshot.QueuedVideo > 0 && !imagePreservesVideoGuarantee)
+        {
+            TemplateGenerationMetrics.RecordSchedulerNoSlotSkip("video_reserved");
+        }
+
+        var videoPreprocessingAvailable = snapshot.ActiveVideoPreprocessing
+            < profile.VideoPreprocessingMaxConcurrentGenerations;
+        var allowNativeVideo = snapshot.ActiveVideo < profile.VideoReservedConcurrentGenerations;
         string? borrowDeniedReason = null;
-        var allowBorrowedVideo = !allowNativeVideo && CanBorrowVideoCapacity(snapshot, out borrowDeniedReason);
+        var allowBorrowedVideo = !allowNativeVideo
+            && CanBorrowVideoCapacity(snapshot, profile, out borrowDeniedReason);
         borrowDeniedReason ??= string.Empty;
         if (!allowBorrowedVideo && !string.IsNullOrWhiteSpace(borrowDeniedReason))
         {
@@ -530,39 +657,53 @@ internal sealed partial class TemplateGenerationJobProcessor
         }
 
         return string.Equals(dbContext.Database.ProviderName, NpgsqlProviderName, StringComparison.Ordinal)
-            ? await TryAcquirePostgresMediaConcurrencyLeasesAsync(allowImage, allowNativeVideo, allowBorrowedVideo, cancellationToken)
-            : TryAcquireLocalMediaConcurrencyLeases(allowImage, allowNativeVideo, allowBorrowedVideo);
+            ? await TryAcquirePostgresMediaConcurrencyLeasesAsync(
+                profile,
+                allowImage,
+                allowNativeVideo,
+                allowBorrowedVideo,
+                videoPreprocessingAvailable,
+                cancellationToken)
+            : TryAcquireLocalMediaConcurrencyLeases(
+                profile,
+                allowImage,
+                allowNativeVideo,
+                allowBorrowedVideo,
+                videoPreprocessingAvailable);
     }
 
     private async Task<MediaConcurrencyLeases> TryAcquirePostgresMediaConcurrencyLeasesAsync(
+        TemplateGenerationConcurrencyProfile profile,
         bool allowImage,
         bool allowNativeVideo,
         bool allowBorrowedVideo,
+        bool allowVideoPreprocessing,
         CancellationToken cancellationToken)
     {
         var imageSlot = allowImage
             ? await TryAcquirePostgresMediaSlotAsync(
                 ImageGenerationAdvisoryLockKey,
-                Math.Max(1, options.ImageMaxConcurrentGenerations),
+                Math.Max(1, profile.ImageMaxConcurrentGenerations),
                 cancellationToken)
             : null;
         var videoSlot = allowNativeVideo
             ? await TryAcquirePostgresMediaSlotAsync(
                 VideoGenerationAdvisoryLockKey,
-                Math.Max(1, ResolveVideoReservedConcurrency()),
+                Math.Max(1, profile.VideoReservedConcurrentGenerations),
                 cancellationToken)
             : null;
         var borrowedVideoSlot = videoSlot is null && allowBorrowedVideo
             ? await TryAcquirePostgresMediaSlotAsync(
                 BorrowedVideoGenerationAdvisoryLockKey,
-                Math.Max(1, ResolveVideoBorrowMaxConcurrency()),
+                Math.Max(1, profile.VideoBorrowMaxConcurrentGenerations),
                 cancellationToken)
             : null;
 
         return new MediaConcurrencyLeases(
             new MediaConcurrencyLease(dbContext, ImageGenerationAdvisoryLockKey, imageSlot),
             new MediaConcurrencyLease(dbContext, VideoGenerationAdvisoryLockKey, videoSlot),
-            new MediaConcurrencyLease(dbContext, BorrowedVideoGenerationAdvisoryLockKey, borrowedVideoSlot));
+            new MediaConcurrencyLease(dbContext, BorrowedVideoGenerationAdvisoryLockKey, borrowedVideoSlot),
+            allowVideoPreprocessing);
     }
 
     private async Task<int?> TryAcquirePostgresMediaSlotAsync(
@@ -590,25 +731,28 @@ internal sealed partial class TemplateGenerationJobProcessor
     }
 
     private MediaConcurrencyLeases TryAcquireLocalMediaConcurrencyLeases(
+        TemplateGenerationConcurrencyProfile profile,
         bool allowImage,
         bool allowNativeVideo,
-        bool allowBorrowedVideo)
+        bool allowBorrowedVideo,
+        bool allowVideoPreprocessing)
     {
         lock (LocalConcurrencyLock)
         {
             var imageSlot = allowImage
-                ? TryAcquireLocalMediaSlot(LocalImageConcurrencySlots, Math.Max(1, options.ImageMaxConcurrentGenerations))
+                ? TryAcquireLocalMediaSlot(LocalImageConcurrencySlots, Math.Max(1, profile.ImageMaxConcurrentGenerations))
                 : null;
             var videoSlot = allowNativeVideo
-                ? TryAcquireLocalMediaSlot(LocalVideoConcurrencySlots, Math.Max(1, ResolveVideoReservedConcurrency()))
+                ? TryAcquireLocalMediaSlot(LocalVideoConcurrencySlots, Math.Max(1, profile.VideoReservedConcurrentGenerations))
                 : null;
             var borrowedVideoSlot = videoSlot is null && allowBorrowedVideo
-                ? TryAcquireLocalMediaSlot(LocalBorrowedVideoConcurrencySlots, Math.Max(1, ResolveVideoBorrowMaxConcurrency()))
+                ? TryAcquireLocalMediaSlot(LocalBorrowedVideoConcurrencySlots, Math.Max(1, profile.VideoBorrowMaxConcurrentGenerations))
                 : null;
             return new MediaConcurrencyLeases(
                 new MediaConcurrencyLease(LocalImageConcurrencySlots, imageSlot),
                 new MediaConcurrencyLease(LocalVideoConcurrencySlots, videoSlot),
-                new MediaConcurrencyLease(LocalBorrowedVideoConcurrencySlots, borrowedVideoSlot));
+                new MediaConcurrencyLease(LocalBorrowedVideoConcurrencySlots, borrowedVideoSlot),
+                allowVideoPreprocessing);
         }
     }
 
@@ -685,19 +829,51 @@ internal sealed partial class TemplateGenerationJobProcessor
 
     private async Task<SchedulerCapacitySnapshot> BuildSchedulerCapacitySnapshotAsync(CancellationToken cancellationToken)
     {
-        var activeCounts = await dbContext.TemplateGenerationJobs
-            .AsNoTracking()
-            .Where(x => TemplateGenerationJobStatusSets.Processing.Contains(x.Status))
-            .GroupBy(x => x.QueueMediaType)
-            .Select(x => new { MediaType = x.Key, Count = x.LongCount() })
-            .ToArrayAsync(cancellationToken);
-
-        var activeImage = activeCounts
-            .Where(x => TemplateGenerationQueue.NormalizeMediaType(x.MediaType) == TemplateGenerationQueue.MediaTypeImage)
-            .Sum(x => x.Count);
-        var activeVideo = activeCounts
-            .Where(x => TemplateGenerationQueue.NormalizeMediaType(x.MediaType) == TemplateGenerationQueue.MediaTypeVideo)
-            .Sum(x => x.Count);
+        long activeImage;
+        long activeVideo;
+        long activeVideoPreprocessing;
+        if (providerAttemptStore is not null)
+        {
+            var activeAttempts = dbContext.TemplateGenerationProviderAttempts
+                .AsNoTracking()
+                .Where(x => x.State == TemplateGenerationProviderAttemptState.SubmitReserved
+                    || x.State == TemplateGenerationProviderAttemptState.Submitting
+                    || x.State == TemplateGenerationProviderAttemptState.ProviderQueued
+                    || x.State == TemplateGenerationProviderAttemptState.ProviderProcessing
+                    || x.State == TemplateGenerationProviderAttemptState.SubmissionUnknown);
+            activeImage = await activeAttempts.LongCountAsync(
+                x => x.Stage == TemplateGenerationProviderAttemptStage.ImageGeneration,
+                cancellationToken);
+            activeVideo = await activeAttempts.LongCountAsync(
+                x => x.Stage != TemplateGenerationProviderAttemptStage.ImageGeneration,
+                cancellationToken);
+            activeVideoPreprocessing = await activeAttempts.LongCountAsync(
+                x => x.Stage == TemplateGenerationProviderAttemptStage.VideoPreprocessing,
+                cancellationToken);
+        }
+        else
+        {
+            var activeCounts = await dbContext.TemplateGenerationJobs
+                .AsNoTracking()
+                .Where(x => TemplateGenerationJobStatusSets.Processing.Contains(x.Status))
+                .GroupBy(x => x.QueueMediaType)
+                .Select(x => new { MediaType = x.Key, Count = x.LongCount() })
+                .ToArrayAsync(cancellationToken);
+            activeImage = activeCounts
+                .Where(x => TemplateGenerationQueue.NormalizeMediaType(x.MediaType) == TemplateGenerationQueue.MediaTypeImage)
+                .Sum(x => x.Count);
+            activeVideo = activeCounts
+                .Where(x => TemplateGenerationQueue.NormalizeMediaType(x.MediaType) == TemplateGenerationQueue.MediaTypeVideo)
+                .Sum(x => x.Count);
+            activeVideoPreprocessing = await dbContext.TemplateGenerationJobs
+                .AsNoTracking()
+                .LongCountAsync(x => (x.Status == TemplateGenerationStatus.SubmittingToProvider
+                        || x.Status == TemplateGenerationStatus.ProviderQueued
+                        || x.Status == TemplateGenerationStatus.ProviderProcessing)
+                    && x.CurrentProviderStage == ProviderStageVideoPreprocessing
+                    && x.ProviderCompletedAtUtc == null,
+                    cancellationToken);
+        }
         var queuedImage = await dbContext.TemplateGenerationJobs
             .AsNoTracking()
             .LongCountAsync(x => x.Status == TemplateGenerationStatus.Queued
@@ -705,10 +881,25 @@ internal sealed partial class TemplateGenerationJobProcessor
                 && x.QueueMediaType == TemplateGenerationQueue.MediaTypeImage,
                 cancellationToken);
 
-        return new SchedulerCapacitySnapshot(activeImage, activeVideo, queuedImage);
+        var queuedVideo = await dbContext.TemplateGenerationJobs
+            .AsNoTracking()
+            .LongCountAsync(x => x.Status == TemplateGenerationStatus.Queued
+                && (x.ChargedAtUtc != null || x.UserId == TemplateGenerationService.AdminTestUserId)
+                && x.QueueMediaType == TemplateGenerationQueue.MediaTypeVideo,
+                cancellationToken);
+
+        return new SchedulerCapacitySnapshot(
+            activeImage,
+            activeVideo,
+            queuedImage,
+            queuedVideo,
+            activeVideoPreprocessing);
     }
 
-    private bool CanBorrowVideoCapacity(SchedulerCapacitySnapshot snapshot, out string? deniedReason)
+    private bool CanBorrowVideoCapacity(
+        SchedulerCapacitySnapshot snapshot,
+        TemplateGenerationConcurrencyProfile profile,
+        out string? deniedReason)
     {
         deniedReason = null;
         if (!options.EnableElasticLaneBorrowing)
@@ -716,20 +907,20 @@ internal sealed partial class TemplateGenerationJobProcessor
             return false;
         }
 
-        if (snapshot.ActiveVideo >= options.VideoMaxConcurrentGenerations)
+        if (snapshot.ActiveVideo >= profile.VideoMaxConcurrentGenerations)
         {
             deniedReason = "video_max";
             return false;
         }
 
-        var borrowedVideo = Math.Max(0, snapshot.ActiveVideo - ResolveVideoReservedConcurrency());
-        if (borrowedVideo >= ResolveVideoBorrowMaxConcurrency())
+        var borrowedVideo = Math.Max(0, snapshot.ActiveVideo - profile.VideoReservedConcurrentGenerations);
+        if (borrowedVideo >= profile.VideoBorrowMaxConcurrentGenerations)
         {
             deniedReason = "borrow_max";
             return false;
         }
 
-        if (snapshot.ActiveImage + ResolveImageProtectedConcurrency() > options.ImageMaxConcurrentGenerations)
+        if (snapshot.ActiveImage + profile.ImageProtectedConcurrentGenerations > profile.ImageMaxConcurrentGenerations)
         {
             deniedReason = "image_protected";
             return false;
@@ -746,7 +937,7 @@ internal sealed partial class TemplateGenerationJobProcessor
             return false;
         }
 
-        var imageEstimatedWaitSeconds = EstimateImageWaitSeconds(snapshot);
+        var imageEstimatedWaitSeconds = EstimateImageWaitSeconds(snapshot, profile);
         if (imageEstimatedWaitSeconds <= options.AllowVideoBorrowWhenImageEstimatedWaitBelowSeconds)
         {
             return true;
@@ -756,37 +947,13 @@ internal sealed partial class TemplateGenerationJobProcessor
         return false;
     }
 
-    private int EstimateImageWaitSeconds(SchedulerCapacitySnapshot snapshot)
+    private int EstimateImageWaitSeconds(
+        SchedulerCapacitySnapshot snapshot,
+        TemplateGenerationConcurrencyProfile profile)
     {
-        var protectedSlots = Math.Max(1, ResolveImageProtectedConcurrency());
+        var protectedSlots = Math.Max(1, profile.ImageProtectedConcurrentGenerations);
         var backlogUnits = Math.Max(0, snapshot.ActiveImage + snapshot.QueuedImage - protectedSlots);
         return (int)Math.Ceiling(backlogUnits * Math.Max(1, options.EstimatedImageGenerationSeconds) / (double)protectedSlots);
-    }
-
-    private int ResolveImageProtectedConcurrency()
-    {
-        return options.ImageProtectedConcurrentGenerations > 0
-            ? options.ImageProtectedConcurrentGenerations
-            : ResolveImageReservedConcurrency();
-    }
-
-    private int ResolveImageReservedConcurrency()
-    {
-        return options.ImageReservedConcurrentGenerations > 0
-            ? options.ImageReservedConcurrentGenerations
-            : options.ImageMaxConcurrentGenerations;
-    }
-
-    private int ResolveVideoReservedConcurrency()
-    {
-        return options.VideoReservedConcurrentGenerations > 0
-            ? options.VideoReservedConcurrentGenerations
-            : options.VideoMaxConcurrentGenerations;
-    }
-
-    private int ResolveVideoBorrowMaxConcurrency()
-    {
-        return Math.Max(0, options.VideoBorrowMaxConcurrentGenerations);
     }
 
     private bool IsBorrowingTierAllowed(string queueTier)
@@ -801,17 +968,24 @@ internal sealed partial class TemplateGenerationJobProcessor
     private readonly record struct SchedulerCapacitySnapshot(
         long ActiveImage,
         long ActiveVideo,
-        long QueuedImage)
+        long QueuedImage,
+        long QueuedVideo,
+        long ActiveVideoPreprocessing)
     {
         public long ActiveGlobal => ActiveImage + ActiveVideo;
     }
 
-    private sealed class MediaConcurrencyLeases(MediaConcurrencyLease image, MediaConcurrencyLease video, MediaConcurrencyLease borrowedVideo) : IAsyncDisposable
+    private sealed class MediaConcurrencyLeases(
+        MediaConcurrencyLease image,
+        MediaConcurrencyLease video,
+        MediaConcurrencyLease borrowedVideo,
+        bool allowVideoPreprocessing) : IAsyncDisposable
     {
         public static readonly MediaConcurrencyLeases Empty = new(
             MediaConcurrencyLease.Empty,
             MediaConcurrencyLease.Empty,
-            MediaConcurrencyLease.Empty);
+            MediaConcurrencyLease.Empty,
+            allowVideoPreprocessing: false);
 
         private bool disposed;
 
@@ -820,6 +994,8 @@ internal sealed partial class TemplateGenerationJobProcessor
         public bool AllowNativeVideo => video.HasSlot;
 
         public bool AllowBorrowedVideo => borrowedVideo.HasSlot;
+
+        public bool AllowVideoPreprocessing => allowVideoPreprocessing;
 
         public bool AllowVideo => video.HasSlot || borrowedVideo.HasSlot;
 

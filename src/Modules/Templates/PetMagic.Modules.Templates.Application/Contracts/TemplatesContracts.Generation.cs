@@ -347,7 +347,8 @@ public sealed record FalProviderWebhookCommand(
     string Status,
     JsonElement Payload,
     string? Error,
-    DateTime ReceivedAtUtc);
+    DateTime ReceivedAtUtc,
+    string? CallbackToken = null);
 
 public sealed record FalProviderWebhookResponse(
     string RequestId,

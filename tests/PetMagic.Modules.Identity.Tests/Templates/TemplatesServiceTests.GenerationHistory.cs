@@ -751,11 +751,11 @@ public sealed partial class TemplatesServiceTests
 
         var firstQueued = Assert.Single(history.Value, x => x.GenerationId == firstQueuedJobId);
         Assert.Equal(2, firstQueued.QueuePosition);
-        Assert.Equal(40, firstQueued.EstimatedWaitSeconds);
+        Assert.Equal(60, firstQueued.EstimatedWaitSeconds);
 
         var secondQueued = Assert.Single(history.Value, x => x.GenerationId == secondQueuedJobId);
         Assert.Equal(3, secondQueued.QueuePosition);
-        Assert.Equal(60, secondQueued.EstimatedWaitSeconds);
+        Assert.Equal(90, secondQueued.EstimatedWaitSeconds);
 
         var processing = Assert.Single(history.Value, x => x.GenerationId == processingJobId);
         Assert.Null(processing.QueuePosition);
@@ -831,9 +831,9 @@ public sealed partial class TemplatesServiceTests
         Assert.True(firstQueued.IsSuccess);
         Assert.True(secondQueued.IsSuccess);
         Assert.Equal(2, firstQueued.Value.QueuePosition);
-        Assert.Equal(20, firstQueued.Value.EstimatedWaitSeconds);
+        Assert.Equal(30, firstQueued.Value.EstimatedWaitSeconds);
         Assert.Equal(3, secondQueued.Value.QueuePosition);
-        Assert.Equal(40, secondQueued.Value.EstimatedWaitSeconds);
+        Assert.Equal(60, secondQueued.Value.EstimatedWaitSeconds);
     }
 
     [Fact]

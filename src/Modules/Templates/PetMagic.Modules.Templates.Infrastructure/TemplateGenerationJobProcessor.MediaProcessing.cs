@@ -468,25 +468,18 @@ internal sealed partial class TemplateGenerationJobProcessor
         return null;
     }
 
-    private async Task RegisterGenerationOutputMediaRecordAsync(
+    private async Task<TemplateMediaRecord> RegisterGenerationOutputMediaRecordAsync(
         TemplateGenerationJob job,
         StoredMediaResponse storedOutput,
         TemplateType mediaType,
         StoredMediaResponse? preview,
-        StoredMediaResponse? watermarkedPreview)
+        StoredMediaResponse? watermarkedPreview,
+        CancellationToken cancellationToken = default,
+        bool attachAsCompletedResult = true)
     {
         var now = DateTime.UtcNow;
         var mediaTypeText = mediaType.ToString().ToLowerInvariant();
-        var existing = job.MediaRecords.FirstOrDefault(x =>
-            x.GenerationId == job.Id
-            && x.SourceType == "generation_result"
-            && x.MediaType == mediaTypeText);
-
-        existing ??= await dbContext.TemplateMediaRecords
-            .FirstOrDefaultAsync(x =>
-                x.GenerationId == job.Id
-                && x.SourceType == "generation_result"
-                && x.MediaType == mediaTypeText);
+        var existing = await FindGenerationOutputMediaRecordAsync(job, mediaType, cancellationToken);
 
         if (existing is null)
         {
@@ -505,9 +498,9 @@ internal sealed partial class TemplateGenerationJobProcessor
         existing.UserId = job.UserId;
         existing.MediaType = mediaTypeText;
         existing.StoragePath = storedOutput.StorageKey;
-        existing.WatermarkedStoragePath = job.WatermarkedResultUrl;
-        existing.PreviewUrl = preview?.StorageKey;
-        existing.WatermarkedPreviewUrl = watermarkedPreview?.StorageKey;
+        existing.WatermarkedStoragePath = job.WatermarkedResultUrl ?? existing.WatermarkedStoragePath;
+        existing.PreviewUrl = preview?.StorageKey ?? existing.PreviewUrl;
+        existing.WatermarkedPreviewUrl = watermarkedPreview?.StorageKey ?? existing.WatermarkedPreviewUrl;
         existing.SourceType = "generation_result";
         existing.GenerationId = job.Id;
         existing.Url = storedOutput.Url;
@@ -525,7 +518,98 @@ internal sealed partial class TemplateGenerationJobProcessor
         existing.IsDeleted = false;
         existing.FailureCode = null;
         existing.FailureMessage = null;
-        job.ResultMediaAssetId = existing.Id;
+        if (attachAsCompletedResult)
+        {
+            job.ResultMediaAssetId = existing.Id;
+        }
+
+        return existing;
+    }
+
+    private async Task<TemplateMediaRecord?> FindGenerationOutputMediaRecordAsync(
+        TemplateGenerationJob job,
+        TemplateType mediaType,
+        CancellationToken cancellationToken)
+    {
+        var mediaTypeText = mediaType.ToString().ToLowerInvariant();
+        var existing = job.MediaRecords.FirstOrDefault(x =>
+            x.GenerationId == job.Id
+            && x.SourceType == "generation_result"
+            && x.MediaType == mediaTypeText);
+
+        return existing ?? await dbContext.TemplateMediaRecords
+            .FirstOrDefaultAsync(
+                x => x.GenerationId == job.Id
+                    && x.SourceType == "generation_result"
+                    && x.MediaType == mediaTypeText,
+                cancellationToken);
+    }
+
+    private static StoredMediaResponse? RestoreOriginalMediaCheckpoint(TemplateMediaRecord? mediaRecord)
+    {
+        if (mediaRecord is null
+            || string.IsNullOrWhiteSpace(mediaRecord.StoragePath)
+            || string.IsNullOrWhiteSpace(mediaRecord.FileName)
+            || string.IsNullOrWhiteSpace(mediaRecord.ContentType))
+        {
+            return null;
+        }
+
+        return new StoredMediaResponse(
+            string.IsNullOrWhiteSpace(mediaRecord.Url) ? mediaRecord.StoragePath : mediaRecord.Url,
+            mediaRecord.StoragePath,
+            mediaRecord.FileName,
+            mediaRecord.ContentType,
+            mediaRecord.FileSizeBytes,
+            LocalPath: null);
+    }
+
+    private static StoredMediaResponse? RestoreWatermarkedMediaCheckpoint(
+        TemplateMediaRecord? mediaRecord,
+        StoredMediaResponse original)
+    {
+        if (string.IsNullOrWhiteSpace(mediaRecord?.WatermarkedStoragePath))
+        {
+            return null;
+        }
+
+        var storagePath = mediaRecord.WatermarkedStoragePath;
+        return new StoredMediaResponse(
+            storagePath,
+            storagePath,
+            ResolveCheckpointFileName(storagePath, original.FileName),
+            original.ContentType,
+            FileSizeBytes: null,
+            LocalPath: null);
+    }
+
+    private static StoredMediaResponse? RestorePreviewMediaCheckpoint(
+        string? storagePath,
+        string fallbackFileName)
+    {
+        if (string.IsNullOrWhiteSpace(storagePath))
+        {
+            return null;
+        }
+
+        var extension = Path.GetExtension(storagePath);
+        var contentType = string.Equals(extension, ".jpg", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(extension, ".jpeg", StringComparison.OrdinalIgnoreCase)
+            ? "image/jpeg"
+            : "image/webp";
+        return new StoredMediaResponse(
+            storagePath,
+            storagePath,
+            ResolveCheckpointFileName(storagePath, fallbackFileName),
+            contentType,
+            FileSizeBytes: null,
+            LocalPath: null);
+    }
+
+    private static string ResolveCheckpointFileName(string storagePath, string fallback)
+    {
+        var fileName = Path.GetFileName(storagePath);
+        return string.IsNullOrWhiteSpace(fileName) ? fallback : fileName;
     }
 
     private static string BuildGenerationPreviewStorageKey(Guid userId, Guid generationId, string fileName, string extension = "webp")

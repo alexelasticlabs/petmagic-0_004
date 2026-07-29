@@ -3,8 +3,8 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 
-using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.Extensions.Logging;
 
 using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
@@ -28,6 +28,14 @@ internal sealed class FalQueueClient(
         string model,
         object input,
         FalQueueStageKind stageKind,
+        CancellationToken cancellationToken) =>
+        await SubmitAsync(model, input, stageKind, callbackToken: null, cancellationToken);
+
+    public async Task<Result<FalQueueSubmitResult>> SubmitAsync(
+        string model,
+        object input,
+        FalQueueStageKind stageKind,
+        string? callbackToken,
         CancellationToken cancellationToken)
     {
         if (!options.Fal.IsConfigured)
@@ -35,10 +43,11 @@ internal sealed class FalQueueClient(
             return ProviderFailure<FalQueueSubmitResult>("configuration", model, TemplatesErrors.AiProviderUnavailable);
         }
 
+        var requestMayHaveBeenDispatched = false;
         try
         {
             var queueBaseUri = BuildQueueBaseUri();
-            var submitUri = BuildSubmitUri(model);
+            var submitUri = BuildSubmitUri(model, callbackToken);
             if (submitUri is null)
             {
                 logger.LogWarning(
@@ -60,6 +69,7 @@ internal sealed class FalQueueClient(
             submitRequest.Content = new StringContent(JsonSerializer.Serialize(input, JsonOptions), Encoding.UTF8, "application/json");
 
             await rateLimiter.WaitForPermitAsync("fal", cancellationToken);
+            requestMayHaveBeenDispatched = true;
             using var submitResponse = await CreateClient().SendAsync(
                 submitRequest,
                 HttpCompletionOption.ResponseHeadersRead,
@@ -78,7 +88,9 @@ internal sealed class FalQueueClient(
                 return ProviderFailure<FalQueueSubmitResult>(
                     "submit",
                     model,
-                    IsTransientStatusCode(submitResponse.StatusCode)
+                    submitResponse.StatusCode == System.Net.HttpStatusCode.TooManyRequests
+                        ? TemplatesErrors.AiProviderRateLimited
+                        : IsTransientStatusCode(submitResponse.StatusCode)
                         ? TemplatesErrors.AiProviderTransientFailure
                         : TemplatesErrors.AiProviderFailed);
             }
@@ -119,7 +131,7 @@ internal sealed class FalQueueClient(
                     model,
                     SafeLogValues.StableHash(requestId),
                     SafeLogValues.SanitizeText(queueBaseUri.ToString()));
-                return ProviderFailure<FalQueueSubmitResult>("submit.parse", model, TemplatesErrors.AiProviderFailed);
+                return ProviderFailure<FalQueueSubmitResult>("submit.parse", model, TemplatesErrors.AiProviderSubmissionUnknown);
             }
 
             return Result.Success(new FalQueueSubmitResult(requestId, statusUrl, responseUrl, cancelUrl));
@@ -140,10 +152,20 @@ internal sealed class FalQueueClient(
             TemplateGenerationMetrics.RecordFalProviderSubmitFailure(stageKind.Stage, model, "network");
             return ProviderFailure<FalQueueSubmitResult>("request.network", model, TemplatesErrors.AiProviderTransientFailure);
         }
+        catch (JsonException)
+        {
+            TemplateGenerationMetrics.RecordFalProviderSubmitFailure(stageKind.Stage, model, "response.parse");
+            return ProviderFailure<FalQueueSubmitResult>("submit.parse", model, TemplatesErrors.AiProviderSubmissionUnknown);
+        }
         catch
         {
             TemplateGenerationMetrics.RecordFalProviderSubmitFailure(stageKind.Stage, model, "exception");
-            return ProviderFailure<FalQueueSubmitResult>("request.exception", model, TemplatesErrors.AiProviderFailed);
+            return ProviderFailure<FalQueueSubmitResult>(
+                "request.exception",
+                model,
+                requestMayHaveBeenDispatched
+                    ? TemplatesErrors.AiProviderSubmissionUnknown
+                    : TemplatesErrors.AiProviderFailed);
         }
     }
 
@@ -327,6 +349,57 @@ internal sealed class FalQueueClient(
             "cancel");
     }
 
+    public Uri? ResolveStatusUri(string model, string requestId, string? statusUrl)
+    {
+        return ResolveQueueCallbackUri(
+            statusUrl,
+            BuildQueueBaseUri(),
+            model,
+            requestId,
+            "status");
+    }
+
+    internal static ProviderQueueSubmission? ValidateProviderSubmissionCorrelation(
+        FalAiOptions falOptions,
+        string model,
+        string requestId,
+        string? statusUrl,
+        string? responseUrl,
+        string? cancelUrl)
+    {
+        if (string.IsNullOrWhiteSpace(falOptions.QueueBaseUrl)
+            || !Uri.TryCreate(falOptions.QueueBaseUrl.TrimEnd('/') + "/", UriKind.Absolute, out var queueBaseUri))
+        {
+            return null;
+        }
+
+        var validatedStatus = ResolveQueueCallbackUri(
+            statusUrl,
+            queueBaseUri,
+            model,
+            requestId,
+            "status");
+        var validatedResponse = ResolveQueueCallbackUri(
+            responseUrl,
+            queueBaseUri,
+            model,
+            requestId,
+            "response");
+        var validatedCancel = ResolveQueueCallbackUri(
+            cancelUrl,
+            queueBaseUri,
+            model,
+            requestId,
+            "cancel");
+        return validatedStatus is null || validatedResponse is null || validatedCancel is null
+            ? null
+            : new ProviderQueueSubmission(
+                requestId,
+                validatedStatus.ToString(),
+                validatedResponse.ToString(),
+                validatedCancel.ToString());
+    }
+
     public async Task<Result<FalQueueRunResult>> RunAsync(
         string model,
         object input,
@@ -419,7 +492,9 @@ internal sealed class FalQueueClient(
                 return ProviderFailure<JsonDocument>(
                     "status",
                     model,
-                    IsTransientStatusCode(response.StatusCode)
+                    response.StatusCode == System.Net.HttpStatusCode.NotFound
+                        ? TemplatesErrors.AiProviderRequestNotFound
+                        : IsTransientStatusCode(response.StatusCode)
                         ? TemplatesErrors.AiProviderTransientFailure
                         : TemplatesErrors.AiProviderFailed);
             }
@@ -555,7 +630,7 @@ internal sealed class FalQueueClient(
                 : null;
     }
 
-    private Uri? BuildSubmitUri(string model)
+    private Uri? BuildSubmitUri(string model, string? callbackToken = null)
     {
         var modelUri = BuildModelUri(model);
         if (modelUri is null)
@@ -566,6 +641,20 @@ internal sealed class FalQueueClient(
         if (!Uri.TryCreate(options.Fal.WebhookUrl, UriKind.Absolute, out var webhookUri))
         {
             return modelUri;
+        }
+
+        if (!string.IsNullOrWhiteSpace(callbackToken))
+        {
+            var normalizedToken = callbackToken.Trim();
+            if (normalizedToken.Length != 64 || normalizedToken.Any(character => !Uri.IsHexDigit(character)))
+            {
+                return null;
+            }
+
+            webhookUri = new Uri(QueryHelpers.AddQueryString(
+                webhookUri.ToString(),
+                "attempt_token",
+                normalizedToken));
         }
 
         var submitUrl = QueryHelpers.AddQueryString(modelUri.ToString(), "fal_webhook", webhookUri.ToString());

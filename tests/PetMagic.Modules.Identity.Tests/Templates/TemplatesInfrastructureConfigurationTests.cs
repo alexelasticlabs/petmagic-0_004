@@ -27,6 +27,7 @@ public sealed class TemplatesInfrastructureConfigurationTests
         var imagePreprocessor = provider.GetRequiredService<IImagePreprocessor>();
         var videoMotionGenerator = provider.GetRequiredService<IVideoMotionGenerator>();
         var generatedMediaImporter = provider.GetRequiredService<IGeneratedMediaImporter>();
+        var callbackService = provider.GetRequiredService<ITemplateGenerationProviderCallbackService>();
         var hostedServices = provider.GetServices<IHostedService>();
 
         Assert.Equal(TemplateStorageProviders.Local, options.StorageProvider);
@@ -35,12 +36,16 @@ public sealed class TemplatesInfrastructureConfigurationTests
         Assert.False(options.SeedSampleTemplates);
         Assert.False(options.LocalizationBackfillEnabled);
         Assert.True(options.GenerationWorkerEnabled);
+        Assert.False(options.GenerationSchedulerV2Enabled);
         Assert.Equal(1_000, options.GenerationWorkerPollIntervalMilliseconds);
         Assert.Equal(1_000, options.RealtimePollingIntervalMilliseconds);
         Assert.Equal(60, options.RealtimeEventRetentionMinutes);
         Assert.Equal(10, options.RealtimeEventCleanupIntervalMinutes);
         Assert.Equal(1_000, options.RealtimeEventCleanupBatchSize);
-        Assert.Equal(1, options.MaxConcurrentJobsPerWorker);
+        Assert.Equal(4, options.GenerationDispatchConcurrency);
+        Assert.Equal(4, options.ProviderReconciliationConcurrency);
+        Assert.Equal(1, options.MediaImportConcurrency);
+        Assert.Equal(1, options.GenerationMaintenanceConcurrency);
         Assert.Equal(3, options.GlobalMaxConcurrentGenerations);
         Assert.Equal(0, options.ImageReservedConcurrentGenerations);
         Assert.Equal(2, options.ImageMaxConcurrentGenerations);
@@ -56,11 +61,12 @@ public sealed class TemplatesInfrastructureConfigurationTests
         Assert.Equal(1, options.VideoPreprocessingMaxConcurrentGenerations);
         Assert.Equal(0, options.FalProviderConcurrencyLimit);
         Assert.Equal(1, options.FalProviderReservedConcurrency);
-        Assert.Equal(100m, options.FalProviderBalanceLowThresholdUsd);
-        Assert.Equal(25m, options.FalProviderBalanceCriticalThresholdUsd);
+        Assert.Equal(10m, options.FalProviderBalanceLowThresholdUsd);
+        Assert.Equal(5m, options.FalProviderBalanceCriticalThresholdUsd);
         Assert.Equal(0m, options.FalProviderSpendDailyLimitUsd);
         Assert.Equal(60, options.MaxAiProviderRequestsPerMinute);
         Assert.Equal(900_000, options.JobLockTimeoutMilliseconds);
+        Assert.Equal(90_000, options.ProviderReconciliationClaimLeaseMilliseconds);
         Assert.Equal(1_000, options.QueueMaxSize);
         Assert.Equal(420, options.EstimatedVideoGenerationSeconds);
         Assert.Equal(90, options.EstimatedImageGenerationSeconds);
@@ -82,6 +88,8 @@ public sealed class TemplatesInfrastructureConfigurationTests
         Assert.Equal(900_000, options.StaleProcessingRecoveryDelayMilliseconds);
         Assert.Equal(120_000, options.OrphanQueuedJobTimeoutMilliseconds);
         Assert.Equal(3, options.MaxGenerationAttempts);
+        Assert.Equal(5, options.MediaImportMaxAttempts);
+        Assert.Equal(30, options.MediaImportRetryBaseDelaySeconds);
         Assert.Equal(5, options.MaxRefundAttempts);
         Assert.Equal(30_000, options.RefundRetryDelayMilliseconds);
         Assert.Equal(7, options.GenerationRetentionDaysAfterCompletion);
@@ -96,6 +104,8 @@ public sealed class TemplatesInfrastructureConfigurationTests
         Assert.Equal("FakeImagePreprocessor", imagePreprocessor.GetType().Name);
         Assert.Equal("FakeVideoMotionGenerator", videoMotionGenerator.GetType().Name);
         Assert.Equal("FakeGeneratedMediaImporter", generatedMediaImporter.GetType().Name);
+        Assert.NotNull(callbackService);
+        Assert.Null(provider.GetService<ITemplateGenerationProviderAttemptStore>());
         Assert.Contains(hostedServices, service => service.GetType().Name == "TemplateGenerationWorker");
         Assert.Contains(hostedServices, service => service.GetType().Name == "TemplateMediaCleanupWorker");
     }
@@ -171,11 +181,15 @@ public sealed class TemplatesInfrastructureConfigurationTests
             ["Templates:Fal:ImagePreprocessingMaxPollingAttempts"] = "100",
             ["Templates:Fal:VideoMaxPollingAttempts"] = "360",
             ["Templates:GenerationWorkerPollIntervalMilliseconds"] = "250",
+            ["Templates:GenerationSchedulerV2Enabled"] = "true",
             ["Templates:RealtimePollingIntervalMilliseconds"] = "500",
             ["Templates:RealtimeEventRetentionMinutes"] = "30",
             ["Templates:RealtimeEventCleanupIntervalMinutes"] = "5",
             ["Templates:RealtimeEventCleanupBatchSize"] = "250",
-            ["Templates:MaxConcurrentJobsPerWorker"] = "2",
+            ["Templates:GenerationDispatchConcurrency"] = "8",
+            ["Templates:ProviderReconciliationConcurrency"] = "7",
+            ["Templates:MediaImportConcurrency"] = "2",
+            ["Templates:GenerationMaintenanceConcurrency"] = "3",
             ["Templates:GlobalMaxConcurrentGenerations"] = "5",
             ["Templates:ImageReservedConcurrentGenerations"] = "3",
             ["Templates:ImageMaxConcurrentGenerations"] = "4",
@@ -197,6 +211,7 @@ public sealed class TemplatesInfrastructureConfigurationTests
             ["Templates:FalProviderSpendDailyLimitUsd"] = "300.75",
             ["Templates:MaxAiProviderRequestsPerMinute"] = "12",
             ["Templates:JobLockTimeoutMilliseconds"] = "450000",
+            ["Templates:ProviderReconciliationClaimLeaseMilliseconds"] = "75000",
             ["Templates:QueueMaxSize"] = "25",
             ["Templates:EstimatedVideoGenerationSeconds"] = "180",
             ["Templates:EstimatedImageGenerationSeconds"] = "45",
@@ -217,6 +232,8 @@ public sealed class TemplatesInfrastructureConfigurationTests
             ["Templates:StaleProcessingRecoveryDelayMilliseconds"] = "600000",
             ["Templates:OrphanQueuedJobTimeoutMilliseconds"] = "45000",
             ["Templates:MaxGenerationAttempts"] = "4",
+            ["Templates:MediaImportMaxAttempts"] = "7",
+            ["Templates:MediaImportRetryBaseDelaySeconds"] = "11",
             ["Templates:MaxRefundAttempts"] = "6",
             ["Templates:RefundRetryDelayMilliseconds"] = "125",
             ["Templates:GenerationRetentionDaysAfterCompletion"] = "14",
@@ -238,6 +255,7 @@ public sealed class TemplatesInfrastructureConfigurationTests
         var imagePreprocessor = provider.GetRequiredService<IImagePreprocessor>();
         var videoMotionGenerator = provider.GetRequiredService<IVideoMotionGenerator>();
         var generatedMediaImporter = provider.GetRequiredService<IGeneratedMediaImporter>();
+        var providerAttemptStore = provider.GetRequiredService<ITemplateGenerationProviderAttemptStore>();
         var hostedServices = provider.GetServices<IHostedService>();
 
         Assert.Equal(TemplateStorageProviders.R2, options.StorageProvider);
@@ -248,11 +266,15 @@ public sealed class TemplatesInfrastructureConfigurationTests
         Assert.Equal(100, options.Fal.ImagePreprocessingMaxPollingAttempts);
         Assert.Equal(360, options.Fal.VideoMaxPollingAttempts);
         Assert.Equal(250, options.GenerationWorkerPollIntervalMilliseconds);
+        Assert.True(options.GenerationSchedulerV2Enabled);
         Assert.Equal(500, options.RealtimePollingIntervalMilliseconds);
         Assert.Equal(30, options.RealtimeEventRetentionMinutes);
         Assert.Equal(5, options.RealtimeEventCleanupIntervalMinutes);
         Assert.Equal(250, options.RealtimeEventCleanupBatchSize);
-        Assert.Equal(2, options.MaxConcurrentJobsPerWorker);
+        Assert.Equal(8, options.GenerationDispatchConcurrency);
+        Assert.Equal(7, options.ProviderReconciliationConcurrency);
+        Assert.Equal(2, options.MediaImportConcurrency);
+        Assert.Equal(3, options.GenerationMaintenanceConcurrency);
         Assert.Equal(5, options.GlobalMaxConcurrentGenerations);
         Assert.Equal(3, options.ImageReservedConcurrentGenerations);
         Assert.Equal(4, options.ImageMaxConcurrentGenerations);
@@ -274,6 +296,7 @@ public sealed class TemplatesInfrastructureConfigurationTests
         Assert.Equal(300.75m, options.FalProviderSpendDailyLimitUsd);
         Assert.Equal(12, options.MaxAiProviderRequestsPerMinute);
         Assert.Equal(450_000, options.JobLockTimeoutMilliseconds);
+        Assert.Equal(75_000, options.ProviderReconciliationClaimLeaseMilliseconds);
         Assert.Equal(25, options.QueueMaxSize);
         Assert.Equal(180, options.EstimatedVideoGenerationSeconds);
         Assert.Equal(45, options.EstimatedImageGenerationSeconds);
@@ -294,6 +317,8 @@ public sealed class TemplatesInfrastructureConfigurationTests
         Assert.Equal(600_000, options.StaleProcessingRecoveryDelayMilliseconds);
         Assert.Equal(45_000, options.OrphanQueuedJobTimeoutMilliseconds);
         Assert.Equal(4, options.MaxGenerationAttempts);
+        Assert.Equal(7, options.MediaImportMaxAttempts);
+        Assert.Equal(11, options.MediaImportRetryBaseDelaySeconds);
         Assert.Equal(6, options.MaxRefundAttempts);
         Assert.Equal(125, options.RefundRetryDelayMilliseconds);
         Assert.Equal(14, options.GenerationRetentionDaysAfterCompletion);
@@ -308,6 +333,7 @@ public sealed class TemplatesInfrastructureConfigurationTests
         Assert.Equal("FalImagePreprocessor", imagePreprocessor.GetType().Name);
         Assert.Equal("FalVideoMotionGenerator", videoMotionGenerator.GetType().Name);
         Assert.Equal("HttpGeneratedMediaImporter", generatedMediaImporter.GetType().Name);
+        Assert.NotNull(providerAttemptStore);
         Assert.Contains(hostedServices, service => service.GetType().Name == "TemplateGenerationWorker");
         Assert.DoesNotContain(hostedServices, service => service.GetType().Name == "TemplateMediaCleanupWorker");
     }
@@ -337,7 +363,7 @@ public sealed class TemplatesInfrastructureConfigurationTests
         Assert.Equal(TimeSpan.FromSeconds(30), httpClientFactory.CreateClient(TemplateLocalizationTranslator.HttpClientName).Timeout);
         Assert.Equal(TimeSpan.FromSeconds(150), httpClientFactory.CreateClient(FalQueueClient.HttpClientName).Timeout);
         Assert.Equal(TimeSpan.FromSeconds(30), httpClientFactory.CreateClient(HttpGeneratedMediaImporter.HttpClientName).Timeout);
-        Assert.Equal(TimeSpan.FromSeconds(30), httpClientFactory.CreateClient(FalProviderHealthService.HttpClientName).Timeout);
+        Assert.Equal(TimeSpan.FromSeconds(15), httpClientFactory.CreateClient(FalProviderRuntimeSnapshotService.HttpClientName).Timeout);
         Assert.Equal(TimeSpan.FromSeconds(5), httpClientFactory.CreateClient(TemplateContentHealthCheck.HttpClientName).Timeout);
     }
 
@@ -372,13 +398,21 @@ public sealed class TemplatesInfrastructureConfigurationTests
             "Templates",
             "PetMagic.Modules.Templates.Infrastructure",
             "GeneratedMediaHttpMessageHandler.cs"));
+        var generationControlRegistrationsSource = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Infrastructure",
+            "TemplateGenerationControlServiceCollectionExtensions.cs"));
 
         Assert.Contains("TemplateContentHealthCheck.HttpClientName", source, StringComparison.Ordinal);
         Assert.Contains("HttpGeneratedMediaImporter.HttpClientName", source, StringComparison.Ordinal);
         Assert.Contains(".ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler", source, StringComparison.Ordinal);
         Assert.Contains("ConfigurePrimaryHttpMessageHandler(GeneratedMediaHttpMessageHandler.Create)", source, StringComparison.Ordinal);
         Assert.True(
-            (source + generatedMediaHandlerSource).Split("AllowAutoRedirect = false", StringSplitOptions.None).Length >= 7,
+            (source + generatedMediaHandlerSource + generationControlRegistrationsSource)
+                .Split("AllowAutoRedirect = false", StringSplitOptions.None).Length >= 7,
             "Template media, FCM, Fal, and localization HTTP clients must disable automatic redirects.");
     }
 
@@ -421,7 +455,7 @@ public sealed class TemplatesInfrastructureConfigurationTests
         foreach (var relativePath in new[]
         {
             Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Api", "FalWebhookSignatureVerifier.cs"),
-            Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "FalProviderHealthService.cs"),
+            Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "FalProviderRuntimeSnapshotService.cs"),
             Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "TemplateFeedRealtimeService.cs"),
             Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "TemplateGenerationJobProcessor.ProviderPipeline.cs"),
             Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "TemplateMediaCleanupWorker.cs")
@@ -462,7 +496,7 @@ public sealed class TemplatesInfrastructureConfigurationTests
         foreach (var relativePath in new[]
         {
             Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Api", "FalWebhookSignatureVerifier.cs"),
-            Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "FalProviderHealthService.cs"),
+            Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "FalProviderRuntimeSnapshotService.cs"),
             Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "TemplateLocalizationTranslator.cs")
         })
         {
@@ -693,9 +727,9 @@ public sealed class TemplatesInfrastructureConfigurationTests
     }
 
     [Theory]
-    [InlineData(10, 8, 3, 3, 7, 2, 4, 2, 2)]
-    [InlineData(30, 24, 8, 6, 21, 5, 14, 9, 4)]
-    [InlineData(40, 32, 12, 8, 28, 8, 20, 12, 4)]
+    [InlineData(10, 8, 3, 3, 7, 2, 4, 2)]
+    [InlineData(30, 24, 8, 6, 21, 5, 14, 9)]
+    [InlineData(40, 32, 12, 8, 28, 8, 20, 12)]
     public void AddTemplatesInfrastructure_ShouldAcceptElasticFalConcurrencyProfiles(
         int falConcurrency,
         int global,
@@ -704,8 +738,7 @@ public sealed class TemplatesInfrastructureConfigurationTests
         int imageMax,
         int videoReserved,
         int videoMax,
-        int videoBorrowMax,
-        int maxConcurrentJobsPerWorker)
+        int videoBorrowMax)
     {
         var services = CreateServices();
         var configuration = CreateConfiguration(new Dictionary<string, string?>
@@ -718,7 +751,6 @@ public sealed class TemplatesInfrastructureConfigurationTests
             ["Templates:VideoMaxConcurrentGenerations"] = videoMax.ToString(),
             ["Templates:VideoBorrowMaxConcurrentGenerations"] = videoBorrowMax.ToString(),
             ["Templates:EnableElasticLaneBorrowing"] = "true",
-            ["Templates:MaxConcurrentJobsPerWorker"] = maxConcurrentJobsPerWorker.ToString(),
             ["Templates:FalProviderConcurrencyLimit"] = falConcurrency.ToString(),
             ["Templates:FalProviderReservedConcurrency"] = "2"
         });
@@ -736,7 +768,6 @@ public sealed class TemplatesInfrastructureConfigurationTests
         Assert.Equal(videoMax, options.VideoMaxConcurrentGenerations);
         Assert.Equal(videoBorrowMax, options.VideoBorrowMaxConcurrentGenerations);
         Assert.True(options.EnableElasticLaneBorrowing);
-        Assert.Equal(maxConcurrentJobsPerWorker, options.MaxConcurrentJobsPerWorker);
         Assert.Equal(falConcurrency, options.FalProviderConcurrencyLimit);
         Assert.Equal(2, options.FalProviderReservedConcurrency);
     }

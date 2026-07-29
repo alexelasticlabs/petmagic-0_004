@@ -10,6 +10,7 @@ namespace PetMagic.Modules.Templates.Infrastructure;
 internal sealed class TemplateGenerationWorker(
     IServiceScopeFactory scopeFactory,
     TemplatesOptions options,
+    TemplateGenerationWorkerRuntimeState runtimeState,
     ILogger<TemplateGenerationWorker> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -19,17 +20,36 @@ internal sealed class TemplateGenerationWorker(
             return;
         }
 
-        var loopCount = Math.Max(1, options.MaxConcurrentJobsPerWorker);
-        if (loopCount > 1)
+        if (!options.GenerationSchedulerV2Enabled)
         {
-            await Task.WhenAll(Enumerable.Range(0, loopCount).Select(loopIndex => RunProcessingLoopAsync(loopIndex, stoppingToken)));
+            logger.LogWarning(
+                "Template generation worker is running the Scheduler V1 compatibility loop. Enable Templates__GenerationSchedulerV2Enabled only after migration, backfill, and canary validation.");
+            await RunCompatibilityLoopAsync(stoppingToken);
             return;
         }
 
-        await RunProcessingLoopAsync(0, stoppingToken);
+        var loops = new List<Task>(
+            options.GenerationDispatchConcurrency
+            + options.ProviderReconciliationConcurrency
+            + options.MediaImportConcurrency
+            + options.GenerationMaintenanceConcurrency);
+
+        AddLaneLoops(loops, GenerationWorkerLane.Dispatch, options.GenerationDispatchConcurrency, stoppingToken);
+        AddLaneLoops(loops, GenerationWorkerLane.ProviderReconciliation, options.ProviderReconciliationConcurrency, stoppingToken);
+        AddLaneLoops(loops, GenerationWorkerLane.MediaImport, options.MediaImportConcurrency, stoppingToken);
+        AddLaneLoops(loops, GenerationWorkerLane.Maintenance, options.GenerationMaintenanceConcurrency, stoppingToken);
+
+        logger.LogInformation(
+            "Template generation worker started bounded lanes. DispatchConcurrency={DispatchConcurrency} ProviderReconciliationConcurrency={ProviderReconciliationConcurrency} MediaImportConcurrency={MediaImportConcurrency} MaintenanceConcurrency={MaintenanceConcurrency}",
+            options.GenerationDispatchConcurrency,
+            options.ProviderReconciliationConcurrency,
+            options.MediaImportConcurrency,
+            options.GenerationMaintenanceConcurrency);
+
+        await Task.WhenAll(loops);
     }
 
-    private async Task RunProcessingLoopAsync(int loopIndex, CancellationToken stoppingToken)
+    private async Task RunCompatibilityLoopAsync(CancellationToken stoppingToken)
     {
         var consecutiveFailures = 0;
         while (!stoppingToken.IsCancellationRequested)
@@ -45,6 +65,7 @@ internal sealed class TemplateGenerationWorker(
                 {
                     processed = await processor.ProcessNextAsync(stoppingToken);
                 }
+
                 if (!processed)
                 {
                     processed = await processor.RetryNextRefundAsync(stoppingToken);
@@ -63,6 +84,69 @@ internal sealed class TemplateGenerationWorker(
                 if (await generationService.ProcessNextPendingGamificationShareAsync(stoppingToken))
                 {
                     processed = true;
+                }
+
+                if (processed)
+                {
+                    runtimeState.MarkProgress();
+                }
+                else
+                {
+                    await Task.Delay(options.GenerationWorkerPollIntervalMilliseconds, stoppingToken);
+                }
+
+                consecutiveFailures = 0;
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                return;
+            }
+            catch (Exception exception)
+            {
+                consecutiveFailures++;
+                logger.LogError(
+                    "Template generation Scheduler V1 compatibility loop failed. ConsecutiveFailures={ConsecutiveFailures} ElapsedMs={ElapsedMs} ExceptionType={ExceptionType}",
+                    consecutiveFailures,
+                    ElapsedMsSince(startedAt),
+                    SafeLogValues.ExceptionType(exception));
+                await Task.Delay(
+                    GetBackoffDelay(options.GenerationWorkerPollIntervalMilliseconds, consecutiveFailures),
+                    stoppingToken);
+            }
+        }
+    }
+
+    private void AddLaneLoops(
+        ICollection<Task> loops,
+        GenerationWorkerLane lane,
+        int concurrency,
+        CancellationToken stoppingToken)
+    {
+        for (var loopIndex = 0; loopIndex < Math.Max(1, concurrency); loopIndex++)
+        {
+            loops.Add(RunLaneLoopAsync(lane, loopIndex, stoppingToken));
+        }
+    }
+
+    private async Task RunLaneLoopAsync(
+        GenerationWorkerLane lane,
+        int loopIndex,
+        CancellationToken stoppingToken)
+    {
+        var consecutiveFailures = 0;
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            var startedAt = System.Diagnostics.Stopwatch.GetTimestamp();
+            try
+            {
+                using var scope = scopeFactory.CreateScope();
+                var processor = scope.ServiceProvider.GetRequiredService<TemplateGenerationJobProcessor>();
+                var generationService = scope.ServiceProvider.GetRequiredService<TemplateGenerationService>();
+                var processed = await ProcessLaneAsync(lane, processor, generationService, stoppingToken);
+
+                if (processed)
+                {
+                    runtimeState.MarkProgress();
                 }
 
                 if (!processed)
@@ -84,17 +168,53 @@ internal sealed class TemplateGenerationWorker(
                 using var logScope = logger.BeginScope(new Dictionary<string, object?>
                 {
                     ["CorrelationId"] = correlationId,
+                    ["Lane"] = lane.ToString(),
                     ["LoopIndex"] = loopIndex,
                     ["ConsecutiveFailures"] = consecutiveFailures
                 });
                 logger.LogError(
-                    "Template generation worker loop failed. LoopIndex={LoopIndex} ConsecutiveFailures={ConsecutiveFailures} ElapsedMs={ElapsedMs} ExceptionType={ExceptionType}",
+                    "Template generation worker lane failed. Lane={Lane} LoopIndex={LoopIndex} ConsecutiveFailures={ConsecutiveFailures} ElapsedMs={ElapsedMs} ExceptionType={ExceptionType}",
+                    lane,
                     loopIndex,
                     consecutiveFailures,
                     ElapsedMsSince(startedAt),
                     SafeLogValues.ExceptionType(exception));
                 await Task.Delay(GetBackoffDelay(options.GenerationWorkerPollIntervalMilliseconds, consecutiveFailures), stoppingToken);
             }
+        }
+    }
+
+    private static async Task<bool> ProcessLaneAsync(
+        GenerationWorkerLane lane,
+        TemplateGenerationJobProcessor processor,
+        TemplateGenerationService generationService,
+        CancellationToken cancellationToken)
+    {
+        switch (lane)
+        {
+            case GenerationWorkerLane.Dispatch:
+                return await processor.ProcessNextDispatchAsync(cancellationToken);
+            case GenerationWorkerLane.ProviderReconciliation:
+                return await processor.ProcessNextProviderReconciliationAsync(cancellationToken);
+            case GenerationWorkerLane.MediaImport:
+                return await processor.ProcessNextMediaImportAsync(cancellationToken);
+            case GenerationWorkerLane.Maintenance:
+                {
+                    var processed = await generationService.ProcessNextPendingCancellationAsync(cancellationToken);
+                    if (!processed)
+                    {
+                        processed = await processor.ProcessNextMaintenanceAsync(cancellationToken);
+                    }
+
+                    if (await generationService.ProcessNextPendingGamificationShareAsync(cancellationToken))
+                    {
+                        processed = true;
+                    }
+
+                    return processed;
+                }
+            default:
+                throw new ArgumentOutOfRangeException(nameof(lane), lane, null);
         }
     }
 
@@ -109,5 +229,13 @@ internal sealed class TemplateGenerationWorker(
     private static int ElapsedMsSince(long startedAt)
     {
         return (int)Math.Min(int.MaxValue, System.Diagnostics.Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
+    }
+
+    private enum GenerationWorkerLane
+    {
+        Dispatch,
+        ProviderReconciliation,
+        MediaImport,
+        Maintenance
     }
 }

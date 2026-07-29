@@ -41,6 +41,27 @@ internal sealed class FalVideoMotionGenerator(FalQueueClient queueClient) : IVid
         string prompt,
         string model,
         int? seed,
+        CancellationToken cancellationToken) =>
+        await SubmitAsync(
+            normalizedImageUrl,
+            referenceVideoUrl,
+            characterOrientation,
+            keepOriginalSound,
+            prompt,
+            model,
+            seed,
+            callbackToken: null,
+            cancellationToken);
+
+    public async Task<Result<ProviderQueueSubmission>> SubmitAsync(
+        string normalizedImageUrl,
+        string referenceVideoUrl,
+        string characterOrientation,
+        bool keepOriginalSound,
+        string prompt,
+        string model,
+        int? seed,
+        string? callbackToken,
         CancellationToken cancellationToken)
     {
         var input = BuildInput(normalizedImageUrl, referenceVideoUrl, characterOrientation, keepOriginalSound, prompt, seed);
@@ -48,6 +69,7 @@ internal sealed class FalVideoMotionGenerator(FalQueueClient queueClient) : IVid
             model,
             input,
             new FalQueueStageKind("video", FalQueueStages.VideoGeneration),
+            callbackToken,
             cancellationToken);
         return result.IsFailure
             ? Result.Failure<ProviderQueueSubmission>(result.Error)

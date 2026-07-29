@@ -50,12 +50,11 @@ public sealed class FalTransientProviderPipelineSourceTests
         Assert.Contains("job.NextAttemptEarliestAtUtc = now.AddSeconds(delaySeconds)", source, StringComparison.Ordinal);
         Assert.Contains("SaveClaimedChangesAsync(job, cancellationToken, releaseLock: true)", source, StringComparison.Ordinal);
         Assert.Contains("provider_poll_transient", source, StringComparison.Ordinal);
-        Assert.True(
-            source.IndexOf("IsProviderTransientFailure(statusResult.Error)", StringComparison.Ordinal)
-            < source.IndexOf("MarkFailedAsync(job, statusResult.Error", StringComparison.Ordinal));
-        Assert.True(
-            source.IndexOf("IsProviderTransientFailure(response.Error)", StringComparison.Ordinal)
-            < source.IndexOf("MarkFailedAsync(job, response.Error", StringComparison.Ordinal));
+        Assert.Contains("if (IsExplicitProviderTerminalFailure(status))", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("MarkFailedAsync(job, statusResult.Error", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("MarkFailedAsync(job, response.Error", source, StringComparison.Ordinal);
+        AssertTransientFailurePrecedesManualReconciliation(source, "statusResult.Error");
+        AssertTransientFailurePrecedesManualReconciliation(source, "response.Error");
     }
 
     private static int Count(string source, string value)
@@ -69,6 +68,20 @@ public sealed class FalTransientProviderPipelineSourceTests
         }
 
         return count;
+    }
+
+    private static void AssertTransientFailurePrecedesManualReconciliation(string source, string errorExpression)
+    {
+        var transientIndex = source.IndexOf(
+            $"IsProviderTransientFailure({errorExpression})",
+            StringComparison.Ordinal);
+        Assert.True(transientIndex >= 0);
+        var reconciliationIndex = source.IndexOf(
+            "DeferProviderReadForManualReconciliationAsync(",
+            transientIndex,
+            StringComparison.Ordinal);
+
+        Assert.True(reconciliationIndex > transientIndex);
     }
 
     private static string SourcePath(string fileName)

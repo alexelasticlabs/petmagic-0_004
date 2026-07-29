@@ -1,5 +1,5 @@
-using System.Text.Json;
 using System.Net;
+using System.Text.Json;
 
 using Microsoft.EntityFrameworkCore;
 
@@ -180,7 +180,7 @@ public sealed partial class TemplatesServiceTests
         Assert.Equal("premium", started.Value.PriorityClass);
         Assert.Equal(1, started.Value.QueuePosition);
         Assert.Equal(0, started.Value.EstimatedWaitSeconds);
-        Assert.Equal(90, started.Value.EstimatedTotalSeconds);
+        Assert.Equal(120, started.Value.EstimatedTotalSeconds);
         Assert.NotNull(started.Value.EstimatedCompletionAtUtc);
         Assert.Equal("capacity:image:premium", started.Value.QueueReason);
         Assert.True(started.Value.CanCancel);
@@ -190,6 +190,469 @@ public sealed partial class TemplatesServiceTests
         Assert.Equal(TemplateGenerationQueue.TierPremium, persisted.QueueTier);
         Assert.Equal(0, persisted.EstimatedWaitSecondsAtQueue);
         Assert.NotNull(persisted.EstimatedCompletionAtQueueUtc);
+    }
+
+    [Fact]
+    public async Task StartAsync_ShouldUseSeparateProviderAndImportRollingP90Durations()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var generationService = CreateGenerationService(
+            dbContext,
+            CreateTemplatesOptions(
+                globalMaxConcurrentGenerations: 1,
+                imageMaxConcurrentGenerations: 1,
+                estimatedImageGenerationSeconds: 90));
+        var templateId = await CreateActiveImageTemplateAsync(service, "Rolling P90 Portrait", "Portrait", ["p90"]);
+        var now = DateTime.UtcNow;
+        for (var index = 0; index < 10; index++)
+        {
+            var jobId = Guid.NewGuid();
+            var providerSubmittedAtUtc = now.AddMinutes(-30).AddSeconds(index);
+            var providerCompletedAtUtc = providerSubmittedAtUtc.AddSeconds(10 + index);
+            var importStartedAtUtc = providerCompletedAtUtc;
+            var importCompletedAtUtc = importStartedAtUtc.AddSeconds(20 + index);
+            dbContext.TemplateGenerationJobs.Add(new TemplateGenerationJob
+            {
+                Id = jobId,
+                UserId = Guid.NewGuid(),
+                TemplateId = templateId,
+                Status = TemplateGenerationStatus.Completed,
+                TokenCost = 20,
+                QueueMediaType = TemplateGenerationQueue.MediaTypeImage,
+                QueueTier = TemplateGenerationQueue.TierFree,
+                SourceImageUrl = $"https://cdn.example.com/p90-{index}.jpg",
+                SourceImageFileName = $"p90-{index}.jpg",
+                SourceImageContentType = "image/jpeg",
+                CreatedAtUtc = providerSubmittedAtUtc.AddMinutes(-1),
+                QueuedAtUtc = providerSubmittedAtUtc.AddMinutes(-1),
+                UpdatedAtUtc = importCompletedAtUtc,
+                StartedAtUtc = providerSubmittedAtUtc,
+                ImportStartedAtUtc = importStartedAtUtc,
+                MediaImportCompletedAtUtc = importCompletedAtUtc,
+                CompletedAtUtc = importCompletedAtUtc,
+                ChargedAtUtc = providerSubmittedAtUtc.AddMinutes(-1)
+            });
+            dbContext.TemplateGenerationProviderAttempts.Add(new TemplateGenerationProviderAttempt
+            {
+                Id = Guid.NewGuid(),
+                GenerationJobId = jobId,
+                Stage = TemplateGenerationProviderAttemptStage.ImageGeneration,
+                Ordinal = 1,
+                State = TemplateGenerationProviderAttemptState.Completed,
+                Provider = "fal",
+                SubmissionTokenHash = $"p90-{index}",
+                SubmissionDeadlineAtUtc = providerSubmittedAtUtc.AddMinutes(1),
+                ProcessingDeadlineAtUtc = providerSubmittedAtUtc.AddMinutes(5),
+                ReconciliationDeadlineAtUtc = providerSubmittedAtUtc.AddMinutes(10),
+                CreatedAtUtc = providerSubmittedAtUtc.AddSeconds(-1),
+                UpdatedAtUtc = providerCompletedAtUtc,
+                SubmittedAtUtc = providerSubmittedAtUtc,
+                ProviderCompletedAtUtc = providerCompletedAtUtc,
+                CompletedAtUtc = providerCompletedAtUtc
+            });
+        }
+
+        await dbContext.SaveChangesAsync();
+
+        var started = await generationService.StartAsync(
+            new StartTemplateGenerationCommand(
+                Guid.NewGuid(),
+                templateId,
+                new TemplateAssetCommand("https://cdn.example.com/source.jpg", "source.jpg", "image/jpeg", 2048, null),
+                "rolling-p90-key",
+                "rolling-p90-hash",
+                3),
+            CancellationToken.None);
+
+        Assert.True(started.IsSuccess);
+        Assert.Equal(0, started.Value.EstimatedWaitSeconds);
+        Assert.Equal(46, started.Value.EstimatedTotalSeconds);
+    }
+
+    [Fact]
+    public async Task StartAsync_ShouldIncludeActiveVideoPreprocessingInDownstreamGenerationTimeline()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var generationService = CreateGenerationService(
+            dbContext,
+            CreateTemplatesOptions(
+                globalMaxConcurrentGenerations: 2,
+                videoMaxConcurrentGenerations: 1,
+                videoReservedConcurrentGenerations: 1,
+                estimatedVideoPreprocessingSeconds: 10,
+                estimatedVideoGenerationSeconds: 100,
+                estimatedVideoImportSeconds: 10));
+        var templateId = await CreateActiveVideoTemplateAsync(service, "Active Preprocessing ETA", "Video", ["eta"]);
+        var template = await dbContext.TemplateItems.SingleAsync(x => x.Id == templateId);
+        var now = DateTime.UtcNow;
+        var active = CreateEtaJob(
+            template,
+            TemplateGenerationStatus.ProviderProcessing,
+            TemplateGenerationQueue.MediaTypeVideo,
+            now.AddMinutes(-1),
+            "active-preprocessing");
+        active.CurrentProviderStage = "video_preprocessing";
+        active.ChargedAtUtc = now.AddMinutes(-1);
+        dbContext.TemplateGenerationJobs.Add(active);
+        dbContext.TemplateGenerationProviderAttempts.Add(new TemplateGenerationProviderAttempt
+        {
+            Id = Guid.NewGuid(),
+            GenerationJobId = active.Id,
+            Stage = TemplateGenerationProviderAttemptStage.VideoPreprocessing,
+            Ordinal = 1,
+            State = TemplateGenerationProviderAttemptState.ProviderProcessing,
+            Provider = "fal",
+            SubmissionTokenHash = "active-preprocessing-attempt",
+            SubmissionDeadlineAtUtc = now.AddMinutes(1),
+            ProcessingDeadlineAtUtc = now.AddMinutes(5),
+            ReconciliationDeadlineAtUtc = now.AddMinutes(10),
+            CreatedAtUtc = now.AddMinutes(-1),
+            UpdatedAtUtc = now,
+            SubmittedAtUtc = now.AddMinutes(-1)
+        });
+        await dbContext.SaveChangesAsync();
+
+        var started = await generationService.StartAsync(
+            new StartTemplateGenerationCommand(
+                Guid.NewGuid(),
+                templateId,
+                new TemplateAssetCommand("https://cdn.example.com/source.jpg", "source.jpg", "image/jpeg", 2048, null),
+                "active-preprocessing-eta-key",
+                "active-preprocessing-eta-hash",
+                3),
+            CancellationToken.None);
+
+        Assert.True(started.IsSuccess);
+        Assert.Equal(100, started.Value.EstimatedWaitSeconds);
+        Assert.Equal(220, started.Value.EstimatedTotalSeconds);
+    }
+
+    [Fact]
+    public async Task StartAsync_ShouldNotRepeatPreprocessingOrDoubleCountElapsedTimeForInterstageVideoBacklog()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var generationService = CreateGenerationService(
+            dbContext,
+            CreateTemplatesOptions(
+                globalMaxConcurrentGenerations: 2,
+                videoMaxConcurrentGenerations: 1,
+                videoReservedConcurrentGenerations: 1,
+                estimatedVideoPreprocessingSeconds: 10,
+                estimatedVideoGenerationSeconds: 100,
+                estimatedVideoImportSeconds: 10));
+        var templateId = await CreateActiveVideoTemplateAsync(service, "Interstage Video ETA", "Video", ["eta"]);
+        var template = await dbContext.TemplateItems.SingleAsync(x => x.Id == templateId);
+        var now = DateTime.UtcNow;
+        var interstage = CreateEtaJob(
+            template,
+            TemplateGenerationStatus.Queued,
+            TemplateGenerationQueue.MediaTypeVideo,
+            now.AddMinutes(-2),
+            "interstage-video");
+        interstage.CurrentProviderStage = "video_generation";
+        interstage.PreprocessingCompletedAtUtc = now.AddMinutes(-1);
+        interstage.NormalizedImageUrl = "https://cdn.example.com/interstage-normalized.jpg";
+        interstage.ChargedAtUtc = now.AddMinutes(-2);
+        dbContext.TemplateGenerationJobs.Add(interstage);
+        await dbContext.SaveChangesAsync();
+
+        var interstageStatus = await generationService.GetAsync(
+            interstage.UserId,
+            interstage.Id,
+            isPremium: false,
+            CancellationToken.None);
+        Assert.True(interstageStatus.IsSuccess);
+        Assert.Equal(0, interstageStatus.Value.EstimatedWaitSeconds);
+        Assert.Equal(110, interstageStatus.Value.EstimatedTotalSeconds);
+
+        var started = await generationService.StartAsync(
+            new StartTemplateGenerationCommand(
+                Guid.NewGuid(),
+                templateId,
+                new TemplateAssetCommand("https://cdn.example.com/source.jpg", "source.jpg", "image/jpeg", 2048, null),
+                "interstage-video-eta-key",
+                "interstage-video-eta-hash",
+                3),
+            CancellationToken.None);
+
+        Assert.True(started.IsSuccess);
+        Assert.Equal(90, started.Value.EstimatedWaitSeconds);
+        Assert.Equal(210, started.Value.EstimatedTotalSeconds);
+    }
+
+    [Fact]
+    public async Task StartAsync_ShouldIncludeOppositeMediaQueuedWorkInSharedImportLaneBeforeCharge()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var billing = new RecordingGenerationBilling();
+        var generationService = CreateGenerationService(
+            dbContext,
+            CreateTemplatesOptions(
+                globalMaxConcurrentGenerations: 8,
+                imageMaxConcurrentGenerations: 7,
+                videoMaxConcurrentGenerations: 1,
+                videoReservedConcurrentGenerations: 1,
+                estimatedImageGenerationSeconds: 5,
+                estimatedVideoPreprocessingSeconds: 10,
+                estimatedVideoGenerationSeconds: 10,
+                estimatedImageImportSeconds: 30,
+                estimatedVideoImportSeconds: 10,
+                freeVideoMaxEstimatedWaitSeconds: 100),
+            billing);
+        var templateId = await CreateActiveVideoTemplateAsync(service, "Mixed Import ETA", "Video", ["eta"]);
+        var template = await dbContext.TemplateItems.SingleAsync(x => x.Id == templateId);
+        var now = DateTime.UtcNow;
+        for (var index = 0; index < 10; index++)
+        {
+            dbContext.TemplateGenerationJobs.Add(CreateEtaJob(
+                template,
+                TemplateGenerationStatus.Queued,
+                TemplateGenerationQueue.MediaTypeImage,
+                now.AddMinutes(-5).AddSeconds(index),
+                $"mixed-image-{index}"));
+        }
+
+        await dbContext.SaveChangesAsync();
+
+        var started = await generationService.StartAsync(
+            new StartTemplateGenerationCommand(
+                Guid.NewGuid(),
+                templateId,
+                new TemplateAssetCommand("https://cdn.example.com/source.jpg", "source.jpg", "image/jpeg", 2048, null),
+                "mixed-import-eta-key",
+                "mixed-import-eta-hash",
+                3),
+            CancellationToken.None);
+
+        Assert.True(started.IsFailure);
+        Assert.Equal(TemplatesErrors.GenerationWaitTooLong.Code, started.Error.Code);
+        Assert.Equal(285, started.Error.Metadata!["estimatedWaitSeconds"]);
+        Assert.Equal(315, started.Error.Metadata["estimatedTotalSeconds"]);
+        Assert.Empty(billing.ChargedGenerationIds);
+        Assert.Equal(10, await dbContext.TemplateGenerationJobs.CountAsync());
+    }
+
+    [Fact]
+    public async Task StartAsync_ShouldSampleRollingP90IndependentlyPerProviderStageAndImportMediaType()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var generationService = CreateGenerationService(dbContext);
+        var imageTemplateId = await CreateActiveImageTemplateAsync(service, "Dominant Image History", "Portrait", ["p90"]);
+        var videoTemplateId = await CreateActiveVideoTemplateAsync(service, "Sparse Video History", "Video", ["p90"]);
+        var imageTemplate = await dbContext.TemplateItems.SingleAsync(x => x.Id == imageTemplateId);
+        var videoTemplate = await dbContext.TemplateItems.SingleAsync(x => x.Id == videoTemplateId);
+        var now = DateTime.UtcNow;
+        for (var index = 0; index < 600; index++)
+        {
+            var completedAt = now.AddMinutes(-1).AddMilliseconds(index);
+            var imageJob = CreateEtaJob(
+                imageTemplate,
+                TemplateGenerationStatus.Completed,
+                TemplateGenerationQueue.MediaTypeImage,
+                completedAt.AddMinutes(-2),
+                $"dominant-image-{index}");
+            imageJob.ImportStartedAtUtc = completedAt.AddSeconds(-20);
+            imageJob.MediaImportCompletedAtUtc = completedAt;
+            imageJob.CompletedAtUtc = completedAt;
+            imageJob.ChargedAtUtc = completedAt.AddMinutes(-2);
+            dbContext.TemplateGenerationJobs.Add(imageJob);
+            dbContext.TemplateGenerationProviderAttempts.Add(CreateCompletedEtaAttempt(
+                imageJob.Id,
+                TemplateGenerationProviderAttemptStage.ImageGeneration,
+                completedAt.AddSeconds(-60),
+                completedAt,
+                $"dominant-image-attempt-{index}"));
+        }
+
+        for (var index = 0; index < 10; index++)
+        {
+            var completedAt = now.AddHours(-1).AddSeconds(index);
+            var videoJob = CreateEtaJob(
+                videoTemplate,
+                TemplateGenerationStatus.Completed,
+                TemplateGenerationQueue.MediaTypeVideo,
+                completedAt.AddMinutes(-2),
+                $"sparse-video-{index}");
+            videoJob.ImportStartedAtUtc = completedAt.AddSeconds(-(30 + index));
+            videoJob.MediaImportCompletedAtUtc = completedAt;
+            videoJob.CompletedAtUtc = completedAt;
+            videoJob.ChargedAtUtc = completedAt.AddMinutes(-2);
+            dbContext.TemplateGenerationJobs.Add(videoJob);
+            dbContext.TemplateGenerationProviderAttempts.AddRange(
+                CreateCompletedEtaAttempt(
+                    videoJob.Id,
+                    TemplateGenerationProviderAttemptStage.VideoPreprocessing,
+                    completedAt.AddSeconds(-(5 + index)),
+                    completedAt,
+                    $"sparse-video-pre-{index}"),
+                CreateCompletedEtaAttempt(
+                    videoJob.Id,
+                    TemplateGenerationProviderAttemptStage.VideoGeneration,
+                    completedAt.AddSeconds(-(20 + index)),
+                    completedAt,
+                    $"sparse-video-gen-{index}"));
+        }
+
+        await dbContext.SaveChangesAsync();
+
+        var started = await generationService.StartAsync(
+            new StartTemplateGenerationCommand(
+                Guid.NewGuid(),
+                videoTemplateId,
+                new TemplateAssetCommand("https://cdn.example.com/source.jpg", "source.jpg", "image/jpeg", 2048, null),
+                "per-stage-p90-key",
+                "per-stage-p90-hash",
+                3),
+            CancellationToken.None);
+
+        Assert.True(started.IsSuccess);
+        Assert.Equal(0, started.Value.EstimatedWaitSeconds);
+        Assert.Equal(79, started.Value.EstimatedTotalSeconds);
+    }
+
+    [Fact]
+    public async Task StartAsync_ShouldUseRollingImageP90WhenDecidingVideoBorrowCapacity()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var generationService = CreateGenerationService(
+            dbContext,
+            CreateTemplatesOptions(
+                globalMaxConcurrentGenerations: 4,
+                imageMaxConcurrentGenerations: 3,
+                imageProtectedConcurrentGenerations: 2,
+                videoMaxConcurrentGenerations: 3,
+                videoReservedConcurrentGenerations: 1,
+                videoBorrowMaxConcurrentGenerations: 2,
+                enableElasticLaneBorrowing: true,
+                allowVideoBorrowWhenImageEstimatedWaitBelowSeconds: 120,
+                estimatedImageGenerationSeconds: 10,
+                estimatedVideoPreprocessingSeconds: 10,
+                estimatedVideoGenerationSeconds: 100,
+                estimatedImageImportSeconds: 1,
+                estimatedVideoImportSeconds: 10));
+        var imageTemplateId = await CreateActiveImageTemplateAsync(service, "Borrow P90 Image", "Portrait", ["p90"]);
+        var videoTemplateId = await CreateActiveVideoTemplateAsync(service, "Borrow P90 Video", "Video", ["p90"]);
+        var imageTemplate = await dbContext.TemplateItems.SingleAsync(x => x.Id == imageTemplateId);
+        var videoTemplate = await dbContext.TemplateItems.SingleAsync(x => x.Id == videoTemplateId);
+        var now = DateTime.UtcNow;
+        for (var index = 0; index < 10; index++)
+        {
+            var completedAt = now.AddMinutes(-10).AddSeconds(index);
+            var history = CreateEtaJob(
+                imageTemplate,
+                TemplateGenerationStatus.Completed,
+                TemplateGenerationQueue.MediaTypeImage,
+                completedAt.AddMinutes(-6),
+                $"borrow-p90-history-{index}");
+            history.CompletedAtUtc = completedAt;
+            history.ChargedAtUtc = completedAt.AddMinutes(-6);
+            dbContext.TemplateGenerationJobs.Add(history);
+            dbContext.TemplateGenerationProviderAttempts.Add(CreateCompletedEtaAttempt(
+                history.Id,
+                TemplateGenerationProviderAttemptStage.ImageGeneration,
+                completedAt.AddSeconds(-300),
+                completedAt,
+                $"borrow-p90-attempt-{index}"));
+        }
+
+        for (var index = 0; index < 3; index++)
+        {
+            dbContext.TemplateGenerationJobs.Add(CreateEtaJob(
+                imageTemplate,
+                TemplateGenerationStatus.Queued,
+                TemplateGenerationQueue.MediaTypeImage,
+                now.AddMinutes(-5).AddSeconds(index),
+                $"borrow-image-queue-{index}"));
+        }
+
+        for (var index = 0; index < 2; index++)
+        {
+            var readyVideo = CreateEtaJob(
+                videoTemplate,
+                TemplateGenerationStatus.Queued,
+                TemplateGenerationQueue.MediaTypeVideo,
+                now.AddMinutes(-5).AddSeconds(index),
+                $"borrow-video-queue-{index}");
+            readyVideo.CurrentProviderStage = "video_generation";
+            readyVideo.PreprocessingCompletedAtUtc = now.AddMinutes(-6);
+            readyVideo.NormalizedImageUrl = $"https://cdn.example.com/borrow-normalized-{index}.jpg";
+            dbContext.TemplateGenerationJobs.Add(readyVideo);
+        }
+
+        await dbContext.SaveChangesAsync();
+
+        var started = await generationService.StartAsync(
+            new StartTemplateGenerationCommand(
+                Guid.NewGuid(),
+                videoTemplateId,
+                new TemplateAssetCommand("https://cdn.example.com/source.jpg", "source.jpg", "image/jpeg", 2048, null),
+                "borrow-p90-key",
+                "borrow-p90-hash",
+                3),
+            CancellationToken.None);
+
+        Assert.True(started.IsSuccess);
+        Assert.Equal(193, started.Value.EstimatedWaitSeconds);
+        Assert.Equal(313, started.Value.EstimatedTotalSeconds);
+    }
+
+    private static TemplateGenerationJob CreateEtaJob(
+        TemplateItem template,
+        TemplateGenerationStatus status,
+        string mediaType,
+        DateTime queuedAtUtc,
+        string key)
+    {
+        return new TemplateGenerationJob
+        {
+            Id = Guid.NewGuid(),
+            UserId = Guid.NewGuid(),
+            TemplateId = template.Id,
+            Template = template,
+            Status = status,
+            TokenCost = template.TokenCost,
+            QueueMediaType = mediaType,
+            QueueTier = TemplateGenerationQueue.TierFree,
+            SourceImageUrl = $"https://cdn.example.com/{key}.jpg",
+            SourceImageFileName = $"{key}.jpg",
+            SourceImageContentType = "image/jpeg",
+            CreatedAtUtc = queuedAtUtc,
+            QueuedAtUtc = queuedAtUtc,
+            UpdatedAtUtc = queuedAtUtc
+        };
+    }
+
+    private static TemplateGenerationProviderAttempt CreateCompletedEtaAttempt(
+        Guid generationJobId,
+        TemplateGenerationProviderAttemptStage stage,
+        DateTime submittedAtUtc,
+        DateTime completedAtUtc,
+        string submissionTokenHash)
+    {
+        return new TemplateGenerationProviderAttempt
+        {
+            Id = Guid.NewGuid(),
+            GenerationJobId = generationJobId,
+            Stage = stage,
+            Ordinal = 1,
+            State = TemplateGenerationProviderAttemptState.Completed,
+            Provider = "fal",
+            SubmissionTokenHash = submissionTokenHash,
+            SubmissionDeadlineAtUtc = submittedAtUtc.AddMinutes(1),
+            ProcessingDeadlineAtUtc = submittedAtUtc.AddMinutes(5),
+            ReconciliationDeadlineAtUtc = submittedAtUtc.AddMinutes(10),
+            CreatedAtUtc = submittedAtUtc.AddSeconds(-1),
+            UpdatedAtUtc = completedAtUtc,
+            SubmittedAtUtc = submittedAtUtc,
+            ProviderCompletedAtUtc = completedAtUtc,
+            CompletedAtUtc = completedAtUtc
+        };
     }
 
     [Fact]
@@ -264,7 +727,7 @@ public sealed partial class TemplatesServiceTests
     }
 
     [Fact]
-    public async Task StartAsync_ShouldRejectOverloadedFreeImageBeforeCharge()
+    public async Task StartAsync_ShouldRejectFreeImageBeforeCharge_WhenUnchargedBacklogMakesTotalExceedSla()
     {
         await using var dbContext = CreateDbContext();
         var service = CreateService(dbContext);
@@ -274,7 +737,7 @@ public sealed partial class TemplatesServiceTests
             CreateTemplatesOptions(
                 imageMaxConcurrentGenerations: 1,
                 estimatedImageGenerationSeconds: 90,
-                freeImageMaxEstimatedWaitSeconds: 60),
+                freeImageMaxEstimatedWaitSeconds: 180),
             billing);
         var templateId = await CreateActiveImageTemplateAsync(service, "Overloaded Portrait", "Portrait", ["overload"]);
         var template = await dbContext.TemplateItems.SingleAsync(x => x.Id == templateId);
@@ -293,8 +756,7 @@ public sealed partial class TemplatesServiceTests
             SourceImageContentType = "image/jpeg",
             CreatedAtUtc = DateTime.UtcNow.AddMinutes(-10),
             QueuedAtUtc = DateTime.UtcNow.AddMinutes(-10),
-            UpdatedAtUtc = DateTime.UtcNow.AddMinutes(-10),
-            ChargedAtUtc = DateTime.UtcNow.AddMinutes(-10)
+            UpdatedAtUtc = DateTime.UtcNow.AddMinutes(-10)
         });
         await dbContext.SaveChangesAsync();
 
@@ -310,8 +772,71 @@ public sealed partial class TemplatesServiceTests
 
         Assert.True(started.IsFailure);
         Assert.Equal(TemplatesErrors.GenerationWaitTooLong.Code, started.Error.Code);
+        Assert.Equal(90, started.Error.Metadata!["estimatedWaitSeconds"]);
+        Assert.Equal(210, started.Error.Metadata["estimatedTotalSeconds"]);
+        Assert.Equal(180, started.Error.Metadata["maxAllowedTotalSeconds"]);
         Assert.Empty(billing.ChargedGenerationIds);
         Assert.Equal(1, await dbContext.TemplateGenerationJobs.CountAsync());
+    }
+
+    [Fact]
+    public async Task StartAsync_ShouldSerializeImportingMediaBacklogInsteadOfDividingItByProviderSlots()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var billing = new RecordingGenerationBilling();
+        var generationService = CreateGenerationService(
+            dbContext,
+            CreateTemplatesOptions(
+                globalMaxConcurrentGenerations: 20,
+                imageMaxConcurrentGenerations: 20,
+                estimatedImageGenerationSeconds: 10,
+                freeImageMaxEstimatedWaitSeconds: 500),
+            billing);
+        var templateId = await CreateActiveImageTemplateAsync(service, "Serialized Import Portrait", "Portrait", ["import"]);
+        var template = await dbContext.TemplateItems.SingleAsync(x => x.Id == templateId);
+        var now = DateTime.UtcNow;
+        for (var index = 0; index < 20; index++)
+        {
+            dbContext.TemplateGenerationJobs.Add(new TemplateGenerationJob
+            {
+                Id = Guid.NewGuid(),
+                UserId = Guid.NewGuid(),
+                TemplateId = templateId,
+                Template = template,
+                Status = TemplateGenerationStatus.ImportingMedia,
+                TokenCost = template.TokenCost,
+                QueueMediaType = TemplateGenerationQueue.MediaTypeImage,
+                QueueTier = TemplateGenerationQueue.TierFree,
+                SourceImageUrl = $"https://cdn.example.com/import-{index}.jpg",
+                SourceImageFileName = $"import-{index}.jpg",
+                SourceImageContentType = "image/jpeg",
+                ProviderResultUrl = $"https://provider.example.com/import-{index}.jpg",
+                CreatedAtUtc = now.AddMinutes(-5),
+                QueuedAtUtc = now.AddMinutes(-5),
+                UpdatedAtUtc = now.AddMinutes(-1),
+                ChargedAtUtc = now.AddMinutes(-5)
+            });
+        }
+
+        await dbContext.SaveChangesAsync();
+
+        var started = await generationService.StartAsync(
+            new StartTemplateGenerationCommand(
+                Guid.NewGuid(),
+                templateId,
+                new TemplateAssetCommand("https://cdn.example.com/source.jpg", "source.jpg", "image/jpeg", 2048, null),
+                "serialized-import-key",
+                "serialized-import-hash",
+                3),
+            CancellationToken.None);
+
+        Assert.True(started.IsFailure);
+        Assert.Equal(TemplatesErrors.GenerationWaitTooLong.Code, started.Error.Code);
+        Assert.Equal(590, started.Error.Metadata!["estimatedWaitSeconds"]);
+        Assert.Equal(630, started.Error.Metadata["estimatedTotalSeconds"]);
+        Assert.Empty(billing.ChargedGenerationIds);
+        Assert.Equal(20, await dbContext.TemplateGenerationJobs.CountAsync());
     }
 
     [Fact]
@@ -452,7 +977,7 @@ public sealed partial class TemplatesServiceTests
                 imageMaxConcurrentGenerations: 1,
                 estimatedImageGenerationSeconds: 90,
                 freeImageMaxEstimatedWaitSeconds: 60,
-                premiumImageMaxEstimatedWaitSeconds: 180),
+                premiumImageMaxEstimatedWaitSeconds: 210),
             billing);
         var templateId = await CreateActiveImageTemplateAsync(service, "Premium Overload Portrait", "Portrait", ["overload"]);
         var template = await dbContext.TemplateItems.SingleAsync(x => x.Id == templateId);
@@ -795,20 +1320,21 @@ public sealed partial class TemplatesServiceTests
         {
             case "accepted":
                 Assert.True(cancelled.IsSuccess);
-                Assert.False(cancelled.Value.IsPending);
-                Assert.Equal("Cancelled", cancelled.Value.Generation.Status);
-                Assert.Equal(TemplateGenerationStatus.Cancelled, persisted.Status);
+                Assert.True(cancelled.Value.IsPending);
+                Assert.Equal("CancellationRequested", cancelled.Value.Generation.Status);
+                Assert.Equal(TemplateGenerationStatus.CancellationRequested, persisted.Status);
                 Assert.NotNull(persisted.CancellationAcceptedAtUtc);
-                Assert.NotNull(persisted.RefundedAtUtc);
-                Assert.Single(billing.RefundedGenerationIds);
+                Assert.NotNull(persisted.CancellationNextAttemptAtUtc);
+                Assert.Null(persisted.RefundedAtUtc);
+                Assert.Empty(billing.RefundedGenerationIds);
                 var repeatedAccepted = await generationService.CancelAdminAsync(
                     Guid.NewGuid(),
                     job.Id,
                     CancellationToken.None);
                 Assert.True(repeatedAccepted.IsSuccess);
-                Assert.False(repeatedAccepted.Value.IsPending);
+                Assert.True(repeatedAccepted.Value.IsPending);
                 Assert.Equal(1, handler.RequestCount);
-                Assert.Single(billing.RefundedGenerationIds);
+                Assert.Empty(billing.RefundedGenerationIds);
                 break;
             case "pending":
                 Assert.True(cancelled.IsSuccess);
@@ -838,6 +1364,114 @@ public sealed partial class TemplatesServiceTests
                 Assert.Empty(billing.RefundedGenerationIds);
                 break;
         }
+    }
+
+    [Fact]
+    public async Task ProcessNextPendingCancellationAsync_WhenAcceptedRequestDisappears_ShouldCancelAndRefundExactlyOnce()
+    {
+        await using var dbContext = CreateDbContext();
+        var catalogService = CreateService(dbContext);
+        var billing = new RecordingGenerationBilling();
+        var audit = new RecordingAdminAuditLog();
+        var falOptions = new FalAiOptions
+        {
+            ApiKey = "test-fal-key",
+            QueueBaseUrl = "https://queue.fal.test"
+        };
+        var options = CreateTemplatesOptions(fal: falOptions);
+        var handler = new AcceptedCancellationReconciliationHttpHandler(
+            HttpStatusCode.NotFound,
+            "NOT_FOUND");
+        var generationService = CreateGenerationService(
+            dbContext,
+            options,
+            billing,
+            adminAuditLog: audit,
+            falQueueClient: CreateFalQueueClient(dbContext, options, handler));
+        var job = await CreateProviderCancellationJobAsync(
+            dbContext,
+            catalogService,
+            "Accepted Provider Cancellation Missing");
+
+        var requested = await generationService.CancelAdminAsync(Guid.NewGuid(), job.Id, CancellationToken.None);
+        Assert.True(requested.IsSuccess);
+        Assert.True(requested.Value.IsPending);
+
+        dbContext.ChangeTracker.Clear();
+        var pending = await dbContext.TemplateGenerationJobs.SingleAsync(x => x.Id == job.Id);
+        pending.CancellationAcceptedAtUtc = DateTime.UtcNow.AddSeconds(-10);
+        pending.CancellationNextAttemptAtUtc = DateTime.UtcNow.AddSeconds(-1);
+        await dbContext.SaveChangesAsync();
+
+        Assert.True(await generationService.ProcessNextPendingCancellationAsync(CancellationToken.None));
+        Assert.False(await generationService.ProcessNextPendingCancellationAsync(CancellationToken.None));
+
+        dbContext.ChangeTracker.Clear();
+        var persisted = await dbContext.TemplateGenerationJobs.SingleAsync(x => x.Id == job.Id);
+        Assert.Equal(TemplateGenerationStatus.Cancelled, persisted.Status);
+        Assert.Equal("CANCELLED", persisted.ProviderStatus);
+        Assert.NotNull(persisted.CancelledAtUtc);
+        Assert.NotNull(persisted.RefundedAtUtc);
+        Assert.Null(persisted.CancellationNextAttemptAtUtc);
+        Assert.Equal(1, handler.CancelRequestCount);
+        Assert.Equal(1, handler.StatusRequestCount);
+        Assert.Equal([job.Id], billing.RefundedGenerationIds);
+        Assert.Contains(audit.Entries, entry => entry.Action == "admin.template_generation.cancelled");
+    }
+
+    [Fact]
+    public async Task ProcessNextPendingCancellationAsync_WhenProviderCompleted_ShouldResumeReconciliationWithoutRefund()
+    {
+        await using var dbContext = CreateDbContext();
+        var catalogService = CreateService(dbContext);
+        var billing = new RecordingGenerationBilling();
+        var audit = new RecordingAdminAuditLog();
+        var falOptions = new FalAiOptions
+        {
+            ApiKey = "test-fal-key",
+            QueueBaseUrl = "https://queue.fal.test"
+        };
+        var options = CreateTemplatesOptions(fal: falOptions);
+        var handler = new AcceptedCancellationReconciliationHttpHandler(
+            HttpStatusCode.OK,
+            "COMPLETED");
+        var generationService = CreateGenerationService(
+            dbContext,
+            options,
+            billing,
+            adminAuditLog: audit,
+            falQueueClient: CreateFalQueueClient(dbContext, options, handler));
+        var job = await CreateProviderCancellationJobAsync(
+            dbContext,
+            catalogService,
+            "Accepted Provider Cancellation Completion Race");
+
+        var requested = await generationService.CancelAdminAsync(Guid.NewGuid(), job.Id, CancellationToken.None);
+        Assert.True(requested.IsSuccess);
+        Assert.True(requested.Value.IsPending);
+
+        dbContext.ChangeTracker.Clear();
+        var pending = await dbContext.TemplateGenerationJobs.SingleAsync(x => x.Id == job.Id);
+        pending.CancellationNextAttemptAtUtc = DateTime.UtcNow.AddSeconds(-1);
+        await dbContext.SaveChangesAsync();
+
+        Assert.True(await generationService.ProcessNextPendingCancellationAsync(CancellationToken.None));
+
+        dbContext.ChangeTracker.Clear();
+        var persisted = await dbContext.TemplateGenerationJobs.SingleAsync(x => x.Id == job.Id);
+        Assert.Equal(TemplateGenerationStatus.ProviderProcessing, persisted.Status);
+        Assert.Equal("COMPLETED", persisted.ProviderStatus);
+        Assert.NotNull(persisted.ProviderStatusCheckedAtUtc);
+        Assert.NotNull(persisted.NextAttemptEarliestAtUtc);
+        Assert.True(persisted.NextAttemptEarliestAtUtc <= DateTime.UtcNow);
+        Assert.Null(persisted.RefundedAtUtc);
+        Assert.Null(persisted.CancellationNextAttemptAtUtc);
+        Assert.Empty(billing.RefundedGenerationIds);
+        Assert.Equal(1, handler.CancelRequestCount);
+        Assert.Equal(1, handler.StatusRequestCount);
+        Assert.Contains(
+            audit.Entries,
+            entry => entry.Action == "admin.template_generation.cancellation_raced_completion");
     }
 
     [Fact]
@@ -902,7 +1536,9 @@ public sealed partial class TemplatesServiceTests
             QueueBaseUrl = "https://queue.fal.test"
         };
         var options = CreateTemplatesOptions(fal: falOptions);
-        var handler = new ProviderCancellationHttpHandler(HttpStatusCode.Accepted, "CANCELLATION_REQUESTED");
+        var handler = new AcceptedCancellationReconciliationHttpHandler(
+            HttpStatusCode.NotFound,
+            "NOT_FOUND");
         var generationService = CreateGenerationService(
             dbContext,
             options,
@@ -910,12 +1546,21 @@ public sealed partial class TemplatesServiceTests
             falQueueClient: CreateFalQueueClient(dbContext, options, handler));
         var job = await CreateProviderCancellationJobAsync(dbContext, catalogService, "Provider Cancel Refund Failure");
 
-        var cancelled = await generationService.CancelAdminAsync(Guid.NewGuid(), job.Id, CancellationToken.None);
+        var requested = await generationService.CancelAdminAsync(Guid.NewGuid(), job.Id, CancellationToken.None);
+
+        Assert.True(requested.IsSuccess);
+        Assert.True(requested.Value.IsPending);
+
+        dbContext.ChangeTracker.Clear();
+        var pending = await dbContext.TemplateGenerationJobs.SingleAsync(x => x.Id == job.Id);
+        pending.CancellationAcceptedAtUtc = DateTime.UtcNow.AddSeconds(-10);
+        pending.CancellationNextAttemptAtUtc = DateTime.UtcNow.AddSeconds(-1);
+        await dbContext.SaveChangesAsync();
+
+        Assert.True(await generationService.ProcessNextPendingCancellationAsync(CancellationToken.None));
 
         dbContext.ChangeTracker.Clear();
         var persisted = await dbContext.TemplateGenerationJobs.SingleAsync(x => x.Id == job.Id);
-        Assert.True(cancelled.IsSuccess);
-        Assert.False(cancelled.Value.IsPending);
         Assert.Equal(TemplateGenerationStatus.Cancelled, persisted.Status);
         Assert.Null(persisted.RefundedAtUtc);
         Assert.Equal(1, persisted.RefundAttemptCount);
@@ -1621,7 +2266,7 @@ public sealed partial class TemplatesServiceTests
 
         Assert.True(started.IsSuccess);
         Assert.Equal(2, started.Value.QueuePosition);
-        Assert.Equal(40, started.Value.EstimatedWaitSeconds);
+        Assert.Equal(60, started.Value.EstimatedWaitSeconds);
     }
 
     [Fact]

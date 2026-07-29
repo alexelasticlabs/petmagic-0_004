@@ -11,6 +11,8 @@ namespace PetMagic.Modules.Templates.Api;
 
 public static class TemplatesApiModule
 {
+    internal static readonly TimeSpan FalWebhookJwksTimeout = TimeSpan.FromSeconds(10);
+
     public static IServiceCollection AddTemplatesApiModule(this IServiceCollection services)
     {
         services.AddMemoryCache();
@@ -30,11 +32,19 @@ public static class TemplatesApiModule
         services.AddScoped<IValidator<SubmitFeedbackCommand>, SubmitFeedbackCommandValidator>();
         services.AddScoped<IValidator<UpdateFeedbackAdminCommand>, UpdateFeedbackAdminCommandValidator>();
         services.AddScoped<IValidator<RefundFeedbackCreditsCommand>, RefundFeedbackCreditsCommandValidator>();
-        services.AddHttpClient(FalWebhookSignatureVerifier.HttpClientName);
+        services.AddHttpClient(
+                FalWebhookSignatureVerifier.HttpClientName,
+                client => client.Timeout = FalWebhookJwksTimeout)
+            .ConfigurePrimaryHttpMessageHandler(CreateFalWebhookJwksPrimaryHandler);
         services.AddScoped<IFalWebhookSignatureVerifier, FalWebhookSignatureVerifier>();
 
         return services;
     }
+
+    internal static HttpMessageHandler CreateFalWebhookJwksPrimaryHandler() => new HttpClientHandler
+    {
+        AllowAutoRedirect = false
+    };
 
     public static IApplicationBuilder MapTemplatesApiModule(this WebApplication app)
     {

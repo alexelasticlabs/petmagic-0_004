@@ -45,6 +45,15 @@ internal sealed class FalImageGenerator(FalQueueClient queueClient) : IImageGene
         string prompt,
         string model,
         int? seed,
+        CancellationToken cancellationToken) =>
+        await SubmitAsync(sourceImageUrl, prompt, model, seed, callbackToken: null, cancellationToken);
+
+    public async Task<Result<ProviderQueueSubmission>> SubmitAsync(
+        string sourceImageUrl,
+        string prompt,
+        string model,
+        int? seed,
+        string? callbackToken,
         CancellationToken cancellationToken)
     {
         var input = BuildInput(sourceImageUrl, prompt, seed);
@@ -52,6 +61,7 @@ internal sealed class FalImageGenerator(FalQueueClient queueClient) : IImageGene
             model,
             input,
             new FalQueueStageKind("image", FalQueueStages.ImageGeneration),
+            callbackToken,
             cancellationToken);
         return result.IsFailure
             ? Result.Failure<ProviderQueueSubmission>(result.Error)

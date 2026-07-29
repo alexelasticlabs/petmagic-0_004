@@ -80,7 +80,19 @@ internal sealed partial class TemplateGenerationService
         Guid generationId,
         CancellationToken cancellationToken)
     {
-        await using var transaction = await BeginGenerationAdminActionTransactionAsync(cancellationToken);
+        var retryOwner = await dbContext.TemplateGenerationJobs
+            .AsNoTracking()
+            .Where(x => x.Id == generationId && x.HiddenByUserAtUtc == null)
+            .Select(x => new { x.UserId })
+            .SingleOrDefaultAsync(cancellationToken);
+        if (retryOwner is null)
+        {
+            return Result.Failure<TemplateGenerationResponse>(TemplatesErrors.GenerationJobNotFound);
+        }
+
+        await using var transaction = await BeginGenerationAdmissionTransactionAsync(
+            retryOwner.UserId,
+            cancellationToken);
         if (transaction is not null)
         {
             await LockGenerationRowForAdminActionAsync(generationId, cancellationToken);
@@ -110,9 +122,29 @@ internal sealed partial class TemplateGenerationService
             return Result.Failure<TemplateGenerationResponse>(TemplatesErrors.GenerationRetryNotAllowed);
         }
 
+        const string queueTier = TemplateGenerationQueue.TierAdmin;
+        var admission = await EnsureGenerationAdmissionUnderLockAsync(
+            job.UserId,
+            job.Template,
+            queueTier,
+            options.PrivilegedUserMaxActiveGenerations,
+            cancellationToken);
+        if (admission.IsFailure)
+        {
+            if (transaction is not null)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+            }
+
+            return Result.Failure<TemplateGenerationResponse>(admission.Error);
+        }
+
         var previousStatus = job.Status;
         var now = DateTime.UtcNow;
         ResetAdminRetryState(job, now);
+        job.QueueTier = queueTier;
+        job.EstimatedWaitSecondsAtQueue = admission.Value.EstimatedWaitSeconds;
+        job.EstimatedCompletionAtQueueUtc = admission.Value.EstimatedCompletionAtUtc;
         await dbContext.SaveChangesAsync(cancellationToken);
         if (transaction is not null)
         {

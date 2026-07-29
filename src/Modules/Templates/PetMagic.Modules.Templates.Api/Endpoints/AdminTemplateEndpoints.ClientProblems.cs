@@ -23,6 +23,7 @@ public static partial class AdminTemplateEndpoints
             "templates.invalid_subject" => StatusCodes.Status401Unauthorized,
             "templates.not_found"
                 or "GENERATION_JOB_NOT_FOUND"
+                or "templates.provider_attempt_not_found"
                 or "templates.template_of_the_day_template_unavailable" => StatusCodes.Status404NotFound,
             "templates.invalid_status"
                 or "templates.preview_required"
@@ -43,6 +44,9 @@ public static partial class AdminTemplateEndpoints
                 or "templates.generation_refund_not_pending"
                 or "templates.generation_refund_retry_not_exhausted"
                 or "templates.generation_refund_retry_idempotency_conflict"
+                or "templates.generation_control_policy_conflict"
+                or "templates.generation_control_idempotency_conflict"
+                or "templates.provider_attempt_resolution_conflict"
                 or "templates.gamification_legacy_review_not_required"
                 or "templates.moderation_decision_conflict"
                 or "templates.moderation_lease_conflict"

@@ -32,7 +32,8 @@ internal sealed partial class TemplateGenerationService(
     IDataProtectionProvider? dataProtectionProvider = null,
     IAdminAuditLog? adminAuditLog = null,
     FalQueueClient? falQueueClient = null,
-    IHttpContextAccessor? httpContextAccessor = null) : ITemplateGenerationService, ITemplateGenerationGamificationReconciliationService
+    IHttpContextAccessor? httpContextAccessor = null,
+    ITemplateGenerationRuntimePolicyProvider? runtimePolicyProvider = null) : ITemplateGenerationService, ITemplateGenerationGamificationReconciliationService
 {
     private readonly ITemplateVisibilityPolicy _visibilityPolicy =
         visibilityPolicy ?? new TemplateVisibilityPolicy();

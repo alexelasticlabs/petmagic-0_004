@@ -58,6 +58,10 @@ internal sealed partial class TemplateGenerationService
                 command.PetPhotoId is null ? TemplatesErrors.PetPhotoRequired : TemplatesErrors.PetPhotoNotFound);
         }
 
+        await using var admissionTransaction = await BeginGenerationAdmissionTransactionAsync(
+            command.UserId,
+            cancellationToken);
+
         var duplicate = await FindActiveDuplicateAsync(
             command.UserId,
             normalizedIdempotencyKey,
@@ -72,8 +76,7 @@ internal sealed partial class TemplateGenerationService
         var activeCount = await dbContext.TemplateGenerationJobs
             .AsNoTracking()
             .CountAsync(x => x.UserId == command.UserId
-                && TemplateGenerationJobStatusSets.Active.Contains(x.Status)
-                && (x.Status != TemplateGenerationStatus.Queued || x.ChargedAtUtc != null),
+                && TemplateGenerationJobStatusSets.Active.Contains(x.Status),
                 cancellationToken);
         if (activeCount >= activeLimit)
         {
@@ -84,10 +87,7 @@ internal sealed partial class TemplateGenerationService
         {
             var queueSize = await dbContext.TemplateGenerationJobs
                 .AsNoTracking()
-                .CountAsync(x => TemplateGenerationJobStatusSets.Active.Contains(x.Status)
-                    && (x.Status != TemplateGenerationStatus.Queued
-                        || x.ChargedAtUtc != null
-                        || x.UserId == AdminTestUserId),
+                .CountAsync(x => TemplateGenerationJobStatusSets.Active.Contains(x.Status),
                     cancellationToken);
             if (queueSize >= options.QueueMaxSize)
             {
@@ -153,10 +153,20 @@ internal sealed partial class TemplateGenerationService
         try
         {
             await dbContext.SaveChangesAsync(cancellationToken);
+            if (admissionTransaction is not null)
+            {
+                await admissionTransaction.CommitAsync(cancellationToken);
+            }
+
             TemplateGenerationMetrics.RecordJobQueued(job);
         }
         catch (DbUpdateException) when (normalizedIdempotencyKey is not null)
         {
+            if (admissionTransaction is not null)
+            {
+                await admissionTransaction.RollbackAsync(cancellationToken);
+            }
+
             dbContext.ChangeTracker.Clear();
             duplicate = await FindActiveDuplicateAsync(command.UserId, normalizedIdempotencyKey, null, cancellationToken);
             if (duplicate is not null)
@@ -190,6 +200,21 @@ internal sealed partial class TemplateGenerationService
             return Result.Failure<TemplateGenerationResponse>(readiness);
         }
 
+        await using var admissionTransaction = await BeginGenerationAdmissionTransactionAsync(
+            AdminTestUserId,
+            cancellationToken);
+        const string queueTier = TemplateGenerationQueue.TierAdmin;
+        var admission = await EnsureGenerationAdmissionUnderLockAsync(
+            AdminTestUserId,
+            template,
+            queueTier,
+            options.PrivilegedUserMaxActiveGenerations,
+            cancellationToken);
+        if (admission.IsFailure)
+        {
+            return Result.Failure<TemplateGenerationResponse>(admission.Error);
+        }
+
         var now = DateTime.UtcNow;
         var correlationId = NormalizeOptionalText(CorrelationContext.CurrentId, CorrelationContext.MaxLength);
         var job = new TemplateGenerationJob
@@ -201,7 +226,7 @@ internal sealed partial class TemplateGenerationService
             Status = TemplateGenerationStatus.Queued,
             TokenCost = template.TokenCost,
             QueueMediaType = TemplateGenerationQueue.ResolveMediaType(template.TemplateType),
-            QueueTier = TemplateGenerationQueue.TierAdmin,
+            QueueTier = queueTier,
             SourceImageUrl = ResolveManagedStoragePathOrUrl(sourceImageAsset.Url),
             SourceImageFileName = sourceImageAsset.FileName,
             SourceImageContentType = sourceImageAsset.ContentType,
@@ -210,11 +235,18 @@ internal sealed partial class TemplateGenerationService
             CorrelationId = correlationId,
             CreatedAtUtc = now,
             QueuedAtUtc = now,
+            EstimatedWaitSecondsAtQueue = admission.Value.EstimatedWaitSeconds,
+            EstimatedCompletionAtQueueUtc = admission.Value.EstimatedCompletionAtUtc,
             UpdatedAtUtc = now
         };
 
         dbContext.TemplateGenerationJobs.Add(job);
         await dbContext.SaveChangesAsync(cancellationToken);
+        if (admissionTransaction is not null)
+        {
+            await admissionTransaction.CommitAsync(cancellationToken);
+        }
+
         TemplateGenerationMetrics.RecordJobQueued(job);
 
         return Result.Success(await MapResponseWithQueueMetricsAsync(job, cancellationToken));

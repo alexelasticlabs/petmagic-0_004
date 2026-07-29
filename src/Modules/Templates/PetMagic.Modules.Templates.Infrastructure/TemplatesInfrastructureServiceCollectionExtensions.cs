@@ -89,12 +89,20 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
             SeedSampleTemplates = ParseBool(section["SeedSampleTemplates"], false),
             QaFixturesEnabled = ParseBool(ReadValue(section, "QaFixturesEnabled", "PETMAGIC_QA_FIXTURES_ENABLED"), false),
             GenerationWorkerEnabled = ParseBool(section["GenerationWorkerEnabled"], true),
+            GenerationSchedulerV2Enabled = ParseBool(section["GenerationSchedulerV2Enabled"], false),
             GenerationWorkerPollIntervalMilliseconds = ParseInt(section["GenerationWorkerPollIntervalMilliseconds"], 1_000),
             RealtimePollingIntervalMilliseconds = ParsePositiveInt(section["RealtimePollingIntervalMilliseconds"], 1_000),
             RealtimeEventRetentionMinutes = ParsePositiveInt(section["RealtimeEventRetentionMinutes"], 60),
             RealtimeEventCleanupIntervalMinutes = ParsePositiveInt(section["RealtimeEventCleanupIntervalMinutes"], 10),
             RealtimeEventCleanupBatchSize = ParsePositiveInt(section["RealtimeEventCleanupBatchSize"], 1_000),
-            MaxConcurrentJobsPerWorker = ParsePositiveInt(section["MaxConcurrentJobsPerWorker"], 1),
+            GenerationDispatchConcurrency = ParsePositiveInt(section["GenerationDispatchConcurrency"], 4),
+            ProviderReconciliationConcurrency = ParsePositiveInt(section["ProviderReconciliationConcurrency"], 4),
+            MediaImportConcurrency = ParsePositiveInt(section["MediaImportConcurrency"], 1),
+            GenerationMaintenanceConcurrency = ParsePositiveInt(section["GenerationMaintenanceConcurrency"], 1),
+            ProviderWebhookInboxMaxFailureCount = ParsePositiveInt(section["ProviderWebhookInboxMaxFailureCount"], 8),
+            ProviderWebhookInboxRetentionDays = ParsePositiveInt(section["ProviderWebhookInboxRetentionDays"], 7),
+            ProviderWebhookInboxCleanupIntervalMinutes = ParsePositiveInt(section["ProviderWebhookInboxCleanupIntervalMinutes"], 60),
+            ProviderWebhookInboxCleanupBatchSize = ParsePositiveInt(section["ProviderWebhookInboxCleanupBatchSize"], 500),
             GlobalMaxConcurrentGenerations = ParsePositiveInt(section["GlobalMaxConcurrentGenerations"], 3),
             ImageReservedConcurrentGenerations = ParseNonNegativeInt(section["ImageReservedConcurrentGenerations"], 0),
             ImageMaxConcurrentGenerations = ParsePositiveInt(section["ImageMaxConcurrentGenerations"], 2),
@@ -111,14 +119,16 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
             VideoPreprocessingMaxConcurrentGenerations = ParsePositiveInt(section["VideoPreprocessingMaxConcurrentGenerations"], 1),
             FalProviderConcurrencyLimit = ParseNonNegativeInt(section["FalProviderConcurrencyLimit"], 0),
             FalProviderReservedConcurrency = ParseNonNegativeInt(section["FalProviderReservedConcurrency"], 1),
-            FalProviderBalanceLowThresholdUsd = ParseNonNegativeDecimal(section["FalProviderBalanceLowThresholdUsd"], 100m),
-            FalProviderBalanceCriticalThresholdUsd = ParseNonNegativeDecimal(section["FalProviderBalanceCriticalThresholdUsd"], 25m),
+            FalProviderBalanceLowThresholdUsd = ParseNonNegativeDecimal(section["FalProviderBalanceLowThresholdUsd"], 10m),
+            FalProviderBalanceCriticalThresholdUsd = ParseNonNegativeDecimal(section["FalProviderBalanceCriticalThresholdUsd"], 5m),
             FalProviderSpendDailyLimitUsd = ParseNonNegativeDecimal(section["FalProviderSpendDailyLimitUsd"], 0m),
             MaxAiProviderRequestsPerMinute = ParseNonNegativeInt(section["MaxAiProviderRequestsPerMinute"], 60),
             QueueMaxSize = ParseNonNegativeInt(section["QueueMaxSize"], 1_000),
             EstimatedVideoGenerationSeconds = ParsePositiveInt(section["EstimatedVideoGenerationSeconds"], 420),
             EstimatedImageGenerationSeconds = ParsePositiveInt(section["EstimatedImageGenerationSeconds"], 90),
             EstimatedVideoPreprocessingSeconds = ParsePositiveInt(section["EstimatedVideoPreprocessingSeconds"], 90),
+            EstimatedImageImportSeconds = ParsePositiveInt(section["EstimatedImageImportSeconds"], 30),
+            EstimatedVideoImportSeconds = ParsePositiveInt(section["EstimatedVideoImportSeconds"], 120),
             FreeQueuePriorityScore = ParsePositiveInt(section["FreeQueuePriorityScore"], 1_000),
             PremiumQueuePriorityScore = ParsePositiveInt(section["PremiumQueuePriorityScore"], 4_000),
             PrivilegedQueuePriorityScore = ParsePositiveInt(section["PrivilegedQueuePriorityScore"], 8_000),
@@ -138,10 +148,15 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
             JobLockTimeoutMilliseconds = ParsePositiveInt(
                 section["JobLockTimeoutMilliseconds"] ?? section["StaleProcessingRecoveryDelayMilliseconds"],
                 900_000),
+            ProviderReconciliationClaimLeaseMilliseconds = ParsePositiveInt(
+                section["ProviderReconciliationClaimLeaseMilliseconds"],
+                90_000),
             StaleProcessingRecoveryDelayMilliseconds = ParsePositiveInt(section["StaleProcessingRecoveryDelayMilliseconds"], 900_000),
             OrphanQueuedJobTimeoutMilliseconds = ParsePositiveInt(section["OrphanQueuedJobTimeoutMilliseconds"], 120_000),
             MaxGenerationAttempts = ParsePositiveInt(section["MaxGenerationAttempts"], 3),
             ProviderTransientRetryBaseDelaySeconds = ParsePositiveInt(section["ProviderTransientRetryBaseDelaySeconds"], 30),
+            MediaImportMaxAttempts = ParsePositiveInt(section["MediaImportMaxAttempts"], 5),
+            MediaImportRetryBaseDelaySeconds = ParsePositiveInt(section["MediaImportRetryBaseDelaySeconds"], 30),
             MaxRefundAttempts = ParsePositiveInt(section["MaxRefundAttempts"], 5),
             RefundRetryDelayMilliseconds = ParseNonNegativeInt(section["RefundRetryDelayMilliseconds"], 30_000),
             GenerationRetentionDaysAfterCompletion = ParseInt(section["GenerationRetentionDaysAfterCompletion"], 7),
@@ -215,12 +230,19 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         services.AddSingleton<ITemplateMediaReadUrlSigner, TemplateMediaReadUrlSigner>();
         services.AddSingleton(new TemplateSchedulerConfigComponent(resolvedSchedulerComponent));
         services.AddSingleton<TemplateSchedulerConfigRuntimeState>();
+        services.AddSingleton<TemplateGenerationWorkerRuntimeState>();
         services.AddHostedService<TemplateSchedulerConfigStartupService>();
         services.AddSingleton<TemplateWatermarkSettingsStore>();
         services.AddDbContextPool<TemplatesDbContext>(dbOptions =>
         {
             dbOptions.UseNpgsql(configuration.GetConnectionString("DefaultConnection"));
         });
+        services.AddTemplateGenerationControlFoundation(
+            string.Equals(
+                resolvedSchedulerComponent,
+                TemplateSchedulerConfigFingerprint.ApiComponent,
+                StringComparison.Ordinal),
+            options.GenerationSchedulerV2Enabled);
         services.AddSingleton<ITemplateMediaUploadPolicy, ConfiguredTemplateMediaUploadPolicy>();
         services.AddSingleton<IMediaMetadataReader, FileMediaMetadataReader>();
         services.AddSingleton<ITemplateWatermarkRenderer, TemplateWatermarkRenderer>();
@@ -238,11 +260,6 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
             });
         services.AddHttpClient(HttpGeneratedMediaImporter.HttpClientName, ConfigureExternalHttpClient)
             .ConfigurePrimaryHttpMessageHandler(GeneratedMediaHttpMessageHandler.Create);
-        services.AddHttpClient(FalProviderHealthService.HttpClientName, ConfigureExternalHttpClient)
-            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
-            {
-                AllowAutoRedirect = false
-            });
         services.AddScoped<ITemplateAiProviderHealthService, FalProviderHealthService>();
         services.AddScoped<ITemplatePushTokenService, TemplatePushTokenService>();
         services.AddHttpClient(TemplateLocalizationTranslator.HttpClientName, ConfigureExternalHttpClient)
@@ -765,6 +782,11 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
             || options.RealtimeEventCleanupBatchSize <= 0)
         {
             throw new InvalidOperationException("Template realtime event retention and cleanup settings must be positive.");
+        }
+
+        if (options.MediaImportMaxAttempts <= 0 || options.MediaImportRetryBaseDelaySeconds <= 0)
+        {
+            throw new InvalidOperationException("Template media import retry settings must be positive.");
         }
 
         if (options.FreeImageMaxEstimatedWaitSeconds <= 0

@@ -1,5 +1,5 @@
-using System.Text.RegularExpressions;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Xml.Linq;
 
 namespace PetMagic.Modules.Identity.Tests.Host;
@@ -179,22 +179,12 @@ public sealed class BackendEnvironmentContractTests
         var workerEnvironment = ExtractServiceEnvironmentBlock(dockerCompose, "generation-worker");
         var fingerprintEnvironmentKeys = new[]
         {
-            "Templates__GlobalMaxConcurrentGenerations",
-            "Templates__ImageReservedConcurrentGenerations",
-            "Templates__ImageMaxConcurrentGenerations",
-            "Templates__ImageProtectedConcurrentGenerations",
-            "Templates__VideoReservedConcurrentGenerations",
-            "Templates__VideoMaxConcurrentGenerations",
-            "Templates__VideoBorrowMaxConcurrentGenerations",
             "Templates__EnableElasticLaneBorrowing",
             "Templates__AllowVideoBorrowWhenImageQueueEmpty",
             "Templates__AllowVideoBorrowWhenImageEstimatedWaitBelowSeconds",
             "Templates__VideoBorrowReleaseMode",
             "Templates__BorrowedVideoMaxAgeSeconds",
             "Templates__BorrowingPriorityTiers",
-            "Templates__VideoPreprocessingMaxConcurrentGenerations",
-            "Templates__FalProviderConcurrencyLimit",
-            "Templates__FalProviderReservedConcurrency",
             "Templates__QueueMaxSize",
             "Templates__EstimatedVideoGenerationSeconds",
             "Templates__EstimatedImageGenerationSeconds",
@@ -208,18 +198,40 @@ public sealed class BackendEnvironmentContractTests
             "Templates__QueuePriorityAgingIntervalSeconds",
             "Templates__QueuePriorityAgingBoost",
             "Templates__CancelQueuedGenerationEnabled",
-            "Templates__MaxConcurrentJobsPerWorker",
-            "Templates__GenerationWorkerPollIntervalMilliseconds",
             "Templates__MaxAiProviderRequestsPerMinute",
             "Templates__MaxGenerationAttempts",
             "Templates__RefundRetryDelayMilliseconds",
             "Templates__JobLockTimeoutMilliseconds",
+            "Templates__ProviderReconciliationClaimLeaseMilliseconds",
             "Templates__OrphanQueuedJobTimeoutMilliseconds"
         };
 
         foreach (var key in fingerprintEnvironmentKeys)
         {
             Assert.Contains($"{key}:", backendEnvironment, StringComparison.Ordinal);
+            Assert.Contains($"{key}:", workerEnvironment, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void DockerComposeGenerationWorkerLaneSettings_ShouldStayWorkerOnly()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var dockerCompose = File.ReadAllText(Path.Combine(repositoryRoot, "docker-compose.yml"));
+        var backendEnvironment = ExtractBackendEnvironmentBlock(dockerCompose);
+        var workerEnvironment = ExtractServiceEnvironmentBlock(dockerCompose, "generation-worker");
+        var workerOnlyKeys = new[]
+        {
+            "Templates__GenerationWorkerPollIntervalMilliseconds",
+            "Templates__GenerationDispatchConcurrency",
+            "Templates__ProviderReconciliationConcurrency",
+            "Templates__MediaImportConcurrency",
+            "Templates__GenerationMaintenanceConcurrency"
+        };
+
+        foreach (var key in workerOnlyKeys)
+        {
+            Assert.DoesNotContain($"{key}:", backendEnvironment, StringComparison.Ordinal);
             Assert.Contains($"{key}:", workerEnvironment, StringComparison.Ordinal);
         }
     }
@@ -236,6 +248,9 @@ public sealed class BackendEnvironmentContractTests
         Assert.Equal(900, ReadComposeFallbackInt(dockerCompose, "GENERATION_PREMIUM_IMAGE_MAX_WAIT_SECONDS"));
         Assert.Equal(900, ReadComposeFallbackInt(dockerCompose, "GENERATION_PRIVILEGED_IMAGE_MAX_WAIT_SECONDS"));
         Assert.Equal(900_000, ReadComposeFallbackInt(dockerCompose, "GENERATION_JOB_LOCK_TIMEOUT_MS"));
+        Assert.Equal(90_000, ReadComposeFallbackInt(
+            dockerCompose,
+            "GENERATION_PROVIDER_RECONCILIATION_CLAIM_LEASE_MS"));
         Assert.Equal(30_000, ReadComposeFallbackInt(dockerCompose, "GENERATION_REFUND_RETRY_DELAY_MS"));
     }
 
@@ -270,6 +285,7 @@ public sealed class BackendEnvironmentContractTests
             "GENERATION_PREMIUM_VIDEO_MAX_WAIT_SECONDS",
             "GENERATION_PRIVILEGED_VIDEO_MAX_WAIT_SECONDS",
             "GENERATION_JOB_LOCK_TIMEOUT_MS",
+            "GENERATION_PROVIDER_RECONCILIATION_CLAIM_LEASE_MS",
             "GENERATION_REFUND_RETRY_DELAY_MS"
         };
 
@@ -331,7 +347,7 @@ public sealed class BackendEnvironmentContractTests
     }
 
     [Fact]
-    public void ApiAndGenerationWorkerDevelopmentSchedulerDefaults_ShouldStayFingerprintCompatible()
+    public void ApiAndGenerationWorkerDevelopmentSchedulerDefaults_ShouldSeparateWorkerLanesFromFingerprint()
     {
         var repositoryRoot = FindRepositoryRoot();
         var apiDevelopmentSettingsPath = Path.Combine(
@@ -356,9 +372,14 @@ public sealed class BackendEnvironmentContractTests
         Assert.Equal(
             ReadJsonIntOrDefault(workerSettingsPath, 30_000, "Templates", "RefundRetryDelayMilliseconds"),
             ReadJsonInt(apiDevelopmentSettingsPath, "Templates", "RefundRetryDelayMilliseconds"));
-        Assert.Equal(
-            ReadJsonInt(workerSettingsPath, "Templates", "GenerationWorkerPollIntervalMilliseconds"),
-            ReadJsonInt(apiDevelopmentSettingsPath, "Templates", "GenerationWorkerPollIntervalMilliseconds"));
+        var apiDevelopmentSettings = File.ReadAllText(apiDevelopmentSettingsPath);
+        Assert.DoesNotContain("GenerationWorkerPollIntervalMilliseconds", apiDevelopmentSettings, StringComparison.Ordinal);
+        Assert.DoesNotContain("GenerationDispatchConcurrency", apiDevelopmentSettings, StringComparison.Ordinal);
+        Assert.Equal(500, ReadJsonInt(workerSettingsPath, "Templates", "GenerationWorkerPollIntervalMilliseconds"));
+        Assert.Equal(4, ReadJsonInt(workerSettingsPath, "Templates", "GenerationDispatchConcurrency"));
+        Assert.Equal(4, ReadJsonInt(workerSettingsPath, "Templates", "ProviderReconciliationConcurrency"));
+        Assert.Equal(1, ReadJsonInt(workerSettingsPath, "Templates", "MediaImportConcurrency"));
+        Assert.Equal(1, ReadJsonInt(workerSettingsPath, "Templates", "GenerationMaintenanceConcurrency"));
     }
 
     [Fact]

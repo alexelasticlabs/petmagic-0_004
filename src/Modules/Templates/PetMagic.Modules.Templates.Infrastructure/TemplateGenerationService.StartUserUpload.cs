@@ -39,6 +39,10 @@ internal sealed partial class TemplateGenerationService
             return Result.Failure<TemplateGenerationResponse>(readiness);
         }
 
+        await using var admissionTransaction = await BeginGenerationAdmissionTransactionAsync(
+            command.UserId,
+            cancellationToken);
+
         var duplicate = await FindActiveDuplicateAsync(
             command.UserId,
             normalizedIdempotencyKey,
@@ -53,8 +57,7 @@ internal sealed partial class TemplateGenerationService
         var activeCount = await dbContext.TemplateGenerationJobs
             .AsNoTracking()
             .CountAsync(x => x.UserId == command.UserId
-                && TemplateGenerationJobStatusSets.Active.Contains(x.Status)
-                && (x.Status != TemplateGenerationStatus.Queued || x.ChargedAtUtc != null),
+                && TemplateGenerationJobStatusSets.Active.Contains(x.Status),
                 cancellationToken);
         if (activeCount >= activeLimit)
         {
@@ -65,10 +68,7 @@ internal sealed partial class TemplateGenerationService
         {
             var queueSize = await dbContext.TemplateGenerationJobs
                 .AsNoTracking()
-                .CountAsync(x => TemplateGenerationJobStatusSets.Active.Contains(x.Status)
-                    && (x.Status != TemplateGenerationStatus.Queued
-                        || x.ChargedAtUtc != null
-                        || x.UserId == AdminTestUserId),
+                .CountAsync(x => TemplateGenerationJobStatusSets.Active.Contains(x.Status),
                     cancellationToken);
             if (queueSize >= options.QueueMaxSize)
             {
@@ -147,10 +147,20 @@ internal sealed partial class TemplateGenerationService
         try
         {
             await dbContext.SaveChangesAsync(cancellationToken);
+            if (admissionTransaction is not null)
+            {
+                await admissionTransaction.CommitAsync(cancellationToken);
+            }
+
             TemplateGenerationMetrics.RecordJobQueued(job);
         }
         catch (DbUpdateException) when (normalizedIdempotencyKey is not null || normalizedRequestHash is not null)
         {
+            if (admissionTransaction is not null)
+            {
+                await admissionTransaction.RollbackAsync(cancellationToken);
+            }
+
             dbContext.ChangeTracker.Clear();
             duplicate = await FindActiveDuplicateAsync(
                 command.UserId,

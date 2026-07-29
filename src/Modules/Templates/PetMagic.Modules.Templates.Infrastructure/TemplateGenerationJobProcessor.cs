@@ -38,13 +38,17 @@ internal sealed partial class TemplateGenerationJobProcessor(
     ITemplateWatermarkRenderer? watermarkRenderer = null,
     TemplateWatermarkSettingsStore? watermarkSettings = null,
     IGamificationService? gamificationService = null,
-    IEconomyService? economyService = null)
+    IEconomyService? economyService = null,
+    ITemplateGenerationProviderAttemptStore? providerAttemptStore = null,
+    ITemplateGenerationRuntimePolicyProvider? runtimePolicyProvider = null,
+    IFalProviderRuntimeSnapshotService? providerRuntimeSnapshotService = null)
 {
     private const string NpgsqlProviderName = "Npgsql.EntityFrameworkCore.PostgreSQL";
     private const int GlobalGenerationAdvisoryLockKey = 0x506D4745;
     private const int ImageGenerationAdvisoryLockKey = 0x506D4749;
     private const int VideoGenerationAdvisoryLockKey = 0x506D4756;
     private const int BorrowedVideoGenerationAdvisoryLockKey = 0x506D4742;
+    private const int QueueFairnessAdvisoryLockKey = 0x506D4752;
     private const string GamificationSyncFailedCode = "templates.gamification_sync_failed";
     private static readonly string WorkerInstanceId = $"{Environment.MachineName}:{Guid.NewGuid():N}";
     private static readonly object LocalConcurrencyLock = new();
@@ -52,6 +56,7 @@ internal sealed partial class TemplateGenerationJobProcessor(
     private static readonly HashSet<int> LocalImageConcurrencySlots = [];
     private static readonly HashSet<int> LocalVideoConcurrencySlots = [];
     private static readonly HashSet<int> LocalBorrowedVideoConcurrencySlots = [];
+    private static long nextProviderWebhookInboxCleanupTick;
 
     public TemplateGenerationJobProcessor(
         TemplatesDbContext dbContext,
@@ -106,18 +111,34 @@ internal sealed partial class TemplateGenerationJobProcessor(
             return true;
         }
 
-        await using var concurrencyLease = await TryAcquireGlobalConcurrencyLeaseAsync(cancellationToken);
+        return await ProcessNextDispatchAsync(cancellationToken)
+            || failedOrphanQueuedJob
+            || recoveredStaleJob;
+    }
+
+    public async Task<bool> ProcessNextDispatchAsync(CancellationToken cancellationToken)
+    {
+        var schedulerProfile = await ResolveSchedulerProfileAsync(cancellationToken);
+        if (schedulerProfile is null || schedulerProfile.GlobalMaxConcurrentGenerations <= 0)
+        {
+            TemplateGenerationMetrics.RecordSchedulerNoSlotSkip("admission_paused");
+            return false;
+        }
+
+        await using var concurrencyLease = await TryAcquireGlobalConcurrencyLeaseAsync(
+            schedulerProfile.GlobalMaxConcurrentGenerations,
+            cancellationToken);
         if (concurrencyLease is null)
         {
             TemplateGenerationMetrics.RecordSchedulerNoSlotSkip("global");
-            return failedOrphanQueuedJob || recoveredStaleJob;
+            return false;
         }
 
-        await using var mediaLeases = await TryAcquireMediaConcurrencyLeasesAsync(cancellationToken);
+        await using var mediaLeases = await TryAcquireMediaConcurrencyLeasesAsync(schedulerProfile, cancellationToken);
         if (!mediaLeases.HasAny)
         {
             TemplateGenerationMetrics.RecordSchedulerNoSlotSkip("media");
-            return failedOrphanQueuedJob || recoveredStaleJob;
+            return false;
         }
 
         var claimStartedAt = System.Diagnostics.Stopwatch.GetTimestamp();
@@ -125,6 +146,7 @@ internal sealed partial class TemplateGenerationJobProcessor(
             mediaLeases.AllowImage,
             mediaLeases.AllowNativeVideo,
             mediaLeases.AllowBorrowedVideo,
+            mediaLeases.AllowVideoPreprocessing,
             cancellationToken);
         var usedBorrowedVideoSlot = mediaLeases.UsesBorrowedVideoFor(job);
         mediaLeases.ReleaseUnusedFor(job);
@@ -137,7 +159,7 @@ internal sealed partial class TemplateGenerationJobProcessor(
                 return true;
             }
 
-            return failedOrphanQueuedJob || recoveredStaleJob;
+            return false;
         }
 
         var correlationId = ResolveJobCorrelationId(job);
@@ -160,6 +182,99 @@ internal sealed partial class TemplateGenerationJobProcessor(
 
         await ProcessAsync(job, cancellationToken);
         return true;
+    }
+
+    public async Task<bool> ProcessNextMaintenanceAsync(CancellationToken cancellationToken)
+    {
+        if (await SettleNextPendingGenerationBillingCommandAsync(cancellationToken))
+        {
+            return true;
+        }
+
+        await RecordQueueSnapshotAsync(cancellationToken);
+
+        if (await FailNextOrphanQueuedJobAsync(cancellationToken))
+        {
+            return true;
+        }
+
+        if (await RecoverNextStaleProcessingJobAsync(cancellationToken))
+        {
+            return true;
+        }
+
+        if (await RetryNextRefundAsync(cancellationToken))
+        {
+            return true;
+        }
+
+        if (await CleanupNextExpiredGenerationAsync(cancellationToken))
+        {
+            return true;
+        }
+
+        if (await CleanupTerminalProviderWebhookInboxAsync(cancellationToken))
+        {
+            return true;
+        }
+
+        return await ProcessNextPendingGamificationAsync(cancellationToken);
+    }
+
+    private async Task<bool> CleanupTerminalProviderWebhookInboxAsync(CancellationToken cancellationToken)
+    {
+        if (providerAttemptStore is null)
+        {
+            return false;
+        }
+
+        var nowTick = Environment.TickCount64;
+        var observedNextTick = Volatile.Read(ref nextProviderWebhookInboxCleanupTick);
+        if (observedNextTick > nowTick)
+        {
+            return false;
+        }
+
+        var intervalMilliseconds = checked(
+            (long)TimeSpan.FromMinutes(options.ProviderWebhookInboxCleanupIntervalMinutes).TotalMilliseconds);
+        if (Interlocked.CompareExchange(
+                ref nextProviderWebhookInboxCleanupTick,
+                nowTick + intervalMilliseconds,
+                observedNextTick) != observedNextTick)
+        {
+            return false;
+        }
+
+        try
+        {
+            var cutoffUtc = DateTime.UtcNow.AddDays(-options.ProviderWebhookInboxRetentionDays);
+            var deletedCount = await providerAttemptStore.CleanupTerminalWebhooksAsync(
+                cutoffUtc,
+                options.ProviderWebhookInboxCleanupBatchSize,
+                cancellationToken);
+            if (deletedCount > 0)
+            {
+                TemplateGenerationMetrics.RecordProviderWebhookInboxCleaned(deletedCount);
+                logger.LogInformation(
+                    "Provider webhook inbox retention cleanup completed. DeletedCount={DeletedCount} RetentionDays={RetentionDays}",
+                    deletedCount,
+                    options.ProviderWebhookInboxRetentionDays);
+            }
+
+            if (deletedCount >= options.ProviderWebhookInboxCleanupBatchSize)
+            {
+                Volatile.Write(ref nextProviderWebhookInboxCleanupTick, Environment.TickCount64);
+            }
+
+            return deletedCount > 0;
+        }
+        catch
+        {
+            Volatile.Write(
+                ref nextProviderWebhookInboxCleanupTick,
+                Environment.TickCount64 + (long)TimeSpan.FromMinutes(1).TotalMilliseconds);
+            throw;
+        }
     }
 
     public async Task<bool> ProcessNextPendingGamificationAsync(CancellationToken cancellationToken)

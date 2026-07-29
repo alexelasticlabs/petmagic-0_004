@@ -86,7 +86,7 @@ public sealed class FalQueueClientRateLimiterTests
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
-        Assert.Equal(TemplatesErrors.AiProviderFailed.Code, result.Error.Code);
+        Assert.Equal(TemplatesErrors.AiProviderSubmissionUnknown.Code, result.Error.Code);
         Assert.Equal(1, handler.SubmitCount);
         Assert.Equal(0, handler.StatusCount);
         Assert.Equal(0, handler.ResponseCount);
@@ -115,10 +115,50 @@ public sealed class FalQueueClientRateLimiterTests
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
-        Assert.Equal(TemplatesErrors.AiProviderFailed.Code, result.Error.Code);
+        Assert.Equal(TemplatesErrors.AiProviderSubmissionUnknown.Code, result.Error.Code);
         Assert.Equal(1, handler.SubmitCount);
         Assert.Equal(0, handler.StatusCount);
         Assert.Equal(0, handler.ResponseCount);
+    }
+
+    [Fact]
+    public async Task SubmitAsync_ShouldReturnSubmissionUnknown_WhenAcceptedPayloadIsMalformed()
+    {
+        ResetLocalRateLimiterState();
+        await using var dbContext = CreateDbContext();
+        var handler = new InvalidCallbackFalHandler("{not-json");
+        var client = CreateClient(dbContext, handler, maxRequestsPerMinute: 1);
+
+        var result = await client.SubmitAsync(
+            "fal-ai/test-model",
+            new { image_url = "https://cdn.example.com/pet.jpg" },
+            new FalQueueStageKind("image", FalQueueStages.ImageGeneration),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(TemplatesErrors.AiProviderSubmissionUnknown.Code, result.Error.Code);
+        Assert.Equal(1, handler.SubmitCount);
+        Assert.Equal(0, handler.StatusCount);
+        Assert.Equal(0, handler.ResponseCount);
+    }
+
+    [Fact]
+    public async Task SubmitAsync_ShouldReturnRateLimited_WhenProviderReturnsTooManyRequests()
+    {
+        ResetLocalRateLimiterState();
+        await using var dbContext = CreateDbContext();
+        var handler = new CancellationFalHandler(HttpStatusCode.TooManyRequests, "RATE_LIMITED");
+        var client = CreateClient(dbContext, handler, maxRequestsPerMinute: 1);
+
+        var result = await client.SubmitAsync(
+            "fal-ai/test-model",
+            new { image_url = "https://cdn.example.com/pet.jpg" },
+            new FalQueueStageKind("image", FalQueueStages.ImageGeneration),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(TemplatesErrors.AiProviderRateLimited.Code, result.Error.Code);
+        Assert.Equal(HttpMethod.Post, handler.Method);
     }
 
     [Theory]

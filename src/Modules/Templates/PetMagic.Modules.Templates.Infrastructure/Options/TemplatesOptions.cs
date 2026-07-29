@@ -40,6 +40,8 @@ public sealed class TemplatesOptions
 
     public bool GenerationWorkerEnabled { get; init; } = true;
 
+    public bool GenerationSchedulerV2Enabled { get; init; }
+
     public int GenerationWorkerPollIntervalMilliseconds { get; init; } = 1_000;
 
     public int RealtimePollingIntervalMilliseconds { get; init; } = 1_000;
@@ -52,7 +54,21 @@ public sealed class TemplatesOptions
 
     public int RealtimeEventCleanupBatchSize { get; init; } = 1_000;
 
-    public int MaxConcurrentJobsPerWorker { get; init; } = 1;
+    public int GenerationDispatchConcurrency { get; init; } = 4;
+
+    public int ProviderReconciliationConcurrency { get; init; } = 4;
+
+    public int MediaImportConcurrency { get; init; } = 1;
+
+    public int GenerationMaintenanceConcurrency { get; init; } = 1;
+
+    public int ProviderWebhookInboxMaxFailureCount { get; init; } = 8;
+
+    public int ProviderWebhookInboxRetentionDays { get; init; } = 7;
+
+    public int ProviderWebhookInboxCleanupIntervalMinutes { get; init; } = 60;
+
+    public int ProviderWebhookInboxCleanupBatchSize { get; init; } = 500;
 
     public int GlobalMaxConcurrentGenerations { get; init; } = 3;
 
@@ -86,9 +102,9 @@ public sealed class TemplatesOptions
 
     public int FalProviderReservedConcurrency { get; init; } = 1;
 
-    public decimal FalProviderBalanceLowThresholdUsd { get; init; } = 100m;
+    public decimal FalProviderBalanceLowThresholdUsd { get; init; } = 10m;
 
-    public decimal FalProviderBalanceCriticalThresholdUsd { get; init; } = 25m;
+    public decimal FalProviderBalanceCriticalThresholdUsd { get; init; } = 5m;
 
     public decimal FalProviderSpendDailyLimitUsd { get; init; }
 
@@ -101,6 +117,10 @@ public sealed class TemplatesOptions
     public int EstimatedImageGenerationSeconds { get; init; } = 90;
 
     public int EstimatedVideoPreprocessingSeconds { get; init; } = 90;
+
+    public int EstimatedImageImportSeconds { get; init; } = 30;
+
+    public int EstimatedVideoImportSeconds { get; init; } = 120;
 
     public int FreeQueuePriorityScore { get; init; } = 1_000;
 
@@ -118,9 +138,9 @@ public sealed class TemplatesOptions
 
     public int FreeImageMaxEstimatedWaitSeconds { get; init; } = 1_800;
 
-    public int PremiumImageMaxEstimatedWaitSeconds { get; init; } = 600;
+    public int PremiumImageMaxEstimatedWaitSeconds { get; init; } = 900;
 
-    public int PrivilegedImageMaxEstimatedWaitSeconds { get; init; } = 600;
+    public int PrivilegedImageMaxEstimatedWaitSeconds { get; init; } = 900;
 
     public int FreeVideoMaxEstimatedWaitSeconds { get; init; } = 3_600;
 
@@ -136,6 +156,8 @@ public sealed class TemplatesOptions
 
     public int JobLockTimeoutMilliseconds { get; init; } = 900_000;
 
+    public int ProviderReconciliationClaimLeaseMilliseconds { get; init; } = 90_000;
+
     public int StaleProcessingRecoveryDelayMilliseconds { get; init; } = 900_000;
 
     public int OrphanQueuedJobTimeoutMilliseconds { get; init; } = 120_000;
@@ -143,6 +165,10 @@ public sealed class TemplatesOptions
     public int MaxGenerationAttempts { get; init; } = 3;
 
     public int ProviderTransientRetryBaseDelaySeconds { get; init; } = 30;
+
+    public int MediaImportMaxAttempts { get; init; } = 5;
+
+    public int MediaImportRetryBaseDelaySeconds { get; init; } = 30;
 
     public int MaxRefundAttempts { get; init; } = 5;
 

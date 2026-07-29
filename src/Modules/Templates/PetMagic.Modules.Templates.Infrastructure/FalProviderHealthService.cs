@@ -1,10 +1,4 @@
-using System.Net;
-using System.Net.Http.Headers;
-using System.Text.Json;
-
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Logging;
 
 using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
@@ -16,54 +10,90 @@ namespace PetMagic.Modules.Templates.Infrastructure;
 
 internal sealed class FalProviderHealthService(
     TemplatesDbContext dbContext,
-    IHttpClientFactory httpClientFactory,
-    IMemoryCache memoryCache,
-    TemplatesOptions options,
-    ILogger<FalProviderHealthService> logger) : ITemplateAiProviderHealthService
+    ITemplateGenerationRuntimePolicyProvider runtimePolicyProvider,
+    IFalProviderRuntimeSnapshotService runtimeSnapshotService,
+    TemplatesOptions options) : ITemplateAiProviderHealthService
 {
-    public const string HttpClientName = "FalPlatformApi";
+    private static readonly TemplateGenerationProviderAttemptState[] ActiveAttemptStates =
+    [
+        TemplateGenerationProviderAttemptState.SubmitReserved,
+        TemplateGenerationProviderAttemptState.Submitting,
+        TemplateGenerationProviderAttemptState.ProviderQueued,
+        TemplateGenerationProviderAttemptState.ProviderProcessing,
+        TemplateGenerationProviderAttemptState.SubmissionUnknown
+    ];
 
-    private const string BalanceCacheKey = "templates:fal:provider-balance";
-    private const int BalanceResponseMaxChars = 16 * 1024;
-    private static readonly TimeSpan BalanceCacheTtl = TimeSpan.FromSeconds(60);
+    private static readonly TimeSpan StaleBalanceGracePeriod = TimeSpan.FromMinutes(5);
 
     public async Task<Result> EnsureCanAcceptGenerationAsync(
         string mediaType,
         string tier,
         CancellationToken cancellationToken)
     {
+        var policy = await runtimePolicyProvider.GetRuntimePolicyAsync(cancellationToken);
+        if (!policy.AdmissionEnabled)
+        {
+            return Reject("admission_paused", mediaType, tier);
+        }
+
         if (!IsFalProvider())
         {
             return Result.Success();
         }
 
-        var configuredConcurrency = options.FalProviderConcurrencyLimit;
-        var inflightRequests = await CountInflightProviderRequestsAsync(cancellationToken);
-        if (configuredConcurrency <= 0)
+        int confirmedConcurrency;
+        long inflightRequests;
+        if (options.GenerationSchedulerV2Enabled)
         {
-            RecordSnapshot(configuredConcurrency, inflightRequests, balanceUsd: null);
-            return Reject("concurrency_unknown", mediaType, tier);
+            if (policy.EffectiveProfile.GlobalMaxConcurrentGenerations <= 0)
+            {
+                return Reject("effective_capacity_zero", mediaType, tier);
+            }
+
+            confirmedConcurrency = policy.ConfirmedFalConcurrencyLimit;
+            inflightRequests = await CountInflightProviderAttemptsAsync(cancellationToken);
+        }
+        else
+        {
+            confirmedConcurrency = options.FalProviderConcurrencyLimit;
+            inflightRequests = await CountLegacyInflightProviderRequestsAsync(cancellationToken);
+            var usableConcurrency = confirmedConcurrency - options.FalProviderReservedConcurrency;
+            if (confirmedConcurrency <= 0)
+            {
+                RecordSnapshot(confirmedConcurrency, balanceUsd: null, inflightRequests);
+                return Reject("concurrency_unknown", mediaType, tier);
+            }
+
+            if (usableConcurrency <= 0 || inflightRequests >= usableConcurrency)
+            {
+                RecordSnapshot(confirmedConcurrency, balanceUsd: null, inflightRequests);
+                return Reject("concurrency_exhausted", mediaType, tier);
+            }
         }
 
-        var usableConcurrency = configuredConcurrency - options.FalProviderReservedConcurrency;
-        if (usableConcurrency <= 0 || inflightRequests >= usableConcurrency)
-        {
-            RecordSnapshot(configuredConcurrency, inflightRequests, balanceUsd: null);
-            return Reject("concurrency_exhausted", mediaType, tier);
-        }
+        var snapshot = await runtimeSnapshotService.GetSnapshotAsync(cancellationToken);
+        RecordSnapshot(confirmedConcurrency, snapshot.CurrentBalanceUsd, inflightRequests);
 
-        var balance = await GetCurrentBalanceUsdAsync(cancellationToken);
-        RecordSnapshot(configuredConcurrency, inflightRequests, balance);
-        if (balance is null)
+        if (snapshot.BalanceState == TemplateProviderBalanceState.Unknown)
         {
             return Reject("balance_unknown", mediaType, tier);
         }
 
-        if (balance.Value <= options.FalProviderBalanceCriticalThresholdUsd)
+        if (snapshot.BalanceState == TemplateProviderBalanceState.Stale
+            && (!snapshot.LastSuccessfulAtUtc.HasValue
+                || snapshot.LastSuccessfulAtUtc.Value < DateTime.UtcNow.Subtract(StaleBalanceGracePeriod)))
+        {
+            return Reject("balance_unknown", mediaType, tier);
+        }
+
+        if (snapshot.BalanceState == TemplateProviderBalanceState.Critical
+            || snapshot.CurrentBalanceUsd <= options.FalProviderBalanceCriticalThresholdUsd)
         {
             return Reject("balance_critical", mediaType, tier);
         }
 
+        // Provider capacity is enforced atomically when dispatch reserves a durable attempt.
+        // A full provider queue must not reject admission: the accepted job remains in PostgreSQL.
         return Result.Success();
     }
 
@@ -72,7 +102,14 @@ internal sealed class FalProviderHealthService(
         return string.Equals(options.AiProvider, TemplateAiProviders.Fal, StringComparison.OrdinalIgnoreCase);
     }
 
-    private Task<long> CountInflightProviderRequestsAsync(CancellationToken cancellationToken)
+    private Task<long> CountInflightProviderAttemptsAsync(CancellationToken cancellationToken)
+    {
+        return dbContext.TemplateGenerationProviderAttempts
+            .AsNoTracking()
+            .LongCountAsync(x => ActiveAttemptStates.Contains(x.State), cancellationToken);
+    }
+
+    private Task<long> CountLegacyInflightProviderRequestsAsync(CancellationToken cancellationToken)
     {
         return dbContext.TemplateGenerationJobs
             .AsNoTracking()
@@ -84,90 +121,13 @@ internal sealed class FalProviderHealthService(
                 cancellationToken);
     }
 
-    private async Task<decimal?> GetCurrentBalanceUsdAsync(CancellationToken cancellationToken)
-    {
-        if (memoryCache.TryGetValue<decimal?>(BalanceCacheKey, out var cached))
-        {
-            return cached;
-        }
-
-        if (string.IsNullOrWhiteSpace(options.Fal.ApiKey))
-        {
-            return null;
-        }
-
-        try
-        {
-            using var request = new HttpRequestMessage(
-                HttpMethod.Get,
-                "https://api.fal.ai/v1/account/billing?expand=credits");
-            request.Headers.Authorization = new AuthenticationHeaderValue("Key", options.Fal.ApiKey);
-
-            using var response = await httpClientFactory
-                .CreateClient(HttpClientName)
-                .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-            if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
-            {
-                logger.LogWarning("fal account billing API rejected the configured API key. StatusCode={StatusCode}", response.StatusCode);
-                memoryCache.Set<decimal?>(BalanceCacheKey, null, TimeSpan.FromSeconds(15));
-                return null;
-            }
-
-            if (!response.IsSuccessStatusCode)
-            {
-                logger.LogWarning("fal account billing API check failed. StatusCode={StatusCode}", response.StatusCode);
-                memoryCache.Set<decimal?>(BalanceCacheKey, null, TimeSpan.FromSeconds(15));
-                return null;
-            }
-
-            var body = await SafeHttpContentReader.ReadRawStringPrefixAsync(
-                response.Content,
-                cancellationToken,
-                BalanceResponseMaxChars);
-            using var document = JsonDocument.Parse(body);
-            var balance = ReadBalanceUsd(document.RootElement);
-            memoryCache.Set(BalanceCacheKey, balance, BalanceCacheTtl);
-            return balance;
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (Exception exception)
-        {
-            logger.LogWarning(
-                "fal account billing API check failed. ExceptionType={ExceptionType}",
-                SafeLogValues.ExceptionType(exception));
-            memoryCache.Set<decimal?>(BalanceCacheKey, null, TimeSpan.FromSeconds(15));
-            return null;
-        }
-    }
-
-    private static decimal? ReadBalanceUsd(JsonElement root)
-    {
-        if (!root.TryGetProperty("credits", out var credits)
-            || credits.ValueKind != JsonValueKind.Object
-            || !credits.TryGetProperty("current_balance", out var balanceElement))
-        {
-            return null;
-        }
-
-        return balanceElement.ValueKind switch
-        {
-            JsonValueKind.Number when balanceElement.TryGetDecimal(out var numeric) => numeric,
-            JsonValueKind.String when decimal.TryParse(
-                balanceElement.GetString(),
-                System.Globalization.NumberStyles.Number,
-                System.Globalization.CultureInfo.InvariantCulture,
-                out var parsed) => parsed,
-            _ => null
-        };
-    }
-
-    private void RecordSnapshot(int configuredConcurrency, long inflightRequests, decimal? balanceUsd)
+    private void RecordSnapshot(
+        int confirmedFalConcurrencyLimit,
+        decimal? balanceUsd,
+        long inflightRequests)
     {
         TemplateGenerationMetrics.RecordFalProviderCapacitySnapshot(
-            configuredConcurrency,
+            confirmedFalConcurrencyLimit,
             inflightRequests,
             balanceUsd,
             options.FalProviderBalanceLowThresholdUsd,

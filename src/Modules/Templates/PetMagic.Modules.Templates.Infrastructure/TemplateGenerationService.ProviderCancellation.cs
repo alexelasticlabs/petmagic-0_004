@@ -65,6 +65,11 @@ internal sealed partial class TemplateGenerationService
             return Result.Failure<AdminGenerationCancellationResult>(TemplatesErrors.GenerationCancelNotAllowed);
         }
 
+        if (IsVideoInterstageCancellation(current))
+        {
+            return await CancelVideoInterstageAsync(adminUserId, generationId, cancellationToken);
+        }
+
         if (falQueueClient is null || ResolveProviderCancellationTarget(current) is null)
         {
             return Result.Failure<AdminGenerationCancellationResult>(TemplatesErrors.GenerationCancelProviderUnsupported);
@@ -152,23 +157,29 @@ internal sealed partial class TemplateGenerationService
     public async Task<bool> ProcessNextPendingCancellationAsync(CancellationToken cancellationToken)
     {
         var now = DateTime.UtcNow;
-        var generationId = await dbContext.TemplateGenerationJobs
+        var pendingCancellation = await dbContext.TemplateGenerationJobs
             .AsNoTracking()
             .Where(x => x.Status == TemplateGenerationStatus.CancellationRequested
                 && (x.CancellationNextAttemptAtUtc == null || x.CancellationNextAttemptAtUtc <= now))
             .OrderBy(x => x.CancellationNextAttemptAtUtc)
             .ThenBy(x => x.CancellationRequestedAtUtc)
-            .Select(x => (Guid?)x.Id)
+            .Select(x => new PendingProviderCancellation(
+                x.Id,
+                x.CancellationAcceptedAtUtc != null))
             .FirstOrDefaultAsync(cancellationToken);
-        if (!generationId.HasValue)
+        if (pendingCancellation is null)
         {
             return false;
         }
 
-        _ = await ProcessProviderCancellationAsync(
-            generationId.Value,
-            ignoreSchedule: false,
-            cancellationToken);
+        _ = pendingCancellation.ProviderAccepted
+            ? await ReconcileAcceptedProviderCancellationAsync(
+                pendingCancellation.GenerationId,
+                cancellationToken)
+            : await ProcessProviderCancellationAsync(
+                pendingCancellation.GenerationId,
+                ignoreSchedule: false,
+                cancellationToken);
         return true;
     }
 
@@ -202,7 +213,8 @@ internal sealed partial class TemplateGenerationService
             }
 
             var now = DateTime.UtcNow;
-            if (!ignoreSchedule && job.CancellationNextAttemptAtUtc > now)
+            if ((!ignoreSchedule || job.CancellationAcceptedAtUtc is not null)
+                && job.CancellationNextAttemptAtUtc > now)
             {
                 return Result.Success(new AdminGenerationCancellationResult(
                     await MapResponseWithQueueMetricsAsync(job, cancellationToken),
@@ -272,23 +284,29 @@ internal sealed partial class TemplateGenerationService
         switch (providerResult.Outcome)
         {
             case FalQueueCancellationOutcome.Accepted:
-                await FinalizeProviderCancellationAsync(settledJob, cancellationToken);
+                var acceptedAtUtc = DateTime.UtcNow;
+                settledJob.ProviderStatus = "CANCELLATION_REQUESTED";
+                settledJob.CancellationAcceptedAtUtc ??= acceptedAtUtc;
+                settledJob.CancellationLastErrorCode = null;
+                settledJob.CancellationNextAttemptAtUtc = acceptedAtUtc.Add(
+                    ResolveProviderCancellationRetryDelay(settledJob.CancellationAttemptCount));
+                settledJob.UpdatedAtUtc = acceptedAtUtc;
+                await dbContext.SaveChangesAsync(cancellationToken);
                 if (settleTransaction is not null)
                 {
                     await settleTransaction.CommitAsync(cancellationToken);
                 }
 
-                await RefundAcceptedProviderCancellationAsync(settledJob, cancellationToken);
                 var acceptedResponse = await MapResponseWithQueueMetricsAsync(settledJob, cancellationToken);
                 await PublishCancellationStatusAsync(settledJob, cancellationToken, acceptedResponse);
                 await WriteCancellationAuditAsync(
                     settledJob,
-                    "admin.template_generation.cancelled",
+                    "admin.template_generation.cancellation_accepted",
                     settledJob.CancellationPreviousStatus?.ToString(),
                     settledJob.Status.ToString(),
-                    $"Provider cancellation accepted. Refunded={settledJob.RefundedAtUtc is not null}.",
+                    "Provider acknowledged the cancellation request; terminal confirmation is still pending.",
                     cancellationToken);
-                return Result.Success(new AdminGenerationCancellationResult(acceptedResponse, IsPending: false));
+                return Result.Success(new AdminGenerationCancellationResult(acceptedResponse, IsPending: true));
 
             case FalQueueCancellationOutcome.AlreadyCompleted:
                 await RestoreAfterRejectedCancellationAsync(
@@ -371,6 +389,224 @@ internal sealed partial class TemplateGenerationService
         }
     }
 
+    private async Task<Result<AdminGenerationCancellationResult>> ReconcileAcceptedProviderCancellationAsync(
+        Guid generationId,
+        CancellationToken cancellationToken)
+    {
+        ProviderCancellationTarget target;
+        dbContext.ChangeTracker.Clear();
+        await using (var claimTransaction = await BeginGenerationAdminActionTransactionAsync(cancellationToken))
+        {
+            if (claimTransaction is not null)
+            {
+                await LockGenerationRowForAdminActionAsync(generationId, cancellationToken);
+            }
+
+            var job = await dbContext.TemplateGenerationJobs
+                .Include(x => x.Template)
+                .FirstOrDefaultAsync(x => x.Id == generationId, cancellationToken);
+            if (job is null)
+            {
+                return Result.Failure<AdminGenerationCancellationResult>(TemplatesErrors.GenerationJobNotFound);
+            }
+
+            if (job.Status != TemplateGenerationStatus.CancellationRequested
+                || job.CancellationAcceptedAtUtc is null)
+            {
+                if (claimTransaction is not null)
+                {
+                    await claimTransaction.CommitAsync(cancellationToken);
+                }
+
+                return Result.Success(new AdminGenerationCancellationResult(
+                    await MapResponseWithQueueMetricsAsync(job, cancellationToken),
+                    IsPending: job.Status == TemplateGenerationStatus.CancellationRequested));
+            }
+
+            var now = DateTime.UtcNow;
+            if (job.CancellationNextAttemptAtUtc > now)
+            {
+                if (claimTransaction is not null)
+                {
+                    await claimTransaction.CommitAsync(cancellationToken);
+                }
+
+                return Result.Success(new AdminGenerationCancellationResult(
+                    await MapResponseWithQueueMetricsAsync(job, cancellationToken),
+                    IsPending: true));
+            }
+
+            target = ResolveProviderCancellationTarget(job)!;
+            if (falQueueClient is null || target is null)
+            {
+                job.CancellationLastErrorCode = TemplatesErrors.GenerationCancelProviderUnsupported.Code;
+                job.CancellationNextAttemptAtUtc = now.AddMinutes(5);
+                job.UpdatedAtUtc = now;
+                await dbContext.SaveChangesAsync(cancellationToken);
+                if (claimTransaction is not null)
+                {
+                    await claimTransaction.CommitAsync(cancellationToken);
+                }
+
+                return Result.Success(new AdminGenerationCancellationResult(
+                    await MapResponseWithQueueMetricsAsync(job, cancellationToken),
+                    IsPending: true));
+            }
+
+            job.CancellationLastAttemptedAtUtc = now;
+            job.CancellationNextAttemptAtUtc = now.AddSeconds(ProviderCancellationLeaseSeconds);
+            job.UpdatedAtUtc = now;
+            await dbContext.SaveChangesAsync(cancellationToken);
+            if (claimTransaction is not null)
+            {
+                await claimTransaction.CommitAsync(cancellationToken);
+            }
+        }
+
+        var providerStatus = await falQueueClient!.GetStatusAsync(
+            target.StatusUri,
+            target.Model,
+            cancellationToken);
+
+        dbContext.ChangeTracker.Clear();
+        await using var settleTransaction = await BeginGenerationAdminActionTransactionAsync(cancellationToken);
+        if (settleTransaction is not null)
+        {
+            await LockGenerationRowForAdminActionAsync(generationId, cancellationToken);
+        }
+
+        var settledJob = await dbContext.TemplateGenerationJobs
+            .Include(x => x.Template)
+            .FirstOrDefaultAsync(x => x.Id == generationId, cancellationToken);
+        if (settledJob is null)
+        {
+            return Result.Failure<AdminGenerationCancellationResult>(TemplatesErrors.GenerationJobNotFound);
+        }
+
+        if (settledJob.Status != TemplateGenerationStatus.CancellationRequested
+            || settledJob.CancellationAcceptedAtUtc is null)
+        {
+            if (settleTransaction is not null)
+            {
+                await settleTransaction.CommitAsync(cancellationToken);
+            }
+
+            return Result.Success(new AdminGenerationCancellationResult(
+                await MapResponseWithQueueMetricsAsync(settledJob, cancellationToken),
+                IsPending: settledJob.Status == TemplateGenerationStatus.CancellationRequested));
+        }
+
+        var settledAtUtc = DateTime.UtcNow;
+        if (providerStatus.IsSuccess)
+        {
+            var normalizedStatus = providerStatus.Value.Status.Trim().ToUpperInvariant();
+            settledJob.ProviderStatus = normalizedStatus;
+            settledJob.ProviderStatusCheckedAtUtc = settledAtUtc;
+            if (string.Equals(normalizedStatus, "COMPLETED", StringComparison.Ordinal))
+            {
+                await RestoreAfterRejectedCancellationAsync(
+                    settledJob,
+                    errorCode: null,
+                    markGenerationError: false,
+                    cancellationToken);
+                settledJob.NextAttemptEarliestAtUtc = settledAtUtc;
+                settledJob.UpdatedAtUtc = settledAtUtc;
+                await dbContext.SaveChangesAsync(cancellationToken);
+                if (settleTransaction is not null)
+                {
+                    await settleTransaction.CommitAsync(cancellationToken);
+                }
+
+                var completedResponse = await MapResponseWithQueueMetricsAsync(settledJob, cancellationToken);
+                await PublishCancellationStatusAsync(settledJob, cancellationToken, completedResponse);
+                await WriteCancellationAuditAsync(
+                    settledJob,
+                    "admin.template_generation.cancellation_raced_completion",
+                    TemplateGenerationStatus.CancellationRequested.ToString(),
+                    settledJob.Status.ToString(),
+                    "Provider completed before cancellation reached a terminal state; result reconciliation resumed without refund.",
+                    cancellationToken);
+                return Result.Success(new AdminGenerationCancellationResult(completedResponse, IsPending: false));
+            }
+
+            settledJob.CancellationLastErrorCode = normalizedStatus is "IN_QUEUE" or "IN_PROGRESS"
+                ? null
+                : "templates.provider_cancellation_status_unknown";
+            settledJob.CancellationNextAttemptAtUtc = settledAtUtc.Add(
+                ResolveProviderCancellationReconciliationDelay(settledJob.CancellationAcceptedAtUtc.Value, settledAtUtc));
+            settledJob.UpdatedAtUtc = settledAtUtc;
+            await dbContext.SaveChangesAsync(cancellationToken);
+            if (settleTransaction is not null)
+            {
+                await settleTransaction.CommitAsync(cancellationToken);
+            }
+
+            return Result.Success(new AdminGenerationCancellationResult(
+                await MapResponseWithQueueMetricsAsync(settledJob, cancellationToken),
+                IsPending: true));
+        }
+
+        var providerRequestMissing = string.Equals(
+            providerStatus.Error.Code,
+            TemplatesErrors.AiProviderRequestNotFound.Code,
+            StringComparison.Ordinal);
+        if (providerRequestMissing
+            && settledAtUtc - settledJob.CancellationAcceptedAtUtc.Value >= TimeSpan.FromSeconds(5))
+        {
+            settledJob.Status = TemplateGenerationStatus.Cancelled;
+            settledJob.ProviderStatus = "CANCELLED";
+            settledJob.ProviderStatusCheckedAtUtc = settledAtUtc;
+            settledJob.CancelledAtUtc = settledAtUtc;
+            settledJob.CompletedAtUtc = settledAtUtc;
+            settledJob.CancellationNextAttemptAtUtc = null;
+            settledJob.CancellationLastErrorCode = null;
+            settledJob.LastErrorCode = null;
+            settledJob.LastErrorMessage = null;
+            settledJob.LockedAtUtc = null;
+            settledJob.LockedBy = null;
+            settledJob.UpdatedAtUtc = settledAtUtc;
+            await MarkActiveProviderAttemptsCancelledAsync(settledJob.Id, settledAtUtc, cancellationToken);
+            await dbContext.SaveChangesAsync(cancellationToken);
+            if (settleTransaction is not null)
+            {
+                await settleTransaction.CommitAsync(cancellationToken);
+            }
+
+            await RefundAcceptedProviderCancellationAsync(settledJob, cancellationToken);
+            TemplateGenerationMetrics.RecordJobCancelled(settledJob);
+            var cancelledResponse = await MapResponseWithQueueMetricsAsync(settledJob, cancellationToken);
+            await PublishCancellationStatusAsync(settledJob, cancellationToken, cancelledResponse);
+            await WriteCancellationAuditAsync(
+                settledJob,
+                "admin.template_generation.cancelled",
+                TemplateGenerationStatus.CancellationRequested.ToString(),
+                settledJob.Status.ToString(),
+                $"Provider cancellation reached a terminal not-found state. Refunded={settledJob.RefundedAtUtc is not null}.",
+                cancellationToken);
+            return Result.Success(new AdminGenerationCancellationResult(cancelledResponse, IsPending: false));
+        }
+
+        settledJob.CancellationLastErrorCode = AdminFailureMessageSanitizer.SanitizeCode(providerStatus.Error.Code);
+        settledJob.CancellationNextAttemptAtUtc = settledAtUtc.Add(
+            providerRequestMissing
+                ? TimeSpan.FromSeconds(5)
+                : IsProviderCancellationTransient(providerStatus.Error)
+                    ? ResolveProviderCancellationReconciliationDelay(
+                        settledJob.CancellationAcceptedAtUtc.Value,
+                        settledAtUtc)
+                    : TimeSpan.FromMinutes(5));
+        settledJob.UpdatedAtUtc = settledAtUtc;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        if (settleTransaction is not null)
+        {
+            await settleTransaction.CommitAsync(cancellationToken);
+        }
+
+        return Result.Success(new AdminGenerationCancellationResult(
+            await MapResponseWithQueueMetricsAsync(settledJob, cancellationToken),
+            IsPending: true));
+    }
+
     private ProviderCancellationTarget? ResolveProviderCancellationTarget(TemplateGenerationJob job)
     {
         if (falQueueClient is null)
@@ -411,21 +647,47 @@ internal sealed partial class TemplateGenerationService
         }
 
         var cancelUri = falQueueClient.ResolveCancellationUri(model, requestId, cancelUrl, statusUrl);
-        return cancelUri is null
+        var statusUri = falQueueClient.ResolveStatusUri(model, requestId, statusUrl);
+        return cancelUri is null || statusUri is null
             ? null
-            : new ProviderCancellationTarget(model, requestId, cancelUri);
+            : new ProviderCancellationTarget(model, requestId, statusUri, cancelUri);
     }
 
-    private async Task FinalizeProviderCancellationAsync(
-        TemplateGenerationJob job,
+    private async Task<Result<AdminGenerationCancellationResult>> CancelVideoInterstageAsync(
+        Guid adminUserId,
+        Guid generationId,
         CancellationToken cancellationToken)
     {
+        dbContext.ChangeTracker.Clear();
+        await using var transaction = await BeginGenerationAdminActionTransactionAsync(cancellationToken);
+        if (transaction is not null)
+        {
+            await LockGenerationRowForAdminActionAsync(generationId, cancellationToken);
+        }
+
+        var job = await dbContext.TemplateGenerationJobs
+            .Include(x => x.Template)
+            .FirstOrDefaultAsync(x => x.Id == generationId && x.HiddenByUserAtUtc == null, cancellationToken);
+        if (job is null)
+        {
+            return Result.Failure<AdminGenerationCancellationResult>(TemplatesErrors.GenerationJobNotFound);
+        }
+
+        if (!IsVideoInterstageCancellation(job))
+        {
+            return Result.Failure<AdminGenerationCancellationResult>(TemplatesErrors.GenerationCancelNotAllowed);
+        }
+
+        var previousStatus = job.Status;
         var now = DateTime.UtcNow;
-        job.Status = TemplateGenerationStatus.Cancelled;
-        job.ProviderStatus = "CANCELLATION_REQUESTED";
+        job.CancellationPreviousStatus = previousStatus;
+        job.CancellationRequestedByAdminUserId = adminUserId;
+        job.CancellationRequestedAtUtc ??= now;
         job.CancellationAcceptedAtUtc = now;
         job.CancellationNextAttemptAtUtc = null;
         job.CancellationLastErrorCode = null;
+        job.Status = TemplateGenerationStatus.Cancelled;
+        job.ProviderStatus = "CANCELLED_BETWEEN_STAGES";
         job.CancelledAtUtc = now;
         job.CompletedAtUtc = now;
         job.LastErrorCode = null;
@@ -433,8 +695,73 @@ internal sealed partial class TemplateGenerationService
         job.LockedAtUtc = null;
         job.LockedBy = null;
         job.UpdatedAtUtc = now;
+        await MarkActiveProviderAttemptsCancelledAsync(job.Id, now, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
+        if (transaction is not null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+        }
+
+        await RefundAcceptedProviderCancellationAsync(job, cancellationToken);
         TemplateGenerationMetrics.RecordJobCancelled(job);
+        var response = await MapResponseWithQueueMetricsAsync(job, cancellationToken);
+        await PublishCancellationStatusAsync(job, cancellationToken, response);
+        await WriteCancellationAuditAsync(
+            job,
+            "admin.template_generation.cancelled",
+            previousStatus.ToString(),
+            job.Status.ToString(),
+            $"Generation cancelled locally between video preprocessing and motion submit. Refunded={job.RefundedAtUtc is not null}.",
+            cancellationToken);
+        return Result.Success(new AdminGenerationCancellationResult(response, IsPending: false));
+    }
+
+    private static bool IsVideoInterstageCancellation(TemplateGenerationJob job)
+    {
+        return job.Status == TemplateGenerationStatus.ProviderQueued
+            && string.Equals(job.CurrentProviderStage, "video_preprocessing", StringComparison.Ordinal)
+            && job.ProviderCompletedAtUtc is not null
+            && !string.IsNullOrWhiteSpace(job.NormalizedImageUrl)
+            && string.IsNullOrWhiteSpace(job.MotionProviderRequestId);
+    }
+
+    private async Task MarkActiveProviderAttemptsCancelledAsync(
+        Guid generationId,
+        DateTime cancelledAtUtc,
+        CancellationToken cancellationToken)
+    {
+        var activeAttempts = dbContext.TemplateGenerationProviderAttempts
+            .Where(x => x.GenerationJobId == generationId
+                && (x.State == TemplateGenerationProviderAttemptState.SubmitReserved
+                    || x.State == TemplateGenerationProviderAttemptState.Submitting
+                    || x.State == TemplateGenerationProviderAttemptState.ProviderQueued
+                    || x.State == TemplateGenerationProviderAttemptState.ProviderProcessing
+                    || x.State == TemplateGenerationProviderAttemptState.SubmissionUnknown));
+        if (string.Equals(dbContext.Database.ProviderName, NpgsqlProviderName, StringComparison.Ordinal))
+        {
+            await activeAttempts.ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(x => x.State, TemplateGenerationProviderAttemptState.Cancelled)
+                    .SetProperty(x => x.NextPollAtUtc, (DateTime?)null)
+                    .SetProperty(x => x.CompletedAtUtc, cancelledAtUtc)
+                    .SetProperty(x => x.LockedAtUtc, (DateTime?)null)
+                    .SetProperty(x => x.LockedBy, (string?)null)
+                    .SetProperty(x => x.UpdatedAtUtc, cancelledAtUtc)
+                    .SetProperty(x => x.Version, x => x.Version + 1),
+                cancellationToken);
+            return;
+        }
+
+        foreach (var attempt in await activeAttempts.ToListAsync(cancellationToken))
+        {
+            attempt.State = TemplateGenerationProviderAttemptState.Cancelled;
+            attempt.NextPollAtUtc = null;
+            attempt.CompletedAtUtc = cancelledAtUtc;
+            attempt.LockedAtUtc = null;
+            attempt.LockedBy = null;
+            attempt.UpdatedAtUtc = cancelledAtUtc;
+            attempt.Version++;
+        }
     }
 
     private async Task RefundAcceptedProviderCancellationAsync(
@@ -535,5 +862,30 @@ internal sealed partial class TemplateGenerationService
         return TimeSpan.FromSeconds(seconds);
     }
 
-    private sealed record ProviderCancellationTarget(string Model, string RequestId, Uri CancelUri);
+    private static TimeSpan ResolveProviderCancellationReconciliationDelay(
+        DateTime acceptedAtUtc,
+        DateTime nowUtc)
+    {
+        var elapsed = nowUtc - acceptedAtUtc;
+        if (elapsed < TimeSpan.FromSeconds(30))
+        {
+            return TimeSpan.FromSeconds(5);
+        }
+
+        return elapsed < TimeSpan.FromMinutes(2)
+            ? TimeSpan.FromSeconds(15)
+            : TimeSpan.FromSeconds(30);
+    }
+
+    private static bool IsProviderCancellationTransient(Error error) =>
+        string.Equals(error.Code, TemplatesErrors.AiProviderTransientFailure.Code, StringComparison.Ordinal)
+        || string.Equals(error.Code, TemplatesErrors.AiProviderRateLimited.Code, StringComparison.Ordinal);
+
+    private sealed record PendingProviderCancellation(Guid GenerationId, bool ProviderAccepted);
+
+    private sealed record ProviderCancellationTarget(
+        string Model,
+        string RequestId,
+        Uri StatusUri,
+        Uri CancelUri);
 }

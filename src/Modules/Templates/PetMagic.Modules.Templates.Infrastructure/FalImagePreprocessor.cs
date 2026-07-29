@@ -35,6 +35,14 @@ internal sealed class FalImagePreprocessor(FalQueueClient queueClient) : IImageP
         string originalImageUrl,
         string model,
         string prompt,
+        CancellationToken cancellationToken) =>
+        await SubmitAsync(originalImageUrl, model, prompt, callbackToken: null, cancellationToken);
+
+    public async Task<Result<ProviderQueueSubmission>> SubmitAsync(
+        string originalImageUrl,
+        string model,
+        string prompt,
+        string? callbackToken,
         CancellationToken cancellationToken)
     {
         var input = BuildInput(originalImageUrl, prompt);
@@ -42,6 +50,7 @@ internal sealed class FalImagePreprocessor(FalQueueClient queueClient) : IImageP
             model,
             input,
             new FalQueueStageKind("image", FalQueueStages.ImagePreprocessing),
+            callbackToken,
             cancellationToken);
         return result.IsFailure
             ? Result.Failure<ProviderQueueSubmission>(result.Error)

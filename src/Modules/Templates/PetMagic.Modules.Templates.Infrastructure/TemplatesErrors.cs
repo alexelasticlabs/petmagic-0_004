@@ -39,6 +39,9 @@ internal static class TemplatesErrors
     public static readonly Error AiProviderUnavailable = new("templates.ai_provider_unavailable", "AI provider is not configured.");
     public static readonly Error AiProviderFailed = new("templates.ai_provider_failed", "AI provider request failed.");
     public static readonly Error AiProviderTransientFailure = new("templates.ai_provider_transient", "AI provider is temporarily unavailable. The generation will be retried.");
+    public static readonly Error AiProviderRateLimited = new("templates.ai_provider_rate_limited", "AI provider rate limit was reached. The generation will be retried.");
+    public static readonly Error AiProviderSubmissionUnknown = new("templates.ai_provider_submission_unknown", "AI provider may have accepted the request. The generation requires reconciliation.");
+    public static readonly Error AiProviderRequestNotFound = new("templates.ai_provider_request_not_found", "AI provider request was not found.");
     public static readonly Error AiProviderTimedOut = new("templates.ai_provider_timed_out", "AI provider request timed out.");
     public static readonly Error GenerationAttemptsExceeded = new("templates.generation_attempts_exceeded", "Template generation exceeded the maximum number of attempts.");
     public static readonly Error GenerationQueueOrphaned = new("templates.generation_queue_orphaned", "Generation was not charged and was removed from the queue.");
@@ -46,6 +49,17 @@ internal static class TemplatesErrors
     public static readonly Error GenerationQueueOverloaded = new("GENERATION_QUEUE_OVERLOADED", "Generation queue is overloaded.");
     public static readonly Error GenerationWaitTooLong = new("GENERATION_WAIT_TOO_LONG", "Estimated generation wait is too long. Please retry later.");
     public static readonly Error ProviderCapacityUnavailable = new("PROVIDER_CAPACITY_UNAVAILABLE", "Generation provider is temporarily unavailable. Please retry later.");
+    public static readonly Error GenerationControlPolicyInvalid = new("templates.generation_control_policy_invalid", "Generation control policy is invalid.");
+    public static readonly Error GenerationControlPolicyConflict = new("templates.generation_control_policy_conflict", "Generation control policy was changed. Reload it and try again.");
+    public static readonly Error GenerationControlIdempotencyKeyInvalid = new("templates.generation_control_idempotency_key_invalid", "Generation control idempotency key is required and must not exceed 256 characters.");
+    public static readonly Error GenerationControlIdempotencyConflict = new("templates.generation_control_idempotency_conflict", "The idempotency key was already used for a different generation control request.");
+    public static readonly Error GenerationControlReasonInvalid = new("templates.generation_control_reason_invalid", "Generation control reason must contain between 3 and 500 characters.");
+    public static readonly Error ProviderAttemptNotFound = new("templates.provider_attempt_not_found", "Provider attempt was not found.");
+    public static readonly Error ProviderAttemptResolutionInvalid = new("templates.provider_attempt_resolution_invalid", "Provider attempt resolution is invalid.");
+    public static readonly Error ProviderAttemptResolutionConflict = new("templates.provider_attempt_resolution_conflict", "Provider attempt changed or no longer requires manual reconciliation.");
+    public static readonly Error ProviderAttemptResolutionEvidenceInvalid = new("templates.provider_attempt_resolution_evidence_invalid", "Provider attempt resolution evidence must contain between 3 and 160 characters.");
+    public static readonly Error ProviderAttemptCorrelationInvalid = new("templates.provider_attempt_correlation_invalid", "Provider request identifiers and URLs are invalid for this generation stage.");
+    public static readonly Error ProviderRuntimeRefreshUnavailable = new("templates.provider_runtime_refresh_unavailable", "Provider runtime status could not be refreshed.");
     public static readonly Error GenerationCancelDisabled = new("templates.generation_cancel_disabled", "Generation cancellation is disabled.");
     public static readonly Error GenerationCancelNotAllowed = new("templates.generation_cancel_not_allowed", "Generation cannot be cancelled in its current state.");
     public static readonly Error GenerationCancelAlreadyCompleted = new("templates.generation_cancel_already_completed", "Provider generation already completed before cancellation.");

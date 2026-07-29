@@ -11,8 +11,8 @@ internal sealed partial class TemplateGenerationService
         CancellationToken cancellationToken)
     {
         var estimate = await CalculateQueueEstimateForNewJobAsync(template.TemplateType, queueTier, cancellationToken);
-        var maxWaitSeconds = ResolveMaxEstimatedWaitSeconds(estimate.MediaType, estimate.PriorityClass);
-        if (estimate.EstimatedWaitSeconds <= maxWaitSeconds)
+        var maxSlaSeconds = ResolveMaxEstimatedWaitSeconds(estimate.MediaType, estimate.PriorityClass);
+        if (estimate.EstimatedTotalSeconds <= maxSlaSeconds)
         {
             if (aiProviderHealthService is not null)
             {
@@ -35,13 +35,15 @@ internal sealed partial class TemplateGenerationService
             estimate.PriorityClass);
         return Result.Failure<QueueEstimate>(new Error(
             TemplatesErrors.GenerationWaitTooLong.Code,
-            $"Estimated wait is {estimate.EstimatedWaitSeconds} seconds for {estimate.MediaType}/{estimate.PriorityClass}; retry after about {estimate.RetryAfterSeconds} seconds.",
+            $"Estimated completion is {estimate.EstimatedTotalSeconds} seconds for {estimate.MediaType}/{estimate.PriorityClass}; retry after about {estimate.RetryAfterSeconds} seconds.",
             new Dictionary<string, object?>
             {
                 ["mediaType"] = estimate.MediaType,
                 ["tier"] = estimate.PriorityClass,
                 ["estimatedWaitSeconds"] = estimate.EstimatedWaitSeconds,
-                ["maxAllowedWaitSeconds"] = maxWaitSeconds,
+                ["estimatedTotalSeconds"] = estimate.EstimatedTotalSeconds,
+                ["maxAllowedWaitSeconds"] = maxSlaSeconds,
+                ["maxAllowedTotalSeconds"] = maxSlaSeconds,
                 ["retryAfterSeconds"] = estimate.RetryAfterSeconds,
                 ["canRetry"] = true,
                 ["canUpgradeForPriority"] = estimate.PriorityClass == TemplateGenerationQueue.TierFree

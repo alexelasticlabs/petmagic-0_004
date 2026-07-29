@@ -15,6 +15,16 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
 
     public DbSet<TemplateGenerationJob> TemplateGenerationJobs => Set<TemplateGenerationJob>();
 
+    public DbSet<TemplateGenerationProviderAttempt> TemplateGenerationProviderAttempts => Set<TemplateGenerationProviderAttempt>();
+
+    public DbSet<TemplateProviderWebhookInbox> TemplateProviderWebhookInbox => Set<TemplateProviderWebhookInbox>();
+
+    public DbSet<TemplateGenerationControlPolicy> TemplateGenerationControlPolicies => Set<TemplateGenerationControlPolicy>();
+
+    public DbSet<TemplateGenerationControlPolicyCommandReceipt> TemplateGenerationControlPolicyCommandReceipts => Set<TemplateGenerationControlPolicyCommandReceipt>();
+
+    public DbSet<TemplateProviderRuntimeSnapshot> TemplateProviderRuntimeSnapshots => Set<TemplateProviderRuntimeSnapshot>();
+
     public DbSet<AdminGenerationRefundRetryReceipt> AdminGenerationRefundRetryReceipts => Set<AdminGenerationRefundRetryReceipt>();
 
     public DbSet<TemplateGenerationBillingCommand> TemplateGenerationBillingCommands => Set<TemplateGenerationBillingCommand>();
@@ -205,6 +215,7 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
             entity.Property(x => x.MotionProviderCancelUrl).HasMaxLength(2048);
             entity.Property(x => x.ProviderResultUrl).HasMaxLength(2048);
             entity.Property(x => x.MotionProviderCostUsd).HasPrecision(12, 4);
+            entity.Property(x => x.MediaImportAttemptCount).HasDefaultValue(0);
             entity.Property(x => x.EstimatedWaitSecondsAtQueue);
             entity.Property(x => x.EstimatedCompletionAtQueueUtc);
             entity.Property(x => x.LastErrorCode).HasMaxLength(128);
@@ -228,6 +239,9 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
                 .HasDatabaseName("IX_tgj_Status_QueueMediaType_StartedAtUtc");
             entity.HasIndex(x => new { x.Status, x.ProviderStatusCheckedAtUtc })
                 .HasDatabaseName("IX_tgj_Status_ProviderStatusCheckedAtUtc");
+            entity.HasIndex(x => new { x.Status, x.MediaImportNextAttemptAtUtc })
+                .HasDatabaseName("IX_tgj_ImportingMedia_NextAttempt")
+                .HasFilter("\"Status\" = 10");
             entity.HasIndex(x => new { x.Status, x.CancellationNextAttemptAtUtc })
                 .HasDatabaseName("IX_tgj_PendingCancellation")
                 .HasFilter("\"Status\" = 11");
@@ -286,6 +300,142 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
                 .WithMany()
                 .HasForeignKey(x => x.TemplateId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<TemplateGenerationProviderAttempt>(entity =>
+        {
+            entity.ToTable("templates_generation_provider_attempts", table =>
+            {
+                table.HasCheckConstraint("CK_tgpa_Ordinal", "\"Ordinal\" > 0");
+                table.HasCheckConstraint("CK_tgpa_TokenHash", "length(\"SubmissionTokenHash\") = 64");
+                table.HasCheckConstraint("CK_tgpa_AttemptCounts", "\"SubmitAttemptCount\" >= 0 AND \"PollAttemptCount\" >= 0 AND \"CancelAttemptCount\" >= 0");
+                table.HasCheckConstraint("CK_tgpa_Deadlines", "\"SubmissionDeadlineAtUtc\" <= \"ProcessingDeadlineAtUtc\" AND \"ProcessingDeadlineAtUtc\" <= \"ReconciliationDeadlineAtUtc\"");
+            });
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Stage).HasConversion<int>();
+            entity.Property(x => x.State).HasConversion<int>();
+            entity.Property(x => x.Provider).HasMaxLength(64).IsRequired();
+            entity.Property(x => x.SubmissionTokenHash).HasMaxLength(64).IsRequired();
+            entity.Property(x => x.ProviderRequestId).HasMaxLength(128);
+            entity.Property(x => x.ProviderStatusUrl).HasMaxLength(2048);
+            entity.Property(x => x.ProviderResponseUrl).HasMaxLength(2048);
+            entity.Property(x => x.ProviderCancelUrl).HasMaxLength(2048);
+            entity.Property(x => x.LastErrorCode).HasMaxLength(128);
+            entity.Property(x => x.LockedBy).HasMaxLength(128).IsConcurrencyToken();
+            entity.Property(x => x.Version).HasDefaultValue(0L).IsConcurrencyToken();
+            entity.HasIndex(x => new { x.GenerationJobId, x.Stage, x.Ordinal })
+                .IsUnique()
+                .HasDatabaseName("UX_tgpa_JobId_Stage_Ordinal");
+            entity.HasIndex(x => new { x.Provider, x.ProviderRequestId })
+                .IsUnique()
+                .HasDatabaseName("UX_tgpa_Provider_RequestId")
+                .HasFilter("\"ProviderRequestId\" IS NOT NULL");
+            entity.HasIndex(x => x.SubmissionTokenHash)
+                .IsUnique()
+                .HasDatabaseName("UX_tgpa_SubmissionTokenHash");
+            entity.HasIndex(x => new { x.State, x.NextPollAtUtc })
+                .HasDatabaseName("IX_tgpa_State_NextPollAtUtc")
+                .HasFilter("\"State\" IN (1, 2, 3, 4, 5)");
+            entity.HasIndex(x => new { x.State, x.LockedAtUtc })
+                .HasDatabaseName("IX_tgpa_State_LockedAtUtc")
+                .HasFilter("\"State\" IN (1, 2, 3, 4, 5)");
+            entity.HasIndex(x => new { x.GenerationJobId, x.CreatedAtUtc })
+                .HasDatabaseName("IX_tgpa_JobId_CreatedAtUtc");
+            entity.HasOne(x => x.GenerationJob)
+                .WithMany(x => x.ProviderAttempts)
+                .HasForeignKey(x => x.GenerationJobId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<TemplateProviderWebhookInbox>(entity =>
+        {
+            entity.ToTable("templates_provider_webhook_inbox", table =>
+            {
+                table.HasCheckConstraint("CK_tpwbi_AttemptCount", "\"AttemptCount\" >= 0");
+                table.HasCheckConstraint("CK_tpwbi_FailureCount", "\"FailureCount\" >= 0");
+            });
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Provider).HasMaxLength(64).IsRequired();
+            entity.Property(x => x.DeduplicationKey).HasMaxLength(160).IsRequired();
+            entity.Property(x => x.CallbackTokenHash).HasMaxLength(64);
+            entity.Property(x => x.ProviderRequestId).HasMaxLength(128);
+            entity.Property(x => x.EventType).HasMaxLength(64).IsRequired();
+            entity.Property(x => x.PayloadJson).HasColumnType("text").IsRequired();
+            entity.Property(x => x.Status).HasConversion<int>();
+            entity.Property(x => x.LockedBy).HasMaxLength(128).IsConcurrencyToken();
+            entity.Property(x => x.LastErrorCode).HasMaxLength(128);
+            entity.HasIndex(x => new { x.Provider, x.DeduplicationKey })
+                .IsUnique()
+                .HasDatabaseName("UX_tpwbi_Provider_Dedupe");
+            entity.HasIndex(x => new { x.Status, x.NextAttemptAtUtc })
+                .HasDatabaseName("IX_tpwbi_Status_NextAttemptAtUtc")
+                .HasFilter("\"Status\" IN (1, 4)");
+            entity.HasIndex(x => new { x.Status, x.UpdatedAtUtc })
+                .HasDatabaseName("IX_tpwbi_Terminal_UpdatedAtUtc")
+                .HasFilter("\"Status\" IN (3, 5)");
+            entity.HasIndex(x => x.ProviderAttemptId)
+                .HasDatabaseName("IX_tpwbi_ProviderAttemptId");
+            entity.HasIndex(x => x.GenerationJobId)
+                .HasDatabaseName("IX_tpwbi_GenerationJobId");
+            entity.HasIndex(x => x.ProviderRequestId)
+                .HasDatabaseName("IX_tpwbi_ProviderRequestId")
+                .HasFilter("\"ProviderRequestId\" IS NOT NULL");
+            entity.HasIndex(x => x.CallbackTokenHash)
+                .HasDatabaseName("IX_tpwbi_CallbackTokenHash")
+                .HasFilter("\"CallbackTokenHash\" IS NOT NULL");
+            entity.HasOne(x => x.ProviderAttempt)
+                .WithMany(x => x.WebhookEvents)
+                .HasForeignKey(x => x.ProviderAttemptId)
+                .OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(x => x.GenerationJob)
+                .WithMany(x => x.ProviderWebhookEvents)
+                .HasForeignKey(x => x.GenerationJobId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        builder.Entity<TemplateGenerationControlPolicy>(entity =>
+        {
+            entity.ToTable("templates_generation_control_policy", table =>
+            {
+                table.HasCheckConstraint("CK_tgcp_Revision", "\"Revision\" > 0");
+                table.HasCheckConstraint("CK_tgcp_ProviderCapacity", "\"ConfirmedFalConcurrencyLimit\" > 0 AND \"ReservedHeadroom\" >= 0 AND \"ReservedHeadroom\" < \"ConfirmedFalConcurrencyLimit\" AND \"ApplicationHardCeiling\" > 0");
+                table.HasCheckConstraint("CK_tgcp_BaseProfile", "\"BaseGlobalMaxConcurrentGenerations\" > 0 AND \"BaseImageReservedConcurrentGenerations\" > 0 AND \"BaseImageProtectedConcurrentGenerations\" > 0 AND \"BaseImageMaxConcurrentGenerations\" > 0 AND \"BaseVideoReservedConcurrentGenerations\" > 0 AND \"BaseVideoMaxConcurrentGenerations\" > 0 AND \"BaseVideoBorrowMaxConcurrentGenerations\" > 0 AND \"BaseVideoPreprocessingMaxConcurrentGenerations\" > 0");
+            });
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Revision).HasDefaultValue(1L).IsConcurrencyToken();
+            entity.Property(x => x.LastReason).HasMaxLength(500);
+            entity.HasIndex(x => x.UpdatedAtUtc)
+                .HasDatabaseName("IX_tgcp_UpdatedAtUtc");
+        });
+
+        builder.Entity<TemplateGenerationControlPolicyCommandReceipt>(entity =>
+        {
+            entity.ToTable("templates_generation_control_receipts", table =>
+                table.HasCheckConstraint("CK_tgcr_PolicyRevision", "\"PolicyRevision\" > 0"));
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.IdempotencyKey).HasMaxLength(256).IsRequired();
+            entity.Property(x => x.RequestHash).HasMaxLength(64).IsRequired();
+            entity.Property(x => x.ResponseJson).HasColumnType("text").IsRequired();
+            entity.HasIndex(x => new { x.ActorUserId, x.IdempotencyKey })
+                .IsUnique()
+                .HasDatabaseName("UX_tgcr_ActorUserId_IdempotencyKey");
+            entity.HasIndex(x => new { x.PolicyRevision, x.CreatedAtUtc })
+                .HasDatabaseName("IX_tgcr_PolicyRevision_CreatedAtUtc");
+        });
+
+        builder.Entity<TemplateProviderRuntimeSnapshot>(entity =>
+        {
+            entity.ToTable("templates_provider_runtime_snapshots");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Provider).HasMaxLength(64).IsRequired();
+            entity.Property(x => x.BalanceState).HasConversion<int>();
+            entity.Property(x => x.CurrentBalanceUsd).HasPrecision(18, 6);
+            entity.Property(x => x.LastErrorCode).HasMaxLength(128);
+            entity.HasIndex(x => x.Provider)
+                .IsUnique()
+                .HasDatabaseName("UX_tprs_Provider");
+            entity.HasIndex(x => x.RefreshLeaseExpiresAtUtc)
+                .HasDatabaseName("IX_tprs_RefreshLeaseExpiresAtUtc");
         });
 
         builder.Entity<AdminGenerationRefundRetryReceipt>(entity =>

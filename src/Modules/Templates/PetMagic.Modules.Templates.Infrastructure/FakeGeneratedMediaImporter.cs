@@ -22,14 +22,26 @@ internal sealed class FakeGeneratedMediaImporter(IMediaStorage mediaStorage) : I
     public Task<Result<StoredMediaResponse>> ImportVideoAsync(string generatedVideoUrl, Guid generationId, CancellationToken cancellationToken)
     {
         return mediaStorage.StoreAsync(
-            new MediaUploadCommand($"generated-{generationId:N}.mp4", "video/mp4", Mp4Header),
+            new MediaUploadCommand(
+                $"generated-{generationId:N}.mp4",
+                "video/mp4",
+                Mp4Header,
+                ContentStream: null,
+                ContentLengthBytes: Mp4Header.LongLength,
+                PreferredStorageKey: $"generations/{generationId:N}/original.mp4"),
             cancellationToken);
     }
 
     public Task<Result<StoredMediaResponse>> ImportImageAsync(string generatedImageUrl, Guid generationId, CancellationToken cancellationToken)
     {
         return mediaStorage.StoreAsync(
-            new MediaUploadCommand($"generated-{generationId:N}.png", "image/png", Png1x1),
+            new MediaUploadCommand(
+                $"generated-{generationId:N}.png",
+                "image/png",
+                Png1x1,
+                ContentStream: null,
+                ContentLengthBytes: Png1x1.LongLength,
+                PreferredStorageKey: $"generations/{generationId:N}/original.png"),
             cancellationToken);
     }
 }

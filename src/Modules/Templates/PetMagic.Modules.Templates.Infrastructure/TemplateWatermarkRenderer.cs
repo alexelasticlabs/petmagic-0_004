@@ -88,7 +88,13 @@ internal sealed class TemplateWatermarkRenderer(
             await image.SaveAsPngAsync(outputStream, cancellationToken);
             outputStream.Position = 0;
             var stored = await mediaStorage.StoreAsync(
-                new MediaUploadCommand($"watermarked-{generationId:N}.png", "image/png", outputStream, outputStream.Length),
+                new MediaUploadCommand(
+                    $"watermarked-{generationId:N}.png",
+                    "image/png",
+                    Content: null,
+                    ContentStream: outputStream,
+                    ContentLengthBytes: outputStream.Length,
+                    PreferredStorageKey: $"generations/{generationId:N}/watermarked.png"),
                 cancellationToken);
             if (stored.IsSuccess)
             {
@@ -199,7 +205,13 @@ internal sealed class TemplateWatermarkRenderer(
 
             await using var output = File.OpenRead(tempOutput);
             var stored = await mediaStorage.StoreAsync(
-                new MediaUploadCommand($"watermarked-{generationId:N}.mp4", "video/mp4", output, output.Length),
+                new MediaUploadCommand(
+                    $"watermarked-{generationId:N}.mp4",
+                    "video/mp4",
+                    Content: null,
+                    ContentStream: output,
+                    ContentLengthBytes: output.Length,
+                    PreferredStorageKey: $"generations/{generationId:N}/watermarked.mp4"),
                 cancellationToken);
             if (stored.IsSuccess)
             {

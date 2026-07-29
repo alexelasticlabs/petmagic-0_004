@@ -161,7 +161,13 @@ internal sealed class HttpGeneratedMediaImporter(
 
             memoryStream.Position = 0;
             var extension = resolveExtension(detectedContentType, uri);
-            var upload = new MediaUploadCommand($"generated-{generationId:N}{extension}", detectedContentType, memoryStream, memoryStream.Length);
+            var upload = new MediaUploadCommand(
+                $"generated-{generationId:N}{extension}",
+                detectedContentType,
+                Content: null,
+                ContentStream: memoryStream,
+                ContentLengthBytes: memoryStream.Length,
+                PreferredStorageKey: $"generations/{generationId:N}/original{extension}");
             var storeResult = await mediaStorage.StoreAsync(upload, cancellationToken);
             if (storeResult.IsFailure)
             {

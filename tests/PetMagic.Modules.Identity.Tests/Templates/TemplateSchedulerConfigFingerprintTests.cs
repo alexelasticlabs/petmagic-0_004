@@ -33,7 +33,7 @@ public sealed class TemplateSchedulerConfigFingerprintTests
     }
 
     [Fact]
-    public void Create_ShouldReturnDifferentChecksum_WhenGlobalCapChanges()
+    public void Create_ShouldIgnoreRuntimePolicyConcurrency_WhenGlobalCapChanges()
     {
         var first = TemplateSchedulerConfigFingerprint.Create(
             CreateOptions(globalMaxConcurrentGenerations: 3),
@@ -44,7 +44,49 @@ public sealed class TemplateSchedulerConfigFingerprintTests
             "Staging",
             TemplateSchedulerConfigFingerprint.ApiComponent);
 
-        Assert.NotEqual(first.Checksum, second.Checksum);
+        Assert.Equal(first.Checksum, second.Checksum);
+    }
+
+    [Fact]
+    public void Create_ShouldReturnDifferentChecksum_WhenSchedulerModeChanges()
+    {
+        var compatibility = TemplateSchedulerConfigFingerprint.Create(
+            CreateOptions(generationSchedulerV2Enabled: false),
+            "Production",
+            TemplateSchedulerConfigFingerprint.ApiComponent);
+        var schedulerV2 = TemplateSchedulerConfigFingerprint.Create(
+            CreateOptions(generationSchedulerV2Enabled: true),
+            "Production",
+            TemplateSchedulerConfigFingerprint.GenerationWorkerComponent);
+
+        Assert.NotEqual(compatibility.Checksum, schedulerV2.Checksum);
+        Assert.Contains("generationSchedulerV2Enabled", compatibility.CanonicalJson, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Create_ShouldIgnoreWorkerOnlyLoopAndUnusedSpendSettings()
+    {
+        var firstOptions = CreateOptions();
+        var secondOptions = CreateOptions(
+            generationWorkerPollIntervalMilliseconds: 250,
+            generationDispatchConcurrency: 12,
+            providerReconciliationConcurrency: 9,
+            mediaImportConcurrency: 3,
+            generationMaintenanceConcurrency: 2,
+            falProviderSpendDailyLimitUsd: 999m);
+        var first = TemplateSchedulerConfigFingerprint.Create(
+            firstOptions,
+            "Staging",
+            TemplateSchedulerConfigFingerprint.ApiComponent);
+        var second = TemplateSchedulerConfigFingerprint.Create(
+            secondOptions,
+            "Staging",
+            TemplateSchedulerConfigFingerprint.GenerationWorkerComponent);
+
+        Assert.Equal(first.Checksum, second.Checksum);
+        Assert.DoesNotContain("falProviderSpendDailyLimitUsd", first.CanonicalJson, StringComparison.Ordinal);
+        Assert.DoesNotContain("generationWorkerPollIntervalMilliseconds", first.CanonicalJson, StringComparison.Ordinal);
+        Assert.DoesNotContain("generationDispatchConcurrency", first.CanonicalJson, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -125,6 +167,7 @@ public sealed class TemplateSchedulerConfigFingerprintTests
             new TemplateSchedulerConfigComponent(TemplateSchedulerConfigFingerprint.ApiComponent),
             new TestHostEnvironment(Environments.Development),
             runtimeState,
+            new TemplateGenerationWorkerRuntimeState(),
             NullLogger<TemplateSchedulerConfigStartupService>.Instance);
 
         await startupService.StartAsync(CancellationToken.None);
@@ -174,6 +217,7 @@ public sealed class TemplateSchedulerConfigFingerprintTests
             new TemplateSchedulerConfigComponent(TemplateSchedulerConfigFingerprint.ApiComponent),
             new TestHostEnvironment(Environments.Development),
             runtimeState,
+            new TemplateGenerationWorkerRuntimeState(),
             NullLogger<TemplateSchedulerConfigStartupService>.Instance);
 
         await startupService.StartAsync(CancellationToken.None);
@@ -181,6 +225,41 @@ public sealed class TemplateSchedulerConfigFingerprintTests
         Assert.True(runtimeState.Snapshot.Initialized);
         Assert.False(runtimeState.Snapshot.IsMismatchDetected);
         await startupService.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task StartupService_ShouldPersistGenerationWorkerRuntimeConfiguration()
+    {
+        var services = new ServiceCollection();
+        var databaseName = $"scheduler-config-worker-runtime-{Guid.NewGuid():N}";
+        services.AddDbContext<TemplatesDbContext>(options => options.UseInMemoryDatabase(databaseName));
+        await using var provider = services.BuildServiceProvider();
+        var options = CreateOptions(
+            generationSchedulerV2Enabled: true,
+            generationDispatchConcurrency: 8,
+            providerReconciliationConcurrency: 7,
+            mediaImportConcurrency: 2,
+            generationMaintenanceConcurrency: 3);
+        var startupService = new TemplateSchedulerConfigStartupService(
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            options,
+            new TemplateSchedulerConfigComponent(TemplateSchedulerConfigFingerprint.GenerationWorkerComponent),
+            new TestHostEnvironment(Environments.Development),
+            new TemplateSchedulerConfigRuntimeState(),
+            new TemplateGenerationWorkerRuntimeState(),
+            NullLogger<TemplateSchedulerConfigStartupService>.Instance);
+
+        await startupService.StartAsync(CancellationToken.None);
+        await startupService.StopAsync(CancellationToken.None);
+
+        await using var verificationScope = provider.CreateAsyncScope();
+        var dbContext = verificationScope.ServiceProvider.GetRequiredService<TemplatesDbContext>();
+        var fingerprint = await dbContext.TemplateRuntimeConfigFingerprints.SingleAsync();
+        Assert.True(fingerprint.GenerationSchedulerV2Enabled);
+        Assert.Equal(8, fingerprint.GenerationDispatchConcurrency);
+        Assert.Equal(7, fingerprint.ProviderReconciliationConcurrency);
+        Assert.Equal(2, fingerprint.MediaImportConcurrency);
+        Assert.Equal(3, fingerprint.GenerationMaintenanceConcurrency);
     }
 
     [Fact]
@@ -216,6 +295,7 @@ public sealed class TemplateSchedulerConfigFingerprintTests
             new TemplateSchedulerConfigComponent(TemplateSchedulerConfigFingerprint.ApiComponent),
             new TestHostEnvironment(Environments.Development),
             runtimeState,
+            new TemplateGenerationWorkerRuntimeState(),
             NullLogger<TemplateSchedulerConfigStartupService>.Instance);
 
         await startupService.StartAsync(CancellationToken.None);
@@ -223,6 +303,140 @@ public sealed class TemplateSchedulerConfigFingerprintTests
         Assert.True(runtimeState.Snapshot.Initialized);
         Assert.True(runtimeState.Snapshot.IsMismatchDetected);
         Assert.Contains("active-worker-checksum", runtimeState.Snapshot.MismatchDetails, StringComparison.Ordinal);
+        await startupService.StopAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task StartupService_ApiHeartbeat_ShouldConvergeAfterMatchingWorkerRevisionStarts()
+    {
+        var services = new ServiceCollection();
+        var databaseName = $"scheduler-config-rolling-api-{Guid.NewGuid():N}";
+        services.AddDbContext<TemplatesDbContext>(options => options.UseInMemoryDatabase(databaseName));
+        await using var provider = services.BuildServiceProvider();
+        var now = DateTime.UtcNow;
+        var options = CreateOptions(generationSchedulerV2Enabled: true);
+        await using (var scope = provider.CreateAsyncScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<TemplatesDbContext>();
+            dbContext.TemplateRuntimeConfigFingerprints.Add(new TemplateRuntimeConfigFingerprint
+            {
+                Id = Guid.NewGuid(),
+                Component = TemplateSchedulerConfigFingerprint.GenerationWorkerComponent,
+                ProfileName = Environments.Development,
+                Checksum = "previous-worker-revision",
+                ConfigJson = "{}",
+                StartedAtUtc = now,
+                LastSeenAtUtc = now,
+                MismatchDetected = false
+            });
+            await dbContext.SaveChangesAsync();
+        }
+
+        var runtimeState = new TemplateSchedulerConfigRuntimeState();
+        var startupService = new TemplateSchedulerConfigStartupService(
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            options,
+            new TemplateSchedulerConfigComponent(TemplateSchedulerConfigFingerprint.ApiComponent),
+            new TestHostEnvironment(Environments.Development),
+            runtimeState,
+            new TemplateGenerationWorkerRuntimeState(),
+            NullLogger<TemplateSchedulerConfigStartupService>.Instance);
+
+        await startupService.StartAsync(CancellationToken.None);
+        Assert.True(runtimeState.Snapshot.IsMismatchDetected);
+
+        Guid apiFingerprintId;
+        await using (var scope = provider.CreateAsyncScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<TemplatesDbContext>();
+            var apiFingerprint = await dbContext.TemplateRuntimeConfigFingerprints
+                .SingleAsync(x => x.Component == TemplateSchedulerConfigFingerprint.ApiComponent);
+            apiFingerprintId = apiFingerprint.Id;
+            dbContext.TemplateRuntimeConfigFingerprints.Add(new TemplateRuntimeConfigFingerprint
+            {
+                Id = Guid.NewGuid(),
+                Component = TemplateSchedulerConfigFingerprint.GenerationWorkerComponent,
+                ProfileName = Environments.Development,
+                Checksum = apiFingerprint.Checksum,
+                ConfigJson = "{}",
+                StartedAtUtc = now.AddSeconds(1),
+                LastSeenAtUtc = DateTime.UtcNow,
+                MismatchDetected = false
+            });
+            await dbContext.SaveChangesAsync();
+        }
+
+        Assert.True(await startupService.RefreshHeartbeatAsync(apiFingerprintId, CancellationToken.None));
+        Assert.False(runtimeState.Snapshot.IsMismatchDetected);
+        await startupService.StopAsync(CancellationToken.None);
+
+        await using var verificationScope = provider.CreateAsyncScope();
+        var verificationDbContext = verificationScope.ServiceProvider.GetRequiredService<TemplatesDbContext>();
+        var persistedApi = await verificationDbContext.TemplateRuntimeConfigFingerprints
+            .SingleAsync(x => x.Id == apiFingerprintId);
+        Assert.False(persistedApi.MismatchDetected);
+        Assert.Null(persistedApi.MismatchDetails);
+    }
+
+    [Fact]
+    public async Task StartupService_WorkerShouldUseLatestRollingApiFingerprint_EvenWhenApiRowWasInitiallyMismatch()
+    {
+        var services = new ServiceCollection();
+        var databaseName = $"scheduler-config-rolling-worker-{Guid.NewGuid():N}";
+        services.AddDbContext<TemplatesDbContext>(options => options.UseInMemoryDatabase(databaseName));
+        await using var provider = services.BuildServiceProvider();
+        var now = DateTime.UtcNow;
+        var options = CreateOptions(generationSchedulerV2Enabled: true);
+        var expectedChecksum = TemplateSchedulerConfigFingerprint.Create(
+            options,
+            Environments.Development,
+            TemplateSchedulerConfigFingerprint.GenerationWorkerComponent).Checksum;
+        await using (var scope = provider.CreateAsyncScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<TemplatesDbContext>();
+            dbContext.TemplateRuntimeConfigFingerprints.AddRange(
+                new TemplateRuntimeConfigFingerprint
+                {
+                    Id = Guid.NewGuid(),
+                    Component = TemplateSchedulerConfigFingerprint.ApiComponent,
+                    ProfileName = Environments.Development,
+                    Checksum = "previous-api-revision",
+                    ConfigJson = "{}",
+                    StartedAtUtc = now.AddSeconds(-1),
+                    LastSeenAtUtc = now,
+                    MismatchDetected = false
+                },
+                new TemplateRuntimeConfigFingerprint
+                {
+                    Id = Guid.NewGuid(),
+                    Component = TemplateSchedulerConfigFingerprint.ApiComponent,
+                    ProfileName = Environments.Development,
+                    Checksum = expectedChecksum,
+                    ConfigJson = "{}",
+                    StartedAtUtc = now,
+                    LastSeenAtUtc = now,
+                    MismatchDetected = true,
+                    MismatchDetails = "waiting for matching worker rollout"
+                });
+            await dbContext.SaveChangesAsync();
+        }
+
+        var runtimeState = new TemplateSchedulerConfigRuntimeState();
+        var startupService = new TemplateSchedulerConfigStartupService(
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            options,
+            new TemplateSchedulerConfigComponent(TemplateSchedulerConfigFingerprint.GenerationWorkerComponent),
+            new TestHostEnvironment(Environments.Development),
+            runtimeState,
+            new TemplateGenerationWorkerRuntimeState(),
+            NullLogger<TemplateSchedulerConfigStartupService>.Instance);
+
+        await startupService.StartAsync(CancellationToken.None);
+
+        Assert.True(runtimeState.Snapshot.Initialized);
+        Assert.False(runtimeState.Snapshot.IsMismatchDetected);
+        Assert.Equal(expectedChecksum, runtimeState.Snapshot.Checksum);
+        await startupService.StopAsync(CancellationToken.None);
     }
 
     [Fact]
@@ -258,6 +472,7 @@ public sealed class TemplateSchedulerConfigFingerprintTests
             new TemplateSchedulerConfigComponent(TemplateSchedulerConfigFingerprint.GenerationWorkerComponent),
             new TestHostEnvironment(Environments.Development),
             runtimeState,
+            new TemplateGenerationWorkerRuntimeState(),
             NullLogger<TemplateSchedulerConfigStartupService>.Instance);
 
         await Assert.ThrowsAnyAsync<InvalidOperationException>(() => startupService.StartAsync(CancellationToken.None));
@@ -314,7 +529,14 @@ public sealed class TemplateSchedulerConfigFingerprintTests
         string r2SecretKey = "",
         string falApiKey = "",
         string firebaseServiceAccountJson = "",
-        string falWebhookUrl = "")
+        string falWebhookUrl = "",
+        int generationWorkerPollIntervalMilliseconds = 1_000,
+        bool generationSchedulerV2Enabled = false,
+        int generationDispatchConcurrency = 4,
+        int providerReconciliationConcurrency = 4,
+        int mediaImportConcurrency = 1,
+        int generationMaintenanceConcurrency = 1,
+        decimal falProviderSpendDailyLimitUsd = 0m)
     {
         return new TemplatesOptions
         {
@@ -330,8 +552,13 @@ public sealed class TemplateSchedulerConfigFingerprintTests
             AllowedKlingModels = ["video-model"],
             SupportedLocalizationLocales = ["ru", "de"],
             GenerationWorkerEnabled = false,
-            GenerationWorkerPollIntervalMilliseconds = 1_000,
-            MaxConcurrentJobsPerWorker = 1,
+            GenerationWorkerPollIntervalMilliseconds = generationWorkerPollIntervalMilliseconds,
+            GenerationSchedulerV2Enabled = generationSchedulerV2Enabled,
+            GenerationDispatchConcurrency = generationDispatchConcurrency,
+            ProviderReconciliationConcurrency = providerReconciliationConcurrency,
+            MediaImportConcurrency = mediaImportConcurrency,
+            GenerationMaintenanceConcurrency = generationMaintenanceConcurrency,
+            FalProviderSpendDailyLimitUsd = falProviderSpendDailyLimitUsd,
             GlobalMaxConcurrentGenerations = globalMaxConcurrentGenerations,
             ImageReservedConcurrentGenerations = 1,
             ImageMaxConcurrentGenerations = 2,

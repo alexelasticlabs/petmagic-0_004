@@ -85,7 +85,7 @@ internal sealed partial class TemplateGenerationService
 
         var compareAccessContext = await BuildCompareAccessContextAsync(jobs, cancellationToken);
         var queuedJobs = jobs
-            .Where(IsClaimableQueuedJob)
+            .Where(IsQueuedJob)
             .ToArray();
         if (queuedJobs.Length == 0)
         {
@@ -109,36 +109,62 @@ internal sealed partial class TemplateGenerationService
         var now = DateTime.UtcNow;
         var queuedOrderKeys = await dbContext.TemplateGenerationJobs
             .AsNoTracking()
-            .Where(x => x.Status == TemplateGenerationStatus.Queued
-                && (x.ChargedAtUtc != null || x.UserId == AdminTestUserId))
+            .Where(x => x.Status == TemplateGenerationStatus.Queued)
             .Select(x => new
             {
                 x.Id,
                 x.QueuedAtUtc,
                 x.QueueMediaType,
-                x.QueueTier
+                x.QueueTier,
+                x.CurrentProviderStage,
+                x.PreprocessingCompletedAtUtc,
+                x.NormalizedImageUrl
             })
             .ToArrayAsync(cancellationToken);
 
-        var positionByQueuedJobId = queuedOrderKeys
-            .GroupBy(x => TemplateGenerationQueue.NormalizeMediaType(x.QueueMediaType))
-            .SelectMany(group => group
+        var orderStateByQueuedJobId = new Dictionary<Guid, QueuedOrderState>(queuedOrderKeys.Length);
+        foreach (var group in queuedOrderKeys
+            .GroupBy(x => TemplateGenerationQueue.NormalizeMediaType(x.QueueMediaType)))
+        {
+            long videoNeedsPreprocessingAhead = 0;
+            long videoReadyForGenerationAhead = 0;
+            var ordered = group
                 .OrderByDescending(x => ResolveQueuedProjectionScore(x.QueueTier, x.QueuedAtUtc, now))
                 .ThenBy(x => x.QueuedAtUtc)
                 .ThenBy(x => x.Id)
-                .Select((job, index) => new
-                {
-                    job.Id,
-                    Position = index + 1
-                }))
-            .ToDictionary(x => x.Id, x => x.Position);
+                .ToArray();
+            for (var index = 0; index < ordered.Length; index++)
+            {
+                var queued = ordered[index];
+                var requiresVideoPreprocessing = RequiresVideoPreprocessing(
+                    queued.QueueMediaType,
+                    queued.CurrentProviderStage,
+                    queued.PreprocessingCompletedAtUtc,
+                    queued.NormalizedImageUrl);
+                orderStateByQueuedJobId[queued.Id] = new QueuedOrderState(
+                    index + 1,
+                    new VideoQueueStageContext(
+                        videoNeedsPreprocessingAhead,
+                        videoReadyForGenerationAhead,
+                        requiresVideoPreprocessing));
 
-        var processingCountByMediaType = await dbContext.TemplateGenerationJobs
-            .AsNoTracking()
-            .Where(x => TemplateGenerationJobStatusSets.Processing.Contains(x.Status))
-            .GroupBy(x => x.QueueMediaType)
-            .Select(x => new { MediaType = x.Key, Count = x.Count() })
-            .ToDictionaryAsync(x => TemplateGenerationQueue.NormalizeMediaType(x.MediaType), x => x.Count, cancellationToken);
+                if (TemplateGenerationQueue.NormalizeMediaType(queued.QueueMediaType)
+                    != TemplateGenerationQueue.MediaTypeVideo)
+                {
+                    continue;
+                }
+
+                if (requiresVideoPreprocessing)
+                {
+                    videoNeedsPreprocessingAhead++;
+                }
+                else
+                {
+                    videoReadyForGenerationAhead++;
+                }
+            }
+        }
+
         var capacityContext = await BuildQueueCapacityContextAsync(cancellationToken);
 
         var items = new List<TemplateGenerationResponse>(jobs.Count);
@@ -159,13 +185,20 @@ internal sealed partial class TemplateGenerationService
             }
 
             var mediaType = TemplateGenerationQueue.ResolveMediaType(job);
-            var queuePosition = positionByQueuedJobId.GetValueOrDefault(job.Id, 1);
+            var orderState = orderStateByQueuedJobId.GetValueOrDefault(
+                job.Id,
+                new QueuedOrderState(
+                    1,
+                    new VideoQueueStageContext(
+                        0,
+                        0,
+                        RequiresVideoPreprocessing(job))));
             var queueEstimate = BuildQueueEstimate(
-                queuePosition,
-                processingCountByMediaType.GetValueOrDefault(mediaType),
+                orderState.Position,
                 mediaType,
                 job.QueueTier,
-                capacityContext);
+                capacityContext,
+                orderState.VideoStages);
             items.Add(await SignUserMediaUrlsAsync(
                 ApplyCompareAccess(
                     ApplyWatermarkAccess(
@@ -192,31 +225,47 @@ internal sealed partial class TemplateGenerationService
         var queuedJobs = await dbContext.TemplateGenerationJobs
             .AsNoTracking()
             .Where(x => x.Status == TemplateGenerationStatus.Queued
-                && (x.ChargedAtUtc != null || x.UserId == AdminTestUserId)
                 && x.QueueMediaType == mediaType)
             .Select(x => new
             {
                 x.Id,
                 x.QueuedAtUtc,
-                x.QueueTier
+                x.QueueTier,
+                x.CurrentProviderStage,
+                x.PreprocessingCompletedAtUtc,
+                x.NormalizedImageUrl
             })
             .ToArrayAsync(cancellationToken);
 
-        var queuedAhead = queuedJobs.Count(x =>
+        var queuedAhead = queuedJobs.Where(x =>
         {
             var score = ResolveQueuedProjectionScore(x.QueueTier, x.QueuedAtUtc, now);
             return score > jobScore
                 || (score == jobScore && (x.QueuedAtUtc < job.QueuedAtUtc || (x.QueuedAtUtc == job.QueuedAtUtc && x.Id.CompareTo(job.Id) < 0)));
-        });
-
-        var processingCount = await dbContext.TemplateGenerationJobs
-            .AsNoTracking()
-            .CountAsync(x => TemplateGenerationJobStatusSets.Processing.Contains(x.Status)
-                && x.QueueMediaType == mediaType,
-                cancellationToken);
+        }).ToArray();
 
         var capacityContext = await BuildQueueCapacityContextAsync(cancellationToken);
-        return BuildQueueEstimate(queuedAhead + 1, processingCount, mediaType, job.QueueTier, capacityContext);
+        var videoStages = TemplateGenerationQueue.NormalizeMediaType(mediaType)
+            == TemplateGenerationQueue.MediaTypeVideo
+            ? new VideoQueueStageContext(
+                queuedAhead.LongCount(x => RequiresVideoPreprocessing(
+                    mediaType,
+                    x.CurrentProviderStage,
+                    x.PreprocessingCompletedAtUtc,
+                    x.NormalizedImageUrl)),
+                queuedAhead.LongCount(x => !RequiresVideoPreprocessing(
+                    mediaType,
+                    x.CurrentProviderStage,
+                    x.PreprocessingCompletedAtUtc,
+                    x.NormalizedImageUrl)),
+                RequiresVideoPreprocessing(job))
+            : default;
+        return BuildQueueEstimate(
+            queuedAhead.Length + 1,
+            mediaType,
+            job.QueueTier,
+            capacityContext,
+            videoStages);
     }
 
     private async Task<QueueEstimate> CalculateQueueEstimateForNewJobAsync(
@@ -231,24 +280,43 @@ internal sealed partial class TemplateGenerationService
         var queuedJobs = await dbContext.TemplateGenerationJobs
             .AsNoTracking()
             .Where(x => x.Status == TemplateGenerationStatus.Queued
-                && (x.ChargedAtUtc != null || x.UserId == AdminTestUserId)
                 && x.QueueMediaType == mediaType)
             .Select(x => new
             {
                 x.QueuedAtUtc,
-                x.QueueTier
+                x.QueueTier,
+                x.QueueMediaType,
+                x.CurrentProviderStage,
+                x.PreprocessingCompletedAtUtc,
+                x.NormalizedImageUrl
             })
             .ToArrayAsync(cancellationToken);
 
-        var queuedAhead = queuedJobs.Count(x => ResolveQueuedProjectionScore(x.QueueTier, x.QueuedAtUtc, now) >= newScore);
-        var processingCount = await dbContext.TemplateGenerationJobs
-            .AsNoTracking()
-            .CountAsync(x => TemplateGenerationJobStatusSets.Processing.Contains(x.Status)
-                && x.QueueMediaType == mediaType,
-                cancellationToken);
-
+        var queuedAhead = queuedJobs
+            .Where(x => ResolveQueuedProjectionScore(x.QueueTier, x.QueuedAtUtc, now) >= newScore)
+            .ToArray();
         var capacityContext = await BuildQueueCapacityContextAsync(cancellationToken);
-        return BuildQueueEstimate(queuedAhead + 1, processingCount, mediaType, normalizedTier, capacityContext);
+        var videoStages = TemplateGenerationQueue.NormalizeMediaType(mediaType)
+            == TemplateGenerationQueue.MediaTypeVideo
+            ? new VideoQueueStageContext(
+                queuedAhead.LongCount(x => RequiresVideoPreprocessing(
+                    mediaType,
+                    x.CurrentProviderStage,
+                    x.PreprocessingCompletedAtUtc,
+                    x.NormalizedImageUrl)),
+                queuedAhead.LongCount(x => !RequiresVideoPreprocessing(
+                    mediaType,
+                    x.CurrentProviderStage,
+                    x.PreprocessingCompletedAtUtc,
+                    x.NormalizedImageUrl)),
+                OwnNeedsPreprocessing: true)
+            : default;
+        return BuildQueueEstimate(
+            queuedAhead.Length + 1,
+            mediaType,
+            normalizedTier,
+            capacityContext,
+            videoStages);
     }
 
     private int ResolveQueuedProjectionScore(string queueTier, DateTime queuedAtUtc, DateTime now)
@@ -261,20 +329,99 @@ internal sealed partial class TemplateGenerationService
 
     private QueueEstimate BuildQueueEstimate(
         int queuePosition,
-        int processingCount,
         string mediaType,
         string queueTier,
-        QueueCapacityContext? capacityContext = null)
+        QueueCapacityContext? capacityContext,
+        VideoQueueStageContext videoStages)
     {
         var normalizedMediaType = TemplateGenerationQueue.NormalizeMediaType(mediaType);
-        var slots = ResolveEffectiveSlotsForEstimate(normalizedMediaType, capacityContext);
-        var durationSeconds = normalizedMediaType == TemplateGenerationQueue.MediaTypeVideo
-            ? Math.Max(1, options.EstimatedVideoGenerationSeconds)
-            : Math.Max(1, options.EstimatedImageGenerationSeconds);
-        var estimatedWaitSeconds = (int)Math.Ceiling(Math.Max(0, processingCount + queuePosition - 1) * durationSeconds / (double)slots);
-        var estimatedTotalSeconds = estimatedWaitSeconds + durationSeconds;
+        var queuedAhead = Math.Max(0, queuePosition - 1);
+        var providerImportArrivals = new List<ImportArrival>();
+        var imageGenerationSeconds = ResolveImageGenerationSeconds(capacityContext);
+        var videoPreprocessingSeconds = ResolveVideoPreprocessingSeconds(capacityContext);
+        var videoGenerationSeconds = ResolveVideoGenerationSeconds(capacityContext);
+        var imageImportSeconds = ResolveImageImportSeconds(capacityContext);
+        var videoImportSeconds = ResolveVideoImportSeconds(capacityContext);
+
+        int ownProviderSeconds;
+        int providerCompletedAtSeconds;
+        if (normalizedMediaType == TemplateGenerationQueue.MediaTypeVideo)
+        {
+            var preprocessingSlots = ResolveVideoPreprocessingSlotsForEstimate(capacityContext);
+            var generationSlots = ResolveEffectiveSlotsForEstimate(normalizedMediaType, capacityContext);
+            var activePreprocessing = capacityContext?.ActiveVideoPreprocessingProvider ?? 0;
+            var activeGeneration = capacityContext?.ActiveVideoGenerationProvider ?? 0;
+            var videoTimeline = EstimateVideoProviderTimeline(
+                activePreprocessing,
+                activeGeneration,
+                videoStages.QueuedAheadNeedsPreprocessing,
+                videoStages.QueuedAheadReadyForGeneration,
+                includeOwn: true,
+                videoStages.OwnNeedsPreprocessing,
+                videoPreprocessingSeconds,
+                videoGenerationSeconds,
+                preprocessingSlots,
+                generationSlots);
+            providerCompletedAtSeconds = videoTimeline.OwnCompletedAtSeconds;
+            providerImportArrivals.AddRange(videoTimeline.AheadCompletionTimes.Select(
+                completedAt => new ImportArrival(completedAt, videoImportSeconds, IsOwn: false)));
+            ownProviderSeconds = videoStages.OwnNeedsPreprocessing
+                ? checked(videoPreprocessingSeconds + videoGenerationSeconds)
+                : videoGenerationSeconds;
+
+            var imageTimeline = EstimateSingleStageProviderTimeline(
+                capacityContext?.ActiveImageProvider ?? 0,
+                capacityContext?.QueuedImage ?? 0,
+                includeOwn: false,
+                imageGenerationSeconds,
+                ResolveEffectiveSlotsForEstimate(TemplateGenerationQueue.MediaTypeImage, capacityContext));
+            providerImportArrivals.AddRange(imageTimeline.AheadCompletionTimes.Select(
+                completedAt => new ImportArrival(completedAt, imageImportSeconds, IsOwn: false)));
+        }
+        else
+        {
+            var generationSlots = ResolveEffectiveSlotsForEstimate(normalizedMediaType, capacityContext);
+            var activeGeneration = capacityContext?.ActiveImageProvider ?? 0;
+            var imageTimeline = EstimateSingleStageProviderTimeline(
+                activeGeneration,
+                queuedAhead,
+                includeOwn: true,
+                imageGenerationSeconds,
+                generationSlots);
+            providerCompletedAtSeconds = imageTimeline.OwnCompletedAtSeconds;
+            providerImportArrivals.AddRange(imageTimeline.AheadCompletionTimes.Select(
+                completedAt => new ImportArrival(completedAt, imageImportSeconds, IsOwn: false)));
+            ownProviderSeconds = imageGenerationSeconds;
+
+            var videoTimeline = EstimateVideoProviderTimeline(
+                capacityContext?.ActiveVideoPreprocessingProvider ?? 0,
+                capacityContext?.ActiveVideoGenerationProvider ?? 0,
+                capacityContext?.QueuedVideoNeedsPreprocessing ?? 0,
+                capacityContext?.QueuedVideoReadyForGeneration ?? 0,
+                includeOwn: false,
+                ownNeedsPreprocessing: false,
+                videoPreprocessingSeconds,
+                videoGenerationSeconds,
+                ResolveVideoPreprocessingSlotsForEstimate(capacityContext),
+                ResolveEffectiveSlotsForEstimate(TemplateGenerationQueue.MediaTypeVideo, capacityContext));
+            providerImportArrivals.AddRange(videoTimeline.AheadCompletionTimes.Select(
+                completedAt => new ImportArrival(completedAt, videoImportSeconds, IsOwn: false)));
+        }
+
+        var ownImportSeconds = ResolveImportSeconds(normalizedMediaType, capacityContext);
+        var estimatedTotalSeconds = EstimateImportCompletionSeconds(
+            capacityContext?.ActiveImageImports ?? 0,
+            capacityContext?.ActiveVideoImports ?? 0,
+            providerImportArrivals,
+            providerCompletedAtSeconds,
+            ownImportSeconds,
+            imageImportSeconds,
+            videoImportSeconds,
+            Math.Max(1, options.MediaImportConcurrency));
+        var ownServiceSeconds = checked(ownProviderSeconds + ownImportSeconds);
+        var estimatedWaitSeconds = Math.Max(0, estimatedTotalSeconds - ownServiceSeconds);
         var lane = TemplateGenerationQueue.ResolveLane(normalizedMediaType, queueTier);
-        var reason = processingCount + queuePosition > slots ? $"backlog:{lane}" : $"capacity:{lane}";
+        var reason = estimatedWaitSeconds > 0 ? $"backlog:{lane}" : $"capacity:{lane}";
         return new QueueEstimate(
             queuePosition,
             estimatedWaitSeconds,
@@ -286,43 +433,274 @@ internal sealed partial class TemplateGenerationService
             Math.Max(30, Math.Min(300, estimatedWaitSeconds / 2)));
     }
 
+    private static readonly TemplateGenerationProviderAttemptState[] QueueEstimateActiveAttemptStates =
+    [
+        TemplateGenerationProviderAttemptState.SubmitReserved,
+        TemplateGenerationProviderAttemptState.Submitting,
+        TemplateGenerationProviderAttemptState.ProviderQueued,
+        TemplateGenerationProviderAttemptState.ProviderProcessing,
+        TemplateGenerationProviderAttemptState.SubmissionUnknown
+    ];
+
+    private static readonly TemplateGenerationStatus[] QueueEstimateProviderStatuses =
+    [
+        TemplateGenerationStatus.Processing,
+        TemplateGenerationStatus.Retrying,
+        TemplateGenerationStatus.SubmittingToProvider,
+        TemplateGenerationStatus.ProviderQueued,
+        TemplateGenerationStatus.ProviderProcessing
+    ];
+
     private async Task<QueueCapacityContext> BuildQueueCapacityContextAsync(CancellationToken cancellationToken)
     {
-        var activeCounts = await dbContext.TemplateGenerationJobs
+        var activeAttemptCounts = await dbContext.TemplateGenerationProviderAttempts
             .AsNoTracking()
-            .Where(x => TemplateGenerationJobStatusSets.Processing.Contains(x.Status))
+            .Where(x => QueueEstimateActiveAttemptStates.Contains(x.State))
+            .GroupBy(x => x.Stage)
+            .Select(x => new { Stage = x.Key, Count = x.LongCount() })
+            .ToArrayAsync(cancellationToken);
+        var activeImageProvider = activeAttemptCounts
+            .Where(x => x.Stage == TemplateGenerationProviderAttemptStage.ImageGeneration)
+            .Sum(x => x.Count);
+        var activeVideoPreprocessingProvider = activeAttemptCounts
+            .Where(x => x.Stage == TemplateGenerationProviderAttemptStage.VideoPreprocessing)
+            .Sum(x => x.Count);
+        var activeVideoGenerationProvider = activeAttemptCounts
+            .Where(x => x.Stage == TemplateGenerationProviderAttemptStage.VideoGeneration)
+            .Sum(x => x.Count);
+
+        var legacyProviderJobs = await dbContext.TemplateGenerationJobs
+            .AsNoTracking()
+            .Where(x => QueueEstimateProviderStatuses.Contains(x.Status)
+                && !x.ProviderAttempts.Any(attempt => QueueEstimateActiveAttemptStates.Contains(attempt.State)))
+            .Select(x => new
+            {
+                x.QueueMediaType,
+                x.CurrentProviderStage,
+                x.PreprocessingCompletedAtUtc,
+                x.NormalizedImageUrl
+            })
+            .ToArrayAsync(cancellationToken);
+        foreach (var legacyJob in legacyProviderJobs)
+        {
+            if (TemplateGenerationQueue.NormalizeMediaType(legacyJob.QueueMediaType)
+                == TemplateGenerationQueue.MediaTypeImage)
+            {
+                activeImageProvider++;
+                continue;
+            }
+
+            var isVideoGeneration = string.Equals(
+                    legacyJob.CurrentProviderStage,
+                    "video_generation",
+                    StringComparison.Ordinal)
+                || (legacyJob.PreprocessingCompletedAtUtc is not null
+                    && !string.IsNullOrWhiteSpace(legacyJob.NormalizedImageUrl));
+            if (isVideoGeneration)
+            {
+                activeVideoGenerationProvider++;
+            }
+            else
+            {
+                activeVideoPreprocessingProvider++;
+            }
+        }
+
+        var activeImportCounts = await dbContext.TemplateGenerationJobs
+            .AsNoTracking()
+            .Where(x => x.Status == TemplateGenerationStatus.ImportingMedia)
             .GroupBy(x => x.QueueMediaType)
             .Select(x => new { MediaType = x.Key, Count = x.LongCount() })
             .ToArrayAsync(cancellationToken);
-        var activeImage = activeCounts
+        var activeImageImports = activeImportCounts
             .Where(x => TemplateGenerationQueue.NormalizeMediaType(x.MediaType) == TemplateGenerationQueue.MediaTypeImage)
             .Sum(x => x.Count);
-        var activeVideo = activeCounts
+        var activeVideoImports = activeImportCounts
             .Where(x => TemplateGenerationQueue.NormalizeMediaType(x.MediaType) == TemplateGenerationQueue.MediaTypeVideo)
             .Sum(x => x.Count);
-        var queuedImage = await dbContext.TemplateGenerationJobs
-            .AsNoTracking()
-            .LongCountAsync(x => x.Status == TemplateGenerationStatus.Queued
-                && (x.ChargedAtUtc != null || x.UserId == AdminTestUserId)
-                && x.QueueMediaType == TemplateGenerationQueue.MediaTypeImage,
-                cancellationToken);
 
-        return new QueueCapacityContext(activeImage, activeVideo, queuedImage);
+        var queuedJobs = await dbContext.TemplateGenerationJobs
+            .AsNoTracking()
+            .Where(x => x.Status == TemplateGenerationStatus.Queued)
+            .Select(x => new
+            {
+                x.QueueMediaType,
+                x.CurrentProviderStage,
+                x.PreprocessingCompletedAtUtc,
+                x.NormalizedImageUrl
+            })
+            .ToArrayAsync(cancellationToken);
+        var queuedImage = queuedJobs.LongCount(x =>
+            TemplateGenerationQueue.NormalizeMediaType(x.QueueMediaType)
+            == TemplateGenerationQueue.MediaTypeImage);
+        var queuedVideoNeedsPreprocessing = queuedJobs.LongCount(x =>
+            RequiresVideoPreprocessing(
+                x.QueueMediaType,
+                x.CurrentProviderStage,
+                x.PreprocessingCompletedAtUtc,
+                x.NormalizedImageUrl));
+        var queuedVideoReadyForGeneration = queuedJobs.LongCount(x =>
+            TemplateGenerationQueue.NormalizeMediaType(x.QueueMediaType)
+                == TemplateGenerationQueue.MediaTypeVideo
+            && !RequiresVideoPreprocessing(
+                x.QueueMediaType,
+                x.CurrentProviderStage,
+                x.PreprocessingCompletedAtUtc,
+                x.NormalizedImageUrl));
+
+        var sampleCutoffUtc = DateTime.UtcNow.AddDays(-7);
+        var imageGenerationP90Seconds = await LoadProviderP90DurationSecondsAsync(
+            TemplateGenerationProviderAttemptStage.ImageGeneration,
+            sampleCutoffUtc,
+            cancellationToken);
+        var videoPreprocessingP90Seconds = await LoadProviderP90DurationSecondsAsync(
+            TemplateGenerationProviderAttemptStage.VideoPreprocessing,
+            sampleCutoffUtc,
+            cancellationToken);
+        var videoGenerationP90Seconds = await LoadProviderP90DurationSecondsAsync(
+            TemplateGenerationProviderAttemptStage.VideoGeneration,
+            sampleCutoffUtc,
+            cancellationToken);
+        var imageImportP90Seconds = await LoadImportP90DurationSecondsAsync(
+            TemplateGenerationQueue.MediaTypeImage,
+            sampleCutoffUtc,
+            cancellationToken);
+        var videoImportP90Seconds = await LoadImportP90DurationSecondsAsync(
+            TemplateGenerationQueue.MediaTypeVideo,
+            sampleCutoffUtc,
+            cancellationToken);
+
+        TemplateGenerationConcurrencyProfile? runtimeProfile = null;
+        if (options.GenerationSchedulerV2Enabled && runtimePolicyProvider is not null)
+        {
+            var runtimePolicy = await runtimePolicyProvider.GetRuntimePolicyAsync(cancellationToken);
+            runtimeProfile = runtimePolicy.AdmissionEnabled
+                ? runtimePolicy.EffectiveProfile
+                : new TemplateGenerationConcurrencyProfile(0, 0, 0, 0, 0, 0, 0, 0);
+        }
+
+        return new QueueCapacityContext(
+            activeImageProvider,
+            activeVideoPreprocessingProvider,
+            activeVideoGenerationProvider,
+            activeImageImports,
+            activeVideoImports,
+            queuedImage,
+            queuedVideoNeedsPreprocessing,
+            queuedVideoReadyForGeneration,
+            imageGenerationP90Seconds,
+            videoPreprocessingP90Seconds,
+            videoGenerationP90Seconds,
+            imageImportP90Seconds,
+            videoImportP90Seconds,
+            runtimeProfile);
+    }
+
+    private async Task<int?> LoadProviderP90DurationSecondsAsync(
+        TemplateGenerationProviderAttemptStage stage,
+        DateTime cutoffUtc,
+        CancellationToken cancellationToken)
+    {
+        var samples = await dbContext.TemplateGenerationProviderAttempts
+            .AsNoTracking()
+            .Where(x => x.State == TemplateGenerationProviderAttemptState.Completed
+                && x.Stage == stage
+                && x.SubmittedAtUtc != null
+                && x.ProviderCompletedAtUtc != null
+                && x.ProviderCompletedAtUtc >= cutoffUtc)
+            .OrderByDescending(x => x.ProviderCompletedAtUtc)
+            .Take(600)
+            .Select(x => new
+            {
+                SubmittedAtUtc = x.SubmittedAtUtc!.Value,
+                ProviderCompletedAtUtc = x.ProviderCompletedAtUtc!.Value
+            })
+            .ToArrayAsync(cancellationToken);
+        return CalculateP90DurationSeconds(
+            samples.Select(x => x.ProviderCompletedAtUtc - x.SubmittedAtUtc));
+    }
+
+    private async Task<int?> LoadImportP90DurationSecondsAsync(
+        string mediaType,
+        DateTime cutoffUtc,
+        CancellationToken cancellationToken)
+    {
+        var samples = await dbContext.TemplateGenerationJobs
+            .AsNoTracking()
+            .Where(x => x.Status == TemplateGenerationStatus.Completed
+                && x.QueueMediaType == mediaType
+                && x.ImportStartedAtUtc != null
+                && x.MediaImportCompletedAtUtc != null
+                && x.MediaImportCompletedAtUtc >= cutoffUtc)
+            .OrderByDescending(x => x.MediaImportCompletedAtUtc)
+            .Take(400)
+            .Select(x => new
+            {
+                ImportStartedAtUtc = x.ImportStartedAtUtc!.Value,
+                MediaImportCompletedAtUtc = x.MediaImportCompletedAtUtc!.Value
+            })
+            .ToArrayAsync(cancellationToken);
+        return CalculateP90DurationSeconds(
+            samples.Select(x => x.MediaImportCompletedAtUtc - x.ImportStartedAtUtc));
+    }
+
+    private int ResolveImageGenerationSeconds(QueueCapacityContext? capacityContext) =>
+        capacityContext?.ImageGenerationP90Seconds
+        ?? Math.Max(1, options.EstimatedImageGenerationSeconds);
+
+    private int ResolveVideoPreprocessingSeconds(QueueCapacityContext? capacityContext) =>
+        capacityContext?.VideoPreprocessingP90Seconds
+        ?? Math.Max(1, options.EstimatedVideoPreprocessingSeconds);
+
+    private int ResolveVideoGenerationSeconds(QueueCapacityContext? capacityContext) =>
+        capacityContext?.VideoGenerationP90Seconds
+        ?? Math.Max(1, options.EstimatedVideoGenerationSeconds);
+
+    private int ResolveImageImportSeconds(QueueCapacityContext? capacityContext) =>
+        capacityContext?.ImageImportP90Seconds
+        ?? Math.Max(1, options.EstimatedImageImportSeconds);
+
+    private int ResolveVideoImportSeconds(QueueCapacityContext? capacityContext) =>
+        capacityContext?.VideoImportP90Seconds
+        ?? Math.Max(1, options.EstimatedVideoImportSeconds);
+
+    private int ResolveImportSeconds(string normalizedMediaType, QueueCapacityContext? capacityContext) =>
+        normalizedMediaType == TemplateGenerationQueue.MediaTypeVideo
+            ? ResolveVideoImportSeconds(capacityContext)
+            : ResolveImageImportSeconds(capacityContext);
+
+    private static int? CalculateP90DurationSeconds(IEnumerable<TimeSpan> durations)
+    {
+        var ordered = durations
+            .Where(duration => duration > TimeSpan.Zero && duration <= TimeSpan.FromHours(2))
+            .Select(duration => (int)Math.Ceiling(duration.TotalSeconds))
+            .Order()
+            .ToArray();
+        if (ordered.Length < 10)
+        {
+            return null;
+        }
+
+        var index = (int)Math.Ceiling(ordered.Length * 0.9) - 1;
+        return ordered[Math.Clamp(index, 0, ordered.Length - 1)];
     }
 
     private int ResolveEffectiveSlotsForEstimate(string normalizedMediaType, QueueCapacityContext? capacityContext)
     {
+        var runtimeProfile = capacityContext?.RuntimeProfile;
         if (normalizedMediaType == TemplateGenerationQueue.MediaTypeVideo)
         {
-            var reserved = ResolveVideoReservedConcurrency();
+            var reserved = runtimeProfile?.VideoReservedConcurrentGenerations
+                ?? ResolveVideoReservedConcurrency();
             if (!CanEstimateVideoBorrow(capacityContext))
             {
                 return Math.Max(1, reserved);
             }
 
             return Math.Max(1, Math.Min(
-                options.VideoMaxConcurrentGenerations,
-                reserved + ResolveVideoBorrowMaxConcurrency()));
+                runtimeProfile?.VideoMaxConcurrentGenerations ?? options.VideoMaxConcurrentGenerations,
+                reserved + (runtimeProfile?.VideoBorrowMaxConcurrentGenerations
+                    ?? ResolveVideoBorrowMaxConcurrency())));
         }
 
         if (capacityContext is null)
@@ -331,16 +709,219 @@ internal sealed partial class TemplateGenerationService
         }
 
         var context = capacityContext.Value;
-        var borrowedVideo = Math.Max(0, context.ActiveVideo - ResolveVideoReservedConcurrency());
+        var imageMax = runtimeProfile?.ImageMaxConcurrentGenerations
+            ?? options.ImageMaxConcurrentGenerations;
+        var imageProtected = runtimeProfile?.ImageProtectedConcurrentGenerations
+            ?? ResolveImageProtectedConcurrency();
+        var globalMax = runtimeProfile?.GlobalMaxConcurrentGenerations
+            ?? options.GlobalMaxConcurrentGenerations;
+        var videoReserved = runtimeProfile?.VideoReservedConcurrentGenerations
+            ?? ResolveVideoReservedConcurrency();
+        var borrowedVideo = Math.Max(0, context.ActiveVideo - videoReserved);
         var globalSlotsAvailableAfterBorrowedVideo = Math.Max(
-            ResolveImageProtectedConcurrency(),
-            options.GlobalMaxConcurrentGenerations - (int)borrowedVideo);
-        return Math.Max(1, Math.Min(options.ImageMaxConcurrentGenerations, globalSlotsAvailableAfterBorrowedVideo));
+            imageProtected,
+            globalMax - (int)borrowedVideo);
+        return Math.Max(1, Math.Min(imageMax, globalSlotsAvailableAfterBorrowedVideo));
+    }
+
+    private int ResolveVideoPreprocessingSlotsForEstimate(QueueCapacityContext? capacityContext)
+    {
+        return Math.Max(
+            1,
+            capacityContext?.RuntimeProfile?.VideoPreprocessingMaxConcurrentGenerations
+                ?? options.VideoPreprocessingMaxConcurrentGenerations);
+    }
+
+    private static ProviderTimeline EstimateVideoProviderTimeline(
+        long activePreprocessing,
+        long activeGeneration,
+        long queuedAheadNeedsPreprocessing,
+        long queuedAheadReadyForGeneration,
+        bool includeOwn,
+        bool ownNeedsPreprocessing,
+        int preprocessingSeconds,
+        int generationSeconds,
+        int preprocessingSlots,
+        int generationSlots)
+    {
+        var preprocessingLaneAvailableAt = new long[Math.Max(1, preprocessingSlots)];
+        var generationReleaseTimes = new List<long>();
+
+        for (long index = 0; index < activePreprocessing; index++)
+        {
+            generationReleaseTimes.Add(ScheduleLane(
+                preprocessingLaneAvailableAt,
+                releaseAtSeconds: 0,
+                preprocessingSeconds));
+        }
+
+        for (long index = 0; index < queuedAheadNeedsPreprocessing; index++)
+        {
+            generationReleaseTimes.Add(ScheduleLane(
+                preprocessingLaneAvailableAt,
+                releaseAtSeconds: 0,
+                preprocessingSeconds));
+        }
+
+        var ownGenerationReleaseAt = includeOwn && ownNeedsPreprocessing
+            ? ScheduleLane(
+                preprocessingLaneAvailableAt,
+                releaseAtSeconds: 0,
+                preprocessingSeconds)
+            : 0;
+
+        for (long index = 0; index < queuedAheadReadyForGeneration; index++)
+        {
+            generationReleaseTimes.Add(0);
+        }
+
+        var generationLaneAvailableAt = new long[Math.Max(1, generationSlots)];
+        var aheadCompletionTimes = new List<long>();
+        for (long index = 0; index < activeGeneration; index++)
+        {
+            aheadCompletionTimes.Add(ScheduleLane(
+                generationLaneAvailableAt,
+                releaseAtSeconds: 0,
+                generationSeconds));
+        }
+
+        var queuedGenerationWork = generationReleaseTimes
+            .Select(releaseAt => new ProviderStageArrival(releaseAt, IsOwn: false))
+            .ToList();
+        if (includeOwn)
+        {
+            queuedGenerationWork.Add(new ProviderStageArrival(ownGenerationReleaseAt, IsOwn: true));
+        }
+
+        long ownCompletedAt = 0;
+        foreach (var work in queuedGenerationWork
+            .OrderBy(x => x.ReleaseAtSeconds)
+            .ThenBy(x => x.IsOwn))
+        {
+            var completedAt = ScheduleLane(
+                generationLaneAvailableAt,
+                work.ReleaseAtSeconds,
+                generationSeconds);
+            if (work.IsOwn)
+            {
+                ownCompletedAt = completedAt;
+            }
+            else
+            {
+                aheadCompletionTimes.Add(completedAt);
+            }
+        }
+
+        return new ProviderTimeline(
+            ToSaturatedInt(ownCompletedAt),
+            aheadCompletionTimes);
+    }
+
+    private static ProviderTimeline EstimateSingleStageProviderTimeline(
+        long active,
+        long queuedAhead,
+        bool includeOwn,
+        int durationSeconds,
+        int slots)
+    {
+        var laneAvailableAt = new long[Math.Max(1, slots)];
+        var aheadCompletionTimes = new List<long>();
+        for (long index = 0; index < active; index++)
+        {
+            aheadCompletionTimes.Add(ScheduleLane(
+                laneAvailableAt,
+                releaseAtSeconds: 0,
+                durationSeconds));
+        }
+
+        for (long index = 0; index < queuedAhead; index++)
+        {
+            aheadCompletionTimes.Add(ScheduleLane(
+                laneAvailableAt,
+                releaseAtSeconds: 0,
+                durationSeconds));
+        }
+
+        var ownCompletedAt = includeOwn
+            ? ScheduleLane(laneAvailableAt, releaseAtSeconds: 0, durationSeconds)
+            : 0;
+        return new ProviderTimeline(
+            ToSaturatedInt(ownCompletedAt),
+            aheadCompletionTimes);
+    }
+
+    private static int EstimateImportCompletionSeconds(
+        long activeImageImports,
+        long activeVideoImports,
+        IReadOnlyCollection<ImportArrival> providerArrivals,
+        int ownProviderCompletedAtSeconds,
+        int ownImportSeconds,
+        int imageImportSeconds,
+        int videoImportSeconds,
+        int importSlots)
+    {
+        var importLaneAvailableAt = new long[Math.Max(1, importSlots)];
+        for (long index = 0; index < activeImageImports; index++)
+        {
+            ScheduleLane(importLaneAvailableAt, releaseAtSeconds: 0, imageImportSeconds);
+        }
+
+        for (long index = 0; index < activeVideoImports; index++)
+        {
+            ScheduleLane(importLaneAvailableAt, releaseAtSeconds: 0, videoImportSeconds);
+        }
+
+        var arrivals = new List<ImportArrival>(providerArrivals.Count + 1);
+        arrivals.AddRange(providerArrivals);
+        arrivals.Add(new ImportArrival(
+            ownProviderCompletedAtSeconds,
+            ownImportSeconds,
+            IsOwn: true));
+
+        foreach (var arrival in arrivals
+            .OrderBy(x => x.ReleaseAtSeconds)
+            .ThenBy(x => x.IsOwn)
+            .ThenByDescending(x => x.DurationSeconds))
+        {
+            var completedAt = ScheduleLane(
+                importLaneAvailableAt,
+                arrival.ReleaseAtSeconds,
+                arrival.DurationSeconds);
+            if (arrival.IsOwn)
+            {
+                return ToSaturatedInt(completedAt);
+            }
+        }
+
+        return int.MaxValue;
+    }
+
+    private static int ToSaturatedInt(long value) =>
+        value >= int.MaxValue ? int.MaxValue : (int)Math.Max(0, value);
+
+    private static long ScheduleLane(long[] laneAvailableAt, long releaseAtSeconds, int durationSeconds)
+    {
+        var earliestLaneIndex = 0;
+        for (var index = 1; index < laneAvailableAt.Length; index++)
+        {
+            if (laneAvailableAt[index] < laneAvailableAt[earliestLaneIndex])
+            {
+                earliestLaneIndex = index;
+            }
+        }
+
+        var startedAt = Math.Max(releaseAtSeconds, laneAvailableAt[earliestLaneIndex]);
+        var safeDuration = Math.Max(1, durationSeconds);
+        var completedAt = startedAt > long.MaxValue - safeDuration
+            ? long.MaxValue
+            : startedAt + safeDuration;
+        laneAvailableAt[earliestLaneIndex] = completedAt;
+        return completedAt;
     }
 
     private bool CanEstimateVideoBorrow(QueueCapacityContext? capacityContext)
     {
-        if (!options.EnableElasticLaneBorrowing || ResolveVideoBorrowMaxConcurrency() <= 0)
+        if (!options.EnableElasticLaneBorrowing)
         {
             return false;
         }
@@ -351,17 +932,29 @@ internal sealed partial class TemplateGenerationService
         }
 
         var context = capacityContext.Value;
-        if (context.ActiveVideo >= options.VideoMaxConcurrentGenerations)
+        var runtimeProfile = context.RuntimeProfile;
+        var videoMax = runtimeProfile?.VideoMaxConcurrentGenerations
+            ?? options.VideoMaxConcurrentGenerations;
+        var videoReserved = runtimeProfile?.VideoReservedConcurrentGenerations
+            ?? ResolveVideoReservedConcurrency();
+        var videoBorrowMax = runtimeProfile?.VideoBorrowMaxConcurrentGenerations
+            ?? ResolveVideoBorrowMaxConcurrency();
+        var imageProtected = runtimeProfile?.ImageProtectedConcurrentGenerations
+            ?? ResolveImageProtectedConcurrency();
+        var imageMax = runtimeProfile?.ImageMaxConcurrentGenerations
+            ?? options.ImageMaxConcurrentGenerations;
+        if (context.ActiveVideo >= videoMax)
         {
             return false;
         }
 
-        if (Math.Max(0, context.ActiveVideo - ResolveVideoReservedConcurrency()) >= ResolveVideoBorrowMaxConcurrency())
+        if (videoBorrowMax <= 0
+            || Math.Max(0, context.ActiveVideo - videoReserved) >= videoBorrowMax)
         {
             return false;
         }
 
-        if (context.ActiveImage + ResolveImageProtectedConcurrency() > options.ImageMaxConcurrentGenerations)
+        if (context.ActiveImage + imageProtected > imageMax)
         {
             return false;
         }
@@ -371,9 +964,10 @@ internal sealed partial class TemplateGenerationService
             return options.AllowVideoBorrowWhenImageQueueEmpty;
         }
 
-        var protectedSlots = Math.Max(1, ResolveImageProtectedConcurrency());
+        var protectedSlots = Math.Max(1, imageProtected);
         var backlogUnits = Math.Max(0, context.ActiveImage + context.QueuedImage - protectedSlots);
-        var imageEstimatedWaitSeconds = (int)Math.Ceiling(backlogUnits * Math.Max(1, options.EstimatedImageGenerationSeconds) / (double)protectedSlots);
+        var imageEstimatedWaitSeconds = (int)Math.Ceiling(
+            backlogUnits * ResolveImageGenerationSeconds(context) / (double)protectedSlots);
         return imageEstimatedWaitSeconds <= options.AllowVideoBorrowWhenImageEstimatedWaitBelowSeconds;
     }
 
@@ -404,14 +998,74 @@ internal sealed partial class TemplateGenerationService
     }
 
     private readonly record struct QueueCapacityContext(
-        long ActiveImage,
-        long ActiveVideo,
-        long QueuedImage);
-
-    private static bool IsClaimableQueuedJob(TemplateGenerationJob job)
+        long ActiveImageProvider,
+        long ActiveVideoPreprocessingProvider,
+        long ActiveVideoGenerationProvider,
+        long ActiveImageImports,
+        long ActiveVideoImports,
+        long QueuedImage,
+        long QueuedVideoNeedsPreprocessing,
+        long QueuedVideoReadyForGeneration,
+        int? ImageGenerationP90Seconds,
+        int? VideoPreprocessingP90Seconds,
+        int? VideoGenerationP90Seconds,
+        int? ImageImportP90Seconds,
+        int? VideoImportP90Seconds,
+        TemplateGenerationConcurrencyProfile? RuntimeProfile)
     {
-        return job.Status == TemplateGenerationStatus.Queued
-            && (job.ChargedAtUtc != null || job.UserId == AdminTestUserId);
+        internal long ActiveImage => ActiveImageProvider;
+
+        internal long ActiveVideo => ActiveVideoPreprocessingProvider + ActiveVideoGenerationProvider;
+    }
+
+    private static bool RequiresVideoPreprocessing(TemplateGenerationJob job) =>
+        RequiresVideoPreprocessing(
+            job.QueueMediaType,
+            job.CurrentProviderStage,
+            job.PreprocessingCompletedAtUtc,
+            job.NormalizedImageUrl);
+
+    private static bool RequiresVideoPreprocessing(
+        string mediaType,
+        string? currentProviderStage,
+        DateTime? preprocessingCompletedAtUtc,
+        string? normalizedImageUrl)
+    {
+        if (TemplateGenerationQueue.NormalizeMediaType(mediaType)
+            != TemplateGenerationQueue.MediaTypeVideo)
+        {
+            return false;
+        }
+
+        return !string.Equals(currentProviderStage, "video_generation", StringComparison.Ordinal)
+            && (preprocessingCompletedAtUtc is null || string.IsNullOrWhiteSpace(normalizedImageUrl));
+    }
+
+    private readonly record struct QueuedOrderState(
+        int Position,
+        VideoQueueStageContext VideoStages);
+
+    private readonly record struct VideoQueueStageContext(
+        long QueuedAheadNeedsPreprocessing,
+        long QueuedAheadReadyForGeneration,
+        bool OwnNeedsPreprocessing);
+
+    private readonly record struct ProviderTimeline(
+        int OwnCompletedAtSeconds,
+        IReadOnlyList<long> AheadCompletionTimes);
+
+    private readonly record struct ProviderStageArrival(
+        long ReleaseAtSeconds,
+        bool IsOwn);
+
+    private readonly record struct ImportArrival(
+        long ReleaseAtSeconds,
+        int DurationSeconds,
+        bool IsOwn);
+
+    private static bool IsQueuedJob(TemplateGenerationJob job)
+    {
+        return job.Status == TemplateGenerationStatus.Queued;
     }
 
     private int ResolveMaxEstimatedWaitSeconds(string mediaType, string tier)

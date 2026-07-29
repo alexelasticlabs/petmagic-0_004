@@ -19,4 +19,18 @@ public sealed class TemplateRuntimeConfigFingerprint
     public bool MismatchDetected { get; set; }
 
     public string? MismatchDetails { get; set; }
+
+    public long? AppliedPolicyRevision { get; set; }
+
+    public DateTime? LastProgressAtUtc { get; set; }
+
+    public bool? GenerationSchedulerV2Enabled { get; set; }
+
+    public int? GenerationDispatchConcurrency { get; set; }
+
+    public int? ProviderReconciliationConcurrency { get; set; }
+
+    public int? MediaImportConcurrency { get; set; }
+
+    public int? GenerationMaintenanceConcurrency { get; set; }
 }

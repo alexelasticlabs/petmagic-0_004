@@ -1,9 +1,8 @@
-using System.Threading.Channels;
 using System.Net;
 using System.Text;
+using System.Threading.Channels;
 
 using Microsoft.Data.Sqlite;
-
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Caching.Memory;
@@ -211,7 +210,12 @@ public sealed partial class TemplatesServiceTests
         bool allowVideoBorrowWhenImageQueueEmpty = true,
         int allowVideoBorrowWhenImageEstimatedWaitBelowSeconds = 120,
         int estimatedImageGenerationSeconds = 90,
+        int estimatedVideoPreprocessingSeconds = 90,
         int estimatedVideoGenerationSeconds = 420,
+        int estimatedImageImportSeconds = 30,
+        int estimatedVideoImportSeconds = 120,
+        int videoPreprocessingMaxConcurrentGenerations = 1,
+        int mediaImportConcurrency = 1,
         int freeImageMaxEstimatedWaitSeconds = 1_800,
         int premiumImageMaxEstimatedWaitSeconds = 600,
         int freeVideoMaxEstimatedWaitSeconds = 3_600,
@@ -250,7 +254,12 @@ public sealed partial class TemplatesServiceTests
             AllowVideoBorrowWhenImageQueueEmpty = allowVideoBorrowWhenImageQueueEmpty,
             AllowVideoBorrowWhenImageEstimatedWaitBelowSeconds = allowVideoBorrowWhenImageEstimatedWaitBelowSeconds,
             EstimatedImageGenerationSeconds = estimatedImageGenerationSeconds,
+            EstimatedVideoPreprocessingSeconds = estimatedVideoPreprocessingSeconds,
             EstimatedVideoGenerationSeconds = estimatedVideoGenerationSeconds,
+            EstimatedImageImportSeconds = estimatedImageImportSeconds,
+            EstimatedVideoImportSeconds = estimatedVideoImportSeconds,
+            VideoPreprocessingMaxConcurrentGenerations = videoPreprocessingMaxConcurrentGenerations,
+            MediaImportConcurrency = mediaImportConcurrency,
             FreeImageMaxEstimatedWaitSeconds = freeImageMaxEstimatedWaitSeconds,
             PremiumImageMaxEstimatedWaitSeconds = premiumImageMaxEstimatedWaitSeconds,
             FreeVideoMaxEstimatedWaitSeconds = freeVideoMaxEstimatedWaitSeconds,
@@ -354,6 +363,43 @@ public sealed partial class TemplatesServiceTests
             RequestCount++;
             Assert.Equal(HttpMethod.Put, request.Method);
             Assert.Equal("Key", request.Headers.Authorization?.Scheme);
+            return Task.FromResult(new HttpResponseMessage(statusCode)
+            {
+                Content = new StringContent(
+                    $$"""{"status":"{{providerStatus}}"}""",
+                    Encoding.UTF8,
+                    "application/json")
+            });
+        }
+    }
+
+    private sealed class AcceptedCancellationReconciliationHttpHandler(
+        HttpStatusCode reconciliationStatusCode,
+        string reconciliationProviderStatus) : HttpMessageHandler
+    {
+        public int CancelRequestCount { get; private set; }
+
+        public int StatusRequestCount { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            Assert.Equal("Key", request.Headers.Authorization?.Scheme);
+            if (request.Method == HttpMethod.Put)
+            {
+                CancelRequestCount++;
+                return JsonAsync(HttpStatusCode.Accepted, "CANCELLATION_REQUESTED");
+            }
+
+            Assert.Equal(HttpMethod.Get, request.Method);
+            Assert.EndsWith("/status", request.RequestUri?.AbsolutePath, StringComparison.Ordinal);
+            StatusRequestCount++;
+            return JsonAsync(reconciliationStatusCode, reconciliationProviderStatus);
+        }
+
+        private static Task<HttpResponseMessage> JsonAsync(HttpStatusCode statusCode, string providerStatus)
+        {
             return Task.FromResult(new HttpResponseMessage(statusCode)
             {
                 Content = new StringContent(

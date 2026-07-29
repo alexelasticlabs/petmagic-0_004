@@ -116,6 +116,16 @@ public sealed class TemplateGenerationJob
 
     public DateTime? MediaImportCompletedAtUtc { get; set; }
 
+    public int MediaImportAttemptCount { get; set; }
+
+    public DateTime? MediaImportNextAttemptAtUtc { get; set; }
+
+    public DateTime? OriginalImportedAtUtc { get; set; }
+
+    public DateTime? WatermarkImportedAtUtc { get; set; }
+
+    public DateTime? PreviewImportedAtUtc { get; set; }
+
     public DateTime? ProviderSubmittedAtUtc { get; set; }
 
     public DateTime? ProviderStatusCheckedAtUtc { get; set; }
@@ -217,4 +227,8 @@ public sealed class TemplateGenerationJob
     public List<TemplateMediaRecord> MediaRecords { get; set; } = [];
 
     public List<TemplateGenerationWatermarkUnlock> WatermarkUnlocks { get; set; } = [];
+
+    public List<TemplateGenerationProviderAttempt> ProviderAttempts { get; set; } = [];
+
+    public List<TemplateProviderWebhookInbox> ProviderWebhookEvents { get; set; } = [];
 }

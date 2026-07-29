@@ -32,6 +32,7 @@ using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Domain.Enums;
 using PetMagic.Modules.Templates.Infrastructure;
 using PetMagic.Modules.Templates.Infrastructure.Data;
+using PetMagic.Modules.Templates.Infrastructure.Entities;
 using PetMagic.Modules.Templates.Infrastructure.Options;
 
 namespace PetMagic.Modules.Identity.Tests.Templates;
@@ -204,7 +205,9 @@ public sealed partial class TemplatesApiIntegrationTests
             bool startGenerationWorker = true,
             bool qaFixturesEnabled = false,
             IAdminAuditLog? adminAuditLog = null,
-            IIdentityUserLookupService? identityUserLookupService = null)
+            IIdentityUserLookupService? identityUserLookupService = null,
+            ITemplateAiProviderHealthService? aiProviderHealthService = null,
+            bool acceptFalWebhookSignatures = false)
         {
             var databaseRoot = new InMemoryDatabaseRoot();
             var databaseName = $"templates-api-tests-{Guid.NewGuid():N}";
@@ -344,6 +347,10 @@ public sealed partial class TemplatesApiIntegrationTests
             {
                 builder.Services.AddSingleton(identityUserLookupService);
             }
+            if (aiProviderHealthService is not null)
+            {
+                builder.Services.AddSingleton(aiProviderHealthService);
+            }
 
             builder.Services.AddScoped<ITemplatesService, TemplatesService>();
             builder.Services.AddScoped<TemplateGenerationService>();
@@ -354,11 +361,22 @@ public sealed partial class TemplatesApiIntegrationTests
             builder.Services.AddScoped<IFeedbackService, FeedbackService>();
             builder.Services.AddScoped<ITemplatePushTokenService, TemplatePushTokenService>();
             builder.Services.AddScoped<TemplateGenerationJobProcessor>();
+            builder.Services.AddScoped<ITemplateGenerationProviderCallbackService, TemplateGenerationProviderCallbackService>();
+            builder.Services.AddScoped<TemplateGenerationControlService>();
+            builder.Services.AddScoped<ITemplateGenerationControlService>(serviceProvider =>
+                serviceProvider.GetRequiredService<TemplateGenerationControlService>());
+            builder.Services.AddSingleton<IFalProviderRuntimeSnapshotService>(
+                new TestFalProviderRuntimeSnapshotService());
             if (startGenerationWorker)
             {
+                builder.Services.AddSingleton<TemplateGenerationWorkerRuntimeState>();
                 builder.Services.AddHostedService<TemplateGenerationWorker>();
             }
             builder.Services.AddTemplatesApiModule();
+            if (acceptFalWebhookSignatures)
+            {
+                builder.Services.AddSingleton<IFalWebhookSignatureVerifier, AcceptingFalWebhookSignatureVerifier>();
+            }
 
             var app = builder.Build();
             app.UseRateLimiter();
@@ -381,6 +399,15 @@ public sealed partial class TemplatesApiIntegrationTests
             {
                 return Task.CompletedTask;
             }
+        }
+
+        private sealed class AcceptingFalWebhookSignatureVerifier : IFalWebhookSignatureVerifier
+        {
+            public Task<bool> VerifyAsync(
+                IHeaderDictionary headers,
+                byte[] body,
+                CancellationToken cancellationToken) =>
+                Task.FromResult(true);
         }
 
         private sealed class PassthroughWatermarkRenderer : ITemplateWatermarkRenderer
@@ -670,6 +697,13 @@ public sealed partial class TemplatesApiIntegrationTests
 
         protected override Task<AuthenticateResult> HandleAuthenticateAsync()
         {
+            if (Request.Headers.TryGetValue("X-Test-Unauthenticated", out var unauthenticatedValues)
+                && bool.TryParse(unauthenticatedValues.ToString(), out var unauthenticated)
+                && unauthenticated)
+            {
+                return Task.FromResult(AuthenticateResult.NoResult());
+            }
+
             var role = Request.Headers.TryGetValue("X-Test-Role", out var roleValues)
                 ? roleValues.ToString()
                 : "Admin";
@@ -703,6 +737,28 @@ public sealed partial class TemplatesApiIntegrationTests
             var ticket = new AuthenticationTicket(principal, Scheme.Name);
             return Task.FromResult(AuthenticateResult.Success(ticket));
         }
+    }
+
+    private sealed class TestFalProviderRuntimeSnapshotService : IFalProviderRuntimeSnapshotService
+    {
+        private readonly TemplateProviderRuntimeSnapshot snapshot = new()
+        {
+            Id = TemplateGenerationControlPolicyDefaults.FalSnapshotId,
+            Provider = "fal",
+            BalanceState = TemplateProviderBalanceState.Fresh,
+            StatusChangedAtUtc = DateTime.UtcNow,
+            CurrentBalanceUsd = 20m,
+            LastSuccessfulAtUtc = DateTime.UtcNow,
+            CheckedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        };
+
+        public Task<TemplateProviderRuntimeSnapshot> GetSnapshotAsync(CancellationToken cancellationToken) =>
+            Task.FromResult(snapshot);
+
+        public Task<TemplateProviderRuntimeSnapshot> RefreshAsync(
+            bool force,
+            CancellationToken cancellationToken) => Task.FromResult(snapshot);
     }
 
     private static async Task<TemplateFeedRealtimeEvent> ReadNextServerSentEventAsync(StreamReader reader)

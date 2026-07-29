@@ -48,6 +48,17 @@ public static partial class AdminTemplateEndpoints
             .WithMetadata(new RequestSizeLimitAttribute(MaxAdminTemplateSmallJsonRequestBodyBytes));
         group.MapGet("/generations/metrics", GetGenerationDashboardMetricsAsync)
             .RequireAuthorization("AdminOnly");
+        group.MapGet("/generation-control", GetGenerationControlAsync)
+            .RequireAuthorization("AdminOnly");
+        group.MapPut("/generation-control/policy", UpdateGenerationControlPolicyAsync)
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAdminTemplateSmallJsonRequestBodyBytes))
+            .RequireAuthorization("AdminOnly");
+        group.MapPost("/generation-control/provider/refresh", RefreshGenerationControlProviderAsync)
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAdminTemplateSmallJsonRequestBodyBytes))
+            .RequireAuthorization("AdminOnly");
+        group.MapPost("/generation-control/provider-attempts/{attemptId:guid}/resolve", ResolveGenerationControlProviderAttemptAsync)
+            .WithMetadata(new RequestSizeLimitAttribute(MaxAdminTemplateSmallJsonRequestBodyBytes))
+            .RequireAuthorization("AdminOnly");
         group.MapGet("/generations", ListGenerationsAsync)
             .RequireAuthorization("AdminOnly");
         group.MapGet("/generations/{generationId:guid}", GetGenerationAsync)
