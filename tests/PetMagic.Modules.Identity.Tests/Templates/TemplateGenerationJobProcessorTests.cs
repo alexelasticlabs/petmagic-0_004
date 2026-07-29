@@ -921,6 +921,20 @@ public sealed class TemplateGenerationJobProcessorTests
         Assert.Null(uncertainAttempt.CompletedAtUtc);
         Assert.Empty(billing.RefundedGenerationIds);
 
+        var dueAttempt = await dbContext.TemplateGenerationProviderAttempts
+            .SingleAsync(x => x.Id == attempt.Id);
+        dueAttempt.NextPollAtUtc = DateTime.UtcNow.AddSeconds(-1);
+        await dbContext.SaveChangesAsync();
+        Assert.True(await processor.ProcessNextProviderReconciliationAsync(CancellationToken.None));
+        dbContext.ChangeTracker.Clear();
+        var retriedAttempt = await dbContext.TemplateGenerationProviderAttempts
+            .AsNoTracking()
+            .SingleAsync(x => x.Id == attempt.Id);
+        Assert.Equal(TemplateGenerationProviderAttemptState.SubmissionUnknown, retriedAttempt.State);
+        Assert.Equal(2, retriedAttempt.PollAttemptCount);
+        Assert.Null(retriedAttempt.CompletedAtUtc);
+        Assert.Empty(billing.RefundedGenerationIds);
+
         using var webhookPayload = JsonDocument.Parse("{} ");
         var callbackService = new TemplateGenerationProviderCallbackService(options, providerAttemptStore);
         var queued = await callbackService.ProcessFalWebhookAsync(
@@ -2563,7 +2577,7 @@ public sealed class TemplateGenerationJobProcessorTests
     }
 
     [Fact]
-    public async Task ProcessNextDispatchAsync_ShouldHonorPausedPolicy_WhenSchedulerV2IsDisabled()
+    public async Task ProcessNextDispatchAsync_ShouldDrainAdmittedJob_WhenAdmissionIsPaused()
     {
         await using var dbContext = CreateDbContext();
         var template = CreateReadyImageTemplate();
@@ -2582,10 +2596,10 @@ public sealed class TemplateGenerationJobProcessorTests
                 runtimePolicyProvider: new FixedGenerationRuntimePolicyProvider(policy))
             .ProcessNextDispatchAsync(CancellationToken.None);
 
-        Assert.False(processed);
-        Assert.Equal(0, generator.SubmitCount);
+        Assert.True(processed);
+        Assert.Equal(1, generator.SubmitCount);
         Assert.Equal(
-            TemplateGenerationStatus.Queued,
+            TemplateGenerationStatus.ProviderQueued,
             (await dbContext.TemplateGenerationJobs.SingleAsync(x => x.Id == job.Id)).Status);
     }
 
@@ -2630,6 +2644,76 @@ public sealed class TemplateGenerationJobProcessorTests
         Assert.Equal(TemplateGenerationStatus.Queued, persisted.Status);
         Assert.NotNull(persisted.NextAttemptEarliestAtUtc);
     }
+
+    [Theory]
+    [InlineData(TemplateProviderBalanceState.Critical)]
+    [InlineData(TemplateProviderBalanceState.Unknown)]
+    public async Task ProcessNextDispatchAsync_ShouldFailClosed_WhenBalanceBlocksAfterDurableReservation(
+        TemplateProviderBalanceState blockingState)
+    {
+        await using var dbContext = CreateDbContext();
+        var template = CreateReadyImageTemplate();
+        var job = CreateGenerationJob(template, TemplateGenerationStatus.Queued, DateTime.UtcNow);
+        job.CompletedAtUtc = null;
+        dbContext.TemplateItems.Add(template);
+        dbContext.TemplateGenerationJobs.Add(job);
+        await dbContext.SaveChangesAsync();
+
+        var now = DateTime.UtcNow;
+        var fresh = CreateProviderRuntimeSnapshot(TemplateProviderBalanceState.Fresh, 20m, now);
+        var blocked = CreateProviderRuntimeSnapshot(
+            blockingState,
+            blockingState == TemplateProviderBalanceState.Critical ? 5m : null,
+            now.AddSeconds(1));
+        var snapshots = new SequencedFalRuntimeSnapshotService(fresh, blocked);
+        var options = CreateOptions(
+            aiProvider: TemplateAiProviders.Fal,
+            generationSchedulerV2Enabled: true);
+        var policy = CreateRuntimePolicySnapshot(now);
+        var runtimePolicyProvider = new FixedGenerationRuntimePolicyProvider(policy);
+        var providerAttemptStore = new TemplateGenerationProviderAttemptStore(
+            dbContext,
+            runtimePolicyProvider,
+            snapshots,
+            options);
+        var generator = new AsyncSubmittingImageGenerator();
+        var billing = new TestTemplateGenerationBilling();
+
+        var processed = await CreateProcessor(
+                dbContext,
+                billing: billing,
+                imageGenerator: generator,
+                options: options,
+                providerAttemptStore: providerAttemptStore,
+                runtimePolicyProvider: runtimePolicyProvider,
+                providerRuntimeSnapshotService: snapshots)
+            .ProcessNextDispatchAsync(CancellationToken.None);
+
+        Assert.True(processed);
+        Assert.Equal(0, generator.SubmitCount);
+        var persistedJob = await dbContext.TemplateGenerationJobs.SingleAsync(x => x.Id == job.Id);
+        var persistedAttempt = await dbContext.TemplateGenerationProviderAttempts.SingleAsync(x => x.GenerationJobId == job.Id);
+        Assert.Equal(TemplateGenerationStatus.Queued, persistedJob.Status);
+        Assert.NotNull(persistedJob.NextAttemptEarliestAtUtc);
+        Assert.Equal(TemplateGenerationProviderAttemptState.Failed, persistedAttempt.State);
+        Assert.Equal(TemplatesErrors.ProviderCapacityUnavailable.Code, persistedAttempt.LastErrorCode);
+        Assert.Empty(billing.RefundedGenerationIds);
+    }
+
+    private static TemplateProviderRuntimeSnapshot CreateProviderRuntimeSnapshot(
+        TemplateProviderBalanceState state,
+        decimal? balanceUsd,
+        DateTime now) => new()
+    {
+        Id = Guid.NewGuid(),
+        Provider = "fal",
+        BalanceState = state,
+        StatusChangedAtUtc = now,
+        CurrentBalanceUsd = balanceUsd,
+        LastSuccessfulAtUtc = state == TemplateProviderBalanceState.Unknown ? null : now,
+        CheckedAtUtc = now,
+        UpdatedAtUtc = now
+    };
 
     private static TemplatesDbContext CreateDbContext(string databaseName, InMemoryDatabaseRoot root)
     {
@@ -3934,6 +4018,23 @@ public sealed class TemplateGenerationJobProcessorTests
         public Task<TemplateProviderRuntimeSnapshot> RefreshAsync(
             bool force,
             CancellationToken cancellationToken) => Task.FromResult(snapshot);
+    }
+
+    private sealed class SequencedFalRuntimeSnapshotService(
+        params TemplateProviderRuntimeSnapshot[] snapshots) : IFalProviderRuntimeSnapshotService
+    {
+        private int index;
+
+        public Task<TemplateProviderRuntimeSnapshot> GetSnapshotAsync(CancellationToken cancellationToken)
+        {
+            var current = snapshots[Math.Min(index, snapshots.Length - 1)];
+            index++;
+            return Task.FromResult(current);
+        }
+
+        public Task<TemplateProviderRuntimeSnapshot> RefreshAsync(
+            bool force,
+            CancellationToken cancellationToken) => GetSnapshotAsync(cancellationToken);
     }
 
     private sealed class BlockingCompletedFalQueueHandler(string requestId) : HttpMessageHandler

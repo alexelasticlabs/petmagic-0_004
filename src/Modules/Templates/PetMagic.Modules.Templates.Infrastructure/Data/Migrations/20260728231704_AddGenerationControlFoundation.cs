@@ -417,6 +417,37 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
 
             migrationBuilder.Sql(
                 """
+                DO $$
+                BEGIN
+                    IF EXISTS (
+                        SELECT 1
+                        FROM (
+                            SELECT
+                                CASE
+                                    WHEN job."CurrentProviderStage" = 'video_generation'
+                                        OR job."MotionProviderRequestId" IS NOT NULL
+                                        THEN job."MotionProviderRequestId"
+                                    ELSE job."PreprocessingProviderRequestId"
+                                END AS provider_request_id
+                            FROM templates_generation_jobs AS job
+                            WHERE job."Status" IN (7, 8, 9)
+                        ) AS active_provider_requests
+                        WHERE active_provider_requests.provider_request_id IS NOT NULL
+                        GROUP BY active_provider_requests.provider_request_id
+                        HAVING COUNT(*) > 1
+                    ) THEN
+                        RAISE EXCEPTION
+                            USING
+                                ERRCODE = '23505',
+                                MESSAGE = 'Scheduler V2 provider-attempt backfill found duplicate active fal request ids.',
+                                HINT = 'Pause deployment and reconcile duplicate active generation provider ids before rerunning the migration.';
+                    END IF;
+                END
+                $$;
+                """);
+
+            migrationBuilder.Sql(
+                """
                 WITH active_legacy_jobs AS (
                     SELECT
                         job.*,

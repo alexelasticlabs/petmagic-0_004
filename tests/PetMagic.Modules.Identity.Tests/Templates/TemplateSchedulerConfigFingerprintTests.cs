@@ -105,6 +105,22 @@ public sealed class TemplateSchedulerConfigFingerprintTests
     }
 
     [Fact]
+    public void Create_ShouldReturnDifferentChecksum_WhenFalCancellationBudgetChanges()
+    {
+        var first = TemplateSchedulerConfigFingerprint.Create(
+            CreateOptions(falCancelMaxAttempts: 3),
+            "Staging",
+            TemplateSchedulerConfigFingerprint.ApiComponent);
+        var second = TemplateSchedulerConfigFingerprint.Create(
+            CreateOptions(falCancelMaxAttempts: 4),
+            "Staging",
+            TemplateSchedulerConfigFingerprint.GenerationWorkerComponent);
+
+        Assert.NotEqual(first.Checksum, second.Checksum);
+        Assert.Contains("\"falCancelMaxAttempts\":3", first.CanonicalJson, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Create_ShouldNotIncludeSecretsInSanitizedDumpOrCanonicalJson()
     {
         const string r2AccessKey = "test-r2-access-secret";
@@ -536,6 +552,7 @@ public sealed class TemplateSchedulerConfigFingerprintTests
         int providerReconciliationConcurrency = 4,
         int mediaImportConcurrency = 1,
         int generationMaintenanceConcurrency = 1,
+        int falCancelMaxAttempts = 3,
         decimal falProviderSpendDailyLimitUsd = 0m)
     {
         return new TemplatesOptions
@@ -619,6 +636,7 @@ public sealed class TemplateSchedulerConfigFingerprintTests
                 WebhookJwksUrl = "https://rest.fal.ai/.well-known/jwks.json",
                 StartTimeoutSeconds = 120,
                 PollIntervalMilliseconds = 2_000,
+                CancelMaxAttempts = falCancelMaxAttempts,
                 MaxPollingAttempts = 180,
                 ImageMaxPollingAttempts = 180,
                 ImagePreprocessingMaxPollingAttempts = 180,

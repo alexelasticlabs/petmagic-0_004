@@ -386,10 +386,15 @@ public sealed class TemplateGenerationSchedulerV2FoundationTests
 
         Assert.NotNull(firstClaim);
         Assert.Equal(TemplateGenerationProviderAttemptState.ProviderQueued, firstClaim!.State);
-        Assert.Equal(1, firstClaim.PollAttemptCount);
+        Assert.Equal(0, firstClaim.PollAttemptCount);
+        Assert.True(await store.TryBeginPollAsync(
+            attempt.Id,
+            firstClaim.ClaimToken,
+            maxAttempts: 2,
+            CancellationToken.None));
         await store.UpdateClaimedStateAsync(
             attempt.Id,
-            "worker-lifecycle",
+            firstClaim.ClaimToken,
             TemplateGenerationProviderAttemptState.ProviderProcessing,
             DateTime.UtcNow.AddSeconds(-1),
             null,
@@ -402,10 +407,20 @@ public sealed class TemplateGenerationSchedulerV2FoundationTests
             CancellationToken.None);
         Assert.NotNull(secondClaim);
         Assert.Equal(TemplateGenerationProviderAttemptState.ProviderProcessing, secondClaim!.State);
-        Assert.Equal(2, secondClaim.PollAttemptCount);
+        Assert.Equal(1, secondClaim.PollAttemptCount);
+        Assert.True(await store.TryBeginPollAsync(
+            attempt.Id,
+            secondClaim.ClaimToken,
+            maxAttempts: 2,
+            CancellationToken.None));
+        Assert.False(await store.TryBeginPollAsync(
+            attempt.Id,
+            secondClaim.ClaimToken,
+            maxAttempts: 2,
+            CancellationToken.None));
         await store.UpdateClaimedStateAsync(
             attempt.Id,
-            "worker-lifecycle",
+            secondClaim.ClaimToken,
             TemplateGenerationProviderAttemptState.Completed,
             null,
             null,
@@ -416,13 +431,86 @@ public sealed class TemplateGenerationSchedulerV2FoundationTests
         Assert.Equal(TemplateGenerationProviderAttemptState.Completed, persisted.State);
         Assert.Equal(1, persisted.SubmitAttemptCount);
         Assert.Equal(2, persisted.PollAttemptCount);
-        Assert.Equal(6, persisted.Version);
+        Assert.Equal(8, persisted.Version);
         Assert.NotNull(persisted.SubmittedAtUtc);
         Assert.NotNull(persisted.ProviderCompletedAtUtc);
         Assert.NotNull(persisted.CompletedAtUtc);
         Assert.Null(persisted.NextPollAtUtc);
         Assert.Null(persisted.LockedBy);
         Assert.Null(persisted.LockedAtUtc);
+    }
+
+    [Fact]
+    public async Task ProviderAttemptLease_ShouldFencePreviousClaimAfterReclaim()
+    {
+        await using var dbContext = CreateDbContext();
+        var store = CreateAttemptStore(dbContext);
+        var job = Assert.Single(await AddJobsAsync(dbContext, TemplateGenerationQueue.MediaTypeImage, count: 1));
+        var attempt = await store.TryReserveAsync(CreateReservation(job.Id, 1), CancellationToken.None);
+        Assert.NotNull(attempt);
+        await store.MarkSubmissionAcceptedAsync(
+            attempt!.Id,
+            "provider-request-fencing",
+            "https://queue.fal.test/status/provider-request-fencing",
+            "https://queue.fal.test/response/provider-request-fencing",
+            "https://queue.fal.test/cancel/provider-request-fencing",
+            DateTime.UtcNow.AddSeconds(-1),
+            CancellationToken.None);
+
+        var firstClaim = await store.ClaimDueAsync("same-process", TimeSpan.FromMinutes(1), CancellationToken.None);
+        Assert.NotNull(firstClaim);
+        var persisted = await dbContext.TemplateGenerationProviderAttempts.SingleAsync(x => x.Id == attempt.Id);
+        persisted.LockedAtUtc = DateTime.UtcNow.AddMinutes(-2);
+        await dbContext.SaveChangesAsync();
+
+        var secondClaim = await store.ClaimDueAsync("same-process", TimeSpan.FromMinutes(1), CancellationToken.None);
+        Assert.NotNull(secondClaim);
+        Assert.NotEqual(firstClaim!.ClaimToken, secondClaim!.ClaimToken);
+        Assert.Equal(0, secondClaim.PollAttemptCount);
+        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => store.UpdateClaimedStateAsync(
+            attempt.Id,
+            firstClaim.ClaimToken,
+            TemplateGenerationProviderAttemptState.Completed,
+            null,
+            null,
+            providerCompleted: true,
+            CancellationToken.None));
+
+        await store.UpdateClaimedStateAsync(
+            attempt.Id,
+            secondClaim.ClaimToken,
+            TemplateGenerationProviderAttemptState.Completed,
+            null,
+            null,
+            providerCompleted: true,
+            CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task ProviderAttemptCancellationBudget_ShouldIncrementBeforeCallAndStopAtMaximum()
+    {
+        await using var dbContext = CreateDbContext();
+        var store = CreateAttemptStore(dbContext);
+        var job = Assert.Single(await AddJobsAsync(dbContext, TemplateGenerationQueue.MediaTypeImage, count: 1));
+        var attempt = await store.TryReserveAsync(CreateReservation(job.Id, 1), CancellationToken.None);
+        Assert.NotNull(attempt);
+        await store.MarkSubmissionAcceptedAsync(
+            attempt!.Id,
+            "provider-request-cancel-budget",
+            "https://queue.fal.test/status/provider-request-cancel-budget",
+            "https://queue.fal.test/response/provider-request-cancel-budget",
+            "https://queue.fal.test/cancel/provider-request-cancel-budget",
+            DateTime.UtcNow.AddSeconds(-1),
+            CancellationToken.None);
+        var claim = await store.ClaimDueAsync("cancel-budget", TimeSpan.FromMinutes(1), CancellationToken.None);
+        Assert.NotNull(claim);
+
+        Assert.True(await store.TryBeginCancellationAsync(attempt.Id, claim!.ClaimToken, 2, CancellationToken.None));
+        Assert.True(await store.TryBeginCancellationAsync(attempt.Id, claim.ClaimToken, 2, CancellationToken.None));
+        Assert.False(await store.TryBeginCancellationAsync(attempt.Id, claim.ClaimToken, 2, CancellationToken.None));
+        Assert.Equal(
+            2,
+            (await dbContext.TemplateGenerationProviderAttempts.SingleAsync(x => x.Id == attempt.Id)).CancelAttemptCount);
     }
 
     [Fact]
@@ -449,7 +537,7 @@ public sealed class TemplateGenerationSchedulerV2FoundationTests
         Assert.Equal(1, first.AttemptCount);
         await store.MarkWebhookFailedAsync(
             inboxId,
-            "worker-webhook",
+            first.ClaimToken,
             "transient_reconciliation_failure",
             DateTime.UtcNow.AddSeconds(-1),
             CancellationToken.None);
@@ -462,7 +550,7 @@ public sealed class TemplateGenerationSchedulerV2FoundationTests
         Assert.Equal(2, second!.AttemptCount);
         await store.MarkWebhookProcessedAsync(
             inboxId,
-            "worker-webhook",
+            second.ClaimToken,
             CancellationToken.None);
 
         var persisted = await dbContext.TemplateProviderWebhookInbox.SingleAsync(x => x.Id == inboxId);
@@ -471,6 +559,45 @@ public sealed class TemplateGenerationSchedulerV2FoundationTests
         Assert.NotNull(persisted.ProcessedAtUtc);
         Assert.Null(persisted.LockedBy);
         Assert.Null(persisted.LockedAtUtc);
+    }
+
+    [Fact]
+    public async Task WebhookInbox_ShouldReclaimStaleProcessingLeaseAndFencePreviousOwner()
+    {
+        await using var dbContext = CreateDbContext();
+        var store = CreateAttemptStore(dbContext);
+        var inboxId = await store.EnqueueWebhookAsync(
+            "fal",
+            "webhook-stale-processing",
+            null,
+            "provider-request-stale-processing",
+            "IN_PROGRESS",
+            "{}",
+            DateTime.UtcNow,
+            CancellationToken.None);
+        var first = await store.ClaimNextWebhookAsync(
+            "same-process",
+            TimeSpan.FromMinutes(1),
+            CancellationToken.None);
+        Assert.NotNull(first);
+        var persisted = await dbContext.TemplateProviderWebhookInbox.SingleAsync(x => x.Id == inboxId);
+        persisted.LockedAtUtc = DateTime.UtcNow.AddMinutes(-2);
+        await dbContext.SaveChangesAsync();
+
+        var second = await store.ClaimNextWebhookAsync(
+            "same-process",
+            TimeSpan.FromMinutes(1),
+            CancellationToken.None);
+        Assert.NotNull(second);
+        Assert.NotEqual(first!.ClaimToken, second!.ClaimToken);
+        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => store.MarkWebhookProcessedAsync(
+            inboxId,
+            first.ClaimToken,
+            CancellationToken.None));
+        await store.MarkWebhookProcessedAsync(inboxId, second.ClaimToken, CancellationToken.None);
+        Assert.Equal(
+            TemplateProviderWebhookInboxStatus.Processed,
+            (await dbContext.TemplateProviderWebhookInbox.SingleAsync(x => x.Id == inboxId)).Status);
     }
 
     [Fact]
@@ -497,7 +624,7 @@ public sealed class TemplateGenerationSchedulerV2FoundationTests
         Assert.NotNull(lockDeferred);
         await store.DeferWebhookAsync(
             inboxId,
-            "worker-webhook",
+            lockDeferred.ClaimToken,
             "templates.provider_attempt_locked",
             DateTime.UtcNow.AddSeconds(-1),
             CancellationToken.None);
@@ -510,7 +637,7 @@ public sealed class TemplateGenerationSchedulerV2FoundationTests
         Assert.Equal(0, firstFailure!.FailureCount);
         var firstDeadLettered = await store.MarkWebhookFailedAsync(
             inboxId,
-            "worker-webhook",
+            firstFailure.ClaimToken,
             "templates.provider_webhook_reconciliation_failed",
             DateTime.UtcNow.AddSeconds(-1),
             CancellationToken.None);
@@ -523,7 +650,7 @@ public sealed class TemplateGenerationSchedulerV2FoundationTests
         Assert.Equal(1, secondFailure!.FailureCount);
         var secondDeadLettered = await store.MarkWebhookFailedAsync(
             inboxId,
-            "worker-webhook",
+            secondFailure.ClaimToken,
             "templates.provider_webhook_reconciliation_failed",
             DateTime.UtcNow.AddSeconds(-1),
             CancellationToken.None);

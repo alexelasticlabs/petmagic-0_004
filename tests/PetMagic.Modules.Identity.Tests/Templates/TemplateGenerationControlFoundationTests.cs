@@ -63,6 +63,8 @@ public sealed class TemplateGenerationControlFoundationTests
         var designTimeModel = dbContext.GetService<IDesignTimeModel>().Model;
         var attempt = Assert.IsAssignableFrom<IReadOnlyEntityType>(
             designTimeModel.FindEntityType(typeof(TemplateGenerationProviderAttempt)));
+        var generation = Assert.IsAssignableFrom<IReadOnlyEntityType>(
+            designTimeModel.FindEntityType(typeof(TemplateGenerationJob)));
         var webhook = Assert.IsAssignableFrom<IReadOnlyEntityType>(
             designTimeModel.FindEntityType(typeof(TemplateProviderWebhookInbox)));
         var workerFingerprint = Assert.IsAssignableFrom<IReadOnlyEntityType>(
@@ -96,6 +98,35 @@ public sealed class TemplateGenerationControlFoundationTests
         Assert.True(workerFingerprint.FindProperty(nameof(TemplateRuntimeConfigFingerprint.ProviderReconciliationConcurrency))!.IsNullable);
         Assert.True(workerFingerprint.FindProperty(nameof(TemplateRuntimeConfigFingerprint.MediaImportConcurrency))!.IsNullable);
         Assert.True(workerFingerprint.FindProperty(nameof(TemplateRuntimeConfigFingerprint.GenerationMaintenanceConcurrency))!.IsNullable);
+
+        AssertSchedulerHotPathIndex(
+            attempt,
+            "IX_tgpa_Completed_Stage_ProviderCompletedAtUtc",
+            [nameof(TemplateGenerationProviderAttempt.Stage), nameof(TemplateGenerationProviderAttempt.ProviderCompletedAtUtc)],
+            [false, true],
+            "\"State\" = 6 AND \"SubmittedAtUtc\" IS NOT NULL AND \"ProviderCompletedAtUtc\" IS NOT NULL",
+            [nameof(TemplateGenerationProviderAttempt.SubmittedAtUtc)]);
+        AssertSchedulerHotPathIndex(
+            generation,
+            "IX_tgj_Completed_MediaType_ImportCompletedAtUtc",
+            [nameof(TemplateGenerationJob.QueueMediaType), nameof(TemplateGenerationJob.MediaImportCompletedAtUtc)],
+            [false, true],
+            "\"Status\" = 3 AND \"ImportStartedAtUtc\" IS NOT NULL AND \"MediaImportCompletedAtUtc\" IS NOT NULL",
+            [nameof(TemplateGenerationJob.ImportStartedAtUtc)]);
+        AssertSchedulerHotPathIndex(
+            generation,
+            "IX_tgj_UserId_QueueTier_LastAttemptAtUtc",
+            [nameof(TemplateGenerationJob.UserId), nameof(TemplateGenerationJob.QueueTier), nameof(TemplateGenerationJob.LastAttemptAtUtc)],
+            [false, false, true],
+            "\"LastAttemptAtUtc\" IS NOT NULL",
+            []);
+        AssertSchedulerHotPathIndex(
+            webhook,
+            "IX_tpwbi_Processing_LockedAtUtc_NextAttemptAtUtc",
+            [nameof(TemplateProviderWebhookInbox.LockedAtUtc), nameof(TemplateProviderWebhookInbox.NextAttemptAtUtc)],
+            null,
+            "\"Status\" = 2 AND \"LockedAtUtc\" IS NOT NULL",
+            []);
     }
 
     [Fact]
@@ -119,11 +150,49 @@ public sealed class TemplateGenerationControlFoundationTests
         Assert.Equal(12, CountOccurrences(source, "migrationBuilder.AddColumn<"));
         Assert.Contains("active_legacy_jobs", source, StringComparison.Ordinal);
         Assert.Contains("legacy-provider-token", source, StringComparison.Ordinal);
+        Assert.Contains(
+            "Scheduler V2 provider-attempt backfill found duplicate active fal request ids.",
+            source,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "reconcile duplicate active generation provider ids before rerunning the migration",
+            source,
+            StringComparison.Ordinal);
         Assert.Contains("scheduler_v2_bootstrap_legacy_admission_open", source, StringComparison.Ordinal);
         Assert.Contains("ON CONFLICT (\"GenerationJobId\", \"Stage\", \"Ordinal\") DO NOTHING", source, StringComparison.Ordinal);
         Assert.DoesNotContain("templates_categories", source, StringComparison.Ordinal);
         Assert.DoesNotContain("templates_items", source, StringComparison.Ordinal);
         Assert.DoesNotContain("templates_push_outbox", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SchedulerHotPathMigration_ShouldCreateOnlyTheExpectedIndexes()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var migrationDirectory = Path.Combine(
+            repositoryRoot,
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Infrastructure",
+            "Data",
+            "Migrations");
+        var migrationPath = Assert.Single(
+            Directory.GetFiles(migrationDirectory, "*_AddGenerationSchedulerHotPathIndexes.cs"),
+            path => !path.EndsWith(".Designer.cs", StringComparison.Ordinal));
+        var source = File.ReadAllText(migrationPath);
+
+        Assert.Equal(4, CountOccurrences(source, "migrationBuilder.CreateIndex("));
+        Assert.Contains("IX_tgpa_Completed_Stage_ProviderCompletedAtUtc", source, StringComparison.Ordinal);
+        Assert.Contains("IX_tgj_Completed_MediaType_ImportCompletedAtUtc", source, StringComparison.Ordinal);
+        Assert.Contains("IX_tgj_UserId_QueueTier_LastAttemptAtUtc", source, StringComparison.Ordinal);
+        Assert.Contains("IX_tpwbi_Processing_LockedAtUtc_NextAttemptAtUtc", source, StringComparison.Ordinal);
+        Assert.Equal(2, CountOccurrences(source, ".Annotation(\"Npgsql:IndexInclude\""));
+        Assert.Equal(3, CountOccurrences(source, "descending: new[]"));
+        Assert.DoesNotContain("migrationBuilder.AddColumn", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("migrationBuilder.DropColumn", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("migrationBuilder.CreateTable", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("migrationBuilder.DropTable", source, StringComparison.Ordinal);
     }
 
     private static TemplateGenerationControlPolicy CreatePolicy(int confirmedFalLimit)
@@ -160,5 +229,32 @@ public sealed class TemplateGenerationControlFoundationTests
         }
 
         return count;
+    }
+
+    private static void AssertSchedulerHotPathIndex(
+        IReadOnlyEntityType entityType,
+        string databaseName,
+        IReadOnlyList<string> propertyNames,
+        IReadOnlyList<bool>? descending,
+        string filter,
+        IReadOnlyList<string> includedPropertyNames)
+    {
+        var index = Assert.Single(
+            entityType.GetIndexes(),
+            candidate => candidate.GetDatabaseName() == databaseName);
+
+        Assert.Equal(propertyNames, index.Properties.Select(property => property.Name));
+        Assert.Equal(descending, index.IsDescending);
+        Assert.Equal(filter, index.GetFilter());
+
+        var includeAnnotation = index.FindAnnotation("Npgsql:IndexInclude");
+        if (includedPropertyNames.Count == 0)
+        {
+            Assert.Null(includeAnnotation);
+            return;
+        }
+
+        var actualIncludedPropertyNames = Assert.IsAssignableFrom<IReadOnlyList<string>>(includeAnnotation?.Value);
+        Assert.Equal(includedPropertyNames, actualIncludedPropertyNames);
     }
 }

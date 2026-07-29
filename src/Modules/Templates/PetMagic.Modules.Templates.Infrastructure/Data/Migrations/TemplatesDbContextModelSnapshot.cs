@@ -1343,6 +1343,12 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                         .HasDatabaseName("IX_tgj_PendingGamificationShare")
                         .HasFilter("\"GamificationShareRequestedAtUtc\" IS NOT NULL AND \"GamificationShareProcessedAtUtc\" IS NULL");
 
+                    b.HasIndex("QueueMediaType", "MediaImportCompletedAtUtc")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("IX_tgj_Completed_MediaType_ImportCompletedAtUtc")
+                        .HasFilter("\"Status\" = 3 AND \"ImportStartedAtUtc\" IS NOT NULL AND \"MediaImportCompletedAtUtc\" IS NOT NULL")
+                        .HasAnnotation("Npgsql:IndexInclude", new[] { "ImportStartedAtUtc" });
+
                     b.HasIndex("Status", "CancellationNextAttemptAtUtc")
                         .HasDatabaseName("IX_tgj_PendingCancellation")
                         .HasFilter("\"Status\" = 11");
@@ -1375,6 +1381,11 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                         .IsUnique()
                         .HasDatabaseName("UX_templates_generation_jobs_UserId_RequestHash_active")
                         .HasFilter(" \"Status\" IN (1, 2, 6, 7, 8, 9, 10, 11) AND \"RequestHash\" IS NOT NULL ");
+
+                    b.HasIndex("UserId", "QueueTier", "LastAttemptAtUtc")
+                        .IsDescending(false, false, true)
+                        .HasDatabaseName("IX_tgj_UserId_QueueTier_LastAttemptAtUtc")
+                        .HasFilter("\"LastAttemptAtUtc\" IS NOT NULL");
 
                     b.HasIndex("UserId", "Status")
                         .HasDatabaseName("IX_templates_generation_jobs_UserId_Status");
@@ -1525,6 +1536,12 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                         .IsUnique()
                         .HasDatabaseName("UX_tgpa_Provider_RequestId")
                         .HasFilter("\"ProviderRequestId\" IS NOT NULL");
+
+                    b.HasIndex("Stage", "ProviderCompletedAtUtc")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("IX_tgpa_Completed_Stage_ProviderCompletedAtUtc")
+                        .HasFilter("\"State\" = 6 AND \"SubmittedAtUtc\" IS NOT NULL AND \"ProviderCompletedAtUtc\" IS NOT NULL")
+                        .HasAnnotation("Npgsql:IndexInclude", new[] { "SubmittedAtUtc" });
 
                     b.HasIndex("State", "LockedAtUtc")
                         .HasDatabaseName("IX_tgpa_State_LockedAtUtc")
@@ -2102,6 +2119,10 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                     b.HasIndex("ProviderRequestId")
                         .HasDatabaseName("IX_tpwbi_ProviderRequestId")
                         .HasFilter("\"ProviderRequestId\" IS NOT NULL");
+
+                    b.HasIndex("LockedAtUtc", "NextAttemptAtUtc")
+                        .HasDatabaseName("IX_tpwbi_Processing_LockedAtUtc_NextAttemptAtUtc")
+                        .HasFilter("\"Status\" = 2 AND \"LockedAtUtc\" IS NOT NULL");
 
                     b.HasIndex("Provider", "DeduplicationKey")
                         .IsUnique()

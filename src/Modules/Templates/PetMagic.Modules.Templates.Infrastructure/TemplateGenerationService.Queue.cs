@@ -574,9 +574,7 @@ internal sealed partial class TemplateGenerationService
         if (options.GenerationSchedulerV2Enabled && runtimePolicyProvider is not null)
         {
             var runtimePolicy = await runtimePolicyProvider.GetRuntimePolicyAsync(cancellationToken);
-            runtimeProfile = runtimePolicy.AdmissionEnabled
-                ? runtimePolicy.EffectiveProfile
-                : new TemplateGenerationConcurrencyProfile(0, 0, 0, 0, 0, 0, 0, 0);
+            runtimeProfile = runtimePolicy.EffectiveProfile;
         }
 
         return new QueueCapacityContext(

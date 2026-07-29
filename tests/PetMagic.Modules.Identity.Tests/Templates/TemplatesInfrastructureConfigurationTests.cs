@@ -177,6 +177,7 @@ public sealed class TemplatesInfrastructureConfigurationTests
             ["Templates:R2:ObjectKeyPrefix"] = "templates-media-test",
             ["Templates:Fal:ApiKey"] = "test-fal-key",
             ["Templates:Fal:QueueBaseUrl"] = "https://queue.fal.run",
+            ["Templates:Fal:CancelMaxAttempts"] = "4",
             ["Templates:Fal:ImageMaxPollingAttempts"] = "90",
             ["Templates:Fal:ImagePreprocessingMaxPollingAttempts"] = "100",
             ["Templates:Fal:VideoMaxPollingAttempts"] = "360",
@@ -262,6 +263,7 @@ public sealed class TemplatesInfrastructureConfigurationTests
         Assert.Equal(TemplateAiProviders.Fal, options.AiProvider);
         Assert.Equal("petmagic-test", options.R2.BucketName);
         Assert.Equal("test-fal-key", options.Fal.ApiKey);
+        Assert.Equal(4, options.Fal.CancelMaxAttempts);
         Assert.Equal(90, options.Fal.ImageMaxPollingAttempts);
         Assert.Equal(100, options.Fal.ImagePreprocessingMaxPollingAttempts);
         Assert.Equal(360, options.Fal.VideoMaxPollingAttempts);

@@ -121,7 +121,7 @@ internal sealed partial class TemplateGenerationJobProcessor(
         var schedulerProfile = await ResolveSchedulerProfileAsync(cancellationToken);
         if (schedulerProfile is null || schedulerProfile.GlobalMaxConcurrentGenerations <= 0)
         {
-            TemplateGenerationMetrics.RecordSchedulerNoSlotSkip("admission_paused");
+            TemplateGenerationMetrics.RecordSchedulerNoSlotSkip("effective_capacity_zero");
             return false;
         }
 
@@ -149,7 +149,7 @@ internal sealed partial class TemplateGenerationJobProcessor(
             mediaLeases.AllowVideoPreprocessing,
             cancellationToken);
         var usedBorrowedVideoSlot = mediaLeases.UsesBorrowedVideoFor(job);
-        mediaLeases.ReleaseUnusedFor(job);
+        await mediaLeases.ReleaseUnusedForAsync(job);
 
         if (job is null)
         {

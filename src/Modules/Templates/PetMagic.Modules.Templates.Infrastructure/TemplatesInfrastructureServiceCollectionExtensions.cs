@@ -195,7 +195,8 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
                 MaxPollingAttempts = ParseInt(falSection["MaxPollingAttempts"], 180),
                 ImageMaxPollingAttempts = ParsePositiveInt(falSection["ImageMaxPollingAttempts"], 180),
                 ImagePreprocessingMaxPollingAttempts = ParsePositiveInt(falSection["ImagePreprocessingMaxPollingAttempts"], 180),
-                VideoMaxPollingAttempts = ParsePositiveInt(falSection["VideoMaxPollingAttempts"], 300)
+                VideoMaxPollingAttempts = ParsePositiveInt(falSection["VideoMaxPollingAttempts"], 300),
+                CancelMaxAttempts = ParsePositiveInt(falSection["CancelMaxAttempts"], 3)
             },
             FirebasePush = new FirebasePushOptions
             {

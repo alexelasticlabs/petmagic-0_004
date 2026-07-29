@@ -37,7 +37,8 @@ internal sealed record TemplateGenerationProviderAttemptClaim(
     DateTime SubmissionDeadlineAtUtc,
     DateTime ProcessingDeadlineAtUtc,
     DateTime ReconciliationDeadlineAtUtc,
-    bool IsBorrowedCapacity);
+    bool IsBorrowedCapacity,
+    string ClaimToken);
 
 internal sealed record TemplateProviderWebhookInboxClaim(
     Guid InboxId,
@@ -51,7 +52,8 @@ internal sealed record TemplateProviderWebhookInboxClaim(
     TemplateProviderWebhookInboxStatus Status,
     int AttemptCount,
     int FailureCount,
-    DateTime ReceivedAtUtc);
+    DateTime ReceivedAtUtc,
+    string ClaimToken);
 
 internal interface ITemplateGenerationProviderAttemptStore
 {
@@ -93,6 +95,18 @@ internal interface ITemplateGenerationProviderAttemptStore
         DateTime? nextPollAtUtc,
         string? lastErrorCode,
         bool providerCompleted,
+        CancellationToken cancellationToken);
+
+    Task<bool> TryBeginPollAsync(
+        Guid attemptId,
+        string claimToken,
+        int maxAttempts,
+        CancellationToken cancellationToken);
+
+    Task<bool> TryBeginCancellationAsync(
+        Guid attemptId,
+        string claimToken,
+        int maxAttempts,
         CancellationToken cancellationToken);
 
     Task<Guid> EnqueueWebhookAsync(
@@ -173,8 +187,7 @@ internal sealed class TemplateGenerationProviderAttemptStore(
         }
 
         var runtimePolicy = await runtimePolicyProvider.GetRuntimePolicyAsync(cancellationToken);
-        if (!runtimePolicy.AdmissionEnabled
-            || runtimePolicy.EffectiveProfile.GlobalMaxConcurrentGenerations <= 0)
+        if (runtimePolicy.EffectiveProfile.GlobalMaxConcurrentGenerations <= 0)
         {
             if (transaction is not null)
             {
@@ -523,9 +536,9 @@ internal sealed class TemplateGenerationProviderAttemptStore(
             return null;
         }
 
-        attempt.LockedBy = Truncate(workerId, 128);
+        var claimToken = CreateClaimToken(workerId, "attempt");
+        attempt.LockedBy = claimToken;
         attempt.LockedAtUtc = now;
-        attempt.PollAttemptCount++;
         attempt.UpdatedAtUtc = now;
         attempt.Version++;
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -534,7 +547,7 @@ internal sealed class TemplateGenerationProviderAttemptStore(
             await transaction.CommitAsync(cancellationToken);
         }
 
-        return MapClaim(attempt);
+        return MapClaim(attempt, claimToken);
     }
 
     public async Task UpdateClaimedStateAsync(
@@ -568,6 +581,58 @@ internal sealed class TemplateGenerationProviderAttemptStore(
         attempt.UpdatedAtUtc = now;
         attempt.Version++;
         await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<bool> TryBeginPollAsync(
+        Guid attemptId,
+        string claimToken,
+        int maxAttempts,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(claimToken);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxAttempts);
+
+        var attempt = await dbContext.TemplateGenerationProviderAttempts
+            .SingleAsync(x => x.Id == attemptId, cancellationToken);
+        EnsureAttemptClaimOwner(attempt, claimToken);
+        if (attempt.PollAttemptCount >= maxAttempts)
+        {
+            return false;
+        }
+
+        // Spend the polling budget only at the provider I/O boundary. Merely
+        // claiming a due row or failing to acquire the generation-job lease must
+        // never exhaust the budget of a still-running paid provider operation.
+        attempt.PollAttemptCount++;
+        attempt.UpdatedAtUtc = DateTime.UtcNow;
+        attempt.Version++;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    public async Task<bool> TryBeginCancellationAsync(
+        Guid attemptId,
+        string claimToken,
+        int maxAttempts,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(claimToken);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxAttempts);
+
+        var attempt = await dbContext.TemplateGenerationProviderAttempts
+            .SingleAsync(x => x.Id == attemptId, cancellationToken);
+        EnsureAttemptClaimOwner(attempt, claimToken);
+
+        if (attempt.CancelAttemptCount >= maxAttempts)
+        {
+            return false;
+        }
+
+        attempt.CancelAttemptCount++;
+        attempt.UpdatedAtUtc = DateTime.UtcNow;
+        attempt.Version++;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return true;
     }
 
     public async Task<Guid> EnqueueWebhookAsync(
@@ -684,7 +749,9 @@ internal sealed class TemplateGenerationProviderAttemptStore(
         {
             inbox = await dbContext.TemplateProviderWebhookInbox
                 .Where(x => (x.Status == TemplateProviderWebhookInboxStatus.Queued
-                        || x.Status == TemplateProviderWebhookInboxStatus.Failed)
+                        || x.Status == TemplateProviderWebhookInboxStatus.Failed
+                        || (x.Status == TemplateProviderWebhookInboxStatus.Processing
+                            && x.LockedAtUtc < staleBefore))
                     && x.NextAttemptAtUtc <= now
                     && (x.LockedAtUtc == null || x.LockedAtUtc < staleBefore))
                 .OrderBy(x => x.NextAttemptAtUtc)
@@ -698,7 +765,8 @@ internal sealed class TemplateGenerationProviderAttemptStore(
                     """
                     SELECT *
                     FROM templates_provider_webhook_inbox
-                    WHERE "Status" IN (1, 4)
+                    WHERE ("Status" IN (1, 4)
+                           OR ("Status" = 2 AND "LockedAtUtc" < {1}))
                       AND "NextAttemptAtUtc" <= {0}
                       AND ("LockedAtUtc" IS NULL OR "LockedAtUtc" < {1})
                     ORDER BY "NextAttemptAtUtc", "ReceivedAtUtc"
@@ -720,8 +788,9 @@ internal sealed class TemplateGenerationProviderAttemptStore(
             return null;
         }
 
+        var claimToken = CreateClaimToken(normalizedWorkerId, "webhook");
         inbox.Status = TemplateProviderWebhookInboxStatus.Processing;
-        inbox.LockedBy = normalizedWorkerId;
+        inbox.LockedBy = claimToken;
         inbox.LockedAtUtc = now;
         inbox.AttemptCount++;
         inbox.UpdatedAtUtc = now;
@@ -743,7 +812,8 @@ internal sealed class TemplateGenerationProviderAttemptStore(
             inbox.Status,
             inbox.AttemptCount,
             inbox.FailureCount,
-            inbox.ReceivedAtUtc);
+            inbox.ReceivedAtUtc,
+            claimToken);
     }
 
     public async Task MarkWebhookProcessedAsync(
@@ -931,7 +1001,9 @@ internal sealed class TemplateGenerationProviderAttemptStore(
         _ => throw new ArgumentOutOfRangeException(nameof(stage), stage, null)
     };
 
-    private static TemplateGenerationProviderAttemptClaim MapClaim(TemplateGenerationProviderAttempt attempt) => new(
+    private static TemplateGenerationProviderAttemptClaim MapClaim(
+        TemplateGenerationProviderAttempt attempt,
+        string claimToken) => new(
         attempt.Id,
         attempt.GenerationJobId,
         attempt.Stage,
@@ -948,7 +1020,29 @@ internal sealed class TemplateGenerationProviderAttemptStore(
         attempt.SubmissionDeadlineAtUtc,
         attempt.ProcessingDeadlineAtUtc,
         attempt.ReconciliationDeadlineAtUtc,
-        attempt.IsBorrowedCapacity);
+        attempt.IsBorrowedCapacity,
+        claimToken);
+
+    private static string CreateClaimToken(string workerId, string scope)
+    {
+        var suffix = $":{scope}:{Guid.NewGuid():N}";
+        var prefixLength = 128 - suffix.Length;
+        var normalizedWorkerId = workerId.Trim();
+        var prefix = normalizedWorkerId.Length <= prefixLength
+            ? normalizedWorkerId
+            : normalizedWorkerId[..prefixLength];
+        return prefix + suffix;
+    }
+
+    private static void EnsureAttemptClaimOwner(
+        TemplateGenerationProviderAttempt attempt,
+        string claimToken)
+    {
+        if (!string.Equals(attempt.LockedBy, Truncate(claimToken, 128), StringComparison.Ordinal))
+        {
+            throw new DbUpdateConcurrencyException("Provider attempt claim is no longer owned by this lease.");
+        }
+    }
 
     private static void EnsureWebhookClaimOwner(TemplateProviderWebhookInbox inbox, string workerId)
     {

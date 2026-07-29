@@ -541,7 +541,7 @@ public sealed class TemplateGenerationProviderAttemptPostgresConcurrencyTests
         {
             await store.UpdateClaimedStateAsync(
                 claim.AttemptId,
-                "scheduler-v2-load-acceptance",
+                claim.ClaimToken,
                 TemplateGenerationProviderAttemptState.Completed,
                 nextPollAtUtc: null,
                 lastErrorCode: null,

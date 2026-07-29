@@ -120,7 +120,22 @@ internal sealed partial class TemplateGenerationControlService(
             return await ResolveReplayAsync(existingReceipt, requestHash, cancellationToken);
         }
 
-        await EnsurePolicyAsync(cancellationToken);
+        var currentPolicy = await EnsurePolicyAsync(cancellationToken);
+        if (currentPolicy.Revision != command.ExpectedRevision)
+        {
+            return Result.Failure<AdminTemplateGenerationControlResponse>(
+                TemplatesErrors.GenerationControlPolicyConflict);
+        }
+
+        // Capacity/queue aggregation is intentionally performed before taking the
+        // admission and provider-capacity advisory locks. The transaction below
+        // still revalidates the revision and atomically persists the policy,
+        // receipt, and audit outbox, but no longer blocks dispatch/admission while
+        // the operational snapshot is being assembled.
+        var now = DateTime.UtcNow;
+        var response = await BuildResponseAsync(
+            CreateProspectivePolicy(currentPolicy, command, normalizedReason, now),
+            cancellationToken);
         await using var transaction = await BeginTransactionAsync(cancellationToken);
         if (transaction is not null)
         {
@@ -171,18 +186,7 @@ internal sealed partial class TemplateGenerationControlService(
         }
 
         var oldPolicyJson = SerializeAuditPolicy(policy);
-        var now = DateTime.UtcNow;
-        policy.Revision++;
-        policy.AdmissionEnabled = command.AdmissionEnabled;
-        policy.ConfirmedFalConcurrencyLimit = command.ConfirmedFalConcurrencyLimit;
-        policy.ConfirmedAtUtc = now;
-        policy.ReservedHeadroom = command.ReservedHeadroom;
-        policy.ApplicationHardCeiling = command.ApplicationHardCeiling;
-        policy.UpdatedAtUtc = now;
-        policy.UpdatedByAdminUserId = command.ActorUserId;
-        policy.LastReason = normalizedReason;
-
-        var response = await BuildResponseAsync(policy, cancellationToken);
+        ApplyPolicyUpdate(policy, command, normalizedReason, now);
         var receiptId = CreateReceiptId(command.ActorUserId, normalizedIdempotencyKey);
         dbContext.TemplateGenerationControlPolicyCommandReceipts.Add(
             new TemplateGenerationControlPolicyCommandReceipt
@@ -730,6 +734,54 @@ internal sealed partial class TemplateGenerationControlService(
             && command.ReservedHeadroom < command.ConfirmedFalConcurrencyLimit
             && command.ApplicationHardCeiling > 0
             && command.ApplicationHardCeiling <= CapacityLimitMax;
+    }
+
+    private static TemplateGenerationControlPolicy CreateProspectivePolicy(
+        TemplateGenerationControlPolicy current,
+        UpdateAdminTemplateGenerationControlPolicyCommand command,
+        string normalizedReason,
+        DateTime now)
+    {
+        var prospective = new TemplateGenerationControlPolicy
+        {
+            Id = current.Id,
+            Revision = current.Revision,
+            AdmissionEnabled = current.AdmissionEnabled,
+            ConfirmedFalConcurrencyLimit = current.ConfirmedFalConcurrencyLimit,
+            ConfirmedAtUtc = current.ConfirmedAtUtc,
+            ReservedHeadroom = current.ReservedHeadroom,
+            ApplicationHardCeiling = current.ApplicationHardCeiling,
+            BaseGlobalMaxConcurrentGenerations = current.BaseGlobalMaxConcurrentGenerations,
+            BaseImageReservedConcurrentGenerations = current.BaseImageReservedConcurrentGenerations,
+            BaseImageProtectedConcurrentGenerations = current.BaseImageProtectedConcurrentGenerations,
+            BaseImageMaxConcurrentGenerations = current.BaseImageMaxConcurrentGenerations,
+            BaseVideoReservedConcurrentGenerations = current.BaseVideoReservedConcurrentGenerations,
+            BaseVideoMaxConcurrentGenerations = current.BaseVideoMaxConcurrentGenerations,
+            BaseVideoBorrowMaxConcurrentGenerations = current.BaseVideoBorrowMaxConcurrentGenerations,
+            BaseVideoPreprocessingMaxConcurrentGenerations = current.BaseVideoPreprocessingMaxConcurrentGenerations,
+            UpdatedAtUtc = current.UpdatedAtUtc,
+            UpdatedByAdminUserId = current.UpdatedByAdminUserId,
+            LastReason = current.LastReason
+        };
+        ApplyPolicyUpdate(prospective, command, normalizedReason, now);
+        return prospective;
+    }
+
+    private static void ApplyPolicyUpdate(
+        TemplateGenerationControlPolicy policy,
+        UpdateAdminTemplateGenerationControlPolicyCommand command,
+        string normalizedReason,
+        DateTime now)
+    {
+        policy.Revision++;
+        policy.AdmissionEnabled = command.AdmissionEnabled;
+        policy.ConfirmedFalConcurrencyLimit = command.ConfirmedFalConcurrencyLimit;
+        policy.ConfirmedAtUtc = now;
+        policy.ReservedHeadroom = command.ReservedHeadroom;
+        policy.ApplicationHardCeiling = command.ApplicationHardCeiling;
+        policy.UpdatedAtUtc = now;
+        policy.UpdatedByAdminUserId = command.ActorUserId;
+        policy.LastReason = normalizedReason;
     }
 
     private static AdminTemplateGenerationConcurrencyProfileResponse MapProfile(

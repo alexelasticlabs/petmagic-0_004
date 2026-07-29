@@ -132,6 +132,10 @@ internal sealed partial class TemplateGenerationJobProcessor
         if (reservation.IsDurable)
         {
             await providerAttemptStore!.MarkSubmittingAsync(reservation.AttemptId, cancellationToken);
+            if (!await RecheckProviderBalanceBeforeSubmitAsync(job, reservation, cancellationToken))
+            {
+                return true;
+            }
         }
 
         var submission = reservation.IsDurable
@@ -216,6 +220,10 @@ internal sealed partial class TemplateGenerationJobProcessor
         if (reservation.IsDurable)
         {
             await providerAttemptStore!.MarkSubmittingAsync(reservation.AttemptId, cancellationToken);
+            if (!await RecheckProviderBalanceBeforeSubmitAsync(job, reservation, cancellationToken))
+            {
+                return true;
+            }
         }
 
         var submission = reservation.IsDurable
@@ -293,6 +301,10 @@ internal sealed partial class TemplateGenerationJobProcessor
         if (reservation.IsDurable)
         {
             await providerAttemptStore!.MarkSubmittingAsync(reservation.AttemptId, cancellationToken);
+            if (!await RecheckProviderBalanceBeforeSubmitAsync(job, reservation, cancellationToken))
+            {
+                return true;
+            }
         }
 
         var submission = reservation.IsDurable
@@ -409,15 +421,6 @@ internal sealed partial class TemplateGenerationJobProcessor
 
     private async Task<bool> IsLegacyProviderSubmissionBlockedAsync(CancellationToken cancellationToken)
     {
-        if (runtimePolicyProvider is not null)
-        {
-            var runtimePolicy = await runtimePolicyProvider.GetRuntimePolicyAsync(cancellationToken);
-            if (!runtimePolicy.AdmissionEnabled)
-            {
-                return true;
-            }
-        }
-
         if (!string.Equals(options.AiProvider, TemplateAiProviders.Fal, StringComparison.OrdinalIgnoreCase)
             || providerRuntimeSnapshotService is null)
         {
@@ -428,6 +431,62 @@ internal sealed partial class TemplateGenerationJobProcessor
         return snapshot.BalanceState is TemplateProviderBalanceState.Critical
                 or TemplateProviderBalanceState.Unknown
             || snapshot.CurrentBalanceUsd <= options.FalProviderBalanceCriticalThresholdUsd;
+    }
+
+    private async Task<bool> RecheckProviderBalanceBeforeSubmitAsync(
+        TemplateGenerationJob job,
+        ProviderSubmissionReservation reservation,
+        CancellationToken cancellationToken)
+    {
+        if (!reservation.IsDurable
+            || !string.Equals(options.AiProvider, TemplateAiProviders.Fal, StringComparison.OrdinalIgnoreCase)
+            || providerRuntimeSnapshotService is null)
+        {
+            return true;
+        }
+
+        TemplateProviderRuntimeSnapshot snapshot;
+        try
+        {
+            snapshot = await providerRuntimeSnapshotService.GetSnapshotAsync(cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(
+                "Provider balance pre-submit recheck failed closed. GenerationIdHash={GenerationIdHash} AttemptIdHash={AttemptIdHash} ExceptionType={ExceptionType}",
+                TemplateLogSanitizer.SafeId(job.Id),
+                TemplateLogSanitizer.SafeId(reservation.AttemptId),
+                SafeLogValues.ExceptionType(exception));
+            await BlockReservedProviderSubmissionAsync(job, reservation.AttemptId, cancellationToken);
+            return false;
+        }
+
+        var blocked = snapshot.BalanceState is TemplateProviderBalanceState.Critical
+                or TemplateProviderBalanceState.Unknown
+            || snapshot.CurrentBalanceUsd <= options.FalProviderBalanceCriticalThresholdUsd;
+        if (!blocked)
+        {
+            return true;
+        }
+
+        await BlockReservedProviderSubmissionAsync(job, reservation.AttemptId, cancellationToken);
+        return false;
+    }
+
+    private async Task BlockReservedProviderSubmissionAsync(
+        TemplateGenerationJob job,
+        Guid attemptId,
+        CancellationToken cancellationToken)
+    {
+        await providerAttemptStore!.MarkSubmissionFailedAsync(
+            attemptId,
+            TemplatesErrors.ProviderCapacityUnavailable.Code,
+            cancellationToken);
+        await DeferClaimForProviderCapacityAsync(job, cancellationToken);
     }
 
     private async Task PersistAcceptedProviderSubmissionAsync(
@@ -672,7 +731,7 @@ internal sealed partial class TemplateGenerationJobProcessor
                         inbox.Provider);
                     await providerAttemptStore.MarkWebhookProcessedAsync(
                         inbox.InboxId,
-                        WorkerInstanceId,
+                        inbox.ClaimToken,
                         cancellationToken);
                     return true;
                 }
@@ -692,7 +751,7 @@ internal sealed partial class TemplateGenerationJobProcessor
 
                 await providerAttemptStore.MarkWebhookProcessedAsync(
                     inbox.InboxId,
-                    WorkerInstanceId,
+                    inbox.ClaimToken,
                     cancellationToken);
                 return true;
             }
@@ -713,7 +772,7 @@ internal sealed partial class TemplateGenerationJobProcessor
                     inbox.Provider);
                 await providerAttemptStore.MarkWebhookProcessedAsync(
                     inbox.InboxId,
-                    WorkerInstanceId,
+                    inbox.ClaimToken,
                     cancellationToken);
                 return true;
             }
@@ -724,7 +783,7 @@ internal sealed partial class TemplateGenerationJobProcessor
             {
                 await providerAttemptStore.MarkWebhookProcessedAsync(
                     inbox.InboxId,
-                    WorkerInstanceId,
+                    inbox.ClaimToken,
                     cancellationToken);
                 return true;
             }
@@ -736,14 +795,14 @@ internal sealed partial class TemplateGenerationJobProcessor
             {
                 await providerAttemptStore.DeferWebhookAsync(
                     inbox.InboxId,
-                    WorkerInstanceId,
+                    inbox.ClaimToken,
                     "templates.provider_attempt_locked",
                     DateTime.UtcNow.AddSeconds(2),
                     cancellationToken);
                 return true;
             }
 
-            attemptLockOwner = $"{WorkerInstanceId}:webhook:{inbox.InboxId:N}";
+            attemptLockOwner = $"webhook:{inbox.InboxId:N}:{Guid.NewGuid():N}";
             attempt.LockedBy = attemptLockOwner;
             attempt.LockedAtUtc = DateTime.UtcNow;
             attempt.UpdatedAtUtc = DateTime.UtcNow;
@@ -751,7 +810,10 @@ internal sealed partial class TemplateGenerationJobProcessor
             await dbContext.SaveChangesAsync(cancellationToken);
             lockedAttemptId = attempt.Id;
 
-            var job = await TryClaimProviderAttemptJobAsync(attempt.GenerationJobId, cancellationToken);
+            var job = await TryClaimProviderAttemptJobAsync(
+                attempt.GenerationJobId,
+                attemptLockOwner,
+                cancellationToken);
             if (job is null)
             {
                 attempt.LockedBy = null;
@@ -762,7 +824,7 @@ internal sealed partial class TemplateGenerationJobProcessor
                 lockedAttemptId = null;
                 await providerAttemptStore.DeferWebhookAsync(
                     inbox.InboxId,
-                    WorkerInstanceId,
+                    inbox.ClaimToken,
                     "templates.provider_job_locked",
                     DateTime.UtcNow.AddSeconds(2),
                     cancellationToken);
@@ -922,7 +984,7 @@ internal sealed partial class TemplateGenerationJobProcessor
             lockedAttemptId = null;
             await providerAttemptStore.MarkWebhookProcessedAsync(
                 inbox.InboxId,
-                WorkerInstanceId,
+                inbox.ClaimToken,
                 cancellationToken);
             return true;
         }
@@ -971,7 +1033,7 @@ internal sealed partial class TemplateGenerationJobProcessor
 
             var deadLettered = await providerAttemptStore.MarkWebhookFailedAsync(
                 inbox.InboxId,
-                WorkerInstanceId,
+                inbox.ClaimToken,
                 "templates.provider_webhook_reconciliation_failed",
                 DateTime.UtcNow.AddSeconds(Math.Min(300, 2 * (1 << retryExponent))),
                 CancellationToken.None);
@@ -1043,7 +1105,7 @@ internal sealed partial class TemplateGenerationJobProcessor
 
         await providerAttemptStore!.MarkWebhookProcessedAsync(
             inbox.InboxId,
-            WorkerInstanceId,
+            inbox.ClaimToken,
             cancellationToken);
     }
 
@@ -1121,12 +1183,15 @@ internal sealed partial class TemplateGenerationJobProcessor
             return false;
         }
 
-        var job = await TryClaimProviderAttemptJobAsync(claim.GenerationJobId, cancellationToken);
+        var job = await TryClaimProviderAttemptJobAsync(
+            claim.GenerationJobId,
+            claim.ClaimToken,
+            cancellationToken);
         if (job is null)
         {
             await providerAttemptStore.UpdateClaimedStateAsync(
                 claim.AttemptId,
-                WorkerInstanceId,
+                claim.ClaimToken,
                 claim.State,
                 DateTime.UtcNow.AddSeconds(2),
                 "templates.provider_job_locked",
@@ -1142,7 +1207,7 @@ internal sealed partial class TemplateGenerationJobProcessor
                 await SaveClaimedChangesAsync(job, cancellationToken, releaseLock: true);
                 await providerAttemptStore.UpdateClaimedStateAsync(
                     claim.AttemptId,
-                    WorkerInstanceId,
+                    claim.ClaimToken,
                     ResolveAttemptTerminalState(job.Status),
                     nextPollAtUtc: null,
                     job.LastErrorCode,
@@ -1162,7 +1227,7 @@ internal sealed partial class TemplateGenerationJobProcessor
                 await SaveClaimedChangesAsync(job, cancellationToken, releaseLock: true);
                 await providerAttemptStore.UpdateClaimedStateAsync(
                     claim.AttemptId,
-                    WorkerInstanceId,
+                    claim.ClaimToken,
                     cancellationState,
                     cancellationPollAtUtc,
                     "templates.provider_cancellation_pending",
@@ -1176,7 +1241,7 @@ internal sealed partial class TemplateGenerationJobProcessor
                 await SaveClaimedChangesAsync(job, cancellationToken, releaseLock: true);
                 await providerAttemptStore.UpdateClaimedStateAsync(
                     claim.AttemptId,
-                    WorkerInstanceId,
+                    claim.ClaimToken,
                     TemplateGenerationProviderAttemptState.Completed,
                     nextPollAtUtc: null,
                     lastErrorCode: null,
@@ -1194,7 +1259,7 @@ internal sealed partial class TemplateGenerationJobProcessor
                 await SaveClaimedChangesAsync(job, cancellationToken, releaseLock: true);
                 await providerAttemptStore.UpdateClaimedStateAsync(
                     claim.AttemptId,
-                    WorkerInstanceId,
+                    claim.ClaimToken,
                     claim.State,
                     DateTime.UtcNow.AddMinutes(5),
                     "templates.provider_stage_mismatch",
@@ -1207,7 +1272,7 @@ internal sealed partial class TemplateGenerationJobProcessor
             {
                 await providerAttemptStore.UpdateClaimedStateAsync(
                     claim.AttemptId,
-                    WorkerInstanceId,
+                    claim.ClaimToken,
                     TemplateGenerationProviderAttemptState.Failed,
                     nextPollAtUtc: null,
                     "templates.provider_submit_not_started",
@@ -1230,7 +1295,7 @@ internal sealed partial class TemplateGenerationJobProcessor
                 await SaveClaimedChangesAsync(job, cancellationToken, releaseLock: true);
                 await providerAttemptStore.UpdateClaimedStateAsync(
                     claim.AttemptId,
-                    WorkerInstanceId,
+                    claim.ClaimToken,
                     TemplateGenerationProviderAttemptState.SubmissionUnknown,
                     nextReconciliationAt,
                     "templates.provider_submission_unknown",
@@ -1242,32 +1307,62 @@ internal sealed partial class TemplateGenerationJobProcessor
             if (claim.State == TemplateGenerationProviderAttemptState.SubmissionUnknown)
             {
                 var now = DateTime.UtcNow;
-                var requiresManualReconciliation = now >= claim.ReconciliationDeadlineAtUtc;
-                var nextReconciliationAt = requiresManualReconciliation
-                    ? now.AddMinutes(5)
-                    : MinUtc(claim.ReconciliationDeadlineAtUtc, now.AddSeconds(30));
-                job.Status = TemplateGenerationStatus.SubmittingToProvider;
-                job.ProviderStatus = requiresManualReconciliation
-                    ? "RECONCILIATION_REQUIRED"
-                    : "SUBMISSION_UNKNOWN";
-                job.LastErrorCode = requiresManualReconciliation
-                    ? "templates.provider_submission_reconciliation_required"
-                    : "templates.provider_submission_unknown";
-                job.NextAttemptEarliestAtUtc = nextReconciliationAt;
+                if (string.IsNullOrWhiteSpace(claim.ProviderRequestId))
+                {
+                    var requiresManualReconciliation = now >= claim.ReconciliationDeadlineAtUtc;
+                    DateTime? nextReconciliationAt = requiresManualReconciliation
+                        ? null
+                        : MinUtc(claim.ReconciliationDeadlineAtUtc, now.AddSeconds(30));
+                    job.Status = TemplateGenerationStatus.SubmittingToProvider;
+                    job.ProviderStatus = requiresManualReconciliation
+                        ? ProviderReconciliationRequiredStatus
+                        : "SUBMISSION_UNKNOWN";
+                    job.LastErrorCode = requiresManualReconciliation
+                        ? "templates.provider_submission_reconciliation_required"
+                        : "templates.provider_submission_unknown";
+                    job.NextAttemptEarliestAtUtc = nextReconciliationAt;
+                    job.UpdatedAtUtc = now;
+                    await SaveClaimedChangesAsync(job, cancellationToken, releaseLock: true);
+                    await providerAttemptStore.UpdateClaimedStateAsync(
+                        claim.AttemptId,
+                        claim.ClaimToken,
+                        TemplateGenerationProviderAttemptState.SubmissionUnknown,
+                        nextReconciliationAt,
+                        job.LastErrorCode,
+                        providerCompleted: false,
+                        cancellationToken);
+                    return true;
+                }
+
+                // The provider identity is known, so this is a read uncertainty rather than a
+                // lost submission. Keep reconciling the existing paid operation; never reserve
+                // or submit a replacement request.
+                job.Status = TemplateGenerationStatus.ProviderQueued;
+                job.CurrentProviderStage = ResolveProviderStage(claim.Stage);
+                job.ProviderStatus = "RECONCILING";
+                job.NextAttemptEarliestAtUtc = null;
                 job.UpdatedAtUtc = now;
-                await SaveClaimedChangesAsync(job, cancellationToken, releaseLock: true);
-                await providerAttemptStore.UpdateClaimedStateAsync(
-                    claim.AttemptId,
-                    WorkerInstanceId,
-                    TemplateGenerationProviderAttemptState.SubmissionUnknown,
-                    nextReconciliationAt,
-                    job.LastErrorCode,
-                    providerCompleted: false,
-                    cancellationToken);
-                return true;
             }
 
-            await PollClaimedProviderAttemptAsync(job, claim, cancellationToken);
+            var maxPollAttempts = ResolveProviderPollMaxAttempts(claim.Stage);
+            var providerTimeoutHandledBeforePoll = false;
+            if (await providerAttemptStore.TryBeginPollAsync(
+                    claim.AttemptId,
+                    claim.ClaimToken,
+                    maxPollAttempts,
+                    cancellationToken))
+            {
+                claim = claim with { PollAttemptCount = claim.PollAttemptCount + 1 };
+                await PollClaimedProviderAttemptAsync(job, claim, cancellationToken);
+            }
+            else
+            {
+                // The final allowed provider read has already happened. Do not issue
+                // another status request; move directly into the bounded cancellation
+                // and manual-reconciliation path while this job lease is still owned.
+                await TryCancelTimedOutProviderAttemptAsync(job, claim, cancellationToken);
+                providerTimeoutHandledBeforePoll = true;
+            }
 
             // Provider polling can lose the job lease to an admin cancellation. In that case the
             // in-memory job may contain a completed stage even though SaveClaimedChangesAsync
@@ -1278,7 +1373,7 @@ internal sealed partial class TemplateGenerationJobProcessor
             {
                 await providerAttemptStore.UpdateClaimedStateAsync(
                     claim.AttemptId,
-                    WorkerInstanceId,
+                    claim.ClaimToken,
                     claim.State,
                     DateTime.UtcNow.AddSeconds(30),
                     "templates.provider_job_missing",
@@ -1291,7 +1386,7 @@ internal sealed partial class TemplateGenerationJobProcessor
             {
                 await providerAttemptStore.UpdateClaimedStateAsync(
                     claim.AttemptId,
-                    WorkerInstanceId,
+                    claim.ClaimToken,
                     claim.State,
                     persistedJob.CancellationNextAttemptAtUtc ?? DateTime.UtcNow.AddSeconds(30),
                     "templates.provider_cancellation_pending",
@@ -1300,15 +1395,24 @@ internal sealed partial class TemplateGenerationJobProcessor
                 return true;
             }
 
-            if (persistedJob.Status is (TemplateGenerationStatus.ProviderQueued or TemplateGenerationStatus.ProviderProcessing)
-                && DateTime.UtcNow >= claim.ProcessingDeadlineAtUtc)
+            var providerAttemptTimedOut = DateTime.UtcNow >= claim.ProcessingDeadlineAtUtc
+                || claim.PollAttemptCount >= maxPollAttempts;
+            if (!string.IsNullOrWhiteSpace(claim.ProviderRequestId)
+                && persistedJob.Status is (TemplateGenerationStatus.ProviderQueued
+                    or TemplateGenerationStatus.ProviderProcessing
+                    or TemplateGenerationStatus.SubmittingToProvider)
+                && providerAttemptTimedOut
+                && !providerTimeoutHandledBeforePoll)
             {
-                var timeoutJob = await TryClaimProviderAttemptJobAsync(claim.GenerationJobId, cancellationToken);
+                var timeoutJob = await TryClaimProviderAttemptJobAsync(
+                    claim.GenerationJobId,
+                    claim.ClaimToken,
+                    cancellationToken);
                 if (timeoutJob is null)
                 {
                     await providerAttemptStore.UpdateClaimedStateAsync(
                         claim.AttemptId,
-                        WorkerInstanceId,
+                        claim.ClaimToken,
                         claim.State,
                         DateTime.UtcNow.AddSeconds(2),
                         "templates.provider_job_locked",
@@ -1323,7 +1427,7 @@ internal sealed partial class TemplateGenerationJobProcessor
                 {
                     await providerAttemptStore.UpdateClaimedStateAsync(
                         claim.AttemptId,
-                        WorkerInstanceId,
+                        claim.ClaimToken,
                         claim.State,
                         DateTime.UtcNow.AddSeconds(30),
                         "templates.provider_job_missing",
@@ -1336,7 +1440,7 @@ internal sealed partial class TemplateGenerationJobProcessor
                 {
                     await providerAttemptStore.UpdateClaimedStateAsync(
                         claim.AttemptId,
-                        WorkerInstanceId,
+                        claim.ClaimToken,
                         claim.State,
                         persistedJob.CancellationNextAttemptAtUtc ?? DateTime.UtcNow.AddSeconds(30),
                         "templates.provider_cancellation_pending",
@@ -1349,7 +1453,7 @@ internal sealed partial class TemplateGenerationJobProcessor
             var (state, nextPollAtUtc, providerCompleted) = ResolveAttemptState(persistedJob, claim);
             await providerAttemptStore.UpdateClaimedStateAsync(
                 claim.AttemptId,
-                WorkerInstanceId,
+                claim.ClaimToken,
                 state,
                 nextPollAtUtc,
                 persistedJob.LastErrorCode,
@@ -1384,7 +1488,7 @@ internal sealed partial class TemplateGenerationJobProcessor
 
             await providerAttemptStore.UpdateClaimedStateAsync(
                 claim.AttemptId,
-                WorkerInstanceId,
+                claim.ClaimToken,
                 claim.State,
                 DateTime.UtcNow.AddSeconds(30),
                 "templates.provider_reconciliation_failed",
@@ -1396,6 +1500,7 @@ internal sealed partial class TemplateGenerationJobProcessor
 
     private async Task<TemplateGenerationJob?> TryClaimProviderAttemptJobAsync(
         Guid generationJobId,
+        string claimToken,
         CancellationToken cancellationToken)
     {
         var staleThreshold = DateTime.UtcNow.AddMilliseconds(
@@ -1410,7 +1515,7 @@ internal sealed partial class TemplateGenerationJobProcessor
             return null;
         }
 
-        job.LockedBy = WorkerInstanceId;
+        job.LockedBy = claimToken;
         job.LockedAtUtc = DateTime.UtcNow;
         try
         {
@@ -1463,16 +1568,24 @@ internal sealed partial class TemplateGenerationJobProcessor
         TemplateGenerationProviderAttemptClaim claim,
         CancellationToken cancellationToken)
     {
-        if (falQueueClient is null
+        var maxCancelAttempts = Math.Max(1, options.Fal.CancelMaxAttempts);
+        var cancellationBudgetExhausted = claim.CancelAttemptCount >= maxCancelAttempts
+            || DateTime.UtcNow >= claim.ReconciliationDeadlineAtUtc;
+        if (cancellationBudgetExhausted
+            || falQueueClient is null
             || string.IsNullOrWhiteSpace(claim.ProviderRequestId))
         {
-            await MarkProviderAttemptForManualReconciliationAsync(job, claim, cancellationToken);
+            await MarkProviderAttemptForManualReconciliationAsync(
+                job,
+                claim,
+                terminal: true,
+                cancellationToken);
             return;
         }
 
         if (string.IsNullOrWhiteSpace(job.LockedBy))
         {
-            job.LockedBy = WorkerInstanceId;
+            job.LockedBy = claim.ClaimToken;
             job.LockedAtUtc = DateTime.UtcNow;
             await dbContext.SaveChangesAsync(cancellationToken);
         }
@@ -1485,7 +1598,25 @@ internal sealed partial class TemplateGenerationJobProcessor
             claim.ProviderStatusUrl);
         if (cancellationUri is null)
         {
-            await MarkProviderAttemptForManualReconciliationAsync(job, claim, cancellationToken);
+            await MarkProviderAttemptForManualReconciliationAsync(
+                job,
+                claim,
+                terminal: true,
+                cancellationToken);
+            return;
+        }
+
+        if (!await providerAttemptStore!.TryBeginCancellationAsync(
+                claim.AttemptId,
+                claim.ClaimToken,
+                maxCancelAttempts,
+                cancellationToken))
+        {
+            await MarkProviderAttemptForManualReconciliationAsync(
+                job,
+                claim,
+                terminal: true,
+                cancellationToken);
             return;
         }
 
@@ -1501,7 +1632,11 @@ internal sealed partial class TemplateGenerationJobProcessor
                 job.ProviderStatus = "CANCELLATION_REQUESTED";
             }
 
-            await MarkProviderAttemptForManualReconciliationAsync(job, claim, cancellationToken);
+            await MarkProviderAttemptForManualReconciliationAsync(
+                job,
+                claim,
+                terminal: claim.CancelAttemptCount + 1 >= maxCancelAttempts,
+                cancellationToken);
             return;
         }
 
@@ -1512,24 +1647,44 @@ internal sealed partial class TemplateGenerationJobProcessor
             return;
         }
 
-        await MarkProviderAttemptForManualReconciliationAsync(job, claim, cancellationToken);
+        await MarkProviderAttemptForManualReconciliationAsync(
+            job,
+            claim,
+            terminal: claim.CancelAttemptCount + 1 >= maxCancelAttempts,
+            cancellationToken);
     }
 
     private async Task MarkProviderAttemptForManualReconciliationAsync(
         TemplateGenerationJob job,
         TemplateGenerationProviderAttemptClaim claim,
+        bool terminal,
         CancellationToken cancellationToken)
     {
         var now = DateTime.UtcNow;
-        job.LastErrorCode = now >= claim.ReconciliationDeadlineAtUtc
+        var requiresManualReconciliation = terminal || now >= claim.ReconciliationDeadlineAtUtc;
+        job.LastErrorCode = requiresManualReconciliation
             ? "templates.provider_cancellation_reconciliation_required"
             : "templates.provider_cancellation_pending";
-        job.NextAttemptEarliestAtUtc = now >= claim.ReconciliationDeadlineAtUtc
-            ? now.AddMinutes(5)
+        job.NextAttemptEarliestAtUtc = requiresManualReconciliation
+            ? null
             : MinUtc(claim.ReconciliationDeadlineAtUtc, now.AddSeconds(30));
+        if (requiresManualReconciliation)
+        {
+            job.Status = TemplateGenerationStatus.SubmittingToProvider;
+            job.ProviderStatus = ProviderReconciliationRequiredStatus;
+        }
+
         job.UpdatedAtUtc = now;
         await SaveClaimedChangesAsync(job, cancellationToken, releaseLock: true);
     }
+
+    private int ResolveProviderPollMaxAttempts(TemplateGenerationProviderAttemptStage stage) => stage switch
+    {
+        TemplateGenerationProviderAttemptStage.ImageGeneration => Math.Max(1, options.Fal.ImageMaxPollingAttempts),
+        TemplateGenerationProviderAttemptStage.VideoPreprocessing => Math.Max(1, options.Fal.ImagePreprocessingMaxPollingAttempts),
+        TemplateGenerationProviderAttemptStage.VideoGeneration => Math.Max(1, options.Fal.VideoMaxPollingAttempts),
+        _ => Math.Max(1, options.Fal.MaxPollingAttempts)
+    };
 
     private static (TemplateGenerationProviderAttemptState State, DateTime? NextPollAtUtc, bool ProviderCompleted)
         ResolveAttemptState(

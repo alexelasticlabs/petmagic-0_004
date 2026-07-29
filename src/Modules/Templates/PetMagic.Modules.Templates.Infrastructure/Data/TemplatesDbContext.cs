@@ -237,6 +237,11 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
                 .HasDatabaseName("IX_tgj_Status_QueueMediaType_QueueTier_QueuedAtUtc");
             entity.HasIndex(x => new { x.Status, x.QueueMediaType, x.StartedAtUtc })
                 .HasDatabaseName("IX_tgj_Status_QueueMediaType_StartedAtUtc");
+            entity.HasIndex(x => new { x.QueueMediaType, x.MediaImportCompletedAtUtc })
+                .HasDatabaseName("IX_tgj_Completed_MediaType_ImportCompletedAtUtc")
+                .IsDescending(false, true)
+                .HasFilter("\"Status\" = 3 AND \"ImportStartedAtUtc\" IS NOT NULL AND \"MediaImportCompletedAtUtc\" IS NOT NULL")
+                .IncludeProperties(x => x.ImportStartedAtUtc);
             entity.HasIndex(x => new { x.Status, x.ProviderStatusCheckedAtUtc })
                 .HasDatabaseName("IX_tgj_Status_ProviderStatusCheckedAtUtc");
             entity.HasIndex(x => new { x.Status, x.MediaImportNextAttemptAtUtc })
@@ -265,6 +270,10 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
             entity.HasIndex(x => x.RefundedAtUtc)
                 .HasDatabaseName("IX_tgj_RefundedAtUtc");
             entity.HasIndex(x => new { x.UserId, x.CreatedAtUtc });
+            entity.HasIndex(x => new { x.UserId, x.QueueTier, x.LastAttemptAtUtc })
+                .HasDatabaseName("IX_tgj_UserId_QueueTier_LastAttemptAtUtc")
+                .IsDescending(false, false, true)
+                .HasFilter("\"LastAttemptAtUtc\" IS NOT NULL");
             entity.HasIndex(x => new { x.UserId, x.HiddenByUserAtUtc, x.CreatedAtUtc })
                 .HasDatabaseName("IX_tgj_UserId_HiddenByUserAtUtc_CreatedAtUtc");
             entity.HasIndex(x => new { x.UserId, x.HiddenByUserAtUtc, x.Status, x.CreatedAtUtc, x.Id })
@@ -339,6 +348,11 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
             entity.HasIndex(x => new { x.State, x.LockedAtUtc })
                 .HasDatabaseName("IX_tgpa_State_LockedAtUtc")
                 .HasFilter("\"State\" IN (1, 2, 3, 4, 5)");
+            entity.HasIndex(x => new { x.Stage, x.ProviderCompletedAtUtc })
+                .HasDatabaseName("IX_tgpa_Completed_Stage_ProviderCompletedAtUtc")
+                .IsDescending(false, true)
+                .HasFilter("\"State\" = 6 AND \"SubmittedAtUtc\" IS NOT NULL AND \"ProviderCompletedAtUtc\" IS NOT NULL")
+                .IncludeProperties(x => x.SubmittedAtUtc);
             entity.HasIndex(x => new { x.GenerationJobId, x.CreatedAtUtc })
                 .HasDatabaseName("IX_tgpa_JobId_CreatedAtUtc");
             entity.HasOne(x => x.GenerationJob)
@@ -370,6 +384,9 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
             entity.HasIndex(x => new { x.Status, x.NextAttemptAtUtc })
                 .HasDatabaseName("IX_tpwbi_Status_NextAttemptAtUtc")
                 .HasFilter("\"Status\" IN (1, 4)");
+            entity.HasIndex(x => new { x.LockedAtUtc, x.NextAttemptAtUtc })
+                .HasDatabaseName("IX_tpwbi_Processing_LockedAtUtc_NextAttemptAtUtc")
+                .HasFilter("\"Status\" = 2 AND \"LockedAtUtc\" IS NOT NULL");
             entity.HasIndex(x => new { x.Status, x.UpdatedAtUtc })
                 .HasDatabaseName("IX_tpwbi_Terminal_UpdatedAtUtc")
                 .HasFilter("\"Status\" IN (3, 5)");

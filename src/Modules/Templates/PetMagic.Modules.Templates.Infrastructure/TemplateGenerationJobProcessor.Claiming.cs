@@ -527,11 +527,6 @@ internal sealed partial class TemplateGenerationJobProcessor
         if (runtimePolicyProvider is not null)
         {
             var runtimePolicy = await runtimePolicyProvider.GetRuntimePolicyAsync(cancellationToken);
-            if (!runtimePolicy.AdmissionEnabled)
-            {
-                return null;
-            }
-
             if (options.GenerationSchedulerV2Enabled)
             {
                 return runtimePolicy.EffectiveProfile;
@@ -1009,26 +1004,26 @@ internal sealed partial class TemplateGenerationJobProcessor
                 && string.Equals(TemplateGenerationQueue.ResolveMediaType(job), TemplateGenerationQueue.MediaTypeVideo, StringComparison.Ordinal);
         }
 
-        public void ReleaseUnusedFor(TemplateGenerationJob? job)
+        public async ValueTask ReleaseUnusedForAsync(TemplateGenerationJob? job)
         {
             var mediaType = job is null ? null : TemplateGenerationQueue.ResolveMediaType(job);
             if (!string.Equals(mediaType, TemplateGenerationQueue.MediaTypeImage, StringComparison.Ordinal))
             {
-                image.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                await image.DisposeAsync();
             }
 
             if (!string.Equals(mediaType, TemplateGenerationQueue.MediaTypeVideo, StringComparison.Ordinal))
             {
-                video.DisposeAsync().AsTask().GetAwaiter().GetResult();
-                borrowedVideo.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                await video.DisposeAsync();
+                await borrowedVideo.DisposeAsync();
             }
             else if (video.HasSlot)
             {
-                borrowedVideo.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                await borrowedVideo.DisposeAsync();
             }
             else
             {
-                video.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                await video.DisposeAsync();
             }
         }
 

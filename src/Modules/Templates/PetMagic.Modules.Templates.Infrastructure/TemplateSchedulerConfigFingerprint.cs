@@ -73,6 +73,7 @@ public static class TemplateSchedulerConfigFingerprint
             ["provider"] = new SortedDictionary<string, object?>(StringComparer.Ordinal)
             {
                 ["aiProvider"] = NormalizeText(options.AiProvider),
+                ["falCancelMaxAttempts"] = options.Fal.CancelMaxAttempts,
                 ["falImageMaxPollingAttempts"] = options.Fal.ImageMaxPollingAttempts,
                 ["falImagePreprocessingMaxPollingAttempts"] = options.Fal.ImagePreprocessingMaxPollingAttempts,
                 ["falMaxPollingAttempts"] = options.Fal.MaxPollingAttempts,

@@ -271,6 +271,8 @@ public sealed class FalAiOptions
 
     public int VideoMaxPollingAttempts { get; init; } = 300;
 
+    public int CancelMaxAttempts { get; init; } = 3;
+
     public bool IsConfigured => !string.IsNullOrWhiteSpace(ApiKey);
 }
 
