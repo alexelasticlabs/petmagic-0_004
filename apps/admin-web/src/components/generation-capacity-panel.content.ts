@@ -67,6 +67,8 @@ export type GenerationCapacityPanelText = {
   editTitle: string;
   editDescription: string;
   confirmedLimitLabel: string;
+  confirmFalLimitLabel: string;
+  confirmFalLimitRequired: string;
   reserveLabel: string;
   ceilingLabel: string;
   admissionLabel: string;
@@ -85,12 +87,17 @@ export type GenerationCapacityPanelText = {
   saved: string;
   saveError: string;
   staleConflict: string;
+  staleConflictRefreshFailed: string;
+  refreshConflict: string;
+  refreshingConflict: string;
   snapshotRefreshFailedTitle: string;
   snapshotRefreshFailedDescription: string;
   snapshotTooOldTitle: string;
   snapshotTooOldDescription: string;
   refreshError: string;
   refreshed: string;
+  refreshCoalesced: string;
+  refreshFailed: string;
   notificationSource: string;
   balanceStateLabels: Record<"fresh" | "stale" | "unknown" | "low" | "critical", string>;
 };
@@ -155,6 +162,10 @@ const capacityPanelText: Record<Locale, GenerationCapacityPanelText> = {
     editDescription:
       "Лимит fal.ai вводится по данным Dashboard. Баланс не используется для автоматического вычисления concurrency.",
     confirmedLimitLabel: "Подтверждённый fal.ai concurrency limit",
+    confirmFalLimitLabel:
+      "Я сверил concurrency limit в fal.ai Dashboard и подтверждаю его актуальность",
+    confirmFalLimitRequired:
+      "Новый concurrency limit нельзя применить без явного подтверждения сверки с fal.ai Dashboard.",
     reserveLabel: "Резерв вне PetMagic",
     ceilingLabel: "Жёсткий максимум PetMagic",
     admissionLabel: "Принимать новые генерации",
@@ -174,6 +185,10 @@ const capacityPanelText: Record<Locale, GenerationCapacityPanelText> = {
     saveError: "Не удалось обновить generation capacity.",
     staleConflict:
       "Policy уже изменена другим администратором. Загружена новая revision; ваши значения и причина сохранены — проверьте их снова.",
+    staleConflictRefreshFailed:
+      "Policy конфликтует с сервером, но новую revision получить не удалось. Черновик сохранён; повторите обновление и не отправляйте его вслепую.",
+    refreshConflict: "Загрузить новую revision",
+    refreshingConflict: "Обновляем revision…",
     snapshotRefreshFailedTitle: "Не удалось обновить состояние generation capacity",
     snapshotRefreshFailedDescription:
       "Показан последний успешный снимок. Повторите загрузку перед изменением policy.",
@@ -182,6 +197,8 @@ const capacityPanelText: Record<Locale, GenerationCapacityPanelText> = {
       "Изменение policy заблокировано до успешного обновления состояния очереди и worker.",
     refreshError: "Не удалось обновить состояние fal.ai.",
     refreshed: "Состояние fal.ai обновлено.",
+    refreshCoalesced: "Обновление уже выполнялось; показан самый свежий доступный снимок fal.ai.",
+    refreshFailed: "fal.ai не подтвердил обновление; показан последний безопасный снимок.",
     notificationSource: "Generation capacity",
     balanceStateLabels: {
       fresh: "Актуально",
@@ -250,6 +267,10 @@ const capacityPanelText: Record<Locale, GenerationCapacityPanelText> = {
     editDescription:
       "Enter the fal.ai limit shown in its Dashboard. The credit balance does not determine concurrency automatically.",
     confirmedLimitLabel: "Confirmed fal.ai concurrency limit",
+    confirmFalLimitLabel:
+      "I checked the concurrency limit in the fal.ai Dashboard and confirm it is current",
+    confirmFalLimitRequired:
+      "A new concurrency limit cannot be applied without explicitly confirming the fal.ai Dashboard value.",
     reserveLabel: "Capacity reserved outside PetMagic",
     ceilingLabel: "PetMagic hard ceiling",
     admissionLabel: "Accept new generations",
@@ -270,6 +291,10 @@ const capacityPanelText: Record<Locale, GenerationCapacityPanelText> = {
     saveError: "Failed to update generation capacity.",
     staleConflict:
       "Another administrator changed this policy. The latest revision was loaded; your values and reason were preserved for review.",
+    staleConflictRefreshFailed:
+      "The policy conflicts with the server, but a newer revision could not be loaded. Your draft is preserved; refresh it before retrying.",
+    refreshConflict: "Load latest revision",
+    refreshingConflict: "Loading revision…",
     snapshotRefreshFailedTitle: "Generation capacity refresh failed",
     snapshotRefreshFailedDescription:
       "The last successful snapshot is shown. Refresh it before changing the policy.",
@@ -278,6 +303,9 @@ const capacityPanelText: Record<Locale, GenerationCapacityPanelText> = {
       "Policy changes are blocked until the queue and worker state refresh successfully.",
     refreshError: "Failed to refresh the fal.ai state.",
     refreshed: "fal.ai state was refreshed.",
+    refreshCoalesced:
+      "A refresh was already running; the freshest available fal.ai snapshot is shown.",
+    refreshFailed: "fal.ai did not confirm the refresh; the last safe snapshot is still shown.",
     notificationSource: "Generation capacity",
     balanceStateLabels: {
       fresh: "Fresh",
@@ -327,6 +355,11 @@ const capacityAlertText: Record<Locale, Record<string, GenerationCapacityAlertTe
     "generation-worker-fingerprint-mismatch": {
       title: "Конфигурация generation worker не совпадает",
       message: "Generation worker запущен не с ожидаемой конфигурацией scheduler.",
+    },
+    "generation-worker-instance-count-unexpected": {
+      title: "Запущено больше одного generation worker",
+      message:
+        "Архитектура рассчитана на один Render worker. Проверьте Blueprint, Dashboard scaling и активные инстансы.",
     },
     "generation-worker-runtime-config-unknown": {
       title: "Runtime-конфигурация generation worker неизвестна",
@@ -388,6 +421,11 @@ const capacityAlertText: Record<Locale, Record<string, GenerationCapacityAlertTe
     "generation-worker-fingerprint-mismatch": {
       title: "Generation worker configuration mismatch",
       message: "The generation worker is not running with the expected scheduler configuration.",
+    },
+    "generation-worker-instance-count-unexpected": {
+      title: "More than one generation worker is active",
+      message:
+        "This architecture expects one Render worker. Review the Blueprint, Dashboard scaling, and active instances.",
     },
     "generation-worker-runtime-config-unknown": {
       title: "Generation worker runtime configuration is unknown",

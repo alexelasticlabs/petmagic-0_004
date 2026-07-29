@@ -33,7 +33,9 @@ import type {
   AdminModerationQueueQuery,
   AdminTemplateGenerationDashboardMetrics,
   AdminTemplateGenerationControl,
+  AdminTemplateGenerationProviderRefresh,
   AdminTemplateProviderAttemptResolution,
+  AdminTemplateProviderAttemptRecoveryPage,
   AdminGenerationDetail,
   AdminGamificationLegacyDeliveryResolutionAction,
   AdminGamificationLegacyDeliveryResolutionResponse,
@@ -748,15 +750,33 @@ export async function updateAdminTemplateGenerationControlPolicy(
         confirmedFalConcurrencyLimit: payload.confirmedFalConcurrencyLimit,
         reservedHeadroom: payload.reservedHeadroom,
         applicationHardCeiling: payload.applicationHardCeiling,
+        confirmFalConcurrencyLimit: payload.confirmFalConcurrencyLimit,
       }),
     }
   );
 }
 
-export async function refreshAdminTemplateGenerationProvider(): Promise<AdminTemplateGenerationControl> {
-  return apiRequest<AdminTemplateGenerationControl>(
+export async function refreshAdminTemplateGenerationProvider(): Promise<AdminTemplateGenerationProviderRefresh> {
+  return apiRequest<AdminTemplateGenerationProviderRefresh>(
     "/api/admin/templates/generation-control/provider/refresh",
     { method: "POST" }
+  );
+}
+
+export async function fetchAdminTemplateProviderAttemptRecovery(
+  skip = 0,
+  take = 25,
+  signal?: AbortSignal
+): Promise<AdminTemplateProviderAttemptRecoveryPage> {
+  const normalizedSkip = Number.isFinite(skip) ? Math.max(0, Math.floor(skip)) : 0;
+  const normalizedTake = Number.isFinite(take) ? Math.min(100, Math.max(1, Math.floor(take))) : 25;
+  const params = new URLSearchParams({
+    skip: String(normalizedSkip),
+    take: String(normalizedTake),
+  });
+  return apiRequest<AdminTemplateProviderAttemptRecoveryPage>(
+    `/api/admin/templates/generation-control/provider-attempts/recovery?${params.toString()}`,
+    { method: "GET", signal }
   );
 }
 

@@ -110,6 +110,14 @@ export const adminQueryKeys = {
     ["admin", "templates", templateId, "analytics-feedback", feedbackType, search] as const,
   templateGenerationMetrics: ["admin", "templates", "generations", "metrics"] as const,
   templateGenerationControl: ["admin", "templates", "generation-control"] as const,
+  templateGenerationProviderRecoveryRoot: [
+    "admin",
+    "templates",
+    "generation-control",
+    "provider-recovery",
+  ] as const,
+  templateGenerationProviderRecovery: (skip: number, take: number) =>
+    ["admin", "templates", "generation-control", "provider-recovery", skip, take] as const,
   templateGenerations: (query: unknown) => ["admin", "templates", "generations", query] as const,
   templateGenerationDetail: (generationId: string) =>
     ["admin", "templates", "generations", generationId, "detail"] as const,

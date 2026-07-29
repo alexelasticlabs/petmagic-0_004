@@ -93,5 +93,16 @@ describe("generation capacity alert localization", () => {
       message:
         "Wait for a heartbeat with the current revision or stop rollout and inspect worker logs.",
     });
+    expect(
+      getGenerationCapacityAlertText("ru", {
+        alertId: "generation-worker-instance-count-unexpected",
+        title: "Backend worker count title",
+        message: "Backend worker count message",
+      })
+    ).toEqual({
+      title: "Запущено больше одного generation worker",
+      message:
+        "Архитектура рассчитана на один Render worker. Проверьте Blueprint, Dashboard scaling и активные инстансы.",
+    });
   });
 });

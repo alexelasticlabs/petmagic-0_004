@@ -114,6 +114,27 @@ function createControl(overrides: Partial<Record<string, unknown>> = {}) {
   };
 }
 
+function createRecoveryAttempt(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    attemptId: "9c97c35e-4da1-4de1-8d87-8b02f9fce2ad",
+    generationId: "a8b75673-c816-4900-98b6-9ea5846b4198",
+    stage: "video_generation",
+    ordinal: 1,
+    state: "submission_unknown",
+    attemptVersion: 4,
+    providerRequestId: null,
+    createdAtUtc: "2026-07-29T09:55:00Z",
+    updatedAtUtc: "2026-07-29T10:03:00Z",
+    submittedAtUtc: null,
+    submissionDeadlineAtUtc: "2026-07-29T09:57:00Z",
+    processingDeadlineAtUtc: "2026-07-29T10:10:00Z",
+    reconciliationDeadlineAtUtc: "2026-07-29T10:03:00Z",
+    errorCode: "templates.provider_submission_unknown",
+    evidenceNeeded: "correlated_accepted_or_confirmed_not_found",
+    ...overrides,
+  };
+}
+
 function corsHeaders(route: Route) {
   return {
     "Access-Control-Allow-Origin": route.request().headers().origin ?? "http://127.0.0.1",
@@ -136,12 +157,31 @@ async function fulfillJson(route: Route, body: unknown, status = 200) {
 async function installMocks(
   page: Page,
   initialControl = createControl(),
-  options: { policyConflictsBeforeSuccess?: number } = {}
+  options: {
+    policyConflictsBeforeSuccess?: number;
+    policyConflictRefreshFails?: boolean;
+    providerRefreshOutcome?: "refreshed" | "coalesced" | "failed";
+    providerRecoveryItems?: Array<Record<string, unknown>>;
+    providerResolutionConflictsBeforeSuccess?: number;
+    providerConflictRefreshFails?: boolean;
+    providerConflictRefreshDelayMs?: number;
+    providerRecoveryRefundScheduled?: boolean;
+  } = {}
 ) {
   let control = initialControl;
+  let failNextControlRead = false;
+  let failNextRecoveryRead = false;
+  let delayNextRecoveryRead = false;
+  let providerRecoveryItems = [...(options.providerRecoveryItems ?? [])];
   let policyConflictsRemaining = options.policyConflictsBeforeSuccess ?? 0;
+  let providerResolutionConflictsRemaining = options.providerResolutionConflictsBeforeSuccess ?? 0;
   const policyRequests: Array<{ body: Record<string, unknown>; idempotencyKey: string | null }> =
     [];
+  const recoveryRequests: Array<{
+    attemptId: string;
+    body: Record<string, unknown>;
+    idempotencyKey: string | null;
+  }> = [];
 
   await page.route(apiOrigin + "/api/**", async (route) => {
     const request = route.request();
@@ -165,6 +205,7 @@ async function installMocks(
       });
       if (policyConflictsRemaining > 0) {
         policyConflictsRemaining -= 1;
+        failNextControlRead = options.policyConflictRefreshFails ?? false;
         const nextRevision = Number(control.revision) + 1;
         control = createControl({
           ...control,
@@ -185,6 +226,9 @@ async function installMocks(
         revision: nextRevision,
         admissionEnabled: Boolean(body.admissionEnabled),
         confirmedFalConcurrencyLimit: nextLimit,
+        confirmedAtUtc: body.confirmFalConcurrencyLimit
+          ? new Date().toISOString()
+          : control.confirmedAtUtc,
         reservedHeadroom: nextReserve,
         applicationHardCeiling: nextCeiling,
         effectiveGlobalLimit: nextGlobal,
@@ -196,22 +240,124 @@ async function installMocks(
     }
 
     if (url.pathname === "/api/admin/templates/generation-control/provider/refresh") {
-      control = createControl({
-        ...control,
-        balance: {
-          ...control.balance,
-          state: "fresh",
-          currentBalanceUsd: 20,
-          checkedAtUtc: "2026-07-29T10:10:00Z",
-        },
-        alerts: [],
+      const outcome = options.providerRefreshOutcome ?? "refreshed";
+      if (outcome === "refreshed") {
+        control = createControl({
+          ...control,
+          balance: {
+            ...control.balance,
+            state: "fresh",
+            currentBalanceUsd: 20,
+            checkedAtUtc: "2026-07-29T10:10:00Z",
+            lastSuccessfulAtUtc: "2026-07-29T10:10:00Z",
+          },
+          alerts: [],
+          generatedAtUtc: new Date().toISOString(),
+        });
+      }
+      await fulfillJson(route, {
+        outcome,
+        checkedAtUtc: control.balance.checkedAtUtc,
+        lastSuccessfulAtUtc: control.balance.lastSuccessfulAtUtc,
+        errorCode: outcome === "failed" ? "provider.refresh_failed" : null,
+        control,
+      });
+      return;
+    }
+
+    if (url.pathname === "/api/admin/templates/generation-control/provider-attempts/recovery") {
+      if (failNextRecoveryRead) {
+        failNextRecoveryRead = false;
+        delayNextRecoveryRead = (options.providerConflictRefreshDelayMs ?? 0) > 0;
+        await fulfillJson(route, { title: "Provider recovery unavailable", status: 503 }, 503);
+        return;
+      }
+      if (delayNextRecoveryRead) {
+        delayNextRecoveryRead = false;
+        await new Promise((resolve) =>
+          setTimeout(resolve, options.providerConflictRefreshDelayMs ?? 0)
+        );
+      }
+      const requestedSkip = Number.parseInt(url.searchParams.get("skip") ?? "0", 10);
+      const requestedTake = Number.parseInt(url.searchParams.get("take") ?? "25", 10);
+      const skip = Number.isFinite(requestedSkip) ? Math.max(0, requestedSkip) : 0;
+      const take = Number.isFinite(requestedTake) ? Math.min(100, Math.max(1, requestedTake)) : 25;
+      const items = providerRecoveryItems.slice(skip, skip + take);
+      await fulfillJson(route, {
+        items,
+        totalCount: providerRecoveryItems.length,
+        skip,
+        take,
+        hasMore: skip + items.length < providerRecoveryItems.length,
         generatedAtUtc: new Date().toISOString(),
       });
-      await fulfillJson(route, control);
+      return;
+    }
+
+    if (
+      request.method() === "POST" &&
+      url.pathname.startsWith("/api/admin/templates/generation-control/provider-attempts/") &&
+      url.pathname.endsWith("/resolve")
+    ) {
+      const attemptId = url.pathname.split("/").at(-2) ?? "";
+      const body = request.postDataJSON() as Record<string, unknown>;
+      recoveryRequests.push({
+        attemptId,
+        body,
+        idempotencyKey: request.headers()["idempotency-key"] ?? null,
+      });
+      if (providerResolutionConflictsRemaining > 0) {
+        providerResolutionConflictsRemaining -= 1;
+        providerRecoveryItems = providerRecoveryItems.map((candidate) =>
+          candidate.attemptId === attemptId
+            ? {
+                ...candidate,
+                attemptVersion: Number(candidate.attemptVersion) + 1,
+                updatedAtUtc: new Date().toISOString(),
+              }
+            : candidate
+        );
+        failNextRecoveryRead = options.providerConflictRefreshFails ?? false;
+        delayNextRecoveryRead =
+          !failNextRecoveryRead && (options.providerConflictRefreshDelayMs ?? 0) > 0;
+        await fulfillJson(route, { title: "Provider attempt conflict", status: 409 }, 409);
+        return;
+      }
+      const resolvedAttempt = providerRecoveryItems.find(
+        (candidate) => candidate.attemptId === attemptId
+      );
+      providerRecoveryItems = providerRecoveryItems.filter(
+        (candidate) => candidate.attemptId !== attemptId
+      );
+      control = createControl({
+        ...control,
+        lanes: {
+          ...control.lanes,
+          submissionUnknownCount: providerRecoveryItems.length,
+        },
+        alerts: providerRecoveryItems.length > 0 ? control.alerts : [],
+        generatedAtUtc: new Date().toISOString(),
+      });
+      await fulfillJson(route, {
+        providerAttemptId: attemptId,
+        generationId: resolvedAttempt?.generationId,
+        resolution: body.resolution,
+        attemptState: body.resolution === "correlated_accepted" ? "ProviderQueued" : "Cancelled",
+        attemptVersion: Number(body.expectedAttemptVersion) + 1,
+        refundScheduled:
+          body.resolution === "confirmed_not_found" &&
+          (options.providerRecoveryRefundScheduled ?? true),
+        resolvedAtUtc: new Date().toISOString(),
+      });
       return;
     }
 
     if (url.pathname === "/api/admin/templates/generation-control") {
+      if (failNextControlRead) {
+        failNextControlRead = false;
+        await fulfillJson(route, { title: "Generation control unavailable", status: 503 }, 503);
+        return;
+      }
       await fulfillJson(route, control);
       return;
     }
@@ -256,6 +402,7 @@ async function installMocks(
 
   return {
     getPolicyRequests: () => policyRequests,
+    getRecoveryRequests: () => recoveryRequests,
   };
 }
 
@@ -265,6 +412,18 @@ async function loginAsAdmin(page: Page, locale: "en" | "ru" = "en") {
   await page.locator("#login-password").fill("production-ready-password");
   await page.locator('form button[type="submit"]').click();
   await expect(page).toHaveURL(new RegExp(`/${locale}/dashboard$`));
+}
+
+async function readPersistedNotificationMessages(page: Page): Promise<string[]> {
+  const storageKey = `petmagic.admin.notifications.v2:${encodeURIComponent(createSession().user.userId)}`;
+  return page.evaluate((key) => {
+    const rawValue = window.localStorage.getItem(key);
+    if (!rawValue) return [];
+    const notifications = JSON.parse(rawValue) as Array<{ message?: string }>;
+    return notifications
+      .map((notification) => notification.message)
+      .filter((message): message is string => typeof message === "string");
+  }, storageKey);
 }
 
 test("generation capacity previews and saves a scale-up with optimistic concurrency", async ({
@@ -309,6 +468,9 @@ test("generation capacity previews and saves a scale-up with optimistic concurre
   await expect(save).toBeDisabled();
   await reserve.fill("2");
   await expect(reserve).toHaveAttribute("aria-invalid", "false");
+  await dialog
+    .getByRole("checkbox", { name: /I checked the concurrency limit in the fal.ai Dashboard/ })
+    .check();
   const preview = dialog.getByRole("region", { name: "Balanced profile preview" });
   await expect(preview.getByText("38", { exact: true }).first()).toBeVisible();
   await expect(preview.getByText("10", { exact: true }).first()).toBeVisible();
@@ -323,6 +485,7 @@ test("generation capacity previews and saves a scale-up with optimistic concurre
       reservedHeadroom: 2,
       applicationHardCeiling: 38,
       admissionEnabled: true,
+      confirmFalConcurrencyLimit: true,
     },
   });
   expect(api.getPolicyRequests()[0]?.idempotencyKey).toMatch(/^generation-policy:/);
@@ -349,6 +512,10 @@ test("preserves the draft and rotates concurrency metadata after a 409 conflict"
 
   await confirmedLimit.fill("40");
   await reason.fill(preservedReason);
+  const falLimitConfirmation = dialog.getByRole("checkbox", {
+    name: /I checked the concurrency limit in the fal.ai Dashboard/,
+  });
+  await falLimitConfirmation.check();
   await save.click();
 
   await expect(dialog.getByText(/latest revision was loaded/i)).toBeVisible();
@@ -358,6 +525,9 @@ test("preserves the draft and rotates concurrency metadata after a 409 conflict"
   expect(api.getPolicyRequests()[0]?.body.expectedRevision).toBe(4);
   const firstIdempotencyKey = api.getPolicyRequests()[0]?.idempotencyKey;
 
+  await expect(falLimitConfirmation).not.toBeChecked();
+  await expect(save).toBeDisabled();
+  await falLimitConfirmation.check();
   await expect(save).toBeEnabled();
   await save.click();
   await expect(dialog).toBeHidden();
@@ -366,6 +536,48 @@ test("preserves the draft and rotates concurrency metadata after a 409 conflict"
   expect(api.getPolicyRequests()[1]?.body.reason).toBe(preservedReason);
   expect(api.getPolicyRequests()[1]?.idempotencyKey).toMatch(/^generation-policy:/);
   expect(api.getPolicyRequests()[1]?.idempotencyKey).not.toBe(firstIdempotencyKey);
+});
+
+test("blocks a blind policy retry when the 409 refresh did not load a newer revision", async ({
+  page,
+}) => {
+  const api = await installMocks(page, createControl(), {
+    policyConflictsBeforeSuccess: 1,
+    policyConflictRefreshFails: true,
+  });
+  await loginAsAdmin(page);
+  await page.goto("/en/generations");
+  await page.getByRole("button", { name: "Configure", exact: true }).click();
+
+  const dialog = page.getByRole("dialog", {
+    name: "Configure generation capacity",
+    exact: true,
+  });
+  const confirmedLimit = dialog.getByRole("textbox", {
+    name: "Confirmed fal.ai concurrency limit",
+  });
+  const reason = dialog.getByRole("textbox", { name: "Change reason" });
+  const falLimitConfirmation = dialog.getByRole("checkbox", {
+    name: /I checked the concurrency limit in the fal.ai Dashboard/,
+  });
+  const save = dialog.getByRole("button", { name: "Save policy", exact: true });
+  await confirmedLimit.fill("40");
+  await reason.fill("Verified the desired capacity but need a fresh policy revision.");
+  await falLimitConfirmation.check();
+  await save.click();
+
+  await expect(dialog.getByText(/newer revision could not be loaded/i)).toBeVisible();
+  await expect(save).toBeDisabled();
+  await expect(confirmedLimit).toHaveValue("40");
+  await expect(reason).toHaveValue(
+    "Verified the desired capacity but need a fresh policy revision."
+  );
+  await expect.poll(() => api.getPolicyRequests().length).toBe(1);
+
+  await dialog.getByRole("button", { name: "Load latest revision" }).click();
+  await expect(dialog.getByText(/latest revision was loaded/i)).toBeVisible();
+  await expect(falLimitConfirmation).not.toBeChecked();
+  await expect(save).toBeDisabled();
 });
 
 test("blocks policy mutations while a server snapshot is too old", async ({ page }) => {
@@ -384,6 +596,21 @@ test("blocks policy mutations while a server snapshot is too old", async ({ page
     page.getByText("Generation capacity snapshot is stale", { exact: true })
   ).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Configure", exact: true })).toBeEnabled();
+});
+
+test("does not report a failed provider refresh as successful", async ({ page }) => {
+  await installMocks(page, createControl(), { providerRefreshOutcome: "failed" });
+  await loginAsAdmin(page);
+  await page.goto("/en/generations");
+
+  await page.getByRole("button", { name: "Refresh balance", exact: true }).click();
+
+  await expect(
+    page.getByText("fal.ai did not confirm the refresh; the last safe snapshot is still shown.", {
+      exact: true,
+    })
+  ).toBeVisible();
+  await expect(page.getByText("$8.25", { exact: true })).toBeVisible();
 });
 
 test("pausing admission requires explicit acknowledgement and fits a 390px viewport", async ({
@@ -523,6 +750,283 @@ test("surfaces ambiguous provider submissions as occupied capacity requiring rec
   await page.getByText("Worker and lanes", { exact: true }).click();
   const unknownRow = page.getByText("Provider submits to reconcile", { exact: true }).locator("..");
   await expect(unknownRow).toContainText("2");
+  await expect(
+    page.getByText(
+      "No attempts are currently eligible for a manual decision. Ambiguous submits might still be in automatic recovery.",
+      { exact: true }
+    )
+  ).toBeVisible();
+});
+
+test("loads provider recovery attempts beyond the first bounded page", async ({ page }) => {
+  const attempts = Array.from({ length: 26 }, (_, index) =>
+    createRecoveryAttempt({
+      attemptId: `9c97c35e-4da1-4de1-8d87-${String(index + 1).padStart(12, "0")}`,
+      generationId: `a8b75673-c816-4900-98b6-${String(index + 1).padStart(12, "0")}`,
+      ordinal: index + 1,
+    })
+  );
+  const base = createControl();
+  await installMocks(
+    page,
+    createControl({
+      lanes: { ...base.lanes, submissionUnknownCount: attempts.length },
+      alerts: [],
+    }),
+    { providerRecoveryItems: attempts }
+  );
+  await loginAsAdmin(page);
+  await page.goto("/en/generations");
+
+  const recovery = page.getByRole("region", {
+    name: "Manual provider submit reconciliation",
+  });
+  await expect(recovery.getByText(attempts[0].generationId as string)).toBeVisible();
+  await expect(recovery.getByText(attempts[25].generationId as string)).toHaveCount(0);
+  await expect(recovery.getByText("Showing 25 of 26", { exact: true })).toBeVisible();
+  await expect(
+    recovery.getByRole("button", {
+      name: `Resolve attempt: Generation ${attempts[0].generationId}, Stage video_generation #1`,
+    })
+  ).toBeVisible();
+
+  await recovery.getByRole("button", { name: "Load more attempts", exact: true }).click();
+
+  await expect(recovery.getByText(attempts[25].generationId as string)).toBeVisible();
+  await expect(recovery.getByText("Showing 26 of 26", { exact: true })).toBeVisible();
+  await expect(
+    recovery.getByRole("button", { name: "Load more attempts", exact: true })
+  ).toHaveCount(0);
+});
+
+test("correlates an ambiguous provider submit only with explicit fal.ai evidence", async ({
+  page,
+}) => {
+  const base = createControl();
+  const api = await installMocks(
+    page,
+    createControl({
+      lanes: { ...base.lanes, submissionUnknownCount: 1 },
+      alerts: [
+        {
+          alertId: "generation-provider-submission-unknown",
+          statusChangedAtUtc: "2026-07-29T10:03:00Z",
+          severity: "critical",
+          title: "Provider submissions require reconciliation",
+          message: "One ambiguous submission occupies capacity.",
+        },
+      ],
+    }),
+    { providerRecoveryItems: [createRecoveryAttempt()] }
+  );
+  await page.setViewportSize({ width: 390, height: 844 });
+  await loginAsAdmin(page);
+  await page.goto("/en/generations");
+
+  const recovery = page.getByRole("region", {
+    name: "Manual provider submit reconciliation",
+  });
+  await expect(recovery).toBeVisible();
+  await expect(recovery.getByText(createRecoveryAttempt().generationId as string)).toBeVisible();
+  await recovery.getByRole("button", { name: /^Resolve attempt:/ }).click();
+
+  const dialog = page.getByRole("dialog", { name: "Evidence-backed provider recovery" });
+  const confirm = dialog.getByRole("button", { name: "Apply decision" });
+  await expect(confirm).toBeDisabled();
+  const providerRequestId = dialog.getByRole("textbox", { name: "fal.ai request ID" });
+  const providerRequestDescriptionId = await providerRequestId.getAttribute("aria-describedby");
+  expect(providerRequestDescriptionId).toBeTruthy();
+  await expect(dialog.locator(`#${providerRequestDescriptionId}`)).toContainText(
+    "An accepted request requires its fal.ai request ID."
+  );
+  await providerRequestId.fill("request_accepted_1");
+  await dialog
+    .getByRole("textbox", { name: "Evidence reference" })
+    .fill("fal-dashboard:request_accepted_1");
+  await dialog
+    .getByRole("textbox", { name: "Decision reason" })
+    .fill("Matched the request ID, model stage, and generation in the fal.ai Dashboard.");
+  await dialog
+    .getByRole("checkbox", { name: /I verified the generation, stage, and fal.ai evidence/ })
+    .check();
+  await expect(confirm).toBeEnabled();
+
+  const dimensions = await page.evaluate(() => ({
+    clientWidth: document.documentElement.clientWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+  }));
+  expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth);
+
+  await confirm.click();
+  await expect(dialog).toBeHidden();
+  await expect.poll(() => api.getRecoveryRequests().length).toBe(1);
+  expect(api.getRecoveryRequests()[0]).toMatchObject({
+    attemptId: createRecoveryAttempt().attemptId,
+    body: {
+      expectedAttemptVersion: 4,
+      resolution: "correlated_accepted",
+      evidenceReference: "fal-dashboard:request_accepted_1",
+      providerRequestId: "request_accepted_1",
+      providerStatusUrl: null,
+      providerResponseUrl: null,
+      providerCancelUrl: null,
+    },
+  });
+  expect(api.getRecoveryRequests()[0]?.idempotencyKey).toMatch(/^provider-attempt-resolution:/);
+});
+
+test("keeps the recovery dialog locked while a conflicted attempt version is reloaded", async ({
+  page,
+}) => {
+  const firstAttempt = createRecoveryAttempt();
+  const secondAttempt = createRecoveryAttempt({
+    attemptId: "9c97c35e-4da1-4de1-8d87-8b02f9fce2ae",
+    generationId: "a8b75673-c816-4900-98b6-9ea5846b4199",
+  });
+  const base = createControl();
+  await installMocks(
+    page,
+    createControl({
+      lanes: { ...base.lanes, submissionUnknownCount: 2 },
+      alerts: [],
+    }),
+    {
+      providerRecoveryItems: [firstAttempt, secondAttempt],
+      providerResolutionConflictsBeforeSuccess: 1,
+      providerConflictRefreshFails: true,
+      providerConflictRefreshDelayMs: 750,
+    }
+  );
+  await loginAsAdmin(page);
+  await page.goto("/en/generations");
+  await page
+    .getByRole("button", {
+      name: new RegExp(`^Resolve attempt: Generation ${firstAttempt.generationId}`),
+    })
+    .click();
+
+  const dialog = page.getByRole("dialog", { name: "Evidence-backed provider recovery" });
+  await dialog.getByRole("textbox", { name: "fal.ai request ID" }).fill("request_conflict_1");
+  await dialog
+    .getByRole("textbox", { name: "Evidence reference" })
+    .fill("fal-dashboard:request_conflict_1");
+  await dialog
+    .getByRole("textbox", { name: "Decision reason" })
+    .fill("Matched this request in fal.ai before the attempt version changed.");
+  await dialog
+    .getByRole("checkbox", { name: /I verified the generation, stage, and fal.ai evidence/ })
+    .check();
+  await dialog.getByRole("button", { name: "Apply decision" }).click();
+
+  await expect(dialog.getByText(/Retry is blocked/i)).toBeVisible();
+  const loadLatest = dialog.getByRole("button", { name: "Load latest version" });
+  await loadLatest.click();
+  await expect(dialog.getByRole("button", { name: "Cancel", exact: true })).toBeDisabled();
+  await expect(dialog.getByRole("textbox", { name: "Evidence reference" })).toBeDisabled();
+  await expect(dialog.getByText(/latest version was loaded/i)).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Cancel", exact: true })).toBeEnabled();
+  await expect(dialog.getByText(firstAttempt.generationId as string)).toBeVisible();
+  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+
+  await page
+    .getByRole("button", {
+      name: new RegExp(`^Resolve attempt: Generation ${secondAttempt.generationId}`),
+    })
+    .click();
+  await expect(dialog.getByText(secondAttempt.generationId as string)).toBeVisible();
+  await expect(dialog.getByText(firstAttempt.generationId as string)).toHaveCount(0);
+});
+
+test("requires explicit acknowledgement before confirming that fal.ai did not accept a submit", async ({
+  page,
+}) => {
+  const base = createControl();
+  const api = await installMocks(
+    page,
+    createControl({
+      lanes: { ...base.lanes, submissionUnknownCount: 1 },
+      alerts: [],
+    }),
+    { providerRecoveryItems: [createRecoveryAttempt()] }
+  );
+  await loginAsAdmin(page);
+  await page.goto("/en/generations");
+  await page.getByRole("button", { name: /^Resolve attempt:/ }).click();
+
+  const dialog = page.getByRole("dialog", { name: "Evidence-backed provider recovery" });
+  await dialog
+    .getByRole("combobox", { name: "Confirmed outcome" })
+    .selectOption("confirmed_not_found");
+  await expect(dialog.getByRole("textbox", { name: "fal.ai request ID" })).toHaveCount(0);
+  await expect(dialog.getByText(/idempotent refund/i)).toBeVisible();
+  await dialog.getByRole("textbox", { name: "Evidence reference" }).fill("support:case_456");
+  await dialog
+    .getByRole("textbox", { name: "Decision reason" })
+    .fill("fal.ai support confirmed that no provider request was accepted.");
+  const confirm = dialog.getByRole("button", { name: "Apply decision" });
+  await expect(confirm).toBeDisabled();
+  await dialog
+    .getByRole("checkbox", { name: /I verified the generation, stage, and fal.ai evidence/ })
+    .check();
+  await confirm.click();
+
+  await expect.poll(() => api.getRecoveryRequests().length).toBe(1);
+  expect(api.getRecoveryRequests()[0]?.body).toMatchObject({
+    resolution: "confirmed_not_found",
+    evidenceReference: "support:case_456",
+    providerRequestId: null,
+  });
+  await expect
+    .poll(async () =>
+      (await readPersistedNotificationMessages(page)).includes(
+        "Provider request absence was confirmed; cancellation and refund recovery were scheduled."
+      )
+    )
+    .toBe(true);
+});
+
+test("does not claim that a refund was scheduled when backend reports no refund work", async ({
+  page,
+}) => {
+  const base = createControl();
+  await installMocks(
+    page,
+    createControl({
+      lanes: { ...base.lanes, submissionUnknownCount: 1 },
+      alerts: [],
+    }),
+    {
+      providerRecoveryItems: [createRecoveryAttempt()],
+      providerRecoveryRefundScheduled: false,
+    }
+  );
+  await loginAsAdmin(page);
+  await page.goto("/en/generations");
+  await page.getByRole("button", { name: /^Resolve attempt:/ }).click();
+
+  const dialog = page.getByRole("dialog", { name: "Evidence-backed provider recovery" });
+  await dialog
+    .getByRole("combobox", { name: "Confirmed outcome" })
+    .selectOption("confirmed_not_found");
+  await dialog.getByRole("textbox", { name: "Evidence reference" }).fill("support:case_789");
+  await dialog
+    .getByRole("textbox", { name: "Decision reason" })
+    .fill("The request was never accepted and the generation had no charge to refund.");
+  await dialog
+    .getByRole("checkbox", { name: /I verified the generation, stage, and fal.ai evidence/ })
+    .check();
+  await dialog.getByRole("button", { name: "Apply decision" }).click();
+
+  await expect
+    .poll(async () =>
+      (await readPersistedNotificationMessages(page)).includes(
+        "Provider request absence was confirmed; the generation was cancelled and no new refund was required."
+      )
+    )
+    .toBe(true);
+  expect(await readPersistedNotificationMessages(page)).not.toContain(
+    "Provider request absence was confirmed; cancellation and refund recovery were scheduled."
+  );
 });
 
 test("shows unknown worker runtime instead of claiming compatibility mode before heartbeat", async ({

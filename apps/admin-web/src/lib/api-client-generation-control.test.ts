@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   fetchAdminTemplateGenerationControl,
+  fetchAdminTemplateProviderAttemptRecovery,
   refreshAdminTemplateGenerationProvider,
   resolveAdminTemplateProviderAttempt,
   updateAdminTemplateGenerationControlPolicy,
@@ -46,6 +47,7 @@ describe("admin generation control API", () => {
       confirmedFalConcurrencyLimit: 40,
       reservedHeadroom: 2,
       applicationHardCeiling: 38,
+      confirmFalConcurrencyLimit: true,
       idempotencyKey: "generation-policy-4",
     });
 
@@ -62,11 +64,20 @@ describe("admin generation control API", () => {
       confirmedFalConcurrencyLimit: 40,
       reservedHeadroom: 2,
       applicationHardCeiling: 38,
+      confirmFalConcurrencyLimit: true,
     });
   });
 
   it("refreshes provider state through the dedicated endpoint", async () => {
-    const fetchMock = vi.fn<typeof fetch>(async () => Response.json({ revision: 4 }));
+    const fetchMock = vi.fn<typeof fetch>(async () =>
+      Response.json({
+        outcome: "refreshed",
+        checkedAtUtc: "2026-07-29T10:10:00Z",
+        lastSuccessfulAtUtc: "2026-07-29T10:10:00Z",
+        errorCode: null,
+        control: { revision: 4 },
+      })
+    );
     vi.stubGlobal("fetch", fetchMock);
 
     await refreshAdminTemplateGenerationProvider();
@@ -76,6 +87,23 @@ describe("admin generation control API", () => {
       "https://api.example.com/api/admin/templates/generation-control/provider/refresh"
     );
     expect(init?.method).toBe("POST");
+  });
+
+  it("loads only the bounded provider recovery page", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () =>
+      Response.json({ items: [], totalCount: 0, skip: 0, take: 100, hasMore: false })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const controller = new AbortController();
+
+    await fetchAdminTemplateProviderAttemptRecovery(-5, 500, controller.signal);
+
+    const [input, init] = fetchMock.mock.calls[0];
+    expect(String(input)).toBe(
+      "https://api.example.com/api/admin/templates/generation-control/provider-attempts/recovery?skip=0&take=100"
+    );
+    expect(init?.method).toBe("GET");
+    expect(init?.signal).toBeInstanceOf(AbortSignal);
   });
 
   it("sends evidence-backed provider attempt resolution with idempotency outside JSON", async () => {

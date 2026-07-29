@@ -931,6 +931,18 @@ export type AdminTemplateGenerationControl = {
   generatedAtUtc: string;
 };
 
+export type AdminTemplateGenerationProviderRefresh = {
+  outcome: "refreshed" | "coalesced" | "failed";
+
+  checkedAtUtc?: string | null;
+
+  lastSuccessfulAtUtc?: string | null;
+
+  errorCode?: string | null;
+
+  control: AdminTemplateGenerationControl;
+};
+
 export type UpdateAdminTemplateGenerationControlPolicy = {
   expectedRevision: number;
 
@@ -943,6 +955,8 @@ export type UpdateAdminTemplateGenerationControlPolicy = {
   reservedHeadroom: number;
 
   applicationHardCeiling: number;
+
+  confirmFalConcurrencyLimit: boolean;
 
   idempotencyKey: string;
 };
@@ -983,6 +997,52 @@ export type AdminTemplateProviderAttemptResolution = {
   refundScheduled: boolean;
 
   resolvedAtUtc: string;
+};
+
+export type AdminTemplateProviderAttemptRecoveryItem = {
+  attemptId: string;
+
+  generationId: string;
+
+  stage: string;
+
+  ordinal: number;
+
+  state: string;
+
+  attemptVersion: number;
+
+  providerRequestId?: string | null;
+
+  createdAtUtc: string;
+
+  updatedAtUtc: string;
+
+  submittedAtUtc?: string | null;
+
+  submissionDeadlineAtUtc: string;
+
+  processingDeadlineAtUtc: string;
+
+  reconciliationDeadlineAtUtc: string;
+
+  errorCode?: string | null;
+
+  evidenceNeeded: string;
+};
+
+export type AdminTemplateProviderAttemptRecoveryPage = {
+  items: AdminTemplateProviderAttemptRecoveryItem[];
+
+  totalCount: number;
+
+  skip: number;
+
+  take: number;
+
+  hasMore: boolean;
+
+  generatedAtUtc: string;
 };
 
 export type AdminTemplateGenerationListItem = {

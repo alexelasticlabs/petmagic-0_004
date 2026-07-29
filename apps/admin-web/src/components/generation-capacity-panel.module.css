@@ -37,6 +37,7 @@
 .button:focus-visible,
 .primaryButton:focus-visible,
 .field input:focus-visible,
+.field select:focus-visible,
 .field textarea:focus-visible,
 .toggleField input:focus-visible,
 .riskField input:focus-visible,
@@ -179,6 +180,7 @@
 }
 
 .field input,
+.field select,
 .field textarea {
   width: 100%;
   min-width: 0;
@@ -189,6 +191,10 @@
   padding: 0.52rem 0.62rem;
   font: inherit;
   font-size: 0.82rem;
+}
+
+.field select {
+  appearance: auto;
 }
 
 .field textarea {
@@ -253,6 +259,97 @@
   font-size: 0.7rem;
 }
 
+.recovery {
+  display: grid;
+  gap: 0.7rem;
+  margin-top: 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, var(--border-soft));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--danger) 5%, var(--surface-1));
+  padding: 0.75rem;
+}
+
+.recoveryHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.recoveryHeader h3 {
+  margin: 0;
+  color: var(--text-strong);
+  font-size: 0.88rem;
+}
+
+.recoveryHeader p {
+  max-width: 58rem;
+  margin: 0.2rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.recoveryGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  gap: 0.65rem;
+}
+
+.recoveryCard {
+  display: grid;
+  align-content: start;
+  gap: 0.65rem;
+  min-width: 0;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: var(--surface-1);
+  padding: 0.7rem;
+}
+
+.recoveryCardHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+
+.recoveryDefinitionGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+  margin: 0;
+}
+
+.recoveryDefinitionGrid div {
+  min-width: 0;
+}
+
+.recoveryDefinitionGrid dt {
+  color: var(--text-muted);
+  font-size: 0.66rem;
+}
+
+.recoveryDefinitionGrid dd {
+  margin: 0.12rem 0 0;
+  color: var(--text-soft);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  overflow-wrap: anywhere;
+}
+
+.recoveryPagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+
 @media (max-width: 640px) {
   .actions,
   .actions .button,
@@ -261,14 +358,34 @@
   }
 
   .editorGrid,
-  .definitionGrid {
+  .definitionGrid,
+  .recoveryDefinitionGrid {
     grid-template-columns: 1fr;
+  }
+
+  .recoveryHeader {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .recoveryHeader .button {
+    width: 100%;
+  }
+
+  .recoveryPagination {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .recoveryPagination .button {
+    width: 100%;
   }
 }
 
 @media (max-width: 390px) {
   .metricGrid,
-  .detailGrid {
+  .detailGrid,
+  .recoveryGrid {
     grid-template-columns: minmax(0, 1fr);
   }
 

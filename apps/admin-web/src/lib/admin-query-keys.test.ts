@@ -25,6 +25,20 @@ describe("admin-query-keys", () => {
     expect(adminQueryKeys.templateGenerationControl).not.toEqual(
       adminQueryKeys.templateGenerations({ status: "Running" })
     );
+    expect(adminQueryKeys.templateGenerationProviderRecoveryRoot).toEqual([
+      "admin",
+      "templates",
+      "generation-control",
+      "provider-recovery",
+    ]);
+    expect(adminQueryKeys.templateGenerationProviderRecovery(0, 25)).toEqual([
+      "admin",
+      "templates",
+      "generation-control",
+      "provider-recovery",
+      0,
+      25,
+    ]);
   });
 
   it("builds audit event list and detail keys", () => {

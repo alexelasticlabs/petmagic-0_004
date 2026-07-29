@@ -27,6 +27,7 @@ import {
   retainRecentGenerationCapacityAlertTransitions,
   selectNewestGenerationCapacitySnapshot,
 } from "@/components/generation-capacity-policy";
+import { GenerationProviderRecoveryPanel } from "@/components/generation-provider-recovery-panel";
 import { createAdminCorrelationId } from "@/lib/admin-correlation-id";
 import { getAdminErrorMessage } from "@/lib/admin-error-message";
 import { adminQueryKeys } from "@/lib/admin-query-keys";
@@ -57,6 +58,7 @@ type PolicyDraft = {
   reason: string;
   idempotencyKey: string;
   riskAcknowledged: boolean;
+  falLimitConfirmed: boolean;
 };
 
 const POLICY_LIMIT_MAX = 1_000;
@@ -64,6 +66,7 @@ const POLICY_REASON_MIN_LENGTH = 3;
 const SNAPSHOT_FRESHNESS_TICK_MS = 10_000;
 const POLICY_LIMITS_ERROR_ID = "generation-capacity-policy-limits-error";
 const POLICY_REASON_ERROR_ID = "generation-capacity-policy-reason-error";
+const POLICY_CONFIRMATION_ERROR_ID = "generation-capacity-policy-confirmation-error";
 
 function createPolicyIdempotencyKey(): string {
   return `generation-policy:${createAdminCorrelationId()}`;
@@ -79,6 +82,7 @@ function createPolicyDraft(control: AdminTemplateGenerationControl): PolicyDraft
     reason: "",
     idempotencyKey: createPolicyIdempotencyKey(),
     riskAcknowledged: false,
+    falLimitConfirmed: false,
   };
 }
 
@@ -151,9 +155,12 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [draft, setDraft] = useState<PolicyDraft | null>(null);
   const [editorError, setEditorError] = useState<string | null>(null);
+  const [policyConflictBlocked, setPolicyConflictBlocked] = useState(false);
+  const [isPolicyConflictRefreshing, setIsPolicyConflictRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const [freshnessNowMs, setFreshnessNowMs] = useState(() => Date.now());
   const firstEditorFieldRef = useRef<HTMLInputElement>(null);
+  const policyConflictRefreshSequenceRef = useRef(0);
   const observedAlertTransitionsRef = useRef(new Set<string>());
   const observedAlertTransitionsStorageKeyRef = useRef<string | null>(null);
   const alertTransitionsStorageKey = getGenerationCapacityAlertTransitionsStorageKey(
@@ -200,6 +207,10 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
     draft !== null &&
     (reservedHeadroom === null || (confirmedLimit !== null && reservedHeadroom >= confirmedLimit));
   const hardCeilingInvalid = draft !== null && hardCeiling === null;
+  const falLimitChanged = Boolean(
+    control && confirmedLimit !== null && confirmedLimit !== control.confirmedFalConcurrencyLimit
+  );
+  const falLimitConfirmationMissing = Boolean(draft && falLimitChanged && !draft.falLimitConfirmed);
   const isPolicyShapeValid =
     confirmedLimit !== null &&
     reservedHeadroom !== null &&
@@ -218,6 +229,8 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
     isPolicyShapeValid &&
     isReasonValid &&
     !snapshotTooOld &&
+    !policyConflictBlocked &&
+    !falLimitConfirmationMissing &&
     (!requiresRiskAcknowledgement || draft.riskAcknowledged)
   );
 
@@ -310,6 +323,7 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
       });
     },
     onSuccess: (updated) => {
+      policyConflictRefreshSequenceRef.current += 1;
       const accepted = queryClient.setQueryData<AdminTemplateGenerationControl>(
         adminQueryKeys.templateGenerationControl,
         (current) => selectNewestGenerationCapacitySnapshot(current, updated)
@@ -317,6 +331,7 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
       setIsEditorOpen(false);
       setDraft(null);
       setEditorError(null);
+      setPolicyConflictBlocked(false);
       addNotification({
         title: text.title,
         message: text.saved,
@@ -333,18 +348,7 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
     },
     onError: async (error) => {
       if (getErrorStatus(error) === 409) {
-        const refreshed = await capacityQuery.refetch();
-        setDraft((current) =>
-          current
-            ? {
-                ...current,
-                expectedRevision: refreshed.data?.revision ?? current.expectedRevision,
-                idempotencyKey: createPolicyIdempotencyKey(),
-                riskAcknowledged: false,
-              }
-            : current
-        );
-        setEditorError(text.staleConflict);
+        await refreshPolicyConflict();
         return;
       }
 
@@ -361,19 +365,32 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
         exact: true,
       });
     },
-    onSuccess: (updated) => {
+    onSuccess: (result) => {
+      const updated = result.control;
       const accepted = queryClient.setQueryData<AdminTemplateGenerationControl>(
         adminQueryKeys.templateGenerationControl,
         (current) => selectNewestGenerationCapacitySnapshot(current, updated)
       );
+      const message =
+        result.outcome === "refreshed"
+          ? text.refreshed
+          : result.outcome === "coalesced"
+            ? text.refreshCoalesced
+            : text.refreshFailed;
+      setRefreshError(result.outcome === "failed" ? message : null);
       addNotification({
         title: text.title,
-        message: text.refreshed,
+        message,
         category: "system",
         source: text.notificationSource,
-        tone: "success",
+        tone:
+          result.outcome === "failed"
+            ? "error"
+            : result.outcome === "coalesced"
+              ? "info"
+              : "success",
         href: `/${locale}/generations`,
-        dedupeKey: `generation-provider-refresh:${accepted?.balance.checkedAtUtc ?? updated.revision}`,
+        dedupeKey: `generation-provider-refresh:${result.outcome}:${result.checkedAtUtc ?? accepted?.balance.checkedAtUtc ?? updated.revision}`,
       });
       void queryClient.invalidateQueries({
         queryKey: adminQueryKeys.templateGenerationControl,
@@ -383,22 +400,32 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
     onError: (error) => setRefreshError(getAdminErrorMessage(error, text.refreshError)),
   });
 
+  const isPolicyEditorBusy = policyMutation.isPending || isPolicyConflictRefreshing;
+
   function openEditor() {
     if (!control || snapshotTooOld) return;
+    policyConflictRefreshSequenceRef.current += 1;
     setEditorError(null);
+    setPolicyConflictBlocked(false);
+    setIsPolicyConflictRefreshing(false);
     setDraft(createPolicyDraft(control));
     setIsEditorOpen(true);
   }
 
   function closeEditor() {
-    if (policyMutation.isPending) return;
+    if (isPolicyEditorBusy) return;
+    policyConflictRefreshSequenceRef.current += 1;
     setIsEditorOpen(false);
     setDraft(null);
     setEditorError(null);
+    setPolicyConflictBlocked(false);
+    setIsPolicyConflictRefreshing(false);
   }
 
   function updateDraft(patch: Partial<PolicyDraft>) {
-    setEditorError(null);
+    if (!policyConflictBlocked) {
+      setEditorError(null);
+    }
     setDraft((current) =>
       current
         ? {
@@ -406,9 +433,62 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
             ...patch,
             idempotencyKey: createPolicyIdempotencyKey(),
             riskAcknowledged: "riskAcknowledged" in patch ? Boolean(patch.riskAcknowledged) : false,
+            falLimitConfirmed:
+              "confirmedFalConcurrencyLimit" in patch
+                ? false
+                : "falLimitConfirmed" in patch
+                  ? Boolean(patch.falLimitConfirmed)
+                  : current.falLimitConfirmed,
           }
         : current
     );
+  }
+
+  async function refreshPolicyConflict() {
+    const conflictedRevision = draft?.expectedRevision;
+    if (conflictedRevision === undefined) {
+      setPolicyConflictBlocked(true);
+      setEditorError(text.staleConflictRefreshFailed);
+      return;
+    }
+
+    const refreshSequence = policyConflictRefreshSequenceRef.current + 1;
+    policyConflictRefreshSequenceRef.current = refreshSequence;
+    setIsPolicyConflictRefreshing(true);
+    try {
+      const refreshed = await capacityQuery.refetch({ cancelRefetch: false });
+      if (policyConflictRefreshSequenceRef.current !== refreshSequence) {
+        return;
+      }
+      if (refreshed.isError || !refreshed.data || refreshed.data.revision <= conflictedRevision) {
+        setPolicyConflictBlocked(true);
+        setEditorError(text.staleConflictRefreshFailed);
+        return;
+      }
+
+      setDraft((current) =>
+        current
+          ? {
+              ...current,
+              expectedRevision: refreshed.data.revision,
+              idempotencyKey: createPolicyIdempotencyKey(),
+              riskAcknowledged: false,
+              falLimitConfirmed: false,
+            }
+          : current
+      );
+      setPolicyConflictBlocked(false);
+      setEditorError(text.staleConflict);
+    } catch {
+      if (policyConflictRefreshSequenceRef.current === refreshSequence) {
+        setPolicyConflictBlocked(true);
+        setEditorError(text.staleConflictRefreshFailed);
+      }
+    } finally {
+      if (policyConflictRefreshSequenceRef.current === refreshSequence) {
+        setIsPolicyConflictRefreshing(false);
+      }
+    }
   }
 
   function savePolicy() {
@@ -435,6 +515,7 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
       confirmedFalConcurrencyLimit: confirmedLimit,
       reservedHeadroom,
       applicationHardCeiling: hardCeiling,
+      confirmFalConcurrencyLimit: draft.falLimitConfirmed,
       idempotencyKey: draft.idempotencyKey,
     });
   }
@@ -593,6 +674,11 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
           </section>
         ) : null}
 
+        <GenerationProviderRecoveryPanel
+          locale={locale}
+          enabled={control.lanes.submissionUnknownCount > 0}
+        />
+
         <div className={styles.detailGrid}>
           <details className={styles.details} open>
             <summary>{text.profile}</summary>
@@ -713,7 +799,7 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
         cancelLabel={text.cancel}
         confirmDisabled={!canSavePolicy}
         initialFocusRef={firstEditorFieldRef}
-        isSubmitting={policyMutation.isPending}
+        isSubmitting={isPolicyEditorBusy}
         size="large"
         stickyActions
         tone="primary"
@@ -722,7 +808,24 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
       >
         {draft ? (
           <div className={styles.editor}>
-            {editorError ? <AdminStateCard title={editorError} tone="warning" /> : null}
+            {editorError ? (
+              <AdminStateCard
+                title={editorError}
+                tone="warning"
+                action={
+                  policyConflictBlocked ? (
+                    <button
+                      className={styles.button}
+                      type="button"
+                      disabled={isPolicyConflictRefreshing}
+                      onClick={() => void refreshPolicyConflict()}
+                    >
+                      {isPolicyConflictRefreshing ? text.refreshingConflict : text.refreshConflict}
+                    </button>
+                  ) : undefined
+                }
+              />
+            ) : null}
             {snapshotTooOld ? (
               <AdminStateCard
                 title={text.snapshotTooOldTitle}
@@ -734,7 +837,7 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
               <input
                 type="checkbox"
                 checked={draft.admissionEnabled}
-                disabled={policyMutation.isPending}
+                disabled={isPolicyEditorBusy}
                 onChange={(event) => updateDraft({ admissionEnabled: event.target.checked })}
               />
               <span>{text.admissionLabel}</span>
@@ -749,7 +852,7 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
                   value={draft.confirmedFalConcurrencyLimit}
                   aria-invalid={confirmedLimitInvalid}
                   aria-describedby={confirmedLimitInvalid ? POLICY_LIMITS_ERROR_ID : undefined}
-                  disabled={policyMutation.isPending}
+                  disabled={isPolicyEditorBusy}
                   onChange={(event) =>
                     updateDraft({ confirmedFalConcurrencyLimit: event.target.value })
                   }
@@ -762,7 +865,7 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
                   value={draft.reservedHeadroom}
                   aria-invalid={reservedHeadroomInvalid}
                   aria-describedby={reservedHeadroomInvalid ? POLICY_LIMITS_ERROR_ID : undefined}
-                  disabled={policyMutation.isPending}
+                  disabled={isPolicyEditorBusy}
                   onChange={(event) => updateDraft({ reservedHeadroom: event.target.value })}
                 />
               </label>
@@ -773,11 +876,28 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
                   value={draft.applicationHardCeiling}
                   aria-invalid={hardCeilingInvalid}
                   aria-describedby={hardCeilingInvalid ? POLICY_LIMITS_ERROR_ID : undefined}
-                  disabled={policyMutation.isPending}
+                  disabled={isPolicyEditorBusy}
                   onChange={(event) => updateDraft({ applicationHardCeiling: event.target.value })}
                 />
               </label>
             </div>
+            <label className={styles.toggleField}>
+              <input
+                type="checkbox"
+                checked={draft.falLimitConfirmed}
+                disabled={isPolicyEditorBusy}
+                aria-describedby={
+                  falLimitConfirmationMissing ? POLICY_CONFIRMATION_ERROR_ID : undefined
+                }
+                onChange={(event) => updateDraft({ falLimitConfirmed: event.target.checked })}
+              />
+              <span>{text.confirmFalLimitLabel}</span>
+            </label>
+            {falLimitConfirmationMissing ? (
+              <p id={POLICY_CONFIRMATION_ERROR_ID} className={styles.validation} role="alert">
+                {text.confirmFalLimitRequired}
+              </p>
+            ) : null}
             {!isPolicyShapeValid ? (
               <p id={POLICY_LIMITS_ERROR_ID} className={styles.validation} role="alert">
                 {text.invalidPolicy}
@@ -811,7 +931,7 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
                   <input
                     type="checkbox"
                     checked={draft.riskAcknowledged}
-                    disabled={policyMutation.isPending}
+                    disabled={isPolicyEditorBusy}
                     onChange={(event) => updateDraft({ riskAcknowledged: event.target.checked })}
                   />
                   <span>{text.riskyAcknowledge}</span>
@@ -827,7 +947,7 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
                 maxLength={GENERATION_CONTROL_REASON_MAX_LENGTH}
                 aria-invalid={!isReasonValid}
                 aria-describedby={!isReasonValid ? POLICY_REASON_ERROR_ID : undefined}
-                disabled={policyMutation.isPending}
+                disabled={isPolicyEditorBusy}
                 placeholder={text.reasonPlaceholder}
                 onChange={(event) => updateDraft({ reason: event.target.value })}
               />
