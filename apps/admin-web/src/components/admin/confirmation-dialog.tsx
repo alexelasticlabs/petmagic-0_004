@@ -17,6 +17,7 @@ type ConfirmationDialogProps = {
   initialFocusRef?: RefObject<HTMLElement | null>;
   isSubmitting?: boolean;
   size?: "default" | "large";
+  stickyActions?: boolean;
   tone?: "danger" | "primary";
   onCancel: () => void;
   onConfirm: () => void;
@@ -33,6 +34,7 @@ export function ConfirmationDialog({
   initialFocusRef,
   isSubmitting = false,
   size = "default",
+  stickyActions = false,
   tone = "danger",
   onCancel,
   onConfirm,
@@ -138,7 +140,7 @@ export function ConfirmationDialog({
           {description}
         </p>
         {children}
-        <div className={styles.actions}>
+        <div className={`${styles.actions} ${stickyActions ? styles.actionsSticky : ""}`.trim()}>
           <Button
             ref={cancelButtonRef}
             variant="ghost"

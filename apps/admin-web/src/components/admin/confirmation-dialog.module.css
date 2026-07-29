@@ -50,6 +50,17 @@
   gap: 0.48rem;
 }
 
+.actionsSticky {
+  position: sticky;
+  bottom: -0.86rem;
+  z-index: 1;
+  margin: 0 -0.86rem -0.86rem;
+  padding: 0.72rem 0.86rem;
+  border-top: 1px solid var(--border-soft);
+  background: color-mix(in srgb, var(--surface-1) 94%, transparent);
+  backdrop-filter: blur(8px);
+}
+
 @media (max-width: 420px) {
   .actions {
     justify-content: stretch;

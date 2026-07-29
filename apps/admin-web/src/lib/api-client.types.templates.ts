@@ -832,6 +832,159 @@ export type AdminTemplateGenerationDashboardMetrics = {
   generatedAtUtc: string;
 };
 
+export type AdminTemplateGenerationCapacityProfile = {
+  globalMaxConcurrentGenerations: number;
+
+  imageReservedConcurrentGenerations: number;
+
+  imageProtectedConcurrentGenerations: number;
+
+  imageMaxConcurrentGenerations: number;
+
+  videoReservedConcurrentGenerations: number;
+
+  videoMaxConcurrentGenerations: number;
+
+  videoBorrowMaxConcurrentGenerations: number;
+
+  videoPreprocessingMaxConcurrentGenerations: number;
+};
+
+export type AdminTemplateGenerationBalanceState =
+  "fresh" | "stale" | "unknown" | "low" | "critical";
+
+export type AdminTemplateGenerationCapacityAlert = {
+  alertId: string;
+
+  statusChangedAtUtc: string;
+
+  severity: "info" | "warning" | "critical";
+
+  title: string;
+
+  message: string;
+};
+
+export type AdminTemplateGenerationControl = {
+  revision: number;
+
+  admissionEnabled: boolean;
+
+  confirmedFalConcurrencyLimit: number;
+
+  confirmedAtUtc?: string | null;
+
+  reservedHeadroom: number;
+
+  applicationHardCeiling: number;
+
+  effectiveGlobalLimit: number;
+
+  policy: AdminTemplateGenerationCapacityProfile;
+
+  effectiveProfile: AdminTemplateGenerationCapacityProfile;
+
+  balance: {
+    state: AdminTemplateGenerationBalanceState;
+    currentBalanceUsd?: number | null;
+    checkedAtUtc?: string | null;
+    lastSuccessfulAtUtc?: string | null;
+  };
+
+  queue: {
+    totalDepth: number;
+    imageDepth: number;
+    videoDepth: number;
+    oldestQueuedAtUtc?: string | null;
+    stages: Array<{
+      stage: string;
+      count: number;
+      oldestAtUtc?: string | null;
+    }>;
+  };
+
+  lanes: {
+    inFlightTotal: number;
+    imageInFlight: number;
+    videoInFlight: number;
+    videoPreprocessingInFlight: number;
+    nativeSlotsInUse: number;
+    borrowedSlotsInUse: number;
+    reservedSlotsAvailable: number;
+    submissionUnknownCount: number;
+  };
+
+  worker: {
+    instanceCount: number;
+    heartbeatAtUtc?: string | null;
+    lastProgressAtUtc?: string | null;
+    appliedPolicyRevision?: number | null;
+    schedulerV2Enabled: boolean | null;
+    dispatchConcurrency: number | null;
+    reconciliationConcurrency: number | null;
+    mediaImportConcurrency: number | null;
+    maintenanceConcurrency: number | null;
+  };
+
+  alerts: AdminTemplateGenerationCapacityAlert[];
+
+  generatedAtUtc: string;
+};
+
+export type UpdateAdminTemplateGenerationControlPolicy = {
+  expectedRevision: number;
+
+  reason: string;
+
+  admissionEnabled: boolean;
+
+  confirmedFalConcurrencyLimit: number;
+
+  reservedHeadroom: number;
+
+  applicationHardCeiling: number;
+
+  idempotencyKey: string;
+};
+
+export type ResolveAdminTemplateProviderAttempt = {
+  attemptId: string;
+
+  expectedAttemptVersion: number;
+
+  resolution: "correlated_accepted" | "confirmed_not_found";
+
+  reason: string;
+
+  evidenceReference: string;
+
+  providerRequestId?: string | null;
+
+  providerStatusUrl?: string | null;
+
+  providerResponseUrl?: string | null;
+
+  providerCancelUrl?: string | null;
+
+  idempotencyKey: string;
+};
+
+export type AdminTemplateProviderAttemptResolution = {
+  providerAttemptId: string;
+
+  generationId: string;
+
+  resolution: "correlated_accepted" | "confirmed_not_found";
+
+  attemptState: string;
+
+  attemptVersion: number;
+
+  refundScheduled: boolean;
+
+  resolvedAtUtc: string;
+};
+
 export type AdminTemplateGenerationListItem = {
   generationId: string;
 

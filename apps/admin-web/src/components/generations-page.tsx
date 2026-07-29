@@ -16,6 +16,7 @@ import {
 import { ensureAdminSession } from "@/components/admin/admin-session";
 import { ConfirmationDialog } from "@/components/admin/confirmation-dialog";
 import { useAdminUrlStateSyncGuard } from "@/components/admin/use-admin-url-state-sync-guard";
+import { GenerationCapacityPanel } from "@/components/generation-capacity-panel";
 import styles from "@/components/generations-page.module.css";
 import { createAdminCorrelationId } from "@/lib/admin-correlation-id";
 import { getAdminErrorMessage } from "@/lib/admin-error-message";
@@ -577,6 +578,8 @@ export function GenerationsPage({ locale }: GenerationsPageProps) {
           description={text.description}
           badge={<AdminBadge tone="danger">{text.adminOnly}</AdminBadge>}
         />
+
+        <GenerationCapacityPanel locale={locale} enabled={canViewGenerations} />
 
         <div className={styles.kpiGrid}>
           <AdminKpiCard

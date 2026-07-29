@@ -32,6 +32,8 @@ import type {
   AdminModerationQueuePage,
   AdminModerationQueueQuery,
   AdminTemplateGenerationDashboardMetrics,
+  AdminTemplateGenerationControl,
+  AdminTemplateProviderAttemptResolution,
   AdminGenerationDetail,
   AdminGamificationLegacyDeliveryResolutionAction,
   AdminGamificationLegacyDeliveryResolutionResponse,
@@ -56,6 +58,8 @@ import type {
   TemplateOfTheDaySettingsPayload,
   TemplateStatus,
   TemplateType,
+  UpdateAdminTemplateGenerationControlPolicy,
+  ResolveAdminTemplateProviderAttempt,
   VideoTemplatePayload,
 } from "./api-client.types";
 
@@ -716,6 +720,69 @@ export async function fetchAdminTemplateGenerationMetrics(
 }
 
 export const GENERATION_REFUND_RETRY_REASON_MAX_LENGTH = 500;
+export const GENERATION_CONTROL_REASON_MAX_LENGTH = 500;
+
+export async function fetchAdminTemplateGenerationControl(
+  signal?: AbortSignal
+): Promise<AdminTemplateGenerationControl> {
+  return apiRequest<AdminTemplateGenerationControl>("/api/admin/templates/generation-control", {
+    method: "GET",
+    signal,
+  });
+}
+
+export async function updateAdminTemplateGenerationControlPolicy(
+  payload: UpdateAdminTemplateGenerationControlPolicy
+): Promise<AdminTemplateGenerationControl> {
+  const idempotencyKey = payload.idempotencyKey.trim().slice(0, 256);
+  const reason = payload.reason.trim().slice(0, GENERATION_CONTROL_REASON_MAX_LENGTH);
+  return apiRequest<AdminTemplateGenerationControl>(
+    "/api/admin/templates/generation-control/policy",
+    {
+      method: "PUT",
+      headers: idempotencyKey ? { "Idempotency-Key": idempotencyKey } : undefined,
+      body: JSON.stringify({
+        expectedRevision: payload.expectedRevision,
+        reason,
+        admissionEnabled: payload.admissionEnabled,
+        confirmedFalConcurrencyLimit: payload.confirmedFalConcurrencyLimit,
+        reservedHeadroom: payload.reservedHeadroom,
+        applicationHardCeiling: payload.applicationHardCeiling,
+      }),
+    }
+  );
+}
+
+export async function refreshAdminTemplateGenerationProvider(): Promise<AdminTemplateGenerationControl> {
+  return apiRequest<AdminTemplateGenerationControl>(
+    "/api/admin/templates/generation-control/provider/refresh",
+    { method: "POST" }
+  );
+}
+
+export async function resolveAdminTemplateProviderAttempt(
+  payload: ResolveAdminTemplateProviderAttempt
+): Promise<AdminTemplateProviderAttemptResolution> {
+  const attemptId = encodeURIComponent(payload.attemptId.trim());
+  const idempotencyKey = payload.idempotencyKey.trim().slice(0, 256);
+  return apiRequest<AdminTemplateProviderAttemptResolution>(
+    `/api/admin/templates/generation-control/provider-attempts/${attemptId}/resolve`,
+    {
+      method: "POST",
+      headers: idempotencyKey ? { "Idempotency-Key": idempotencyKey } : undefined,
+      body: JSON.stringify({
+        expectedAttemptVersion: payload.expectedAttemptVersion,
+        resolution: payload.resolution,
+        reason: payload.reason.trim().slice(0, GENERATION_CONTROL_REASON_MAX_LENGTH),
+        evidenceReference: payload.evidenceReference.trim().slice(0, 160),
+        providerRequestId: payload.providerRequestId?.trim() || null,
+        providerStatusUrl: payload.providerStatusUrl?.trim() || null,
+        providerResponseUrl: payload.providerResponseUrl?.trim() || null,
+        providerCancelUrl: payload.providerCancelUrl?.trim() || null,
+      }),
+    }
+  );
+}
 
 export function normalizeAdminTemplateGenerationsQuery(
   query: AdminTemplateGenerationsQuery = {}

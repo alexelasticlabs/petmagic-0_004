@@ -16,6 +16,17 @@ describe("admin-query-keys", () => {
     ]);
   });
 
+  it("keeps generation control separate from generation list polling", () => {
+    expect(adminQueryKeys.templateGenerationControl).toEqual([
+      "admin",
+      "templates",
+      "generation-control",
+    ]);
+    expect(adminQueryKeys.templateGenerationControl).not.toEqual(
+      adminQueryKeys.templateGenerations({ status: "Running" })
+    );
+  });
+
   it("builds audit event list and detail keys", () => {
     const query = { actor: "admin-1", eventType: "WalletAdjusted", page: 2 };
 

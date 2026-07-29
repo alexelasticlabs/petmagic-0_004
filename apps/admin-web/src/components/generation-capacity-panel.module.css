@@ -1,0 +1,274 @@
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.45rem;
+}
+
+.button,
+.primaryButton {
+  min-height: 2.15rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  padding: 0.42rem 0.7rem;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.button {
+  background: var(--surface-2);
+  color: var(--text-soft);
+}
+
+.primaryButton {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border-soft));
+  background: color-mix(in srgb, var(--accent) 17%, var(--surface-2));
+  color: var(--text-strong);
+}
+
+.button:hover:not(:disabled),
+.primaryButton:hover:not(:disabled) {
+  border-color: var(--border-accent);
+  color: var(--text-strong);
+}
+
+.button:focus-visible,
+.primaryButton:focus-visible,
+.field input:focus-visible,
+.field textarea:focus-visible,
+.toggleField input:focus-visible,
+.riskField input:focus-visible,
+.details summary:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.button:disabled,
+.primaryButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.statusRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.7rem;
+  margin-bottom: 0.75rem;
+  color: var(--text-muted);
+  font-size: 0.73rem;
+}
+
+.metricGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12.5rem, 1fr));
+  gap: 0.65rem;
+}
+
+.progressHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.8rem;
+  margin-top: 0.85rem;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.progressHeader strong {
+  color: var(--text-strong);
+}
+
+.progressTrack {
+  height: 0.42rem;
+  margin-top: 0.32rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-2);
+}
+
+.progressTrack span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), var(--magenta));
+  transition: width 180ms ease;
+}
+
+.alerts {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 0.8rem;
+}
+
+.detailGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 0.65rem;
+  margin-top: 0.8rem;
+}
+
+.details {
+  min-width: 0;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface-2) 82%, transparent);
+  padding: 0.68rem;
+}
+
+.details summary {
+  color: var(--text-strong);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.definitionGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.48rem;
+  margin: 0.65rem 0 0;
+}
+
+.definitionGrid div {
+  min-width: 0;
+  border-radius: var(--radius-sm);
+  background: var(--surface-1);
+  padding: 0.48rem;
+}
+
+.definitionGrid dt {
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  overflow-wrap: anywhere;
+}
+
+.definitionGrid dd {
+  margin: 0.16rem 0 0;
+  color: var(--text-strong);
+  font-size: 0.86rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.emptyDetail {
+  margin: 0.6rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.74rem;
+}
+
+.editor {
+  display: grid;
+  gap: 0.72rem;
+}
+
+.editorGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.field {
+  display: grid;
+  gap: 0.32rem;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+
+.field input,
+.field textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-strong);
+  padding: 0.52rem 0.62rem;
+  font: inherit;
+  font-size: 0.82rem;
+}
+
+.field textarea {
+  min-height: 5.5rem;
+  resize: vertical;
+}
+
+.field small,
+.validation {
+  margin: 0;
+  color: var(--warning);
+  font-size: 0.7rem;
+  font-weight: 550;
+}
+
+.toggleField,
+.riskField {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  color: var(--text-soft);
+  font-size: 0.76rem;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.toggleField input,
+.riskField input {
+  width: 1rem;
+  height: 1rem;
+  margin: 0.05rem 0 0;
+  accent-color: var(--accent);
+  flex: 0 0 auto;
+}
+
+.preview {
+  display: grid;
+  gap: 0.15rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface-2) 75%, transparent);
+  padding: 0.68rem;
+}
+
+.preview header {
+  display: grid;
+  gap: 0.12rem;
+}
+
+.preview header strong {
+  color: var(--text-strong);
+  font-size: 0.78rem;
+}
+
+.preview header span {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+}
+
+@media (max-width: 640px) {
+  .actions,
+  .actions .button,
+  .actions .primaryButton {
+    width: 100%;
+  }
+
+  .editorGrid,
+  .definitionGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 390px) {
+  .metricGrid,
+  .detailGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .statusRow {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

@@ -109,6 +109,7 @@ export const adminQueryKeys = {
   templateAnalyticsFeedback: (templateId: string, feedbackType: string, search: string) =>
     ["admin", "templates", templateId, "analytics-feedback", feedbackType, search] as const,
   templateGenerationMetrics: ["admin", "templates", "generations", "metrics"] as const,
+  templateGenerationControl: ["admin", "templates", "generation-control"] as const,
   templateGenerations: (query: unknown) => ["admin", "templates", "generations", query] as const,
   templateGenerationDetail: (generationId: string) =>
     ["admin", "templates", "generations", generationId, "detail"] as const,
