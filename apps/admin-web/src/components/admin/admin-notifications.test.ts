@@ -344,7 +344,7 @@ describe("admin notification sanitization", () => {
     expect(source).toContain(".topbarHeading {\n  min-width: 0;\n  flex: 1 1 0;");
     expect(source).toContain("text-overflow: ellipsis;");
     expect(source).toContain("white-space: nowrap;");
-    expect(source).toContain("font-size: 1.05rem;");
+    expect(source).toContain("font-size: 1.16rem;");
     expect(source).toContain(".topbarTitle {\n    font-size: 0.98rem;");
     expect(source).not.toMatch(/font-size:\s*[^;]*vw/);
     expect(source).toContain("min-height: 100dvh;");

@@ -22,7 +22,8 @@
   gap: 0.58rem;
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-sm);
-  padding: 0.52rem 0.66rem;
+  min-height: var(--control-height-md);
+  padding: 0.54rem 0.72rem;
   background: var(--surface-2);
   color: var(--text-strong);
   text-align: left;
@@ -60,10 +61,7 @@
 
 .triggerOpen {
   border-color: var(--border-accent);
-  box-shadow:
-    0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent),
-    inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 5%, transparent),
-    0 10px 22px color-mix(in srgb, var(--surface-0) 18%, transparent);
+  box-shadow: var(--focus-ring);
 }
 
 .trigger:focus-visible {
@@ -74,7 +72,7 @@
 
 .value {
   color: var(--text-strong);
-  font-size: 0.82rem;
+  font-size: 0.84rem;
   font-weight: 600;
   line-height: 1.28;
 }
@@ -144,7 +142,6 @@
   box-shadow: var(--shadow-strong);
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--text-muted) 42%, transparent) transparent;
-  backdrop-filter: blur(10px);
   transform-origin: top center;
   animation: menuFadeIn 160ms ease;
 }
@@ -172,10 +169,10 @@
   width: 100%;
   min-width: 0;
   display: block;
-  border: 1px solid var(--border-soft);
+  border: 1px solid transparent;
   border-radius: var(--radius-sm);
   padding: 0.58rem 0.68rem;
-  background: var(--surface-2);
+  background: transparent;
   color: var(--text-soft);
   text-align: left;
   cursor: pointer;
@@ -188,17 +185,15 @@
 }
 
 .option:hover {
-  border-color: var(--border-strong);
+  border-color: var(--border-soft);
   background: var(--surface-2);
   box-shadow: none;
 }
 
 .optionSelected {
   border-color: color-mix(in srgb, var(--accent) 34%, transparent);
-  background: color-mix(in srgb, var(--accent) 8%, transparent);
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--accent) 12%, transparent),
-    inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 4%, transparent);
+  background: var(--accent-soft-bg);
+  box-shadow: inset 3px 0 0 var(--accent);
 }
 
 .option:focus-visible {
@@ -223,7 +218,7 @@
 
 .optionLabel {
   min-width: 0;
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   font-weight: 600;
   line-height: 1.32;
   overflow-wrap: anywhere;
@@ -270,7 +265,7 @@
   border: 1px solid transparent;
   border-radius: 999px;
   padding: 0.18rem 0.4rem;
-  font-size: 0.58rem;
+  font-size: 0.64rem;
   font-weight: 600;
   letter-spacing: 0;
   text-transform: uppercase;

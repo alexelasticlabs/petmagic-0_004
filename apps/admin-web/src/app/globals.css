@@ -11,21 +11,23 @@
   --font-manrope: var(--font-heading);
   --font-space-grotesk: var(--font-heading);
   --font-mono: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
-  --surface-0: #000000;
-  --surface-1: #090b0e;
-  --surface-2: #0e1217;
-  --surface-3: #141920;
-  --surface-4: #1a2028;
+  --surface-0: #070a0f;
+  --surface-1: #0c1118;
+  --surface-2: #121923;
+  --surface-3: #19232e;
+  --surface-4: #222e3a;
   --surface: var(--surface-1);
-  --surface-raised: #10151b;
-  --surface-overlay: color-mix(in srgb, var(--surface-0) 92%, transparent);
-  --text-strong: #f5f7fa;
-  --text-soft: #c8d0d9;
-  --text-muted: #8c99a6;
-  --text-subtle: #697583;
+  --surface-raised: #151d27;
+  --surface-overlay: color-mix(in srgb, var(--surface-1) 94%, transparent);
+  --text-strong: #f4f7fb;
+  --text-soft: #cbd5e1;
+  --text-muted: #94a3b8;
+  --text-subtle: #718196;
   --text-inverse: #0b1117;
-  --border-soft: #20262d;
-  --border-strong: #303842;
+  --text-primary: var(--text-strong);
+  --text-secondary: var(--text-soft);
+  --border-soft: #26313d;
+  --border-strong: #3a4858;
   --border-accent: #8ab4f8;
   --accent: #8ab4f8;
   --accent-strong: #669df6;
@@ -46,6 +48,8 @@
   --radius-xs: 4px;
   --radius-lg: 14px;
   --radius-pill: 999px;
+  --control-height-sm: 2.125rem;
+  --control-height-md: 2.5rem;
   --space-1: 0.5rem;
   --space-2: 0.75rem;
   --space-3: 1rem;
@@ -72,6 +76,7 @@
   --secondary-bg: color-mix(in srgb, var(--surface-2) 96%, transparent);
   --surface-hover: color-mix(in srgb, var(--surface-2) 98%, var(--surface-1));
   --accent-soft-bg: color-mix(in srgb, var(--accent) 18%, var(--surface-2));
+  --accent-soft: var(--accent-soft-bg);
   --danger-soft-bg: color-mix(in srgb, var(--danger) 18%, var(--surface-2));
   --danger-soft-fg: #ffd8d3;
   --primary-soft-bg: color-mix(in srgb, var(--accent) 18%, var(--surface-2));
@@ -106,6 +111,8 @@
   --text-muted: #5b6b7d;
   --text-subtle: #64748b;
   --text-inverse: #f7f9fc;
+  --text-primary: var(--text-strong);
+  --text-secondary: var(--text-soft);
   --border-soft: #d7dee8;
   --border-strong: #c4ceda;
   --border-accent: #2563eb;
@@ -142,6 +149,7 @@
   --secondary-bg: color-mix(in srgb, var(--surface-1) 96%, transparent);
   --surface-hover: color-mix(in srgb, var(--surface-3) 98%, transparent);
   --accent-soft-bg: color-mix(in srgb, var(--accent) 12%, var(--surface-1));
+  --accent-soft: var(--accent-soft-bg);
   --danger-soft-bg: color-mix(in srgb, var(--danger) 12%, var(--surface-1));
   --danger-soft-fg: #991b1b;
   --primary-soft-bg: color-mix(in srgb, var(--accent) 12%, var(--surface-1));
@@ -241,6 +249,7 @@ select {
   max-height: min(18rem, calc(100dvh - 2rem));
   overflow-y: auto;
   border: 1px solid var(--border-soft);
+  border-left-width: 3px;
   border-radius: var(--radius-sm);
   padding: 0.8rem 0.95rem;
   box-shadow: var(--shadow-card);
@@ -253,12 +262,14 @@ select {
 .ui-toast--success {
   color: var(--toast-success-fg);
   border-color: var(--toast-success-border);
+  border-left-color: var(--success);
   background: var(--toast-success-bg);
 }
 
 .ui-toast--error {
   color: var(--toast-error-fg);
   border-color: var(--toast-error-border);
+  border-left-color: var(--danger);
   background: var(--toast-error-bg);
 }
 
@@ -278,7 +289,6 @@ select {
   text-align: center;
   cursor: pointer;
   transition:
-    transform 150ms ease,
     background-color 150ms ease,
     border-color 150ms ease,
     color 150ms ease,
@@ -293,13 +303,14 @@ select {
 }
 
 .ui-button--md {
-  min-height: 36px;
-  padding: 0.56rem 0.82rem;
+  min-height: var(--control-height-md);
+  padding: 0.58rem 0.9rem;
+  font-size: 0.85rem;
 }
 
 .ui-button--sm {
-  min-height: 30px;
-  padding: 0.36rem 0.54rem;
+  min-height: var(--control-height-sm);
+  padding: 0.4rem 0.62rem;
   font-size: 0.82rem;
 }
 
@@ -329,7 +340,6 @@ select {
 }
 
 .ui-button:hover:not(:disabled) {
-  transform: translateY(-1px);
   border-color: var(--border-accent);
   filter: none;
 }
@@ -341,7 +351,7 @@ select {
 }
 
 .ui-button:active:not(:disabled) {
-  transform: translateY(0) scale(0.99);
+  filter: brightness(0.96);
 }
 
 .ui-button:focus-visible {
@@ -352,7 +362,6 @@ select {
 .ui-button:disabled {
   opacity: 0.56;
   cursor: not-allowed;
-  transform: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

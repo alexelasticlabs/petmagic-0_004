@@ -313,7 +313,28 @@ test("dashboard switches commerce ranges and stays within the mobile viewport", 
   await expect.poll(() => requestedPeriods.includes(30)).toBe(true);
   await expect(thirtyDays).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByText("Successful payments over 30 days", { exact: true })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath("dashboard-desktop-viewport.png") });
   await page.screenshot({ path: testInfo.outputPath("dashboard-desktop.png"), fullPage: true });
+
+  const darkThemeToggle = page.getByRole("button", {
+    name: "Switch to dark theme",
+    exact: true,
+  });
+  await expect(darkThemeToggle).toHaveCount(1);
+  await darkThemeToggle.click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await page.screenshot({
+    path: testInfo.outputPath("dashboard-desktop-dark-viewport.png"),
+    animations: "disabled",
+  });
+
+  const lightThemeToggle = page.getByRole("button", {
+    name: "Switch to light theme",
+    exact: true,
+  });
+  await expect(lightThemeToggle).toHaveCount(1);
+  await lightThemeToggle.click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
 
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(commercePeriod).toBeVisible();
@@ -336,6 +357,33 @@ test("dashboard switches commerce ranges and stays within the mobile viewport", 
       }))
     )
     .toEqual({ clientWidth: 390, scrollWidth: 390 });
+
+  await page.screenshot({ path: testInfo.outputPath("dashboard-mobile-viewport.png") });
+
+  const mobileNavigationToggle = page.getByRole("button", {
+    name: "Open navigation",
+    exact: true,
+  });
+  await expect(mobileNavigationToggle).toHaveCount(1);
+  await mobileNavigationToggle.click();
+  await expect(mobileSidebar).toBeVisible();
+  await expect(mobileSidebar).not.toHaveAttribute("aria-hidden", "true");
+  await expect(mobileSidebar).toHaveCSS("visibility", "visible");
+  await expect
+    .poll(() =>
+      mobileSidebar.evaluate((element) => {
+        const bounds = element.getBoundingClientRect();
+        return bounds.left >= 0 && bounds.right <= window.innerWidth;
+      })
+    )
+    .toBe(true);
+  await page.screenshot({ path: testInfo.outputPath("dashboard-mobile-navigation.png") });
+
+  const mobileNavigationClose = mobileSidebar.locator("[data-admin-sidebar-close]");
+  await expect(mobileNavigationClose).toHaveCount(1);
+  await mobileNavigationClose.click();
+  await expect(mobileSidebar).toHaveAttribute("aria-hidden", "true");
+  await expect(mobileSidebar).toHaveCSS("visibility", "hidden");
 
   await page.screenshot({ path: testInfo.outputPath("dashboard-mobile.png"), fullPage: true });
 });

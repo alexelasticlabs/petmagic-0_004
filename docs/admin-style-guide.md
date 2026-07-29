@@ -7,8 +7,10 @@
 - Основное действие и focus: blue tokens `--primary-bg` / `--accent` (`#1a73e8` / `#8ab4f8` в dark theme, `#2563eb` в light theme).
 - Success и подтвержденное состояние: green token `--success` (`#81c995` в dark theme, `#16a34a` в light theme). Green не заменяет primary action.
 - Surface-слои берутся из `--surface-0` ... `--surface-4`; не добавляйте локальные hex-цвета и декоративные внешние карточки внутри карточек.
+- Для совместимости feature-модулей semantic aliases `--text-primary`, `--text-secondary` и `--accent-soft` всегда указывают на canonical theme tokens; не объявляйте локальные дубли.
 - Typography: `Inter` через `--font-body`, `Manrope` через `--font-heading`, идентификаторы и числовые ключи через `--font-mono`. Runtime stacks содержат системные fallback fonts для offline/container среды.
 - Радиусы: компактные runtime tokens `--radius-xs: 4px`, `--radius-sm: 8px`, `--radius: 10px`, `--radius-lg: 14px`.
+- Интерактивные элементы используют общую высоту `--control-height-sm` / `--control-height-md`; primary, secondary, select и topbar controls должны оптически совпадать.
 - Сетки: стабильные `grid-template-columns: minmax(0, 1fr)` и явные responsive breakpoints.
 - Текст в компактных панелях должен быть коротким, сканируемым и не hero-size.
 
@@ -71,6 +73,8 @@ Sidebar использует шесть стабильных рабочих об
 
 Названия областей локализуются централизованно в `src/lib/admin-navigation-areas.ts`; route entries продолжают приходить из `getAdminNavItems`, поэтому RBAC-фильтрация и существующие URL остаются источником истины.
 
+Sidebar остается flat navigation rail: обычные пункты не получают отдельную карточку, active route выделяется tinted surface и узкой accent-линией. На mobile rail превращается в modal drawer; topbar сохраняет доступ к search, notifications, theme, locale и текущей сессии без горизонтального overflow.
+
 ## Templates Route Family
 
 - Главный grouped-раздел в sidebar: `Шаблоны`.
@@ -122,6 +126,7 @@ export default async function FeaturePage({ params }: Props) {
 - Не возвращайте старые глобальные классы: `screen-bg`, `shell-*`, `nav-*`, `form-grid`, `table-wrap`, `row-actions`, `templates-*`, `ap-*`.
 - Не кладите feature styles в `globals.css`.
 - Не создавайте nested cards внутри cards.
+- Используйте full-border card только для самостоятельной рабочей области. Page hero, filter bar и metric strip остаются открытыми секциями с divider/rail, чтобы иерархия не превращалась в набор одинаковых контейнеров.
 - Не используйте inline styles, кроме CSS custom properties для динамического цвета badge/stat/icon.
 - Не добавляйте `!important`, если проблему можно решить ownership-ом CSS Module или shared primitive.
 - Mobile breakpoints должны сохранять доступность actions: кнопки не должны обрезаться или перекрывать таблицу.

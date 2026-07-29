@@ -59,7 +59,7 @@ describe("shared admin toast hardening", () => {
     const derivedTokenLines = [...css.matchAll(derivedTokenPattern)].map((match) => match[0]);
 
     expect(darkRoot).toContain(
-      "--surface-overlay: color-mix(in srgb, var(--surface-0) 92%, transparent);"
+      "--surface-overlay: color-mix(in srgb, var(--surface-1) 94%, transparent);"
     );
     expect(darkRoot).toContain(
       "--focus-ring: 0 0 0 2px color-mix(in srgb, var(--accent) 24%, transparent);"

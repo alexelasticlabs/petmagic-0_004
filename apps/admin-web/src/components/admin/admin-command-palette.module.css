@@ -1,6 +1,6 @@
 .trigger {
   min-width: min(15rem, 22vw);
-  min-height: 2.28rem;
+  min-height: var(--control-height-md);
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
@@ -21,7 +21,7 @@
 .trigger:hover {
   border-color: var(--admin-border-strong);
   background: var(--surface-hover);
-  color: var(--text-secondary);
+  color: var(--text-soft);
 }
 
 .trigger:focus-visible {
@@ -41,7 +41,7 @@
   flex: 1 1 auto;
   overflow: hidden;
   color: inherit;
-  font-size: 0.76rem;
+  font-size: 0.8rem;
   font-weight: 600;
   text-align: left;
   text-overflow: ellipsis;
@@ -274,7 +274,7 @@
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--text-soft);
   font: inherit;
   text-align: left;
   cursor: pointer;
@@ -322,7 +322,7 @@
   padding: 0.18rem 0.36rem;
   border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border-soft));
   border-radius: 999px;
-  background: var(--accent-soft);
+  background: var(--accent-soft-bg);
   color: var(--accent-strong);
   font-size: 0.62rem;
   font-weight: 700;
@@ -382,7 +382,7 @@
   padding: 0.42rem 0.7rem;
   border: 1px solid var(--border-accent);
   border-radius: var(--radius-sm);
-  background: var(--accent-soft);
+  background: var(--accent-soft-bg);
   color: var(--accent-strong);
   font: inherit;
   font-size: 0.72rem;

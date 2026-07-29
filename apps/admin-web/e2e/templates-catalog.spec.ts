@@ -1,5 +1,7 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 
+import type { AdminTemplateGenerationControl } from "../src/lib/api-client.types";
+
 const apiOrigin = "https://api.petmagic.test";
 const adminAccessToken = "admin-access-token";
 const adminUserId = "11111111-1111-1111-1111-111111111111";
@@ -22,6 +24,72 @@ const catalogSummary = {
   premiumTemplates: 1,
   qaOnlyTemplates: 1,
   missingPreviewTemplates: 1,
+};
+
+const shellGenerationControlSnapshot: AdminTemplateGenerationControl = {
+  revision: 1,
+  admissionEnabled: true,
+  confirmedFalConcurrencyLimit: 6,
+  confirmedAtUtc: "2026-07-28T10:00:00Z",
+  reservedHeadroom: 1,
+  applicationHardCeiling: 5,
+  effectiveGlobalLimit: 4,
+  policy: {
+    globalMaxConcurrentGenerations: 4,
+    imageReservedConcurrentGenerations: 3,
+    imageProtectedConcurrentGenerations: 2,
+    imageMaxConcurrentGenerations: 3,
+    videoReservedConcurrentGenerations: 1,
+    videoMaxConcurrentGenerations: 2,
+    videoBorrowMaxConcurrentGenerations: 1,
+    videoPreprocessingMaxConcurrentGenerations: 1,
+  },
+  effectiveProfile: {
+    globalMaxConcurrentGenerations: 4,
+    imageReservedConcurrentGenerations: 3,
+    imageProtectedConcurrentGenerations: 2,
+    imageMaxConcurrentGenerations: 3,
+    videoReservedConcurrentGenerations: 1,
+    videoMaxConcurrentGenerations: 2,
+    videoBorrowMaxConcurrentGenerations: 1,
+    videoPreprocessingMaxConcurrentGenerations: 1,
+  },
+  balance: {
+    state: "fresh",
+    currentBalanceUsd: 25,
+    checkedAtUtc: "2026-07-28T10:01:00Z",
+    lastSuccessfulAtUtc: "2026-07-28T10:01:00Z",
+  },
+  queue: {
+    totalDepth: 0,
+    imageDepth: 0,
+    videoDepth: 0,
+    oldestQueuedAtUtc: null,
+    stages: [],
+  },
+  lanes: {
+    inFlightTotal: 0,
+    imageInFlight: 0,
+    videoInFlight: 0,
+    videoPreprocessingInFlight: 0,
+    nativeSlotsInUse: 0,
+    borrowedSlotsInUse: 0,
+    reservedSlotsAvailable: 1,
+    submissionUnknownCount: 0,
+  },
+  worker: {
+    instanceCount: 1,
+    heartbeatAtUtc: "2026-07-28T10:01:00Z",
+    lastProgressAtUtc: "2026-07-28T10:01:00Z",
+    appliedPolicyRevision: 1,
+    schedulerV2Enabled: true,
+    dispatchConcurrency: 4,
+    reconciliationConcurrency: 1,
+    mediaImportConcurrency: 1,
+    maintenanceConcurrency: 1,
+  },
+  alerts: [],
+  generatedAtUtc: "2026-07-28T10:01:00Z",
 };
 
 type CatalogTemplate = {
@@ -410,6 +478,12 @@ async function installStrictCatalogMocks(page: Page, state: CatalogApiState) {
     }
 
     validateBearer(route, state);
+
+    if (url.pathname === "/api/admin/templates/generation-control" && method === "GET") {
+      validateQueryKeys(url, [], state);
+      await fulfillJson(route, shellGenerationControlSnapshot);
+      return;
+    }
 
     if (url.pathname === "/api/admin/templates/moderation" && method === "GET") {
       validateQueryKeys(url, ["status", "take"], state);
