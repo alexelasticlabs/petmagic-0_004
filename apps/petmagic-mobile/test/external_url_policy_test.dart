@@ -11,10 +11,10 @@ void main() {
     });
 
     test('allows https url when no allowlist is provided', () {
-      final uri = parseSafeExternalUri('https://petmagic.app/terms');
+      final uri = parseSafeExternalUri('https://petgpt.app/terms');
       expect(uri, isNotNull);
       expect(uri!.scheme, 'https');
-      expect(uri.host, 'petmagic.app');
+      expect(uri.host, 'petgpt.app');
     });
 
     test('rejects private and local https urls before external handoff', () {
@@ -64,7 +64,7 @@ void main() {
       final allowedHosts = premiumExternalAllowedHosts();
       expect(
         parseSafeExternalUri(
-          'https://petmagic.app/privacy',
+          'https://petgpt.app/privacy',
           allowedHttpsHosts: allowedHosts,
         ),
         isNotNull,
@@ -82,7 +82,7 @@ void main() {
       final allowedHosts = premiumExternalAllowedHosts();
       expect(
         parseSafeExternalUri(
-          'https://user@petmagic.app/privacy',
+          'https://user@petgpt.app/privacy',
           allowedHttpsHosts: allowedHosts,
         ),
         isNull,
@@ -169,9 +169,11 @@ void main() {
   group('premiumExternalAllowedHosts', () {
     test('contains core trusted hosts', () {
       final hosts = premiumExternalAllowedHosts();
-      expect(hosts.contains('petmagic.app'), isTrue);
-      expect(hosts.contains('api.petmagic.app'), isTrue);
+      expect(hosts.contains('petgpt.app'), isTrue);
+      expect(hosts.contains('api.petgpt.app'), isTrue);
       expect(hosts.contains('checkout.stripe.com'), isTrue);
+      expect(hosts.contains('petmagic.app'), isFalse);
+      expect(hosts.contains('api.petmagic.app'), isFalse);
     });
   });
 
@@ -188,7 +190,7 @@ void main() {
       );
       expect(
         parseSafeExternalUri(
-          'https://api.petmagic.app/api/support/attachments/file',
+          'https://api.petgpt.app/api/support/attachments/file',
           allowedHttpsHosts: allowedHosts,
         ),
         isNotNull,
@@ -225,8 +227,8 @@ void main() {
     test('contains production generation media origins', () {
       final hosts = generationMediaAllowedHosts();
 
-      expect(hosts.contains('api.petmagic.app'), isTrue);
-      expect(hosts.contains('cdn.petmagic.app'), isTrue);
+      expect(hosts.contains('api.petgpt.app'), isTrue);
+      expect(hosts.contains('cdn.petgpt.app'), isTrue);
       expect(hosts.contains('cdn.petmagic.ai'), isTrue);
     });
 
@@ -261,13 +263,13 @@ void main() {
     test('allows only trusted generation share origins', () {
       expect(
         parseSafeGenerationShareUri(
-          'https://app.petmagic.app/share/generation/token',
+          'https://app.petgpt.app/share/generation/token',
         ),
         isNotNull,
       );
       expect(
         parseSafeGenerationShareUri(
-          'https://api.petmagic.app/share/generation/token',
+          'https://api.petgpt.app/share/generation/token',
         ),
         isNotNull,
       );
@@ -279,7 +281,7 @@ void main() {
       );
       expect(
         parseSafeGenerationShareUri(
-          'https://app.petmagic.app@evil.example/share/generation/token',
+          'https://app.petgpt.app@evil.example/share/generation/token',
         ),
         isNull,
       );
@@ -329,7 +331,7 @@ void main() {
 }
 
 bool hostsContainsCoreAvatarOrigins(Set<String> hosts) {
-  return hosts.contains('api.petmagic.app') &&
-      hosts.contains('cdn.petmagic.app') &&
+  return hosts.contains('api.petgpt.app') &&
+      hosts.contains('cdn.petgpt.app') &&
       hosts.contains('cdn.petmagic.ai');
 }

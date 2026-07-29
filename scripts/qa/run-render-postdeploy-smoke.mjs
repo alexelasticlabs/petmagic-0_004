@@ -24,6 +24,8 @@ let adminAuthToken;
 let timeoutMs;
 let environment;
 let expectedSchedulerV2Enabled;
+let expectedSourceRevision;
+let maxWorkerProgressAgeSeconds;
 
 try {
   environment = (getOptionValue('--environment') ?? 'staging').toLowerCase();
@@ -59,6 +61,15 @@ try {
     '--expected-scheduler-v2-enabled',
     process.env.PETMAGIC_EXPECTED_GENERATION_SCHEDULER_V2_ENABLED,
     false);
+  expectedSourceRevision = normalizeSourceRevision(
+    getOptionValue('--expected-source-revision')
+      ?? process.env.PETMAGIC_EXPECTED_SOURCE_REVISION
+      ?? (environment === 'staging'
+        ? process.env.STAGING_EXPECTED_SOURCE_REVISION
+        : process.env.PRODUCTION_EXPECTED_SOURCE_REVISION)
+      ?? process.env.GITHUB_SHA
+      ?? '');
+  maxWorkerProgressAgeSeconds = positiveIntegerOption('--max-worker-progress-age-seconds', 120);
 
   mkdirSync(artifactDir, { recursive: true });
 } catch (error) {
@@ -77,6 +88,8 @@ const evidence = {
   timeoutMs,
   environment,
   expectedSchedulerV2Enabled,
+  expectedSourceRevision: abbreviateSourceRevision(expectedSourceRevision),
+  maxWorkerProgressAgeSeconds,
   checks
 };
 
@@ -88,7 +101,8 @@ main().catch((error) => {
 async function main() {
   const apiUrlValid = validateRemoteHttpsUrl('apiBaseUrl', apiBaseUrl);
   const adminUrlValid = validateRemoteHttpsUrl('adminBaseUrl', adminBaseUrl);
-  if (!apiUrlValid || !adminUrlValid) {
+  const sourceRevisionValid = validateExpectedSourceRevision(expectedSourceRevision);
+  if (!apiUrlValid || !adminUrlValid || !sourceRevisionValid) {
     finish(1);
     return;
   }
@@ -120,7 +134,16 @@ async function checkApiHealth() {
 
   const build = readCaseInsensitive(payload, 'build');
   const application = readCaseInsensitive(build, 'application');
+  const sourceRevision = normalizeSourceRevision(readCaseInsensitive(build, 'sourceRevision'));
   record('api.health.application_name', application === 'PetMagic.Host.Api', `application=${application ?? 'missing'}`);
+  record(
+    'api.health.source_revision_present',
+    Boolean(sourceRevision),
+    `sourceRevision=${abbreviateSourceRevision(sourceRevision) ?? 'missing'}`);
+  record(
+    'api.health.source_revision_matches_deploy',
+    sourceRevisionsMatch(expectedSourceRevision, sourceRevision),
+    `expected=${abbreviateSourceRevision(expectedSourceRevision) ?? 'missing'}, actual=${abbreviateSourceRevision(sourceRevision) ?? 'missing'}`);
 
   const checksValue = readCaseInsensitive(payload, 'checks');
   record(
@@ -156,6 +179,28 @@ async function checkAdminRoute() {
     'admin.ru.html',
     /<html[\s>]/i.test(response.text) || /<!doctype html>/i.test(response.text),
     `bodyLength=${response.text.length}`);
+
+  const generationsResponse = await fetchWithTimeout(`${adminBaseUrl}/ru/generations`);
+  const generationsPath = safeUrlPathname(generationsResponse.url);
+  const csp = generationsResponse.contentSecurityPolicy;
+  const routeIdentity = generationsResponse.adminRoute;
+  evidence.adminGenerationsRoute = {
+    response: summarizeResponse(generationsResponse),
+    finalPath: generationsPath,
+    routeIdentity,
+    contentSecurityPolicyPresent: Boolean(csp),
+    contentSecurityPolicyAllowsExpectedApi: Boolean(csp && csp.includes(apiBaseUrl))
+  };
+  record('admin.generations.http_200', generationsResponse.status === 200, `HTTP ${generationsResponse.status}`);
+  record('admin.generations.final_path', generationsPath === '/ru/generations', `path=${generationsPath ?? 'invalid'}`);
+  record(
+    'admin.generations.route_identity',
+    routeIdentity === 'generations',
+    `x-petmagic-admin-route=${routeIdentity || 'missing'}`);
+  record(
+    'admin.generations.csp_expected_api',
+    Boolean(csp && csp.includes(apiBaseUrl)),
+    csp ? `expectedOrigin=${anonymizeUrl(apiBaseUrl)}` : 'Content-Security-Policy missing');
 }
 
 async function checkGenerationWorkerRuntime() {
@@ -234,6 +279,15 @@ async function checkGenerationWorkerRuntime() {
   const reconciliationConcurrency = readCaseInsensitive(worker, 'reconciliationConcurrency');
   const mediaImportConcurrency = readCaseInsensitive(worker, 'mediaImportConcurrency');
   const maintenanceConcurrency = readCaseInsensitive(worker, 'maintenanceConcurrency');
+  const lastProgressAtUtc = readCaseInsensitive(worker, 'lastProgressAtUtc');
+  const queue = readCaseInsensitive(control, 'queue');
+  const lanes = readCaseInsensitive(control, 'lanes');
+  const queueTotalDepth = readCaseInsensitive(queue, 'totalDepth');
+  const inFlightTotal = readCaseInsensitive(lanes, 'inFlightTotal');
+  const generatedAtUtc = readCaseInsensitive(control, 'generatedAtUtc');
+  const workExists = (Number.isInteger(queueTotalDepth) && queueTotalDepth > 0)
+    || (Number.isInteger(inFlightTotal) && inFlightTotal > 0);
+  const progressAgeSeconds = ageSeconds(lastProgressAtUtc, generatedAtUtc);
   const alerts = readCaseInsensitive(control, 'alerts');
   const criticalAlerts = Array.isArray(alerts)
     ? alerts.filter((alert) => String(readCaseInsensitive(alert, 'severity')).toLowerCase() === 'critical')
@@ -249,8 +303,16 @@ async function checkGenerationWorkerRuntime() {
         dispatchConcurrency: dispatchConcurrency ?? null,
         reconciliationConcurrency: reconciliationConcurrency ?? null,
         mediaImportConcurrency: mediaImportConcurrency ?? null,
-        maintenanceConcurrency: maintenanceConcurrency ?? null
+        maintenanceConcurrency: maintenanceConcurrency ?? null,
+        lastProgressAtUtc: sanitizeTimestamp(lastProgressAtUtc),
+        progressAgeSeconds
       }
+      : null,
+    queue: queue && typeof queue === 'object'
+      ? { totalDepth: queueTotalDepth ?? null }
+      : null,
+    lanes: lanes && typeof lanes === 'object'
+      ? { inFlightTotal: inFlightTotal ?? null }
       : null,
     alertIds: Array.isArray(alerts)
       ? alerts.map((alert) => readCaseInsensitive(alert, 'alertId')).filter(Boolean)
@@ -283,6 +345,18 @@ async function checkGenerationWorkerRuntime() {
       && maintenanceConcurrency === 1,
     `dispatch=${dispatchConcurrency ?? 'missing'}, reconciliation=${reconciliationConcurrency ?? 'missing'}, import=${mediaImportConcurrency ?? 'missing'}, maintenance=${maintenanceConcurrency ?? 'missing'}`);
   record(
+    'api.generation_control.progress_present_when_work_exists',
+    !workExists || Boolean(lastProgressAtUtc),
+    workExists
+      ? `queueDepth=${queueTotalDepth ?? 'missing'}, inFlight=${inFlightTotal ?? 'missing'}, lastProgressAtUtc=${sanitizeTimestamp(lastProgressAtUtc) ?? 'missing'}`
+      : `idle queueDepth=${queueTotalDepth ?? 'missing'}, inFlight=${inFlightTotal ?? 'missing'}`);
+  record(
+    'api.generation_control.progress_fresh_when_work_exists',
+    !workExists || (Number.isFinite(progressAgeSeconds) && progressAgeSeconds <= maxWorkerProgressAgeSeconds),
+    workExists
+      ? `ageSeconds=${progressAgeSeconds ?? 'missing'}, max=${maxWorkerProgressAgeSeconds}`
+      : 'idle');
+  record(
     'api.generation_control.no_critical_alerts',
     Array.isArray(criticalAlerts) && criticalAlerts.length === 0,
     `criticalAlerts=${Array.isArray(criticalAlerts)
@@ -309,6 +383,9 @@ async function fetchWithTimeout(url, options = {}) {
       ok: response.ok,
       status: response.status,
       url: response.url,
+      contentSecurityPolicy: response.headers.get('content-security-policy') ?? '',
+      contentType: response.headers.get('content-type') ?? '',
+      adminRoute: response.headers.get('x-petmagic-admin-route') ?? '',
       text
     };
   } catch (error) {
@@ -316,6 +393,9 @@ async function fetchWithTimeout(url, options = {}) {
       ok: false,
       status: 0,
       url,
+      contentSecurityPolicy: '',
+      contentType: '',
+      adminRoute: '',
       text: error instanceof Error ? error.message : String(error)
     };
   } finally {
@@ -346,7 +426,8 @@ function sanitizeHealthPayload(payload) {
       ? {
         application: readCaseInsensitive(build, 'application') ?? null,
         environment: readCaseInsensitive(build, 'environment') ?? null,
-        version: readCaseInsensitive(build, 'version') ?? null
+        version: readCaseInsensitive(build, 'version') ?? null,
+        sourceRevision: abbreviateSourceRevision(readCaseInsensitive(build, 'sourceRevision'))
       }
       : null,
     schedulerConfig: schedulerConfig && typeof schedulerConfig === 'object'
@@ -362,6 +443,64 @@ function sanitizeHealthPayload(payload) {
       }))
       : null
   };
+}
+
+function validateExpectedSourceRevision(value) {
+  const present = Boolean(value);
+  const validFormat = /^[0-9a-f]{7,64}$/i.test(value);
+  record(
+    'input.expected_source_revision_present',
+    present,
+    present ? `revision=${abbreviateSourceRevision(value)}` : 'pass --expected-source-revision or set PETMAGIC_EXPECTED_SOURCE_REVISION');
+  record(
+    'input.expected_source_revision_format',
+    validFormat,
+    validFormat ? 'hex commit revision' : 'expected 7-64 hexadecimal characters');
+  return present && validFormat;
+}
+
+function normalizeSourceRevision(value) {
+  return String(value ?? '').trim().toLowerCase();
+}
+
+function abbreviateSourceRevision(value) {
+  const normalized = normalizeSourceRevision(value);
+  return /^[0-9a-f]{7,64}$/i.test(normalized) ? normalized.slice(0, 12) : null;
+}
+
+function sourceRevisionsMatch(expected, actual) {
+  const normalizedExpected = normalizeSourceRevision(expected);
+  const normalizedActual = normalizeSourceRevision(actual);
+  if (!/^[0-9a-f]{7,64}$/i.test(normalizedExpected)
+      || !/^[0-9a-f]{7,64}$/i.test(normalizedActual)) {
+    return false;
+  }
+
+  return normalizedExpected.startsWith(normalizedActual)
+    || normalizedActual.startsWith(normalizedExpected);
+}
+
+function sanitizeTimestamp(value) {
+  const timestamp = Date.parse(String(value ?? ''));
+  return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : null;
+}
+
+function ageSeconds(value, relativeTo) {
+  const timestamp = Date.parse(String(value ?? ''));
+  const relativeTimestamp = Date.parse(String(relativeTo ?? ''));
+  if (!Number.isFinite(timestamp) || !Number.isFinite(relativeTimestamp)) {
+    return null;
+  }
+
+  return Math.max(0, Math.round((relativeTimestamp - timestamp) / 1000));
+}
+
+function safeUrlPathname(value) {
+  try {
+    return new URL(value).pathname;
+  } catch {
+    return null;
+  }
 }
 
 function validateRemoteHttpsUrl(name, value) {
@@ -568,7 +707,7 @@ Render post-deploy smoke.
 
 Usage:
   node scripts/qa/run-render-postdeploy-smoke.mjs
-  node scripts/qa/run-render-postdeploy-smoke.mjs --api-base-url https://api.staging.petmagic.app --admin-base-url https://admin.staging.petmagic.app
+  node scripts/qa/run-render-postdeploy-smoke.mjs --api-base-url https://api.staging.petmagic.app --admin-base-url https://admin.staging.petmagic.app --expected-source-revision <git-sha>
 
 Options:
   --api-base-url <url>    API base URL. Defaults to STAGING_API_BASE_URL or https://api.staging.petmagic.app.
@@ -578,13 +717,18 @@ Options:
   --timeout-ms <ms>       Per-request timeout. Defaults to 15000.
   --expected-scheduler-v2-enabled <bool>
                           Expected generation-worker rollout mode. Defaults to false.
+  --expected-source-revision <sha>
+                          Required 7-64 character hex revision expected from API /health build.sourceRevision.
+  --max-worker-progress-age-seconds <seconds>
+                          Maximum last-progress age while queue/in-flight work exists. Defaults to 120.
   --run-id <id>           Artifact run id.
   --artifact-dir <dir>    Evidence output directory.
   --help, -h              Print this help.
 
-The smoke is read-only: it checks API /health, admin /ru, scheduler fingerprint,
+The smoke is read-only: it checks API /health and exact source revision, admin /ru
+and the server-attested /ru/generations route identity/CSP contracts, scheduler fingerprint,
 the authenticated generation-worker heartbeat, one-worker topology, policy revision,
-lane concurrency, and critical generation-control alerts without creating users,
+lane concurrency, backlog progress, and critical generation-control alerts without creating users,
 jobs, payments, or provider callbacks. HTTPS is mandatory for authenticated checks.
 An admin token is required for a passing gate.
 `.trim());

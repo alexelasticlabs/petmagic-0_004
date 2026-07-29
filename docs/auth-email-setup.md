@@ -88,7 +88,7 @@ EMAIL_PORT=587
 EMAIL_USERNAME=your-smtp-login
 EMAIL_PASSWORD=your-smtp-password
 EMAIL_USE_SSL=true
-EMAIL_FROM_ADDRESS=no-reply@petmagic.app
+EMAIL_FROM_ADDRESS=no-reply@petgpt.app
 EMAIL_FROM_NAME=PetMagic
 ```
 
@@ -100,7 +100,7 @@ EMAIL_PORT=2525
 EMAIL_USERNAME=your-mailtrap-username
 EMAIL_PASSWORD=your-mailtrap-password
 EMAIL_USE_SSL=true
-EMAIL_FROM_ADDRESS=no-reply@petmagic.app
+EMAIL_FROM_ADDRESS=no-reply@petgpt.app
 EMAIL_FROM_NAME=PetMagic
 ```
 
@@ -112,7 +112,7 @@ EMAIL_FROM_NAME=PetMagic
 BACKEND_HOST_PORT=5001
 POSTGRES_PASSWORD=replace_with_local_postgres_password
 JWT_SIGNING_KEY=сгенерируй_длинный_секрет
-BOOTSTRAP_ADMIN_EMAIL=admin@petmagic.app
+BOOTSTRAP_ADMIN_EMAIL=admin@petgpt.app
 BOOTSTRAP_ADMIN_PASSWORD=replace_with_local_admin_password
 NEXT_PUBLIC_API_BASE_URL=http://localhost:${BACKEND_HOST_PORT}
 ```
@@ -170,7 +170,7 @@ http://localhost:<BACKEND_HOST_PORT>/signin-google
 В production:
 
 ```text
-https://api.petmagic.app/signin-google
+https://api.petgpt.app/signin-google
 ```
 
 ### 3.5 Android client
@@ -349,7 +349,7 @@ $env:EMAIL_PORT="2525"
 $env:EMAIL_USERNAME="your-mailtrap-username"
 $env:EMAIL_PASSWORD="your-mailtrap-password"
 $env:EMAIL_USE_SSL="true"
-$env:EMAIL_FROM_ADDRESS="no-reply@petmagic.app"
+$env:EMAIL_FROM_ADDRESS="no-reply@petgpt.app"
 $env:EMAIL_FROM_NAME="PetMagic"
 ```
 
@@ -372,7 +372,7 @@ http://localhost:5001
 BACKEND_HOST_PORT=5001
 POSTGRES_PASSWORD=replace_with_local_postgres_password
 JWT_SIGNING_KEY=replace_with_long_random_secret
-BOOTSTRAP_ADMIN_EMAIL=admin@petmagic.app
+BOOTSTRAP_ADMIN_EMAIL=admin@petgpt.app
 BOOTSTRAP_ADMIN_PASSWORD=replace_with_local_admin_password
 NEXT_PUBLIC_API_BASE_URL=http://localhost:${BACKEND_HOST_PORT}
 
@@ -384,7 +384,7 @@ EMAIL_PORT=2525
 EMAIL_USERNAME=replace_with_mailtrap_username
 EMAIL_PASSWORD=replace_with_mailtrap_password
 EMAIL_USE_SSL=true
-EMAIL_FROM_ADDRESS=no-reply@petmagic.app
+EMAIL_FROM_ADDRESS=no-reply@petgpt.app
 EMAIL_FROM_NAME=PetMagic
 ```
 

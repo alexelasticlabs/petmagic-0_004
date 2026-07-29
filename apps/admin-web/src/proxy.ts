@@ -15,6 +15,12 @@ export function proxy(request: NextRequest) {
     },
   });
   response.headers.set("Content-Security-Policy", contentSecurityPolicy);
+  if (/^\/(?:ru|en)\/generations\/?$/.test(request.nextUrl.pathname)) {
+    // The authenticated page is client-gated, so its body marker is intentionally absent
+    // from an unauthenticated server response. Expose a non-sensitive route identity for
+    // Render's read-only postdeploy check instead of depending on hydrated browser state.
+    response.headers.set("X-PetMagic-Admin-Route", "generations");
+  }
   return response;
 }
 

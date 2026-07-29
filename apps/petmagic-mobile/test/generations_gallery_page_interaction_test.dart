@@ -327,7 +327,7 @@ void main() {
       shareUrl: 'https://cdn.petmagic.test/fresh-share.jpg?sig=share',
       downloadFileName: 'fresh-download.jpg',
       shareFileName: 'fresh-share.jpg',
-      durableShareUrl: 'https://app.petmagic.app/share/generation/g-ready',
+      durableShareUrl: 'https://app.petgpt.app/share/generation/g-ready',
     );
     final harness = GalleryHarness(
       items: [
@@ -375,7 +375,7 @@ void main() {
     ]);
     expect(mediaActions.sharedFileNames, ['fresh-share.jpg']);
     expect(mediaActions.sharedTexts, [
-      'https://app.petmagic.app/share/generation/g-ready',
+      'https://app.petgpt.app/share/generation/g-ready',
     ]);
     await tester.pump(const Duration(seconds: 3));
 
@@ -390,7 +390,7 @@ void main() {
           .map((call) => call.arguments)
           .toList(),
       [
-        {'text': 'https://app.petmagic.app/share/generation/g-ready'},
+        {'text': 'https://app.petgpt.app/share/generation/g-ready'},
       ],
     );
     expect(repository.shareCalls, ['g-ready-unsafe', 'g-ready-unsafe']);

@@ -108,9 +108,9 @@ bool isAllowedExternalUri(
 
 Set<String> premiumExternalAllowedHosts() {
   final result = <String>{
-    'petmagic.app',
-    'www.petmagic.app',
-    'api.petmagic.app',
+    'petgpt.app',
+    'www.petgpt.app',
+    'api.petgpt.app',
     'billing.stripe.com',
     'checkout.stripe.com',
     'dashboard.stripe.com',
@@ -126,10 +126,10 @@ Set<String> premiumExternalAllowedHosts() {
 
 Set<String> supportExternalAllowedHosts() {
   final result = <String>{
-    'petmagic.app',
-    'www.petmagic.app',
-    'api.petmagic.app',
-    'cdn.petmagic.app',
+    'petgpt.app',
+    'www.petgpt.app',
+    'api.petgpt.app',
+    'cdn.petgpt.app',
     'cdn.petmagic.ai',
   };
 
@@ -143,8 +143,8 @@ Set<String> supportExternalAllowedHosts() {
 
 Set<String> generationMediaAllowedHosts() {
   final result = <String>{
-    'api.petmagic.app',
-    'cdn.petmagic.app',
+    'api.petgpt.app',
+    'cdn.petgpt.app',
     'cdn.petmagic.ai',
     'r2.dev',
     'r2.cloudflarestorage.com',
@@ -160,11 +160,11 @@ Set<String> generationMediaAllowedHosts() {
 
 Set<String> generationShareAllowedHosts() {
   final result = <String>{
-    'petmagic.app',
-    'www.petmagic.app',
-    'app.petmagic.app',
-    'api.petmagic.app',
-    'cdn.petmagic.app',
+    'petgpt.app',
+    'www.petgpt.app',
+    'app.petgpt.app',
+    'api.petgpt.app',
+    'cdn.petgpt.app',
   };
 
   final apiBaseUri = Uri.tryParse(AppConfig.apiBaseUrl);
@@ -177,8 +177,8 @@ Set<String> generationShareAllowedHosts() {
 
 Set<String> profileAvatarAllowedHosts() {
   final result = <String>{
-    'api.petmagic.app',
-    'cdn.petmagic.app',
+    'api.petgpt.app',
+    'cdn.petgpt.app',
     'cdn.petmagic.ai',
     'r2.dev',
     'r2.cloudflarestorage.com',

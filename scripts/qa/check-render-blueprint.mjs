@@ -140,6 +140,9 @@ if (api) {
   requirePersistentDisk(api, `${prefix}-api-data`, '/var/petmagic');
   requireEnvValue(api, 'PORT', '5000');
   requireEnvValue(api, 'ASPNETCORE_HTTP_PORTS', '5000');
+  requireEnvValue(api, 'Database__MaxPoolSize', '28');
+  requireEnvValue(api, 'Database__PeerMaxPoolSize', '24');
+  requireEnvValue(api, 'Database__OperationalReserveConnections', '16');
   requireEnvValue(api, 'STORE_ACCOUNT_BINDING_MODE', 'compatibility');
   requireEnvValue(
     api,
@@ -164,6 +167,7 @@ if (api) {
   );
   requireEnvValue(api, 'STRIPE_CHECKOUT_CANCEL_URL', `https://${adminDomain}/payments/cancel`);
   requireEnvValue(api, 'STRIPE_BILLING_PORTAL_RETURN_URL', `https://${adminDomain}/payments/return`);
+  requireEnvValue(api, 'Templates__FirebasePush__Enabled', 'true');
   requireEnvContains(api, 'AllowedHosts', apiDomain);
   requireDatabaseBinding(api, 'ConnectionStrings__DefaultConnection', `${prefix}-db`);
   requireSecretKeys(api, [
@@ -213,6 +217,9 @@ if (worker) {
   requireWorkerIsPrivateAndEphemeral(worker);
 
   requireEnvValue(worker, 'Templates__GenerationWorkerEnabled', 'true');
+  requireEnvValue(worker, 'Database__MaxPoolSize', '24');
+  requireEnvValue(worker, 'Database__PeerMaxPoolSize', '28');
+  requireEnvValue(worker, 'Database__OperationalReserveConnections', '16');
   requireEnvValue(worker, 'FAL_WEBHOOK_URL', `https://${apiDomain}/api/templates/provider/fal/webhook`);
   requireEnvValue(worker, 'Templates__GenerationWorkerPollIntervalMilliseconds', '500');
   requireEnvValue(worker, 'Templates__GenerationDispatchConcurrency', '4');
@@ -236,8 +243,44 @@ if (worker) {
 }
 
 if (api && worker) {
+  requireDatabaseConnectionBudget(api, worker);
   requireWorkerOnlyLaneSettings(api, worker);
   requireSchedulerFingerprintParity(api, worker);
+}
+
+function requireDatabaseConnectionBudget(apiService, workerService) {
+  const apiMax = readPositiveEnvInteger(apiService, 'Database__MaxPoolSize');
+  const apiPeer = readPositiveEnvInteger(apiService, 'Database__PeerMaxPoolSize');
+  const apiReserve = readPositiveEnvInteger(apiService, 'Database__OperationalReserveConnections');
+  const workerMax = readPositiveEnvInteger(workerService, 'Database__MaxPoolSize');
+  const workerPeer = readPositiveEnvInteger(workerService, 'Database__PeerMaxPoolSize');
+  const workerReserve = readPositiveEnvInteger(workerService, 'Database__OperationalReserveConnections');
+  if ([apiMax, apiPeer, apiReserve, workerMax, workerPeer, workerReserve].some(value => value === null)) {
+    return;
+  }
+
+  if (apiPeer !== workerMax || workerPeer !== apiMax) {
+    fail(
+      `PostgreSQL peer pool budgets must be reciprocal: api=${apiMax}/${apiPeer}, worker=${workerMax}/${workerPeer}.`
+    );
+  }
+  if (apiReserve !== workerReserve) {
+    fail(`PostgreSQL operational reserve must match across API and worker; api=${apiReserve}, worker=${workerReserve}.`);
+  }
+
+  const aggregate = apiMax + workerMax + apiReserve;
+  if (aggregate >= 70) {
+    fail(`PostgreSQL planned aggregate connection budget must remain below 70; configured ${aggregate}.`);
+  }
+}
+
+function readPositiveEnvInteger(service, key) {
+  const entry = findEnv(service.envVars, key);
+  if (!entry || !/^[1-9][0-9]*$/.test(String(entry.value ?? ''))) {
+    fail(`${service.name} ${key} must be a positive integer.`);
+    return null;
+  }
+  return Number(entry.value);
 }
 
 if (admin) {
@@ -667,7 +710,8 @@ function rejectWorkerExternalBillingConfiguration(service) {
   const forbiddenKeys = new Set([
     'STORE_ACCOUNT_BINDING_MODE',
     'ECONOMY_RECONCILIATION_ENABLED',
-    'ECONOMY_PUSH_OUTBOX_DISPATCHER_ENABLED'
+    'ECONOMY_PUSH_OUTBOX_DISPATCHER_ENABLED',
+    'Templates__FirebasePush__Enabled'
   ]);
 
   for (const entry of effectiveServiceEnvVars(service)) {

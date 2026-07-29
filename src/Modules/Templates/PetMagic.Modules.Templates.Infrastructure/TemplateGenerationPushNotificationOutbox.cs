@@ -6,13 +6,11 @@ using PetMagic.BuildingBlocks.Notifications;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Infrastructure.Data;
-using PetMagic.Modules.Templates.Infrastructure.Options;
 
 namespace PetMagic.Modules.Templates.Infrastructure;
 
 internal sealed class TemplateGenerationPushNotificationOutbox(
-    TemplatesDbContext dbContext,
-    TemplatesOptions options) : ITemplateGenerationPushNotificationSender
+    TemplatesDbContext dbContext) : ITemplateGenerationPushNotificationSender
 {
     internal const string GenerationTerminalKind = "generation_terminal";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
@@ -21,7 +19,10 @@ internal sealed class TemplateGenerationPushNotificationOutbox(
         TemplateGenerationResponse generation,
         CancellationToken cancellationToken)
     {
-        if (!options.FirebasePush.IsConfigured || generation.UserId == TemplateGenerationService.AdminTestUserId)
+        // Enqueue in the terminal generation transaction. Delivery credentials
+        // belong to the API dispatcher and are intentionally absent from the
+        // isolated generation worker.
+        if (generation.UserId == TemplateGenerationService.AdminTestUserId)
         {
             return;
         }

@@ -296,7 +296,7 @@ void main() {
     ]);
     expect(mediaActions.shareLocalPaths, [null]);
     expect(mediaActions.shareTexts, [
-      'https://app.petmagic.app/share/generation/generation-pet-1',
+      'https://app.petgpt.app/share/generation/generation-pet-1',
     ]);
     expect(generationRepository.shareCalls, ['generation-pet-1']);
     await tester.pump(const Duration(milliseconds: 300));
@@ -310,7 +310,7 @@ void main() {
 
     expect(
       copied?.text,
-      'https://app.petmagic.app/share/generation/generation-pet-1',
+      'https://app.petgpt.app/share/generation/generation-pet-1',
     );
     expect(generationRepository.shareCalls, [
       'generation-pet-1',
@@ -786,7 +786,7 @@ class _CrossGalleryPetFlowRepository extends TemplateGenerationRepository {
       mediaUrl: 'https://cdn.petmagic.app/fresh-share-bella.jpg?sig=share',
       hasWatermark: false,
       fileName: 'fresh-share-bella.jpg',
-      shareUrl: 'https://app.petmagic.app/share/generation/$generationId',
+      shareUrl: 'https://app.petgpt.app/share/generation/$generationId',
     );
   }
 

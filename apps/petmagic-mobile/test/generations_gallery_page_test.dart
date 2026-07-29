@@ -632,7 +632,7 @@ void main() {
       (call) => call.method == 'Clipboard.setData',
     );
     expect(clipboardCall.arguments, {
-      'text': 'https://app.petmagic.app/share/generation/token',
+      'text': 'https://app.petgpt.app/share/generation/token',
     });
     await tester.pump(const Duration(seconds: 3));
 
@@ -1114,7 +1114,7 @@ void main() {
     ]);
     expect(mediaActions.sharedLocalPaths, [localOutput.path]);
     expect(mediaActions.sharedTexts, [
-      'https://app.petmagic.app/share/generation/token',
+      'https://app.petgpt.app/share/generation/token',
     ]);
     await tester.pump(const Duration(seconds: 3));
     expect(tester.takeException(), isNull);

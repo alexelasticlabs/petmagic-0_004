@@ -9,6 +9,9 @@ const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(scriptDir, '..', '..');
 const rawArgs = process.argv.slice(2);
 const args = new Set(rawArgs);
+const adminTypecheckCommand = process.platform === 'win32'
+  ? ['cmd.exe', ['/d', '/s', '/c', 'npm run typecheck --prefix apps/admin-web']]
+  : ['npm', ['run', 'typecheck', '--prefix', 'apps/admin-web']];
 
 if (args.has('--help') || args.has('-h')) {
   printUsage();
@@ -90,12 +93,12 @@ const steps = [
     skippedReason: 'Production uses managed Render/R2 secrets and does not reuse the staging compose env file.'
   },
   {
-    name: 'backend_api_build',
+    name: 'backend_solution_build',
     command: [
       'dotnet',
       [
         'build',
-        'src/Host/PetMagic.Host.Api/PetMagic.Host.Api.csproj',
+        'PetMagic.slnx',
         '--disable-build-servers',
         '-m:1',
         '-nr:false',
@@ -104,6 +107,28 @@ const steps = [
     ],
     required: !skipDotnetBuild,
     skippedReason: 'Skipped by --skip-dotnet-build.'
+  },
+  {
+    name: 'generation_worker_build',
+    command: [
+      'dotnet',
+      [
+        'build',
+        'src/Host/PetMagic.Host.GenerationWorker/PetMagic.Host.GenerationWorker.csproj',
+        '--no-restore',
+        '--disable-build-servers',
+        '-m:1',
+        '-nr:false',
+        '-p:UseSharedCompilation=false'
+      ]
+    ],
+    required: !skipDotnetBuild,
+    skippedReason: 'Skipped by --skip-dotnet-build.'
+  },
+  {
+    name: 'admin_typecheck',
+    command: adminTypecheckCommand,
+    required: true
   },
   {
     name: 'render_docker_build_smoke',
@@ -194,7 +219,8 @@ function renderSummary() {
     `Started: ${evidence.startedAtUtc}`,
     `Completed: ${evidence.completedAtUtc ?? 'n/a'}`,
     `Docker build smoke: ${withDockerBuild ? `enabled (${dockerPlatform})` : 'skipped'}`,
-    `Backend build: ${skipDotnetBuild ? 'skipped' : 'enabled'}`,
+    `Backend solution and worker builds: ${skipDotnetBuild ? 'skipped' : 'enabled'}`,
+    'Admin typecheck: enabled',
     '',
     '| Step | Result | Detail |',
     '| --- | --- | --- |',
@@ -244,7 +270,7 @@ Usage:
 Options:
   --with-docker-build      Also build API, worker, and admin Docker images with Render Dockerfile/context settings.
   --docker-platform <val>  Platform passed to the Docker build smoke. Defaults to linux/amd64.
-  --skip-dotnet-build      Skip the backend API dotnet build.
+  --skip-dotnet-build      Skip the backend solution and explicit generation-worker builds.
   --environment <value>    staging or production. Defaults to staging.
   --blueprint <path>       Blueprint path. Defaults by environment.
   --run-id <id>            Artifact run id.
@@ -252,7 +278,8 @@ Options:
   --help, -h               Print this help.
 
 The default gate runs only checks that do not require staging secrets and do not
-mutate a database. It is intended before pushing Render Blueprint changes or
-manually triggering a Render deploy.
+mutate a database. It compiles the full .NET solution, explicitly verifies the
+generation-worker host, and typechecks admin-web before pushing Render Blueprint
+changes or manually triggering a Render deploy.
 `.trim());
 }

@@ -67,13 +67,13 @@ class _Footer extends StatelessWidget {
             _Link(
               text: text.profileSettingsTermsTitle,
               accent: accent,
-              url: 'https://petmagic.app/terms',
+              url: 'https://petgpt.app/terms',
             ),
             Text(' • ', style: TextStyle(color: sub, fontSize: 11)),
             _Link(
               text: text.profileSettingsPrivacyTitle,
               accent: accent,
-              url: 'https://petmagic.app/privacy',
+              url: 'https://petgpt.app/privacy',
             ),
           ],
         ),

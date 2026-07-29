@@ -79,7 +79,7 @@ describe("user avatar URL exposure", () => {
 
   it("blocks local user media URLs when the admin API origin is public", () => {
     const originalPublicApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
-    process.env.NEXT_PUBLIC_API_BASE_URL = "https://api.petmagic.app";
+    process.env.NEXT_PUBLIC_API_BASE_URL = "https://api.petgpt.app";
 
     try {
       expect(resolveUserMediaUrl("https://localhost/avatar.jpg")).toBeNull();

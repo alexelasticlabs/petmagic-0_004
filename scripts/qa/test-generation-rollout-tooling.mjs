@@ -165,6 +165,10 @@ function testAcceptanceVerifier(runDir) {
     '2026-07-29T12:00:00.000Z,0,0,4,38,1,1,4,4,1,1,0',
     `2026-07-29T12:00:02.000Z,39,161,12,38,1,1,4,4,1,1,${progressEpochMs}`,
   ], 'runtime.provider_attempts_never_exceed_effective');
+  assertVerifierFails(runDir, header, [
+    '2026-07-29T12:00:00.000Z,0,0,4,38,1,1,4,4,1,1,0',
+    `2026-07-29T12:00:02.000Z,38,162,70,38,1,1,4,4,1,1,${progressEpochMs}`,
+  ], 'runtime.postgres_connections_below_70');
 }
 
 function assertVerifierFails(runDir, header, rows, expectedFailedCheck) {

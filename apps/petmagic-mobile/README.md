@@ -56,7 +56,7 @@ Override the API URL when needed:
 ```bash
 flutter run --dart-define=API_BASE_URL=http://localhost:5000
 flutter run --dart-define=API_BASE_URL=http://localhost:5001
-flutter run --dart-define=API_BASE_URL=https://api.petmagic.app
+flutter run --dart-define=API_BASE_URL=https://api.petgpt.app
 ```
 
 ## Architecture
@@ -130,7 +130,7 @@ Icons font so missing glyphs cannot be accepted as a visual baseline.
 flutter build appbundle --release --flavor production \
   --dart-define=APP_ENVIRONMENT=production \
   --dart-define=APP_PACKAGE_NAME=com.petmagic.app \
-  --dart-define=API_BASE_URL=https://api.petmagic.app \
+  --dart-define=API_BASE_URL=https://api.petgpt.app \
   --obfuscate --split-debug-info=build/symbols/production
 ```
 

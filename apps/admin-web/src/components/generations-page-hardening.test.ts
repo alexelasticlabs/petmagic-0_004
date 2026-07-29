@@ -12,6 +12,12 @@ const generationsStylesPath = fileURLToPath(
 );
 
 describe("generations page hardening", () => {
+  it("exposes the stable authenticated route marker used by the Render postdeploy gate", () => {
+    const source = readGenerationsPageLibrarySource();
+
+    expect(source.match(/data-admin-route="generations"/g) ?? []).toHaveLength(2);
+  });
+
   it("loads the selected generation through the resolvable admin detail contract and polls pending states", () => {
     const source = readGenerationsPageLibrarySource();
 

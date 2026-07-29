@@ -37,7 +37,7 @@ function isLocalObjectUrl(url: string) {
 
 export function isUnsafeTemplateMediaUrl(url: string) {
   try {
-    const parsed = new URL(url, globalThis.location?.href ?? "https://admin.petmagic.app");
+    const parsed = new URL(url, globalThis.location?.href ?? "https://admin.petgpt.app");
     return isUnsafeMediaHost(parsed.hostname);
   } catch {
     return false;

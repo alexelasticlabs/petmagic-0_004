@@ -149,10 +149,10 @@ describe("admin-api-base-url", () => {
     expect(
       resolveAdminApiBaseUrl({
         isServer: true,
-        internalApiBaseUrl: "https://internal-api.petmagic.app/",
-        publicApiBaseUrl: "https://api.petmagic.app",
+        internalApiBaseUrl: "https://internal-api.petgpt.app/",
+        publicApiBaseUrl: "https://api.petgpt.app",
         nodeEnv: "production",
       })
-    ).toBe("https://internal-api.petmagic.app");
+    ).toBe("https://internal-api.petgpt.app");
   });
 });

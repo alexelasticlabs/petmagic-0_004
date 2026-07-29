@@ -33,6 +33,12 @@ test("renders public information routes independently of the API", async () => {
   }
 });
 
+test("publishes legal canonical URLs on the production petgpt.app domain", async () => {
+  const privacy = await readRoute("/privacy");
+  assert.match(privacy, /<link rel="canonical" href="https:\/\/petgpt\.app\/privacy"/);
+  assert.doesNotMatch(privacy, /https:\/\/petmagic\.app/);
+});
+
 test("exposes keyboard and reduced-motion accessibility contracts", async () => {
   const response = await render("/privacy");
   const html = await response.text();

@@ -89,7 +89,8 @@ predeploy gate.
 
 The gate runs repository sensitive-file checks, Blueprint validation, staging
 env example validation, markdown link checks, script safety inventory, Compose
-config validation, and the backend API build. It writes evidence under
+config validation, a full `PetMagic.slnx` build, an explicit generation-worker
+host build, and the admin-web typecheck. It writes evidence under
 `artifacts/render-predeploy-gate/`.
 
 Run the heavier Docker build smoke before the first Render deploy or after

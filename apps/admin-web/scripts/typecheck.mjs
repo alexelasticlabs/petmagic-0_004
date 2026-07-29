@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 const nextPublicApiBaseUrl =
-  process.env.NEXT_PUBLIC_API_BASE_URL?.trim() || "https://api.petmagic.app";
+  process.env.NEXT_PUBLIC_API_BASE_URL?.trim() || "https://api.petgpt.app";
 
 const env = {
   ...process.env,

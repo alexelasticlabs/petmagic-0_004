@@ -295,7 +295,7 @@ export function LoginCard({ locale }: LoginCardProps) {
 
       <p className={styles.contact}>
         {authText.contactText}
-        <a href="mailto:admin@petmagic.app" className={styles.contactLink}>
+        <a href="mailto:admin@petgpt.app" className={styles.contactLink}>
           {authText.contactLinkText}
         </a>
       </p>

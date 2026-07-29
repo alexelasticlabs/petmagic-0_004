@@ -6,32 +6,29 @@ import 'package:petmagic_mobile/core/config/app_config.dart';
 void main() {
   test('production API base URL allowlist rejects non-production origins', () {
     expect(
-      AppConfig.normalizeProductionBaseUrl('https://api.petmagic.app'),
-      'https://api.petmagic.app',
+      AppConfig.normalizeProductionBaseUrl('https://api.petgpt.app'),
+      'https://api.petgpt.app',
     );
     expect(
-      AppConfig.normalizeProductionBaseUrl('https://api.petmagic.app/'),
-      'https://api.petmagic.app',
+      AppConfig.normalizeProductionBaseUrl('https://api.petgpt.app/'),
+      'https://api.petgpt.app',
     );
     expect(
-      AppConfig.normalizeProductionBaseUrl('https://api.petmagic.app:443'),
-      'https://api.petmagic.app',
+      AppConfig.normalizeProductionBaseUrl('https://api.petgpt.app:443'),
+      'https://api.petgpt.app',
     );
-    expect(
-      AppConfig.isProductionSafeBaseUrl('https://api.petmagic.app'),
-      isTrue,
-    );
+    expect(AppConfig.isProductionSafeBaseUrl('https://api.petgpt.app'), isTrue);
 
     for (final unsafeUrl in const [
-      'http://api.petmagic.app',
-      'https://api.petmagic.app:5000',
-      'https://staging-api.petmagic.app',
+      'http://api.petgpt.app',
+      'https://api.petgpt.app:5000',
+      'https://staging-api.petgpt.app',
       'https://dev.petmagic.app',
       'https://evil.example',
-      'https://api.petmagic.app/v1',
-      'https://user@api.petmagic.app',
-      'https://api.petmagic.app?x=1',
-      'https://api.petmagic.app#debug',
+      'https://api.petgpt.app/v1',
+      'https://user@api.petgpt.app',
+      'https://api.petgpt.app?x=1',
+      'https://api.petgpt.app#debug',
       'https://localhost:5000',
       'https://localhost:5001',
       'https://10.0.2.2:5000',

@@ -140,7 +140,7 @@ android {
                 val expectedApiBaseUrl = if (environment == "staging") {
                     "https://api.staging.petmagic.app"
                 } else {
-                    "https://api.petmagic.app"
+                    "https://api.petgpt.app"
                 }
                 val defines = decodedDartDefines()
                 if (defines["APP_ENVIRONMENT"] != environment ||

@@ -146,6 +146,36 @@ try {
     'petmagic-staging-generation-worker numInstances must be 1, found 2.'
   );
 
+  const oversizedApiPoolPath = writeFixture(
+    'render-oversized-api-pool.yaml',
+    replaceOccurrenceRequired(
+      stagingBlueprint,
+      '      - key: Database__MaxPoolSize\n        value: "28"',
+      '      - key: Database__MaxPoolSize\n        value: "54"',
+      1
+    )
+  );
+  requireCheckerFailure(
+    oversizedApiPoolPath,
+    'staging',
+    'petmagic-staging-api Database__MaxPoolSize must be 28, found 54.'
+  );
+
+  const wrongWorkerPeerPoolPath = writeFixture(
+    'render-wrong-worker-peer-pool.yaml',
+    replaceOccurrenceRequired(
+      stagingBlueprint,
+      '      - key: Database__PeerMaxPoolSize\n        value: "28"',
+      '      - key: Database__PeerMaxPoolSize\n        value: "27"',
+      1
+    )
+  );
+  requireCheckerFailure(
+    wrongWorkerPeerPoolPath,
+    'staging',
+    'petmagic-staging-generation-worker Database__PeerMaxPoolSize must be 28, found 27.'
+  );
+
   const wrongWorkerPlanPath = writeFixture(
     'render-wrong-worker-plan.yaml',
     replaceOccurrenceRequired(stagingBlueprint, '    plan: standard', '    plan: starter', 2)
@@ -170,6 +200,36 @@ try {
     workerBillingSecretPath,
     'staging',
     'petmagic-staging-generation-worker must not receive external billing/store/push setting STRIPE_TEST_SECRET_KEY'
+  );
+
+  const missingApiPushDispatcherPath = writeFixture(
+    'render-missing-api-push-dispatcher.yaml',
+    replaceRequired(
+      stagingBlueprint,
+      '      - key: Templates__FirebasePush__Enabled\n        value: "true"\n',
+      ''
+    )
+  );
+  requireCheckerFailure(
+    missingApiPushDispatcherPath,
+    'staging',
+    'petmagic-staging-api is missing env Templates__FirebasePush__Enabled.'
+  );
+
+  const workerPushDispatcherPath = writeFixture(
+    'render-worker-push-dispatcher.yaml',
+    replaceOccurrenceRequired(
+      stagingBlueprint,
+      '      - key: FAL_AI_API_KEY\n        sync: false\n',
+      '      - key: FAL_AI_API_KEY\n        sync: false\n'
+        + '      - key: Templates__FirebasePush__Enabled\n        value: "true"\n',
+      2
+    )
+  );
+  requireCheckerFailure(
+    workerPushDispatcherPath,
+    'staging',
+    'petmagic-staging-generation-worker must not receive external billing/store/push setting Templates__FirebasePush__Enabled'
   );
 
   const inheritedWorkerBillingSecretPath = writeFixture(

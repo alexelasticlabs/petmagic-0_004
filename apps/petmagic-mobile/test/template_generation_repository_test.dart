@@ -1302,7 +1302,7 @@ void main() {
             'contentType': 'image/png',
           }),
           9 => jsonResponse({
-            'shareUrl': 'https://app.petmagic.app/share/generation/token',
+            'shareUrl': 'https://app.petgpt.app/share/generation/token',
             'shareToken': 'token',
             'signedMediaUrl': 'https://cdn.petmagic.test/generated.jpg',
             'hasWatermark': false,
@@ -1346,7 +1346,7 @@ void main() {
     expect(watermark.watermarkRemoved, isTrue);
     expect(download.mediaUrl, 'https://cdn.petmagic.test/generated.jpg');
     expect(share.mediaUrl, 'https://cdn.petmagic.test/generated.jpg');
-    expect(share.shareUrl, 'https://app.petmagic.app/share/generation/token');
+    expect(share.shareUrl, 'https://app.petgpt.app/share/generation/token');
     expect(share.shareToken, 'token');
     expect(share.fileName, 'generated.jpg');
     expect(

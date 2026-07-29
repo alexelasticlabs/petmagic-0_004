@@ -24,7 +24,7 @@ if (!['staging', 'production'].includes(environment)) {
   fail('--environment must be staging or production.');
 }
 const apiBaseUrl = environment === 'production'
-  ? 'https://api.petmagic.app'
+  ? 'https://api.petgpt.app'
   : 'https://api.staging.petmagic.app';
 const runId = getOptionValue('--run-id')
   ?? `render-docker-build-smoke-${environment}-${formatTimestamp(new Date())}-${process.pid}`;

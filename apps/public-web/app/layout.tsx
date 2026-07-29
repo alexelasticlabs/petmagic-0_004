@@ -9,7 +9,7 @@ const comfortaa = Comfortaa({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://petmagic.app"),
+  metadataBase: new URL("https://petgpt.app"),
   title: {
     default: "PetMagic — Legal & Support",
     template: "%s · PetMagic",

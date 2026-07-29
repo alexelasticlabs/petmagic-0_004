@@ -448,7 +448,7 @@ class FakeGalleryTemplateGenerationRepository
     this.shareUrl = 'https://cdn.petmagic.test/fresh-share.jpg',
     this.downloadFileName = 'fresh-download.jpg',
     this.shareFileName = 'fresh-share.jpg',
-    this.durableShareUrl = 'https://app.petmagic.app/share/generation/token',
+    this.durableShareUrl = 'https://app.petgpt.app/share/generation/token',
   }) : super(
          dio: Dio(),
          sessionStorage: AuthSessionStorage(),

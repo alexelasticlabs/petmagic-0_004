@@ -557,7 +557,7 @@ export function GenerationsPage({ locale }: GenerationsPageProps) {
 
   if (!canViewGenerations) {
     return (
-      <section className={styles.page}>
+      <section className={styles.page} data-admin-route="generations">
         <AdminPageHero
           eyebrow={text.eyebrow}
           title={text.title}
@@ -571,7 +571,7 @@ export function GenerationsPage({ locale }: GenerationsPageProps) {
 
   return (
     <>
-      <section className={styles.page}>
+      <section className={styles.page} data-admin-route="generations">
         <AdminPageHero
           eyebrow={text.eyebrow}
           title={text.title}

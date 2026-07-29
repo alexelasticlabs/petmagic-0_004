@@ -149,7 +149,7 @@ class FakeGenerationStatusTemplateGenerationRepository
       mediaUrl: mediaAccessUrl,
       hasWatermark: false,
       fileName: mediaAccessFileName,
-      shareUrl: 'https://app.petmagic.app/share/generation/token',
+      shareUrl: 'https://app.petgpt.app/share/generation/token',
       shareToken: 'token',
     );
   }

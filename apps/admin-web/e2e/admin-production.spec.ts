@@ -90,7 +90,7 @@ test("admin login, session restore, RBAC navigation, nonce CSP and API error", a
   expect(firstPolicy).toContain("style-src-attr 'unsafe-inline'");
   expect(firstPolicy).toContain("img-src 'self' data: blob:");
   expect(firstPolicy).toContain("media-src 'self' blob:");
-  expect(firstPolicy).toContain("https://cdn.petmagic.app");
+  expect(firstPolicy).toContain("https://cdn.petgpt.app");
 
   await page.locator("#login-email").fill("admin@petmagic.test");
   await page.locator("#login-password").fill("production-ready-password");

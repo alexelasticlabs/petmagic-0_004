@@ -590,7 +590,7 @@ void main() {
   test('redacts checkout urls embedded in log text', () {
     final message = AppLogger.sanitizeMessageForTesting(
       'checkoutUrl=https://checkout.stripe.com/c/pay/cs_test_checkoutSession123#fidkdSecret '
-      'return_url: https://petmagic.app/checkout/done?session_id=cs_test_secret',
+      'return_url: https://petgpt.app/checkout/done?session_id=cs_test_secret',
     );
 
     expect(message, contains('checkoutUrl=***'));

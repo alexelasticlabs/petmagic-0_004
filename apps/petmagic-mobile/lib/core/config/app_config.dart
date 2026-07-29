@@ -18,7 +18,7 @@ class AppConfig {
   const AppConfig._();
 
   static const stagingApiBaseUrl = 'https://api.staging.petmagic.app';
-  static const productionApiBaseUrl = 'https://api.petmagic.app';
+  static const productionApiBaseUrl = 'https://api.petgpt.app';
   static const stagingDeepLinkScheme = 'petmagic-staging';
   static const productionDeepLinkScheme = 'petmagic';
   static const appEnvironment = String.fromEnvironment('APP_ENVIRONMENT');
@@ -321,7 +321,7 @@ class AppConfig {
 
     final expectedHost = switch (environment.trim().toLowerCase()) {
       'staging' => 'api.staging.petmagic.app',
-      'production' => 'api.petmagic.app',
+      'production' => 'api.petgpt.app',
       _ => null,
     };
     final host = uri.host.toLowerCase();

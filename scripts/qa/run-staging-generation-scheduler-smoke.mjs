@@ -125,6 +125,11 @@ const evidence = {
   warning: smokeMode === 'local'
     ? 'LOCAL DEVELOPMENT SMOKE ONLY - NOT STAGING OR PRODUCTION EVIDENCE'
     : null,
+  diagnosticOverride: allowIncomplete,
+  diagnosticWarning: allowIncomplete
+    ? 'STAGING_ALLOW_INCOMPLETE is enabled: this run is diagnostic only and cannot be used as release evidence.'
+    : null,
+  releaseEvidence: false,
   apiBaseUrl: anonymize(apiBaseUrl),
   imageTemplateId,
   videoTemplateId,
@@ -342,7 +347,8 @@ function verifyMigrationsAndConcurrentIndexes() {
       '20260630230638_AddGenerationRefundLedgerIdempotencyIndex',
       '20260728231704_AddGenerationControlFoundation',
       '20260729153000_AddGenerationSchedulerHotPathIndexes',
-      '20260729184500_EnforceGenerationResultMediaIdentity'
+      '20260729184500_EnforceGenerationResultMediaIdentity',
+      '20260729213000_RepairGenerationSchedulerV2ExistingDeployments'
     )
     ORDER BY "MigrationId";
   `).flat();
@@ -354,7 +360,8 @@ function verifyMigrationsAndConcurrentIndexes() {
       && migrationRows.includes('20260630230638_AddGenerationRefundLedgerIdempotencyIndex')
       && migrationRows.includes('20260728231704_AddGenerationControlFoundation')
       && migrationRows.includes('20260729153000_AddGenerationSchedulerHotPathIndexes')
-      && migrationRows.includes('20260729184500_EnforceGenerationResultMediaIdentity'),
+      && migrationRows.includes('20260729184500_EnforceGenerationResultMediaIdentity')
+      && migrationRows.includes('20260729213000_RepairGenerationSchedulerV2ExistingDeployments'),
     migrationRows.join(', '));
 
   const indexRows = queryRows(`
@@ -388,15 +395,19 @@ function verifyConcurrentMigrationSource() {
     },
     {
       file: '20260728231704_AddGenerationControlFoundation.cs',
-      expectedConcurrentStatements: 2
+      expectedConcurrentStatements: 0
     },
     {
       file: '20260729153000_AddGenerationSchedulerHotPathIndexes.cs',
-      expectedConcurrentStatements: 8
+      expectedConcurrentStatements: 15
     },
     {
       file: '20260729184500_EnforceGenerationResultMediaIdentity.cs',
       expectedConcurrentStatements: 3
+    },
+    {
+      file: '20260729213000_RepairGenerationSchedulerV2ExistingDeployments.cs',
+      expectedConcurrentStatements: 10
     }
   ];
   evidence.concurrentMigrationSource = [];
@@ -1477,8 +1488,17 @@ function hasFailedChecks() {
 }
 
 function finish(exitCode) {
+  const failed = hasFailedChecks();
   evidence.finishedAtUtc = new Date().toISOString();
   evidence.failedChecks = checks.filter(check => !check.ok);
+  evidence.exitCode = exitCode;
+  evidence.status = failed
+    ? (allowIncomplete ? 'diagnostic_incomplete' : 'failed')
+    : (allowIncomplete ? 'diagnostic_only' : 'passed');
+  evidence.releaseEvidence = smokeMode === 'staging'
+    && !allowIncomplete
+    && !failed
+    && exitCode === 0;
   writeFileSync(join(artifactDir, 'evidence.json'), JSON.stringify(evidence, null, 2));
   writeFileSync(join(artifactDir, 'summary.md'), renderSummary());
   console.log(`[${runId}] wrote ${join(artifactDir, 'evidence.json')}`);
@@ -1493,8 +1513,13 @@ function renderSummary() {
     ...(smokeMode === 'local'
       ? ['**LOCAL DEVELOPMENT SMOKE ONLY - NOT STAGING OR PRODUCTION EVIDENCE**', '']
       : []),
+    ...(allowIncomplete
+      ? ['**DIAGNOSTIC OVERRIDE ACTIVE - THIS ARTIFACT IS NOT RELEASE EVIDENCE**', '']
+      : []),
     `Run ID: ${runId}`,
     `Mode: ${smokeMode}`,
+    `Status: ${evidence.status}`,
+    `Release evidence: ${evidence.releaseEvidence ? 'yes' : 'no'}`,
     `Started: ${evidence.startedAtUtc}`,
     `Finished: ${evidence.finishedAtUtc}`,
     '',

@@ -626,6 +626,12 @@ assert(
     && stagingSmoke.includes('expectedConcurrentStatements: 3'),
   'staging scheduler smoke must gate on the generation-result media identity migration and its valid ready concurrent index',
 );
+assert(
+  stagingSmoke.includes('20260729213000_RepairGenerationSchedulerV2ExistingDeployments')
+    && stagingSmoke.includes("file: '20260729213000_RepairGenerationSchedulerV2ExistingDeployments.cs'")
+    && stagingSmoke.includes('expectedConcurrentStatements: 10'),
+  'staging scheduler smoke must gate on the existing-deployment Scheduler V2 repair migration',
+);
 
 const stagingEnvReadiness = read('scripts/qa/check-staging-env-readiness.mjs');
 assert(
@@ -648,7 +654,7 @@ assert(
 );
 assert(
   renderDockerBuildSmoke.includes("getOptionValue('--environment')")
-    && renderDockerBuildSmoke.includes("'https://api.petmagic.app'")
+    && renderDockerBuildSmoke.includes("'https://api.petgpt.app'")
     && renderDockerBuildSmoke.includes("'https://api.staging.petmagic.app'"),
   'Render Docker build smoke must select admin build-time API URLs by deployment environment',
 );
@@ -660,7 +666,9 @@ assert(
   'Render post-deploy smoke must keep help text for operator use',
 );
 assert(
-  renderPostdeploySmoke.includes('The smoke is read-only: it checks API /health, admin /ru, scheduler fingerprint'),
+  renderPostdeploySmoke.includes('The smoke is read-only: it checks API /health and exact source revision, admin /ru')
+    && renderPostdeploySmoke.includes('/ru/generations')
+    && renderPostdeploySmoke.includes('route identity/CSP contracts, scheduler fingerprint'),
   'Render post-deploy smoke must document its read-only scope',
 );
 assert(
@@ -697,6 +705,12 @@ assert(
 
 const renderPredeployGate = read('scripts/qa/run-render-predeploy-gate.mjs');
 assert(
+  renderPredeployGate.includes("process.platform === 'win32'")
+    && renderPredeployGate.includes("['cmd.exe', ['/d', '/s', '/c', 'npm run typecheck --prefix apps/admin-web']]")
+    && renderPredeployGate.includes("command: adminTypecheckCommand"),
+  'Render predeploy gate must invoke the admin typecheck with a Windows-compatible npm executable',
+);
+assert(
   renderPredeployGate.includes('Render predeploy gate.'),
   'Render predeploy gate must keep help text for operator use',
 );
@@ -718,10 +732,36 @@ assert(
   'Render predeploy gate must keep Docker build smoke opt-in documented',
 );
 assert(
+  renderPredeployGate.includes("'PetMagic.slnx'")
+    && renderPredeployGate.includes("'src/Host/PetMagic.Host.GenerationWorker/PetMagic.Host.GenerationWorker.csproj'")
+    && renderPredeployGate.includes("name: 'generation_worker_build'"),
+  'Render predeploy gate must compile the full solution and explicitly verify the generation worker',
+);
+assert(
+  renderPredeployGate.includes("name: 'admin_typecheck'")
+    && renderPredeployGate.includes("['npm', ['run', 'typecheck', '--prefix', 'apps/admin-web']]")
+    && renderPredeployGate.includes('command: adminTypecheckCommand')
+    && renderPredeployGate.includes('required: true'),
+  'Render predeploy gate must typecheck admin-web by default',
+);
+assert(
   renderPredeployGate.includes("'--environment',")
     && renderPredeployGate.includes('environment,')
     && renderPredeployGate.includes("'--platform',"),
   'Render predeploy gate must pass the selected environment to the Docker build smoke',
+);
+
+const stagingGenerationSchedulerSmoke = read('scripts/qa/run-staging-generation-scheduler-smoke.mjs');
+assert(
+  stagingGenerationSchedulerSmoke.includes("status = failed")
+    && stagingGenerationSchedulerSmoke.includes("'diagnostic_incomplete'")
+    && stagingGenerationSchedulerSmoke.includes("'diagnostic_only'")
+    && stagingGenerationSchedulerSmoke.includes('releaseEvidence = smokeMode === \'staging\''),
+  'Generation scheduler smoke must distinguish diagnostic overrides from release evidence',
+);
+assert(
+  stagingGenerationSchedulerSmoke.includes('DIAGNOSTIC OVERRIDE ACTIVE - THIS ARTIFACT IS NOT RELEASE EVIDENCE'),
+  'Generation scheduler smoke summary must visibly mark STAGING_ALLOW_INCOMPLETE artifacts as diagnostic only',
 );
 
 const economyStagingGate = read('scripts/qa/run-economy-staging-infra-gate.mjs');

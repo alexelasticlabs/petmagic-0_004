@@ -6,19 +6,19 @@ describe("buildNonceContentSecurityPolicy", () => {
   it("uses a nonce without unsafe-inline in production", () => {
     const policy = buildNonceContentSecurityPolicy(
       "nonce-value_123",
-      "https://api.petmagic.app",
+      "https://api.petgpt.app",
       "production",
-      "https://cdn.petmagic.app, https://pub-123.r2.dev"
+      "https://cdn.petgpt.app, https://pub-123.r2.dev"
     );
 
     expect(policy).toContain("script-src 'self' 'nonce-nonce-value_123' 'strict-dynamic'");
     expect(policy).toContain("style-src 'self' 'nonce-nonce-value_123'");
     expect(policy).toContain("style-src-attr 'unsafe-inline'");
     expect(policy).toContain(
-      "connect-src 'self' https://api.petmagic.app https://cdn.petmagic.app https://pub-123.r2.dev"
+      "connect-src 'self' https://api.petgpt.app https://cdn.petgpt.app https://pub-123.r2.dev"
     );
     expect(policy).toContain(
-      "media-src 'self' blob: https://api.petmagic.app https://cdn.petmagic.app https://pub-123.r2.dev"
+      "media-src 'self' blob: https://api.petgpt.app https://cdn.petgpt.app https://pub-123.r2.dev"
     );
     expect(policy).not.toContain("style-src 'self' 'unsafe-inline'");
     expect(policy).not.toContain("'unsafe-eval'");
@@ -52,16 +52,16 @@ describe("buildNonceContentSecurityPolicy", () => {
 
   it("rejects unsafe production media origins", () => {
     for (const mediaOrigin of [
-      "http://cdn.petmagic.app",
-      "https://user:password@cdn.petmagic.app",
-      "https://cdn.petmagic.app/private",
+      "http://cdn.petgpt.app",
+      "https://user:password@cdn.petgpt.app",
+      "https://cdn.petgpt.app/private",
       "https://127.0.0.1",
       "https://cdn.example.com",
     ]) {
       expect(() =>
         buildNonceContentSecurityPolicy(
           "nonce-value",
-          "https://api.petmagic.app",
+          "https://api.petgpt.app",
           "production",
           mediaOrigin
         )
@@ -71,8 +71,8 @@ describe("buildNonceContentSecurityPolicy", () => {
 
   it("rejects unsafe production API origins", () => {
     for (const apiOrigin of [
-      "http://api.petmagic.app",
-      "https://user:password@api.petmagic.app",
+      "http://api.petgpt.app",
+      "https://user:password@api.petgpt.app",
       "https://127.0.0.1",
       "https://api.example.com",
     ]) {
@@ -86,7 +86,7 @@ describe("buildNonceContentSecurityPolicy", () => {
     expect(() =>
       buildNonceContentSecurityPolicy(
         "nonce-value",
-        "http://api.petmagic.app",
+        "http://api.petgpt.app",
         "production",
         undefined,
         true

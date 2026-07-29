@@ -12,7 +12,7 @@ const currentModulePath = fileURLToPath(import.meta.url);
 export async function runAdminBuild({ appRoot = process.cwd(), environment = process.env } = {}) {
   const resolvedAppRoot = path.resolve(appRoot);
   const nextPublicApiBaseUrl =
-    environment.NEXT_PUBLIC_API_BASE_URL?.trim() || "https://api.petmagic.app";
+    environment.NEXT_PUBLIC_API_BASE_URL?.trim() || "https://api.petgpt.app";
   const nextDistDir = environment.NEXT_DIST_DIR?.trim();
   const restoreNextEnv = environment.NEXT_E2E_RESTORE_NEXT_ENV === "1";
   const nextEnvPath = path.join(resolvedAppRoot, "next-env.d.ts");

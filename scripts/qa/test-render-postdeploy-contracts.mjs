@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { dirname, isAbsolute, relative, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(scriptDir, '..', '..');
 const smokePath = resolve(scriptDir, 'run-render-postdeploy-smoke.mjs');
+const adminProxyPath = resolve(repoRoot, 'apps', 'admin-web', 'src', 'proxy.ts');
 const tempBase = resolve(tmpdir());
 const fixtureRoot = mkdtempSync(resolve(tempBase, 'petmagic-render-postdeploy-contracts-'));
 
@@ -34,6 +35,37 @@ try {
     /api\.health\.http_200/,
     'Unsafe URL authority must stop before any remote request is attempted.');
 
+  const invalidRevisionResult = runSmoke(
+    'https://api.example.test',
+    'https://admin.example.test',
+    resolve(fixtureRoot, 'revision'),
+    'not-a-revision');
+  assert.notEqual(invalidRevisionResult.status, 0, 'Invalid expected source revision must fail before remote requests.');
+  assert.match(formatResult(invalidRevisionResult), /input\.expected_source_revision_format/);
+  assert.doesNotMatch(formatResult(invalidRevisionResult), /api\.health\.http_200/);
+
+  const smokeSource = readFileSync(smokePath, 'utf8');
+  for (const requiredContract of [
+    "'api.health.source_revision_matches_deploy'",
+    "'api.generation_control.progress_present_when_work_exists'",
+    "'api.generation_control.progress_fresh_when_work_exists'",
+    "`${adminBaseUrl}/ru/generations`",
+    "'admin.generations.route_identity'",
+    "response.headers.get('x-petmagic-admin-route')",
+    "'admin.generations.csp_expected_api'",
+    "sourceRevision: abbreviateSourceRevision(readCaseInsensitive(build, 'sourceRevision'))"
+  ]) {
+    assert.ok(smokeSource.includes(requiredContract), `Postdeploy smoke contract missing: ${requiredContract}`);
+  }
+
+  const adminProxySource = readFileSync(adminProxyPath, 'utf8');
+  assert.ok(
+    adminProxySource.includes('response.headers.set("X-PetMagic-Admin-Route", "generations")'),
+    'Admin proxy must attest the generations route for the read-only postdeploy check.');
+  assert.ok(
+    adminProxySource.includes('/^\\/(?:ru|en)\\/generations\\/?$/'),
+    'Admin route attestation must be scoped to localized generations routes only.');
+
   console.log('Render post-deploy contract tests passed.');
 } finally {
   const fixtureRelativePath = relative(tempBase, fixtureRoot);
@@ -44,7 +76,7 @@ try {
   rmSync(fixtureRoot, { recursive: true, force: true });
 }
 
-function runSmoke(apiBaseUrl, adminBaseUrl, artifactDir) {
+function runSmoke(apiBaseUrl, adminBaseUrl, artifactDir, expectedSourceRevision = 'abcdef0') {
   const result = spawnSync(
     process.execPath,
     [
@@ -55,6 +87,8 @@ function runSmoke(apiBaseUrl, adminBaseUrl, artifactDir) {
       apiBaseUrl,
       '--admin-base-url',
       adminBaseUrl,
+      '--expected-source-revision',
+      expectedSourceRevision,
       '--artifact-dir',
       artifactDir,
       '--run-id',

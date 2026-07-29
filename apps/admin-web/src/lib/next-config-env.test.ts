@@ -70,16 +70,16 @@ describe("next admin env config", () => {
   });
 
   it("uses only the configured HTTPS API host in production image patterns", () => {
-    expect(apiImageRemotePatterns("https://api.petmagic.app", "production")).toEqual([
+    expect(apiImageRemotePatterns("https://api.petgpt.app", "production")).toEqual([
       {
         protocol: "https",
-        hostname: "api.petmagic.app",
+        hostname: "api.petgpt.app",
         port: "",
         pathname: "/user-avatars/**",
       },
       {
         protocol: "https",
-        hostname: "api.petmagic.app",
+        hostname: "api.petgpt.app",
         port: "",
         pathname: "/support-attachments/**",
       },
@@ -153,9 +153,9 @@ describe("next admin env config", () => {
       "PETMAGIC_APP_DEEP_LINK_SCHEME=petmagic-staging",
     ]);
     expect(productionLines).toEqual([
-      "NEXT_PUBLIC_API_BASE_URL=https://api.petmagic.app",
-      "INTERNAL_API_BASE_URL=https://api.petmagic.app",
-      "ADMIN_MEDIA_ORIGINS=https://cdn.petmagic.app",
+      "NEXT_PUBLIC_API_BASE_URL=https://api.petgpt.app",
+      "INTERNAL_API_BASE_URL=https://api.petgpt.app",
+      "ADMIN_MEDIA_ORIGINS=",
       "PETMAGIC_APP_DEEP_LINK_SCHEME=petmagic",
     ]);
     expect(stagingLines.join("\n")).not.toMatch(/localhost|127\.0\.0\.1|http:\/\//);
