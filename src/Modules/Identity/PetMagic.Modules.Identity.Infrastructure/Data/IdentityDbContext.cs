@@ -23,6 +23,10 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
 
     public DbSet<AdminEmailBroadcast> AdminEmailBroadcasts => Set<AdminEmailBroadcast>();
 
+    public DbSet<AdminNotificationEvent> AdminNotificationEvents => Set<AdminNotificationEvent>();
+
+    public DbSet<AdminNotificationReceipt> AdminNotificationReceipts => Set<AdminNotificationReceipt>();
+
     public DbSet<ExternalAuthTicket> ExternalAuthTickets => Set<ExternalAuthTicket>();
 
     protected override void OnModelCreating(ModelBuilder builder)
@@ -183,6 +187,54 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
             entity.Property(x => x.Status).HasConversion<int>().IsRequired();
             entity.HasIndex(x => new { x.CreatedAtUtc, x.Id }).IsDescending();
             entity.HasIndex(x => new { x.Status, x.CreatedAtUtc }).IsDescending(false, true);
+        });
+
+        builder.Entity<AdminNotificationEvent>(entity =>
+        {
+            entity.ToTable(
+                "admin_notification_events",
+                tableBuilder =>
+                {
+                    tableBuilder.HasCheckConstraint(
+                        "CK_admin_notification_events_schema_version",
+                        "\"SchemaVersion\" > 0");
+                    tableBuilder.HasCheckConstraint(
+                        "CK_admin_notification_events_version",
+                        "\"Version\" > 0");
+                    tableBuilder.HasCheckConstraint(
+                        "CK_admin_notification_events_acknowledgement",
+                        "(\"AcknowledgedAtUtc\" IS NULL AND \"AcknowledgedByUserId\" IS NULL AND \"AcknowledgementReason\" IS NULL) OR (\"AcknowledgedAtUtc\" IS NOT NULL AND \"AcknowledgedByUserId\" IS NOT NULL AND \"AcknowledgementReason\" IS NOT NULL)");
+                });
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Type).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.PayloadJson).HasColumnType("jsonb").IsRequired();
+            entity.Property(x => x.Category).HasMaxLength(32).IsRequired();
+            entity.Property(x => x.Priority).HasMaxLength(16).IsRequired();
+            entity.Property(x => x.AudienceRoles).HasMaxLength(128).IsRequired();
+            entity.Property(x => x.Href).HasMaxLength(512);
+            entity.Property(x => x.Source).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.DeduplicationKey).HasMaxLength(160).IsRequired();
+            entity.Property(x => x.AcknowledgementReason).HasMaxLength(500);
+            entity.Property(x => x.Version).HasDefaultValue(1).IsConcurrencyToken();
+            entity.HasIndex(x => new { x.CreatedAtUtc, x.Id }).IsDescending();
+            entity.HasIndex(x => new { x.Priority, x.AcknowledgedAtUtc, x.CreatedAtUtc })
+                .HasDatabaseName("IX_admin_notif_priority_ack_created")
+                .HasFilter("\"Priority\" = 'critical' AND \"AcknowledgedAtUtc\" IS NULL");
+            entity.HasIndex(x => x.ExpiresAtUtc).HasFilter("\"ExpiresAtUtc\" IS NOT NULL");
+            entity.HasIndex(x => new { x.Source, x.DeduplicationKey }).IsUnique();
+            entity.HasIndex(x => x.TargetUserId);
+        });
+
+        builder.Entity<AdminNotificationReceipt>(entity =>
+        {
+            entity.ToTable("admin_notification_receipts");
+            entity.HasKey(x => new { x.EventId, x.UserId });
+            entity.HasIndex(x => new { x.UserId, x.ArchivedAtUtc, x.ReadAtUtc, x.EventId })
+                .HasDatabaseName("IX_admin_notif_receipt_user_state");
+            entity.HasOne(x => x.Event)
+                .WithMany(x => x.Receipts)
+                .HasForeignKey(x => x.EventId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         builder.Entity<ExternalAuthTicket>(entity =>

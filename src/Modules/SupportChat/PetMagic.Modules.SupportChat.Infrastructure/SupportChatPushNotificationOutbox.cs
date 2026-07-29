@@ -70,4 +70,46 @@ internal sealed class SupportChatPushNotificationOutbox(
             UpdatedAtUtc = now
         });
     }
+
+    internal static void EnqueueAdminMessageNotification(
+        SupportChatDbContext dbContext,
+        Guid conversationId,
+        Guid messageId,
+        DateTime occurredAtUtc)
+    {
+        var deduplicationKey = $"support_admin_notification:{messageId:D}";
+        if (dbContext.PushOutboxMessages.Local.Any(x => x.DeduplicationKey == deduplicationKey))
+        {
+            return;
+        }
+
+        var notification = new AdminNotificationMessage(
+            "support.message.received",
+            1,
+            JsonSerializer.SerializeToElement(new
+            {
+                conversationId,
+                messageId,
+            }, JsonOptions),
+            "support",
+            AdminNotificationPriorities.Normal,
+            ["Admin", "Moderator"],
+            "support_chat",
+            $"message:{messageId:D}",
+            $"/support/{conversationId:D}",
+            OccurredAtUtc: occurredAtUtc);
+        var now = DateTime.UtcNow;
+        dbContext.PushOutboxMessages.Add(new PushOutboxMessage
+        {
+            Id = Guid.NewGuid(),
+            DeduplicationKey = deduplicationKey,
+            Kind = AdminNotificationOutbox.Kind,
+            UserId = Guid.Empty,
+            PayloadJson = AdminNotificationOutbox.Serialize(notification),
+            Status = PushOutboxStatus.Queued,
+            NextAttemptAtUtc = now,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+        });
+    }
 }

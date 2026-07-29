@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 
 using PetMagic.Modules.Identity.Api.Endpoints;
+using PetMagic.Modules.Identity.Api.Realtime;
+using PetMagic.Modules.Identity.Application.Abstractions;
 using PetMagic.Modules.Identity.Application.Contracts;
 using PetMagic.Modules.Identity.Application.Validation;
 
@@ -13,6 +15,8 @@ public static class IdentityApiModule
 {
     public static IServiceCollection AddIdentityApiModule(this IServiceCollection services)
     {
+        services.AddSignalR();
+        services.AddScoped<IAdminNotificationRealtimeNotifier, SignalRAdminNotificationRealtimeNotifier>();
         services.AddScoped<IValidator<RegisterUserCommand>, RegisterUserCommandValidator>();
         services.AddScoped<IValidator<AcceptLegalDocumentsCommand>, AcceptLegalDocumentsCommandValidator>();
         services.AddScoped<IValidator<LoginCommand>, LoginCommandValidator>();
@@ -49,6 +53,9 @@ public static class IdentityApiModule
         app.MapLegalEndpoints();
         app.MapAdminUserEndpoints();
         app.MapAdminAuditEndpoints();
+        app.MapAdminNotificationEndpoints();
+        app.MapHub<AdminNotificationsHub>(AdminNotificationsHub.RoutePattern)
+            .RequireCors("AdminWeb");
         return app;
     }
 }

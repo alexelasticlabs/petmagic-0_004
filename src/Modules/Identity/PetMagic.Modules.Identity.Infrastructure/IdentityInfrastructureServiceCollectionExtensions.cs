@@ -16,6 +16,7 @@ using Npgsql;
 
 using PetMagic.BuildingBlocks.Images;
 using PetMagic.BuildingBlocks.Observability;
+using PetMagic.BuildingBlocks.Notifications;
 using PetMagic.BuildingBlocks.Security;
 using PetMagic.Modules.Identity.Application.Abstractions;
 using PetMagic.Modules.Identity.Application.Contracts;
@@ -114,7 +115,8 @@ public static class IdentityInfrastructureServiceCollectionExtensions
                         }
 
                         var path = context.HttpContext.Request.Path;
-                        if (path.StartsWithSegments("/hubs/support-chat", StringComparison.OrdinalIgnoreCase))
+                        if (path.StartsWithSegments("/hubs/support-chat", StringComparison.OrdinalIgnoreCase)
+                            || path.StartsWithSegments("/hubs/admin-notifications", StringComparison.OrdinalIgnoreCase))
                         {
                             context.Token = accessToken;
                         }
@@ -193,6 +195,11 @@ public static class IdentityInfrastructureServiceCollectionExtensions
         services.AddScoped<IIdentityUserLookupService, IdentityUserLookupService>();
         services.AddScoped<IAdminAuditLog, IdentityAdminAuditLog>();
         services.AddScoped<IAdminAuditQueryService, IdentityAdminAuditQueryService>();
+        services.AddScoped<IdentityAdminNotificationService>();
+        services.AddScoped<IAdminNotificationService>(serviceProvider =>
+            serviceProvider.GetRequiredService<IdentityAdminNotificationService>());
+        services.AddScoped<IAdminNotificationSink>(serviceProvider =>
+            serviceProvider.GetRequiredService<IdentityAdminNotificationService>());
         services.AddScoped<IEmailSender, SmtpEmailSender>();
         services.AddScoped<EmailDispatchProcessor>();
         services.AddHostedService<EmailDispatchWorker>();

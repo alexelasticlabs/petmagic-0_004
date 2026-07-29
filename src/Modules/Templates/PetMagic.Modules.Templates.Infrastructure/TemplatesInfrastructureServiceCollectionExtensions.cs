@@ -287,7 +287,6 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
             serviceProvider.GetRequiredService<FcmTemplateGenerationPushNotificationSender>());
         services.AddScoped<ITemplateGenerationPushNotificationSender, TemplateGenerationPushNotificationOutbox>();
         services.AddScoped<TemplatePushOutboxProcessor>();
-        services.AddScoped<TemplateAdminAuditOutboxProcessor>();
         services.AddScoped<ITemplateMediaLifecycleService, TemplateMediaLifecycleService>();
         services.AddScoped<ITemplateVisibilityPolicy, TemplateVisibilityPolicy>();
         services.AddScoped<ITemplatesService, TemplatesService>();
@@ -325,6 +324,7 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
                 StringComparison.Ordinal)
             && services.Any(descriptor => descriptor.ServiceType == typeof(IAdminAuditLog)))
         {
+            services.AddScoped<TemplateAdminAuditOutboxProcessor>();
             services.AddHostedService<TemplateAdminAuditOutboxWorker>();
         }
 

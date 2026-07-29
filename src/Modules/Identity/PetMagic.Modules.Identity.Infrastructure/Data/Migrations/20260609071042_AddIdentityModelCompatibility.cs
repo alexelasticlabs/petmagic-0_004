@@ -13,18 +13,8 @@ namespace PetMagic.Modules.Identity.Infrastructure.Data.Migrations
         {
             migrationBuilder.Sql(
                 """
-                DO $$
-                BEGIN
-                    IF NOT EXISTS (
-                        SELECT 1
-                        FROM information_schema.columns
-                        WHERE table_schema = 'public'
-                          AND table_name = 'users'
-                          AND column_name = 'LastLoginAtUtc'
-                    ) THEN
-                        ALTER TABLE "users" ADD "LastLoginAtUtc" timestamp with time zone;
-                    END IF;
-                END $$;
+                ALTER TABLE "users"
+                    ADD COLUMN IF NOT EXISTS "LastLoginAtUtc" timestamp with time zone;
                 """);
 
             migrationBuilder.Sql(

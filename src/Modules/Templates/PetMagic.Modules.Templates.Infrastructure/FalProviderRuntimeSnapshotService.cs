@@ -237,6 +237,17 @@ internal sealed class FalProviderRuntimeSnapshotService(
         if (snapshot.BalanceState != previousState)
         {
             snapshot.StatusChangedAtUtc = now;
+            if (snapshot.BalanceState is TemplateProviderBalanceState.Critical
+                or TemplateProviderBalanceState.Unknown)
+            {
+                await TemplateAdminNotificationOutbox.EnqueueProviderCapacityAlertAsync(
+                    dbContext,
+                    ProviderName,
+                    snapshot.BalanceState.ToString().ToLowerInvariant(),
+                    snapshot.LastErrorCode,
+                    snapshot.StatusChangedAtUtc,
+                    cancellationToken);
+            }
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);

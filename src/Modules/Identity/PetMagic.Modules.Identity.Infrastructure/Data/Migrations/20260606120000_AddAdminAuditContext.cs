@@ -87,7 +87,7 @@ namespace PetMagic.Modules.Identity.Infrastructure.Data.Migrations
                 """
                 UPDATE audit_events
                 SET "CreatedAtUtc" = "OccurredAtUtc"
-                WHERE "CreatedAtUtc" IS NULL
+                WHERE "CreatedAtUtc" IS NULL;
                 """);
 
             migrationBuilder.AlterColumn<DateTime>(

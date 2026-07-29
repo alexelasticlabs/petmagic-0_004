@@ -201,6 +201,14 @@ public sealed partial class SupportChatService
                 unreadCountDelta: 1,
                 cancellationToken);
         }
+        else
+        {
+            SupportChatPushNotificationOutbox.EnqueueAdminMessageNotification(
+                supportChatDbContext,
+                conversation.Id,
+                message.Id,
+                message.CreatedAtUtc);
+        }
 
         await supportChatDbContext.SaveChangesAsync(cancellationToken);
         if (transaction is not null)
@@ -322,6 +330,15 @@ public sealed partial class SupportChatService
         if (currentStatus != nextStatus)
         {
             await AppendStatusChangedEventAsync(conversation, currentStatus, nextStatus);
+        }
+
+        if (!command.IsAdmin)
+        {
+            SupportChatPushNotificationOutbox.EnqueueAdminMessageNotification(
+                supportChatDbContext,
+                conversation.Id,
+                message.Id,
+                message.CreatedAtUtc);
         }
 
         await supportChatDbContext.SaveChangesAsync(cancellationToken);

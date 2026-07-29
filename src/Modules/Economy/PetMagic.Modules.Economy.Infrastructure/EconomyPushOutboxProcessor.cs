@@ -16,7 +16,8 @@ internal sealed class EconomyPushOutboxProcessor(
     IEconomyPushDeliverySender deliverySender,
     ILogger<EconomyPushOutboxProcessor> logger,
     IAdminAuditLog? adminAuditLog = null,
-    IOptions<EconomyOptions>? economyOptions = null)
+    IOptions<EconomyOptions>? economyOptions = null,
+    IAdminNotificationSink? adminNotificationSink = null)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -86,6 +87,7 @@ internal sealed class EconomyPushOutboxProcessor(
         var lockId = Guid.NewGuid();
         var lockExpiresAtUtc = now.Add(PushOutboxPolicy.LeaseDuration);
         var canDeliverAdminAudit = adminAuditLog is not null;
+        var canDeliverAdminNotification = adminNotificationSink is not null;
         var canDeliverPush = economyOptions?.Value.IsFirebasePushConfigured ?? true;
         var ids = await dbContext.Database.SqlQueryRaw<Guid>(
             """
@@ -101,8 +103,9 @@ internal sealed class EconomyPushOutboxProcessor(
                 WHERE (("Status" = {0} AND "NextAttemptAtUtc" <= {2} AND "AttemptCount" < {3})
                        OR ("Status" = {1} AND ("LockExpiresAtUtc" IS NULL OR "LockExpiresAtUtc" <= {2})))
                   AND (("Kind" = {6} AND {7})
+                       OR ("Kind" = {11} AND {12})
                        OR ("Kind" IN ({8}, {9}) AND {10})
-                       OR "Kind" NOT IN ({6}, {8}, {9}))
+                       OR "Kind" NOT IN ({6}, {8}, {9}, {11}))
                 ORDER BY "NextAttemptAtUtc", "CreatedAtUtc"
                 FOR UPDATE SKIP LOCKED
                 LIMIT 1
@@ -119,7 +122,9 @@ internal sealed class EconomyPushOutboxProcessor(
             canDeliverAdminAudit,
             EconomyPushNotificationOutbox.WalletKind,
             EconomyPushNotificationOutbox.PremiumKind,
-            canDeliverPush).ToListAsync(cancellationToken);
+            canDeliverPush,
+            AdminNotificationOutbox.Kind,
+            canDeliverAdminNotification).ToListAsync(cancellationToken);
 
         var id = ids.FirstOrDefault();
         return id == Guid.Empty
@@ -131,6 +136,7 @@ internal sealed class EconomyPushOutboxProcessor(
     {
         var now = DateTime.UtcNow;
         var canDeliverAdminAudit = adminAuditLog is not null;
+        var canDeliverAdminNotification = adminNotificationSink is not null;
         var canDeliverPush = economyOptions?.Value.IsFirebasePushConfigured ?? true;
         var message = await dbContext.PushOutboxMessages
             .Where(x => (x.Status == PushOutboxStatus.Queued
@@ -139,10 +145,12 @@ internal sealed class EconomyPushOutboxProcessor(
                     || (x.Status == PushOutboxStatus.Processing
                         && (x.LockExpiresAtUtc == null || x.LockExpiresAtUtc <= now)))
             .Where(x => (x.Kind == EconomyAdminAuditOutbox.Kind && canDeliverAdminAudit)
+                || (x.Kind == AdminNotificationOutbox.Kind && canDeliverAdminNotification)
                 || ((x.Kind == EconomyPushNotificationOutbox.WalletKind
                         || x.Kind == EconomyPushNotificationOutbox.PremiumKind)
                     && canDeliverPush)
                 || (x.Kind != EconomyAdminAuditOutbox.Kind
+                    && x.Kind != AdminNotificationOutbox.Kind
                     && x.Kind != EconomyPushNotificationOutbox.WalletKind
                     && x.Kind != EconomyPushNotificationOutbox.PremiumKind))
             .OrderBy(x => x.NextAttemptAtUtc)
@@ -169,6 +177,7 @@ internal sealed class EconomyPushOutboxProcessor(
             EconomyPushNotificationOutbox.WalletKind => await DeliverWalletAsync(message, cancellationToken),
             EconomyPushNotificationOutbox.PremiumKind => await DeliverPremiumAsync(message, cancellationToken),
             EconomyAdminAuditOutbox.Kind => await DeliverAdminAuditAsync(message, cancellationToken),
+            AdminNotificationOutbox.Kind => await DeliverAdminNotificationAsync(message, cancellationToken),
             _ => PushDeliveryResult.PermanentFailure("push.kind_unknown")
         };
     }
@@ -236,6 +245,29 @@ internal sealed class EconomyPushOutboxProcessor(
         }
 
         await adminAuditLog.WriteAsync(entry, cancellationToken);
+        return PushDeliveryResult.Delivered;
+    }
+
+    private async Task<PushDeliveryResult> DeliverAdminNotificationAsync(
+        PushOutboxMessage message,
+        CancellationToken cancellationToken)
+    {
+        if (adminNotificationSink is null)
+        {
+            return PushDeliveryResult.Retry("admin_notification.sink_unavailable");
+        }
+
+        AdminNotificationMessage notification;
+        try
+        {
+            notification = AdminNotificationOutbox.Deserialize(message.PayloadJson);
+        }
+        catch (JsonException)
+        {
+            return PushDeliveryResult.PermanentFailure("admin_notification.payload_invalid");
+        }
+
+        await adminNotificationSink.PublishAsync(notification, cancellationToken);
         return PushDeliveryResult.Delivered;
     }
 

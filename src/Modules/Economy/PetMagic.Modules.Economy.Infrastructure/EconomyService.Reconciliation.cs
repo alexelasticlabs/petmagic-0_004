@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 
 using Npgsql;
 
+using PetMagic.BuildingBlocks.Notifications;
 using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Abstractions;
@@ -1118,6 +1119,7 @@ public sealed partial class EconomyService
         var now = DateTime.UtcNow;
         var incident = await dbContext.EconomyIncidents
             .FirstOrDefaultAsync(x => x.DeduplicationKey == deduplicationKey, cancellationToken);
+        var wasCreated = incident is null;
 
         if (incident is null)
         {
@@ -1184,7 +1186,57 @@ public sealed partial class EconomyService
             stats.ManualReviewRequired++;
         }
 
+        if (wasCreated && status == "Open")
+        {
+            EnqueueEconomyIncidentNotification(incident);
+        }
+
         await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private void EnqueueEconomyIncidentNotification(EconomyIncident incident)
+    {
+        var outboxDeduplicationKey = $"economy_admin_notification:{incident.Id:D}";
+        if (dbContext.PushOutboxMessages.Local.Any(x => x.DeduplicationKey == outboxDeduplicationKey))
+        {
+            return;
+        }
+
+        var priority = string.Equals(incident.Severity, "Critical", StringComparison.OrdinalIgnoreCase)
+            ? AdminNotificationPriorities.Critical
+            : AdminNotificationPriorities.Warning;
+        var notification = new AdminNotificationMessage(
+            "economy.incident.detected",
+            1,
+            JsonSerializer.SerializeToElement(new
+            {
+                incidentId = incident.Id,
+                incident.Type,
+                incident.Severity,
+                incident.PurchaseOrderId,
+                incident.UserSubscriptionId,
+                incident.Provider,
+            }),
+            "economy",
+            priority,
+            ["Admin"],
+            "economy",
+            $"incident:{incident.Id:D}",
+            $"/economy?incident={incident.Id:D}",
+            OccurredAtUtc: incident.FirstDetectedAtUtc);
+        var now = DateTime.UtcNow;
+        dbContext.PushOutboxMessages.Add(new PushOutboxMessage
+        {
+            Id = Guid.NewGuid(),
+            DeduplicationKey = outboxDeduplicationKey,
+            Kind = AdminNotificationOutbox.Kind,
+            UserId = Guid.Empty,
+            PayloadJson = AdminNotificationOutbox.Serialize(notification),
+            Status = PushOutboxStatus.Queued,
+            NextAttemptAtUtc = now,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+        });
     }
 
     private async Task<bool> HasPackPurchaseLedgerAsync(PurchaseOrder order, CancellationToken cancellationToken)

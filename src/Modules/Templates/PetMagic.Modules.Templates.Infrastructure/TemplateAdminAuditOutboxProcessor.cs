@@ -10,7 +10,8 @@ namespace PetMagic.Modules.Templates.Infrastructure;
 internal sealed class TemplateAdminAuditOutboxProcessor(
     TemplatesDbContext dbContext,
     IAdminAuditLog adminAuditLog,
-    ILogger<TemplateAdminAuditOutboxProcessor> logger)
+    ILogger<TemplateAdminAuditOutboxProcessor> logger,
+    IAdminNotificationSink? adminNotificationSink = null)
 {
     private const string NpgsqlProviderName = "Npgsql.EntityFrameworkCore.PostgreSQL";
 
@@ -31,7 +32,12 @@ internal sealed class TemplateAdminAuditOutboxProcessor(
         }
         else try
         {
-            result = await DeliverAdminAuditAsync(message, cancellationToken);
+            result = message.Kind switch
+            {
+                TemplateAdminAuditOutbox.Kind => await DeliverAdminAuditAsync(message, cancellationToken),
+                AdminNotificationOutbox.Kind => await DeliverAdminNotificationAsync(message, cancellationToken),
+                _ => PushDeliveryResult.PermanentFailure("admin_outbox.kind_unknown"),
+            };
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -80,7 +86,7 @@ internal sealed class TemplateAdminAuditOutboxProcessor(
                 SELECT "Id" FROM templates_push_outbox
                 WHERE (("Status" = {0} AND "NextAttemptAtUtc" <= {2} AND "AttemptCount" < {3})
                        OR ("Status" = {1} AND ("LockExpiresAtUtc" IS NULL OR "LockExpiresAtUtc" <= {2})))
-                    AND "Kind" = {6}
+                    AND "Kind" IN ({6}, {7})
                 ORDER BY "NextAttemptAtUtc", "CreatedAtUtc"
                 FOR UPDATE SKIP LOCKED LIMIT 1)
             RETURNING "Id" AS "Value";
@@ -91,7 +97,8 @@ internal sealed class TemplateAdminAuditOutboxProcessor(
             PushOutboxPolicy.MaxAttempts,
             Guid.NewGuid(),
             now.Add(PushOutboxPolicy.LeaseDuration),
-            TemplateAdminAuditOutbox.Kind).ToListAsync(cancellationToken);
+            TemplateAdminAuditOutbox.Kind,
+            AdminNotificationOutbox.Kind).ToListAsync(cancellationToken);
 
         var id = ids.FirstOrDefault();
         return id == Guid.Empty
@@ -103,7 +110,8 @@ internal sealed class TemplateAdminAuditOutboxProcessor(
     {
         var now = DateTime.UtcNow;
         var message = await dbContext.PushOutboxMessages
-            .Where(item => item.Kind == TemplateAdminAuditOutbox.Kind)
+            .Where(item => item.Kind == TemplateAdminAuditOutbox.Kind
+                || item.Kind == AdminNotificationOutbox.Kind)
             .Where(item => (item.Status == PushOutboxStatus.Queued
                         && item.NextAttemptAtUtc <= now
                         && item.AttemptCount < PushOutboxPolicy.MaxAttempts)
@@ -153,6 +161,29 @@ internal sealed class TemplateAdminAuditOutboxProcessor(
         return PushDeliveryResult.Delivered;
     }
 
+    private async Task<PushDeliveryResult> DeliverAdminNotificationAsync(
+        PushOutboxMessage message,
+        CancellationToken cancellationToken)
+    {
+        if (adminNotificationSink is null)
+        {
+            return PushDeliveryResult.Retry("admin_notification.sink_unavailable");
+        }
+
+        AdminNotificationMessage notification;
+        try
+        {
+            notification = AdminNotificationOutbox.Deserialize(message.PayloadJson);
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return PushDeliveryResult.PermanentFailure("admin_notification.payload_invalid");
+        }
+
+        await adminNotificationSink.PublishAsync(notification, cancellationToken);
+        return PushDeliveryResult.Delivered;
+    }
+
     private static void ApplyResult(PushOutboxMessage message, PushDeliveryResult result)
     {
         var now = DateTime.UtcNow;
@@ -181,7 +212,8 @@ internal sealed class TemplateAdminAuditOutboxProcessor(
     {
         var cutoff = DateTime.UtcNow.Subtract(PushOutboxPolicy.SentRetention);
         var message = await dbContext.PushOutboxMessages
-            .Where(item => item.Kind == TemplateAdminAuditOutbox.Kind
+            .Where(item => (item.Kind == TemplateAdminAuditOutbox.Kind
+                    || item.Kind == AdminNotificationOutbox.Kind)
                 && item.Status == PushOutboxStatus.Sent
                 && item.SentAtUtc <= cutoff)
             .OrderBy(item => item.SentAtUtc)

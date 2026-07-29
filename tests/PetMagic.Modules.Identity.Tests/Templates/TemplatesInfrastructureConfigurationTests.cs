@@ -189,6 +189,27 @@ public sealed class TemplatesInfrastructureConfigurationTests
     }
 
     [Fact]
+    public void AddTemplatesInfrastructure_ShouldNotRegisterAdminAuditProcessorOnGenerationWorker()
+    {
+        var services = CreateServices();
+        var configuration = CreateConfiguration(new Dictionary<string, string?>
+        {
+            ["Templates:GenerationWorkerEnabled"] = "true"
+        });
+
+        services.AddTemplatesInfrastructure(
+            configuration,
+            schedulerComponent: TemplateSchedulerConfigFingerprint.GenerationWorkerComponent);
+
+        Assert.DoesNotContain(
+            services,
+            descriptor => descriptor.ImplementationType?.Name == "TemplateAdminAuditOutboxProcessor");
+        Assert.DoesNotContain(
+            services,
+            descriptor => descriptor.ImplementationType?.Name == "TemplateAdminAuditOutboxWorker");
+    }
+
+    [Fact]
     public void AddTemplatesInfrastructure_ShouldRegisterR2AndFalProviders_WhenConfigured()
     {
         var services = CreateServices();

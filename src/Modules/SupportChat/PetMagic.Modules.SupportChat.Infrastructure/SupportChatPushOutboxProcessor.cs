@@ -14,7 +14,8 @@ internal sealed class SupportChatPushOutboxProcessor(
     SupportChatDbContext dbContext,
     ISupportChatPushDeliverySender deliverySender,
     ILogger<SupportChatPushOutboxProcessor> logger,
-    IAdminAuditLog? adminAuditLog = null)
+    IAdminAuditLog? adminAuditLog = null,
+    IAdminNotificationSink? adminNotificationSink = null)
 {
     private const string NpgsqlProviderName = "Npgsql.EntityFrameworkCore.PostgreSQL";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
@@ -44,6 +45,8 @@ internal sealed class SupportChatPushOutboxProcessor(
                         cancellationToken),
                 SupportChatPushNotificationOutbox.AdminAuditKind =>
                     await DeliverAdminAuditAsync(message.PayloadJson, cancellationToken),
+                AdminNotificationOutbox.Kind =>
+                    await DeliverAdminNotificationAsync(message.PayloadJson, cancellationToken),
                 _ => PushDeliveryResult.PermanentFailure("push.kind_unknown")
             };
         }
@@ -58,9 +61,12 @@ internal sealed class SupportChatPushOutboxProcessor(
                 SafeLogValues.StableHash(message.Id.ToString("D")),
                 SafeLogValues.ExceptionType(exception));
             result = PushDeliveryResult.Retry(
-                message.Kind == SupportChatPushNotificationOutbox.AdminAuditKind
-                    ? "admin_audit.write_failed"
-                    : "fcm.transport_error");
+                message.Kind switch
+                {
+                    SupportChatPushNotificationOutbox.AdminAuditKind => "admin_audit.write_failed",
+                    AdminNotificationOutbox.Kind => "admin_notification.write_failed",
+                    _ => "fcm.transport_error",
+                });
         }
 
         ApplyResult(message, result);
@@ -156,6 +162,29 @@ internal sealed class SupportChatPushOutboxProcessor(
         await adminAuditLog.WriteAsync(
             Deserialize<AdminAuditEntry>(payloadJson),
             cancellationToken);
+        return PushDeliveryResult.Delivered;
+    }
+
+    private async Task<PushDeliveryResult> DeliverAdminNotificationAsync(
+        string payloadJson,
+        CancellationToken cancellationToken)
+    {
+        if (adminNotificationSink is null)
+        {
+            return PushDeliveryResult.Retry("admin_notification.not_configured");
+        }
+
+        AdminNotificationMessage notification;
+        try
+        {
+            notification = AdminNotificationOutbox.Deserialize(payloadJson);
+        }
+        catch (JsonException)
+        {
+            return PushDeliveryResult.PermanentFailure("admin_notification.payload_invalid");
+        }
+
+        await adminNotificationSink.PublishAsync(notification, cancellationToken);
         return PushDeliveryResult.Delivered;
     }
 

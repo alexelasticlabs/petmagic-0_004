@@ -81,6 +81,18 @@ internal sealed class AccountLifecycleCleanupWorker(
             await dbContext.SaveChangesAsync(cancellationToken);
         }
 
+        var expiredNotificationCount = await dbContext.AdminNotificationEvents
+            .Where(notification => notification.ExpiresAtUtc.HasValue
+                && notification.ExpiresAtUtc <= now)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        if (expiredNotificationCount > 0)
+        {
+            logger.LogInformation(
+                "Deleted expired admin notification events. Count={Count}",
+                expiredNotificationCount);
+        }
+
         var expiredUserIds = await dbContext.Users
             .Where(x => x.AccountStatus == AccountStatus.Expired
                 && !x.EmailConfirmed

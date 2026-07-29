@@ -591,6 +591,12 @@ internal sealed partial class TemplateGenerationJobProcessor(
             await TryRefundAsync(job, cancellationToken);
         }
 
+        await TemplateAdminNotificationOutbox.EnqueueGenerationFailedAsync(
+            dbContext,
+            job,
+            safeErrorCode,
+            cancellationToken);
+
         if (!await SaveJobChangesAsync(job, cancellationToken, releaseLock: true))
         {
             return false;
@@ -781,6 +787,11 @@ internal sealed partial class TemplateGenerationJobProcessor(
                 job.RefundAttemptCount,
                 safeErrorCode,
                 ElapsedMsSince(startedAt));
+            await TemplateAdminNotificationOutbox.EnqueueRefundExhaustedAsync(
+                dbContext,
+                job,
+                safeErrorCode,
+                cancellationToken);
         }
 
         return false;

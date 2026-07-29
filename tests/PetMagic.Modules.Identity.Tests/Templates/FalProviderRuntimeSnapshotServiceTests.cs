@@ -5,6 +5,7 @@ using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 
+using PetMagic.BuildingBlocks.Notifications;
 using PetMagic.Modules.Templates.Domain.Enums;
 using PetMagic.Modules.Templates.Infrastructure;
 using PetMagic.Modules.Templates.Infrastructure.Data;
@@ -179,6 +180,12 @@ public sealed class FalProviderRuntimeSnapshotServiceTests
         Assert.Equal(1, snapshot.ConsecutiveFailures);
         Assert.Equal(20m, snapshot.CurrentBalanceUsd);
         Assert.Equal(lastSuccessfulAtUtc, snapshot.LastSuccessfulAtUtc);
+        var outbox = await dbContext.PushOutboxMessages.SingleAsync();
+        Assert.Equal(AdminNotificationOutbox.Kind, outbox.Kind);
+        var notification = AdminNotificationOutbox.Deserialize(outbox.PayloadJson);
+        Assert.Equal("capacity.provider_alert", notification.Type);
+        Assert.Equal(AdminNotificationPriorities.Critical, notification.Priority);
+        Assert.Equal("provider-alert:fal:unknown:", notification.DeduplicationKey[..27]);
     }
 
     [Theory]
