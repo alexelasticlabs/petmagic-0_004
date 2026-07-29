@@ -56,7 +56,7 @@ try
     });
 
     builder.Services
-        .AddEconomyInfrastructure(builder.Configuration, builder.Environment.IsProduction())
+        .AddEconomyGenerationWorkerInfrastructure(builder.Configuration)
         .AddGamificationInfrastructure(builder.Configuration, includeAdminServices: false)
         .AddTemplatesInfrastructure(
             builder.Configuration,

@@ -32,8 +32,6 @@ envVarGroups:
         value: "false"
       - key: Templates__GenerationSchedulerV2Enabled
         value: "false"
-      - key: STORE_ACCOUNT_BINDING_MODE
-        value: compatibility
       - key: Templates__GlobalMaxConcurrentGenerations
         value: "8"
       - key: Templates__ImageReservedConcurrentGenerations
@@ -66,6 +64,8 @@ envVarGroups:
         value: "10"
       - key: Templates__FalProviderReservedConcurrency
         value: "2"
+      - key: Templates__Fal__CancelMaxAttempts
+        value: "3"
       - key: Templates__FalProviderBalanceLowThresholdUsd
         value: "10"
       - key: Templates__FalProviderBalanceCriticalThresholdUsd
@@ -137,6 +137,8 @@ services:
         - src/**
     envVars:
       - fromGroup: petmagic-production-shared
+      - key: STORE_ACCOUNT_BINDING_MODE
+        value: compatibility
       - key: PORT
         value: "5000"
       - key: ASPNETCORE_HTTP_PORTS
@@ -307,10 +309,6 @@ services:
         value: "false"
       - key: Templates__TemplateOfTheDayAutoPickWorkerEnabled
         value: "false"
-      - key: ECONOMY_RECONCILIATION_ENABLED
-        value: "false"
-      - key: ECONOMY_PUSH_OUTBOX_DISPATCHER_ENABLED
-        value: "false"
       - key: ConnectionStrings__DefaultConnection
         fromDatabase:
           name: petmagic-production-db
@@ -330,42 +328,6 @@ services:
       - key: R2_BUCKET_NAME
         sync: false
       - key: R2_PUBLIC_URL
-        sync: false
-      - key: STRIPE_LIVE_SECRET_KEY
-        sync: false
-      - key: STRIPE_LIVE_PUBLISHABLE_KEY
-        sync: false
-      - key: STRIPE_LIVE_WEBHOOK_SECRET
-        sync: false
-      - key: GOOGLE_PLAY_PACKAGE_NAME
-        value: com.petmagic.app
-      - key: GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL
-        sync: false
-      - key: GOOGLE_PLAY_PRIVATE_KEY_PEM
-        sync: false
-      - key: GOOGLE_PLAY_ENVIRONMENT
-        value: production
-      - key: GOOGLE_PLAY_PUBSUB_AUDIENCE
-        sync: false
-      - key: GOOGLE_PLAY_PUBSUB_EXPECTED_EMAIL
-        sync: false
-      - key: GOOGLE_PLAY_PREMIUM_MONTHLY_PRODUCT_ID
-        sync: false
-      - key: GOOGLE_PLAY_PREMIUM_YEARLY_PRODUCT_ID
-        sync: false
-      - key: APP_STORE_BUNDLE_ID
-        value: com.petmagic.app
-      - key: APP_STORE_SHARED_SECRET
-        sync: false
-      - key: APP_STORE_ENVIRONMENT
-        value: production
-      - key: APP_STORE_PREMIUM_MONTHLY_PRODUCT_ID
-        sync: false
-      - key: APP_STORE_PREMIUM_YEARLY_PRODUCT_ID
-        sync: false
-      - key: FIREBASE_PROJECT_ID
-        sync: false
-      - key: FIREBASE_SERVICE_ACCOUNT_JSON
         sync: false
       - key: OTEL_EXPORTER_OTLP_ENDPOINT
         sync: false

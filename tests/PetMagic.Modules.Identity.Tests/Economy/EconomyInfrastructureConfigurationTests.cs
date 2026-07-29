@@ -3,7 +3,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
+using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Economy.Infrastructure;
+using PetMagic.Modules.Economy.Infrastructure.Data;
 using PetMagic.Modules.Economy.Infrastructure.Options;
 using PetMagic.Modules.Economy.Infrastructure.Payments;
 
@@ -212,6 +214,94 @@ public sealed class EconomyInfrastructureConfigurationTests
             descriptor.ServiceType == typeof(IHostedService)
             && descriptor.ImplementationType == typeof(EconomyPushOutboxWorker));
         Assert.Equal(expectedWorkerRegistration, workerRegistered);
+    }
+
+    [Fact]
+    public async Task AddEconomyGenerationWorkerInfrastructure_ShouldExposeOnlyDurableEconomyCapabilities()
+    {
+        var services = CreateServices();
+        var configuration = CreateConfiguration(new Dictionary<string, string?>
+        {
+            ["Economy:WeeklyPremiumSpark"] = "55",
+            ["Economy:StripeLiveSecretKey"] = StripeLiveSecretKey,
+            ["Economy:GooglePlayPrivateKeyPem"] = "private-store-key",
+            ["Economy:AppStoreSharedSecret"] = "app-store-secret",
+            ["Economy:FirebaseServiceAccountJson"] = "firebase-secret"
+        });
+
+        services.AddEconomyGenerationWorkerInfrastructure(configuration);
+
+        Assert.DoesNotContain(services, descriptor =>
+            descriptor.ServiceType == typeof(IHostedService)
+            && (descriptor.ImplementationType == typeof(EconomyReconciliationWorker)
+                || descriptor.ImplementationType == typeof(EconomyPushOutboxWorker)));
+        Assert.DoesNotContain(services, descriptor => descriptor.ServiceType == typeof(IHttpClientFactory));
+        Assert.DoesNotContain(services, descriptor => descriptor.ServiceType == typeof(IEconomyPushTokenService));
+        Assert.DoesNotContain(services, descriptor => descriptor.ServiceType == typeof(IEconomyPushNotificationSender));
+        Assert.DoesNotContain(services, descriptor => descriptor.ImplementationType == typeof(StripePaymentGateway));
+        Assert.DoesNotContain(services, descriptor => descriptor.ImplementationType == typeof(StoreSubscriptionVerifier));
+        Assert.DoesNotContain(services, descriptor => descriptor.ImplementationType == typeof(FcmEconomyPushNotificationSender));
+
+        using var provider = services.BuildServiceProvider(new ServiceProviderOptions
+        {
+            ValidateOnBuild = true,
+            ValidateScopes = true
+        });
+        using var scope = provider.CreateScope();
+
+        Assert.IsType<EconomyService>(scope.ServiceProvider.GetRequiredService<IEconomyService>());
+        Assert.NotNull(scope.ServiceProvider.GetRequiredService<EconomyDbContext>());
+
+        var options = provider.GetRequiredService<IOptions<EconomyOptions>>().Value;
+        Assert.Equal(55, options.WeeklyPremiumSpark);
+        Assert.False(options.EconomyReconciliationEnabled);
+        Assert.False(options.FirebasePushEnabled);
+        Assert.False(options.PushOutboxDispatcherEnabled);
+        Assert.Empty(options.StripeLiveSecretKey);
+        Assert.Empty(options.GooglePlayPrivateKeyPem);
+        Assert.Empty(options.AppStoreSharedSecret);
+        Assert.Empty(options.FirebaseServiceAccountJson);
+
+        var paymentResult = await provider.GetRequiredService<IPaymentGateway>().CreatePaymentAsync(
+            new PaymentCreateRequest(
+                "stripe",
+                Guid.NewGuid(),
+                Guid.NewGuid(),
+                1m,
+                "USD",
+                1,
+                "test"),
+            CancellationToken.None);
+        Assert.True(paymentResult.IsFailure);
+        Assert.Equal("economy.generation_worker.payment_unavailable", paymentResult.Error.Code);
+
+        var storeResult = await provider.GetRequiredService<IStoreSubscriptionVerifier>().VerifyAsync(
+            new StoreSubscriptionVerificationRequest(
+                Guid.NewGuid(),
+                "google_play",
+                "monthly",
+                "premium.monthly",
+                "receipt",
+                null,
+                null,
+                null),
+            CancellationToken.None);
+        Assert.True(storeResult.IsFailure);
+        Assert.Equal("economy.generation_worker.store_verification_unavailable", storeResult.Error.Code);
+    }
+
+    [Fact]
+    public void GenerationWorkerHost_ShouldUseBoundedEconomyRegistration()
+    {
+        var program = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Host",
+            "PetMagic.Host.GenerationWorker",
+            "Program.cs"));
+
+        Assert.Contains(".AddEconomyGenerationWorkerInfrastructure(builder.Configuration)", program, StringComparison.Ordinal);
+        Assert.DoesNotContain(".AddEconomyInfrastructure(", program, StringComparison.Ordinal);
     }
 
     private static string StripeTestSecretKey => "sk_" + "test_should_not_start";

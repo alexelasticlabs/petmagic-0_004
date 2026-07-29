@@ -198,6 +198,44 @@ public static class EconomyInfrastructureServiceCollectionExtensions
         return services;
     }
 
+    /// <summary>
+    /// Registers only the durable wallet and subscription readers required by the
+    /// generation worker. Payment, store verification, push delivery, and economy
+    /// reconciliation capabilities are deliberately unavailable in this host so
+    /// their production credentials never need to be mounted into the worker.
+    /// </summary>
+    public static IServiceCollection AddEconomyGenerationWorkerInfrastructure(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        var section = configuration.GetSection(EconomyOptions.SectionName);
+        var economyOptions = new EconomyOptions
+        {
+            WeeklyFreeSpark = ParseInt(section["WeeklyFreeSpark"], 100),
+            WeeklyPremiumSpark = ParseInt(section["WeeklyPremiumSpark"], 40),
+            AdRewardSpark = ParseInt(section["AdRewardSpark"], 15),
+            AdRewardDailyLimit = ParseInt(section["AdRewardDailyLimit"], 5),
+            ReferralBonusSpark = ParseInt(section["ReferralBonusSpark"], 15),
+            EconomyReconciliationEnabled = false,
+            FirebasePushEnabled = false,
+            PushOutboxDispatcherEnabled = false
+        };
+
+        services.AddMemoryCache();
+        services.AddSingleton<IOptions<EconomyOptions>>(
+            Microsoft.Extensions.Options.Options.Create(economyOptions));
+        services.AddDbContextPool<EconomyDbContext>(options =>
+        {
+            options.UseNpgsql(configuration.GetConnectionString("DefaultConnection"));
+        });
+
+        services.AddSingleton<IPaymentGateway, GenerationWorkerUnavailablePaymentGateway>();
+        services.AddSingleton<IStoreSubscriptionVerifier, GenerationWorkerUnavailableStoreSubscriptionVerifier>();
+        services.AddScoped<IEconomyService, EconomyService>();
+
+        return services;
+    }
+
     private static void ConfigureExternalHttpClient(HttpClient client) =>
         client.Timeout = ExternalHttpClientTimeout;
 

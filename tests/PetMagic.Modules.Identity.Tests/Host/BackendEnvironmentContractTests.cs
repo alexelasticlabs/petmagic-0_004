@@ -136,7 +136,7 @@ public sealed class BackendEnvironmentContractTests
     }
 
     [Fact]
-    public void DockerComposeGenerationWorker_ShouldForwardProductionCriticalEconomyAndTemplateKeys()
+    public void DockerComposeGenerationWorker_ShouldExposeGenerationSecretsOnly()
     {
         var repositoryRoot = FindRepositoryRoot();
         var dockerCompose = File.ReadAllText(Path.Combine(repositoryRoot, "docker-compose.yml"));
@@ -144,7 +144,19 @@ public sealed class BackendEnvironmentContractTests
 
         foreach (var key in BillingAndStoreEnvironmentKeys)
         {
-            Assert.Contains($"{key}:", workerEnvironment, StringComparison.Ordinal);
+            Assert.DoesNotContain($"{key}:", workerEnvironment, StringComparison.Ordinal);
+        }
+
+        foreach (var key in new[]
+        {
+            "STORE_ACCOUNT_BINDING_MODE",
+            "ECONOMY_RECONCILIATION_ENABLED",
+            "ECONOMY_PUSH_OUTBOX_DISPATCHER_ENABLED",
+            "FIREBASE_PROJECT_ID",
+            "FIREBASE_SERVICE_ACCOUNT_JSON"
+        })
+        {
+            Assert.DoesNotContain($"{key}:", workerEnvironment, StringComparison.Ordinal);
         }
 
         foreach (var key in new[]
@@ -166,8 +178,6 @@ public sealed class BackendEnvironmentContractTests
         }
 
         Assert.Contains("Templates__GenerationWorkerEnabled: \"true\"", workerEnvironment, StringComparison.Ordinal);
-        Assert.DoesNotContain("STRIPE_SECRET_KEY:", workerEnvironment, StringComparison.Ordinal);
-        Assert.DoesNotContain("STRIPE_WEBHOOK_SECRET:", workerEnvironment, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -18,6 +18,7 @@ try {
   requireCheckerPass(resolve(repoRoot, 'render.production.yaml'), 'production');
 
   const stagingBlueprint = readFileSync(resolve(repoRoot, 'render.yaml'), 'utf8');
+  const productionBlueprint = readFileSync(resolve(repoRoot, 'render.production.yaml'), 'utf8');
 
   const schedulerV2EnabledPath = writeFixture(
     'render-scheduler-v2-enabled.yaml',
@@ -87,6 +88,54 @@ try {
     'petmagic-staging-db must define an empty ipAllowList to block public database access.'
   );
 
+  const wrongDatabaseRegionPath = writeFixture(
+    'render-wrong-database-region.yaml',
+    replaceOccurrenceRequired(stagingBlueprint, '    region: frankfurt', '    region: oregon', 1)
+  );
+  requireCheckerFailure(
+    wrongDatabaseRegionPath,
+    'staging',
+    'petmagic-staging-db region must be frankfurt, found oregon.'
+  );
+
+  const wrongPostgresVersionPath = writeFixture(
+    'render-wrong-postgres-version.yaml',
+    replaceRequired(stagingBlueprint, '    postgresMajorVersion: "16"', '    postgresMajorVersion: "15"')
+  );
+  requireCheckerFailure(
+    wrongPostgresVersionPath,
+    'staging',
+    'petmagic-staging-db postgresMajorVersion must be 16, found 15.'
+  );
+
+  const extraDatabasePath = writeFixture(
+    'render-extra-database.yaml',
+    replaceRequired(
+      stagingBlueprint,
+      '\nenvVarGroups:',
+      '\n  - name: petmagic-staging-extra-db\n    region: frankfurt\n    plan: basic-1gb\n    ipAllowList: []\n    postgresMajorVersion: "16"\n\nenvVarGroups:'
+    )
+  );
+  requireCheckerFailure(
+    extraDatabasePath,
+    'staging',
+    'Expected 1 Render database, found 2.'
+  );
+
+  const extraEnvGroupPath = writeFixture(
+    'render-extra-env-group.yaml',
+    replaceRequired(
+      stagingBlueprint,
+      '\nservices:',
+      '\n  - name: petmagic-staging-extra-shared\n    envVars: []\n\nservices:'
+    )
+  );
+  requireCheckerFailure(
+    extraEnvGroupPath,
+    'staging',
+    'Expected 1 Render env var group, found 2.'
+  );
+
   const scaledWorkerPath = writeFixture(
     'render-scaled-worker.yaml',
     replaceOccurrenceRequired(stagingBlueprint, '    numInstances: 1', '    numInstances: 2', 2)
@@ -105,6 +154,37 @@ try {
     wrongWorkerPlanPath,
     'staging',
     'petmagic-staging-generation-worker plan must be standard, found starter.'
+  );
+
+  const workerBillingSecretPath = writeFixture(
+    'render-worker-billing-secret.yaml',
+    replaceOccurrenceRequired(
+      stagingBlueprint,
+      '      - key: FAL_AI_API_KEY\n        sync: false\n',
+      '      - key: FAL_AI_API_KEY\n        sync: false\n'
+        + '      - key: STRIPE_TEST_SECRET_KEY\n        sync: false\n',
+      2
+    )
+  );
+  requireCheckerFailure(
+    workerBillingSecretPath,
+    'staging',
+    'petmagic-staging-generation-worker must not receive external billing/store/push setting STRIPE_TEST_SECRET_KEY'
+  );
+
+  const inheritedWorkerBillingSecretPath = writeFixture(
+    'render-worker-inherited-billing-secret.yaml',
+    replaceRequired(
+      stagingBlueprint,
+      '      - key: PETMAGIC_QA_FIXTURES_ENABLED\n        value: "false"\n',
+      '      - key: PETMAGIC_QA_FIXTURES_ENABLED\n        value: "false"\n'
+        + '      - key: STRIPE_TEST_SECRET_KEY\n        sync: false\n'
+    )
+  );
+  requireCheckerFailure(
+    inheritedWorkerBillingSecretPath,
+    'staging',
+    'petmagic-staging-generation-worker must not receive external billing/store/push setting STRIPE_TEST_SECRET_KEY'
   );
 
   const wrongFalWebhookPath = writeFixture(
@@ -174,6 +254,16 @@ try {
     'petmagic-staging-generation-worker must not define disk.'
   );
 
+  const wrongApiDiskSizePath = writeFixture(
+    'render-wrong-api-disk-size.yaml',
+    replaceRequired(stagingBlueprint, '      sizeGB: 10', '      sizeGB: 9')
+  );
+  requireCheckerFailure(
+    wrongApiDiskSizePath,
+    'staging',
+    'petmagic-staging-api disk sizeGB must be exactly 10, found 9.'
+  );
+
   const autoscaledApiPath = writeFixture(
     'render-autoscaled-api.yaml',
     replaceRequired(
@@ -201,6 +291,21 @@ try {
     workerSchedulerOverridePath,
     'staging',
     'Scheduler fingerprint mismatch for admission.queueMaxSize'
+  );
+
+  const malformedWorkerSchedulerOverridePath = writeFixture(
+    'render-malformed-worker-scheduler-override.yaml',
+    replaceOccurrenceRequired(
+      stagingBlueprint,
+      '      - fromGroup: petmagic-staging-shared\n',
+      '      - fromGroup: petmagic-staging-shared\n      - key: Templates__QueueMaxSize\n        value: "many"\n',
+      2
+    )
+  );
+  requireCheckerFailure(
+    malformedWorkerSchedulerOverridePath,
+    'staging',
+    'Scheduler fingerprint field admission.queueMaxSize has invalid nonNegativeInt value many.'
   );
 
   const apiWorkerLaneOverridePath = writeFixture(
@@ -257,6 +362,20 @@ try {
   requireCheckerFailure(
     inertLegacySchedulerKeyPath,
     'staging',
+    'uses inert legacy scheduler key GENERATION_GLOBAL_MAX_CONCURRENT'
+  );
+
+  const productionLegacySchedulerKeyPath = writeFixture(
+    'render-production-inert-legacy-scheduler-key.yaml',
+    replaceRequired(
+      productionBlueprint,
+      '      - key: Templates__GlobalMaxConcurrentGenerations',
+      '      - key: GENERATION_GLOBAL_MAX_CONCURRENT'
+    )
+  );
+  requireCheckerFailure(
+    productionLegacySchedulerKeyPath,
+    'production',
     'uses inert legacy scheduler key GENERATION_GLOBAL_MAX_CONCURRENT'
   );
 

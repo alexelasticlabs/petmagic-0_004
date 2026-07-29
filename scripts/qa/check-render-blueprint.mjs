@@ -61,6 +61,7 @@ const schedulerFingerprintFields = [
   schedulerField('estimates.estimatedVideoGenerationSeconds', 'EstimatedVideoGenerationSeconds', 'positiveInt', 420),
   schedulerField('estimates.estimatedVideoPreprocessingSeconds', 'EstimatedVideoPreprocessingSeconds', 'positiveInt', 90),
   schedulerField('provider.aiProvider', 'AiProvider', 'text', 'Fake'),
+  schedulerField('provider.falCancelMaxAttempts', 'Fal.CancelMaxAttempts', 'positiveInt', 3),
   schedulerField('provider.falImageMaxPollingAttempts', 'Fal.ImageMaxPollingAttempts', 'positiveInt', 180),
   schedulerField('provider.falImagePreprocessingMaxPollingAttempts', 'Fal.ImagePreprocessingMaxPollingAttempts', 'positiveInt', 180),
   schedulerField('provider.falMaxPollingAttempts', 'Fal.MaxPollingAttempts', 'int', 180),
@@ -89,12 +90,15 @@ const schedulerFingerprintFields = [
 ];
 
 requireServiceCount(3);
+requireDatabaseCount(1);
+requireEnvGroupCount(1);
 requireDatabase(`${prefix}-db`, 'basic-1gb');
 requireEnvGroup(`${prefix}-shared`);
 
 const api = requireService(`${prefix}-api`, {
   type: 'web',
   runtime: 'docker',
+  region: 'frankfurt',
   plan: 'standard',
   numInstances: 1,
   dockerfilePath: './Dockerfile.api',
@@ -105,6 +109,7 @@ const api = requireService(`${prefix}-api`, {
 const worker = requireService(`${prefix}-generation-worker`, {
   type: 'worker',
   runtime: 'docker',
+  region: 'frankfurt',
   plan: 'standard',
   numInstances: 1,
   maxShutdownDelaySeconds: 300,
@@ -115,6 +120,7 @@ const worker = requireService(`${prefix}-generation-worker`, {
 const admin = requireService(`${prefix}-admin-web`, {
   type: 'web',
   runtime: 'docker',
+  region: 'frankfurt',
   plan: 'starter',
   numInstances: 1,
   dockerfilePath: './apps/admin-web/Dockerfile',
@@ -134,6 +140,7 @@ if (api) {
   requirePersistentDisk(api, `${prefix}-api-data`, '/var/petmagic');
   requireEnvValue(api, 'PORT', '5000');
   requireEnvValue(api, 'ASPNETCORE_HTTP_PORTS', '5000');
+  requireEnvValue(api, 'STORE_ACCOUNT_BINDING_MODE', 'compatibility');
   requireEnvValue(
     api,
     'ExternalAuth__MobileRedirectScheme',
@@ -223,22 +230,9 @@ if (worker) {
     'R2_SECRET_KEY',
     'R2_BUCKET_NAME',
     'R2_PUBLIC_URL',
-    environment === 'production' ? 'STRIPE_LIVE_SECRET_KEY' : 'STRIPE_TEST_SECRET_KEY',
-    environment === 'production' ? 'STRIPE_LIVE_PUBLISHABLE_KEY' : 'STRIPE_TEST_PUBLISHABLE_KEY',
-    environment === 'production' ? 'STRIPE_LIVE_WEBHOOK_SECRET' : 'STRIPE_TEST_WEBHOOK_SECRET',
-    'GOOGLE_PLAY_PREMIUM_MONTHLY_PRODUCT_ID',
-    'GOOGLE_PLAY_PREMIUM_YEARLY_PRODUCT_ID',
-    'APP_STORE_PREMIUM_MONTHLY_PRODUCT_ID',
-    'APP_STORE_PREMIUM_YEARLY_PRODUCT_ID',
-    'GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL',
-    'GOOGLE_PLAY_PRIVATE_KEY_PEM',
-    'GOOGLE_PLAY_PUBSUB_AUDIENCE',
-    'GOOGLE_PLAY_PUBSUB_EXPECTED_EMAIL',
-    'APP_STORE_SHARED_SECRET',
-    'FIREBASE_PROJECT_ID',
-    'FIREBASE_SERVICE_ACCOUNT_JSON',
     'OTEL_EXPORTER_OTLP_ENDPOINT'
   ]);
+  rejectWorkerExternalBillingConfiguration(worker);
 }
 
 if (api && worker) {
@@ -287,6 +281,18 @@ function requireServiceCount(expected) {
   }
 }
 
+function requireDatabaseCount(expected) {
+  if (databases.length !== expected) {
+    fail(`Expected ${expected} Render database, found ${databases.length}.`);
+  }
+}
+
+function requireEnvGroupCount(expected) {
+  if (envVarGroups.length !== expected) {
+    fail(`Expected ${expected} Render env var group, found ${envVarGroups.length}.`);
+  }
+}
+
 function requireDatabase(name, plan) {
   const database = databases.find((candidate) => candidate.name === name);
   if (!database) {
@@ -296,6 +302,14 @@ function requireDatabase(name, plan) {
 
   if (database.plan !== plan) {
     fail(`${name} must use plan ${plan}, found ${database.plan ?? '<missing>'}.`);
+  }
+
+  if (database.region !== 'frankfurt') {
+    fail(`${name} region must be frankfurt, found ${database.region ?? '<missing>'}.`);
+  }
+
+  if (String(database.postgresMajorVersion ?? '') !== '16') {
+    fail(`${name} postgresMajorVersion must be 16, found ${database.postgresMajorVersion ?? '<missing>'}.`);
   }
 
   if (!Array.isArray(database.ipAllowList) || database.ipAllowList.length !== 0) {
@@ -350,9 +364,7 @@ function requireEnvGroup(name) {
 
   requireGroupValue(group, 'Templates__FalProviderBalanceLowThresholdUsd', '10');
   requireGroupValue(group, 'Templates__FalProviderBalanceCriticalThresholdUsd', '5');
-  if (environment !== 'production') {
-    rejectLegacySchedulerGroupKeys(group);
-  }
+  rejectLegacySchedulerGroupKeys(group);
 }
 
 function requireGroupValue(group, key, expectedValue) {
@@ -511,38 +523,56 @@ function resolveSchedulerField(config, field) {
   if ((raw === undefined || raw === null) && field.alternatePath) {
     raw = getNestedValue(config, field.alternatePath);
   }
-  return normalizeSchedulerValue(raw, field.kind, field.fallback);
+  return normalizeSchedulerValue(raw, field.kind, field.fallback, field.name);
 }
 
-function normalizeSchedulerValue(raw, kind, fallback) {
-  if (raw === undefined || raw === null || raw === '') {
+function normalizeSchedulerValue(raw, kind, fallback, fieldName) {
+  const missing = raw === undefined || raw === null;
+  if (missing) {
     raw = fallback;
+  } else if (String(raw).trim() === '') {
+    fail(`Scheduler fingerprint field ${fieldName} must not be empty.`);
+    return fallback;
   }
 
   if (kind === 'bool') {
     if (typeof raw === 'boolean') return raw;
     if (/^true$/i.test(String(raw))) return true;
     if (/^false$/i.test(String(raw))) return false;
-    return Boolean(fallback);
+    fail(`Scheduler fingerprint field ${fieldName} must be a boolean, found ${raw}.`);
+    return fallback;
   }
 
   if (kind === 'text') {
-    return String(raw).trim().toLowerCase();
+    const normalized = String(raw).trim().toLowerCase();
+    if (!normalized) {
+      fail(`Scheduler fingerprint field ${fieldName} must not be empty.`);
+      return String(fallback).trim().toLowerCase();
+    }
+    return normalized;
   }
 
   if (kind === 'csv') {
-    return [...new Set(String(raw)
+    const values = [...new Set(String(raw)
       .split(',')
       .map((value) => value.trim().toLowerCase())
       .filter(Boolean))]
       .sort();
+    if (values.length === 0) {
+      fail(`Scheduler fingerprint field ${fieldName} must contain at least one value.`);
+      return String(fallback).split(',').map((value) => value.trim().toLowerCase()).filter(Boolean).sort();
+    }
+    return values;
   }
 
   const text = String(raw).trim();
   const parsed = /^[+-]?\d+$/.test(text) ? Number.parseInt(text, 10) : Number.NaN;
-  if (!Number.isFinite(parsed)) return fallback;
-  if (kind === 'positiveInt' && parsed <= 0) return fallback;
-  if (kind === 'nonNegativeInt' && parsed < 0) return fallback;
+  if (!Number.isFinite(parsed)
+      || (kind === 'positiveInt' && parsed <= 0)
+      || (kind === 'nonNegativeInt' && parsed < 0)) {
+    fail(`Scheduler fingerprint field ${fieldName} has invalid ${kind} value ${raw}.`);
+    return fallback;
+  }
   return parsed;
 }
 
@@ -628,6 +658,25 @@ function requireWorkerIsPrivateAndEphemeral(service) {
   for (const key of ['domains', 'disk', 'healthCheckPath']) {
     if (Object.hasOwn(service, key)) {
       fail(`${service.name} must not define ${key}.`);
+    }
+  }
+}
+
+function rejectWorkerExternalBillingConfiguration(service) {
+  const forbiddenPrefixes = ['STRIPE_', 'GOOGLE_PLAY_', 'APP_STORE_', 'FIREBASE_'];
+  const forbiddenKeys = new Set([
+    'STORE_ACCOUNT_BINDING_MODE',
+    'ECONOMY_RECONCILIATION_ENABLED',
+    'ECONOMY_PUSH_OUTBOX_DISPATCHER_ENABLED'
+  ]);
+
+  for (const entry of effectiveServiceEnvVars(service)) {
+    const key = String(entry.key ?? '');
+    if (forbiddenKeys.has(key) || forbiddenPrefixes.some((prefix) => key.startsWith(prefix))) {
+      fail(
+        `${service.name} must not receive external billing/store/push setting ${key}; `
+        + 'the generation worker uses bounded wallet-only Economy infrastructure.'
+      );
     }
   }
 }
@@ -784,8 +833,8 @@ function requirePersistentDisk(service, expectedName, expectedMountPath) {
   if (disk.mountPath !== expectedMountPath) {
     fail(`${service.name} disk mountPath must be ${expectedMountPath}.`);
   }
-  if (!Number.isFinite(disk.sizeGB) || disk.sizeGB < 1) {
-    fail(`${service.name} disk sizeGB must be at least 1.`);
+  if (disk.sizeGB !== 10) {
+    fail(`${service.name} disk sizeGB must be exactly 10, found ${disk.sizeGB ?? '<missing>'}.`);
   }
 }
 
@@ -829,6 +878,25 @@ function collectSyncFalseSecretKeys() {
 function hasEnvGroup(service, groupName) {
   return Array.isArray(service.envVars)
     && service.envVars.some((entry) => entry.fromGroup === groupName);
+}
+
+function effectiveServiceEnvVars(service) {
+  const effective = [];
+  for (const entry of Array.isArray(service.envVars) ? service.envVars : []) {
+    if (!entry.fromGroup) {
+      effective.push(entry);
+      continue;
+    }
+
+    const group = envVarGroups.find((candidate) => candidate.name === entry.fromGroup);
+    if (!group) {
+      fail(`${service.name} references missing env group ${entry.fromGroup}.`);
+      continue;
+    }
+
+    effective.push(...(Array.isArray(group.envVars) ? group.envVars : []));
+  }
+  return effective;
 }
 
 function findEnv(envVars, key) {
