@@ -17,6 +17,13 @@ public sealed record AdminTemplateGenerationControlResponse(
     IReadOnlyList<AdminTemplateGenerationControlAlertResponse> Alerts,
     DateTime GeneratedAtUtc);
 
+public sealed record AdminTemplateGenerationProviderRefreshResponse(
+    string Outcome,
+    DateTime? CheckedAtUtc,
+    DateTime? LastSuccessfulAtUtc,
+    string? ErrorCode,
+    AdminTemplateGenerationControlResponse Control);
+
 public sealed record AdminTemplateGenerationConcurrencyProfileResponse(
     int GlobalMaxConcurrentGenerations,
     int ImageReservedConcurrentGenerations,
@@ -81,7 +88,8 @@ public sealed record UpdateAdminTemplateGenerationControlPolicyCommand(
     bool AdmissionEnabled,
     int ConfirmedFalConcurrencyLimit,
     int ReservedHeadroom,
-    int ApplicationHardCeiling);
+    int ApplicationHardCeiling,
+    bool ConfirmFalConcurrencyLimit);
 
 public sealed record ResolveAdminTemplateProviderAttemptCommand(
     Guid ActorUserId,
@@ -104,3 +112,32 @@ public sealed record AdminTemplateProviderAttemptResolutionResponse(
     long AttemptVersion,
     bool RefundScheduled,
     DateTime ResolvedAtUtc);
+
+public sealed record AdminTemplateProviderAttemptRecoveryQuery(
+    int? Skip,
+    int? Take);
+
+public sealed record AdminTemplateProviderAttemptRecoveryPageResponse(
+    IReadOnlyList<AdminTemplateProviderAttemptRecoveryItemResponse> Items,
+    int TotalCount,
+    int Skip,
+    int Take,
+    bool HasMore,
+    DateTime GeneratedAtUtc);
+
+public sealed record AdminTemplateProviderAttemptRecoveryItemResponse(
+    Guid AttemptId,
+    Guid GenerationId,
+    string Stage,
+    int Ordinal,
+    string State,
+    long AttemptVersion,
+    string? ProviderRequestId,
+    DateTime CreatedAtUtc,
+    DateTime UpdatedAtUtc,
+    DateTime? SubmittedAtUtc,
+    DateTime SubmissionDeadlineAtUtc,
+    DateTime ProcessingDeadlineAtUtc,
+    DateTime ReconciliationDeadlineAtUtc,
+    string? ErrorCode,
+    string EvidenceNeeded);

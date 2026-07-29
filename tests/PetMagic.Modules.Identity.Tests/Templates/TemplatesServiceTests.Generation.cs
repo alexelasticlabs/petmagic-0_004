@@ -437,6 +437,211 @@ public sealed partial class TemplatesServiceTests
     }
 
     [Fact]
+    public async Task StartAsync_ShouldPreserveVideoReserveInMixedProviderEtaBeforeCharge()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var billing = new RecordingGenerationBilling();
+        var generationService = CreateGenerationService(
+            dbContext,
+            CreateTemplatesOptions(
+                globalMaxConcurrentGenerations: 4,
+                imageMaxConcurrentGenerations: 4,
+                imageProtectedConcurrentGenerations: 2,
+                videoMaxConcurrentGenerations: 2,
+                videoReservedConcurrentGenerations: 2,
+                estimatedImageGenerationSeconds: 100,
+                estimatedVideoPreprocessingSeconds: 1,
+                estimatedVideoGenerationSeconds: 1,
+                estimatedImageImportSeconds: 1,
+                estimatedVideoImportSeconds: 1,
+                freeImageMaxEstimatedWaitSeconds: 150),
+            billing);
+        var imageTemplateId = await CreateActiveImageTemplateAsync(
+            service,
+            "Mixed Provider ETA Image",
+            "Portrait",
+            ["eta"]);
+        var videoTemplateId = await CreateActiveVideoTemplateAsync(
+            service,
+            "Mixed Provider ETA Video",
+            "Video",
+            ["eta"]);
+        var imageTemplate = await dbContext.TemplateItems.SingleAsync(x => x.Id == imageTemplateId);
+        var videoTemplate = await dbContext.TemplateItems.SingleAsync(x => x.Id == videoTemplateId);
+        var now = DateTime.UtcNow;
+        dbContext.TemplateGenerationJobs.AddRange(
+            CreateEtaJob(
+                imageTemplate,
+                TemplateGenerationStatus.Queued,
+                TemplateGenerationQueue.MediaTypeImage,
+                now.AddMinutes(-4),
+                "mixed-provider-image-1"),
+            CreateEtaJob(
+                imageTemplate,
+                TemplateGenerationStatus.Queued,
+                TemplateGenerationQueue.MediaTypeImage,
+                now.AddMinutes(-3),
+                "mixed-provider-image-2"),
+            CreateEtaJob(
+                videoTemplate,
+                TemplateGenerationStatus.Queued,
+                TemplateGenerationQueue.MediaTypeVideo,
+                now.AddMinutes(-2),
+                "mixed-provider-video"));
+        await dbContext.SaveChangesAsync();
+
+        var started = await generationService.StartAsync(
+            new StartTemplateGenerationCommand(
+                Guid.NewGuid(),
+                imageTemplateId,
+                new TemplateAssetCommand(
+                    "https://cdn.example.com/source.jpg",
+                    "source.jpg",
+                    "image/jpeg",
+                    2048,
+                    null),
+                "mixed-provider-eta-key",
+                "mixed-provider-eta-hash",
+                3),
+            CancellationToken.None);
+
+        Assert.True(started.IsFailure);
+        Assert.Equal(TemplatesErrors.GenerationWaitTooLong.Code, started.Error.Code);
+        Assert.Empty(billing.ChargedGenerationIds);
+        Assert.Equal(3, await dbContext.TemplateGenerationJobs.CountAsync());
+    }
+
+    [Fact]
+    public async Task StartAsync_ShouldReserveOwnVideoSlotsWhenEstimatingOppositeImageBacklog()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var generationService = CreateGenerationService(
+            dbContext,
+            CreateTemplatesOptions(
+                globalMaxConcurrentGenerations: 4,
+                imageMaxConcurrentGenerations: 4,
+                videoMaxConcurrentGenerations: 2,
+                videoReservedConcurrentGenerations: 2,
+                estimatedImageGenerationSeconds: 100,
+                estimatedVideoPreprocessingSeconds: 1,
+                estimatedVideoGenerationSeconds: 149,
+                estimatedImageImportSeconds: 30,
+                estimatedVideoImportSeconds: 1,
+                freeVideoMaxEstimatedWaitSeconds: 180));
+        var imageTemplateId = await CreateActiveImageTemplateAsync(
+            service,
+            "Own Video Reserve Image Backlog",
+            "Portrait",
+            ["eta"]);
+        var videoTemplateId = await CreateActiveVideoTemplateAsync(
+            service,
+            "Own Video Reserve",
+            "Video",
+            ["eta"]);
+        var imageTemplate = await dbContext.TemplateItems.SingleAsync(x => x.Id == imageTemplateId);
+        var now = DateTime.UtcNow;
+        for (var index = 0; index < 4; index++)
+        {
+            dbContext.TemplateGenerationJobs.Add(CreateEtaJob(
+                imageTemplate,
+                TemplateGenerationStatus.Queued,
+                TemplateGenerationQueue.MediaTypeImage,
+                now.AddMinutes(-4).AddSeconds(index),
+                $"own-video-reserve-image-{index}"));
+        }
+        await dbContext.SaveChangesAsync();
+
+        var started = await generationService.StartAsync(
+            new StartTemplateGenerationCommand(
+                Guid.NewGuid(),
+                videoTemplateId,
+                new TemplateAssetCommand(
+                    "https://cdn.example.com/source.jpg",
+                    "source.jpg",
+                    "image/jpeg",
+                    2_048,
+                    null),
+                "own-video-reserve-key",
+                "own-video-reserve-hash",
+                3),
+            CancellationToken.None);
+
+        Assert.True(
+            started.IsSuccess,
+            started.IsFailure
+                ? $"{started.Error.Code}: wait={started.Error.Metadata?["estimatedWaitSeconds"]}; total={started.Error.Metadata?["estimatedTotalSeconds"]}"
+                : null);
+        Assert.Equal(10, started.Value.EstimatedWaitSeconds);
+        Assert.Equal(161, started.Value.EstimatedTotalSeconds);
+    }
+
+    [Fact]
+    public async Task StartAsync_ShouldNotOverlapVideoStagesBeyondSharedVideoCapacityBeforeCharge()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var billing = new RecordingGenerationBilling();
+        var generationService = CreateGenerationService(
+            dbContext,
+            CreateTemplatesOptions(
+                globalMaxConcurrentGenerations: 4,
+                imageMaxConcurrentGenerations: 2,
+                videoMaxConcurrentGenerations: 2,
+                videoReservedConcurrentGenerations: 2,
+                estimatedVideoPreprocessingSeconds: 1,
+                estimatedVideoGenerationSeconds: 100,
+                estimatedVideoImportSeconds: 1,
+                videoPreprocessingMaxConcurrentGenerations: 1,
+                freeVideoMaxEstimatedWaitSeconds: 250),
+            billing);
+        var templateId = await CreateActiveVideoTemplateAsync(
+            service,
+            "Shared Video Stage Capacity",
+            "Video",
+            ["eta"]);
+        var template = await dbContext.TemplateItems.SingleAsync(x => x.Id == templateId);
+        var now = DateTime.UtcNow;
+        dbContext.TemplateGenerationJobs.AddRange(
+            CreateEtaJob(
+                template,
+                TemplateGenerationStatus.Queued,
+                TemplateGenerationQueue.MediaTypeVideo,
+                now.AddMinutes(-2),
+                "shared-video-stage-1"),
+            CreateEtaJob(
+                template,
+                TemplateGenerationStatus.Queued,
+                TemplateGenerationQueue.MediaTypeVideo,
+                now.AddMinutes(-1),
+                "shared-video-stage-2"));
+        await dbContext.SaveChangesAsync();
+
+        var started = await generationService.StartAsync(
+            new StartTemplateGenerationCommand(
+                Guid.NewGuid(),
+                templateId,
+                new TemplateAssetCommand(
+                    "https://cdn.example.com/source.jpg",
+                    "source.jpg",
+                    "image/jpeg",
+                    2_048,
+                    null),
+                "shared-video-stage-key",
+                "shared-video-stage-hash",
+                3),
+            CancellationToken.None);
+
+        Assert.True(started.IsFailure);
+        Assert.Equal(TemplatesErrors.GenerationWaitTooLong.Code, started.Error.Code);
+        Assert.Equal(200, started.Error.Metadata!["estimatedWaitSeconds"]);
+        Assert.Equal(302, started.Error.Metadata["estimatedTotalSeconds"]);
+        Assert.Empty(billing.ChargedGenerationIds);
+        Assert.Equal(2, await dbContext.TemplateGenerationJobs.CountAsync());
+    }
+
+    [Fact]
     public async Task StartAsync_ShouldSampleRollingP90IndependentlyPerProviderStageAndImportMediaType()
     {
         await using var dbContext = CreateDbContext();

@@ -718,6 +718,28 @@ internal sealed partial class TemplateGenerationJobProcessor(
             dbContext.ChangeTracker.Clear();
             return false;
         }
+        catch (DbUpdateException exception)
+        {
+            if (!await TryRecoverGenerationOutputMediaRecordInsertRaceAsync(job, exception, cancellationToken))
+            {
+                throw;
+            }
+
+            try
+            {
+                await dbContext.SaveChangesAsync(cancellationToken);
+                return true;
+            }
+            catch (DbUpdateConcurrencyException retryException)
+            {
+                logger.LogWarning(
+                    "Template generation job update was skipped after media checkpoint race recovery because its lock changed. GenerationIdHash={GenerationIdHash} ExceptionType={ExceptionType}",
+                    TemplateLogSanitizer.SafeId(job.Id),
+                    SafeLogValues.ExceptionType(retryException));
+                dbContext.ChangeTracker.Clear();
+                return false;
+            }
+        }
     }
 
     private async Task<bool> TryRefundAsync(TemplateGenerationJob job, CancellationToken cancellationToken)

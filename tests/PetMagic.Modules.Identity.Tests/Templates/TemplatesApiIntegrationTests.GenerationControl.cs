@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -50,6 +51,247 @@ public sealed partial class TemplatesApiIntegrationTests
         Assert.Null(payload.Worker.ReconciliationConcurrency);
         Assert.Null(payload.Worker.MediaImportConcurrency);
         Assert.Null(payload.Worker.MaintenanceConcurrency);
+    }
+
+    [Fact]
+    public async Task GenerationControlPolicy_ShouldRequireAdmin_ValidateConfirmation_AndPreserveConfirmedAt()
+    {
+        await using var application = await TestApplication.CreateAsync(startGenerationWorker: false);
+        var initial = await application.Client.GetFromJsonAsync<AdminTemplateGenerationControlResponse>(
+            "/api/admin/templates/generation-control");
+        Assert.NotNull(initial);
+
+        using var unauthenticatedRequest = CreateGenerationControlPolicyRequest(
+            "policy-auth-unauthenticated",
+            new GenerationControlPolicyRequestBody(
+                1, "Pause admission safely", false, 10, 2, 38, false),
+            unauthenticated: true);
+        using var unauthenticated = await application.Client.SendAsync(unauthenticatedRequest);
+
+        using var moderatorRequest = CreateGenerationControlPolicyRequest(
+            "policy-auth-moderator",
+            new GenerationControlPolicyRequestBody(
+                1, "Pause admission safely", false, 10, 2, 38, false),
+            role: "Moderator");
+        using var moderator = await application.Client.SendAsync(moderatorRequest);
+
+        using var adminRequest = CreateGenerationControlPolicyRequest(
+            "policy-auth-admin",
+            new GenerationControlPolicyRequestBody(
+                1, "Pause admission safely", false, 10, 2, 38, false));
+        using var admin = await application.Client.SendAsync(adminRequest);
+        var paused = await admin.Content.ReadFromJsonAsync<AdminTemplateGenerationControlResponse>();
+
+        Assert.Equal(HttpStatusCode.Unauthorized, unauthenticated.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, moderator.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, admin.StatusCode);
+        Assert.NotNull(paused);
+        Assert.False(paused.AdmissionEnabled);
+        Assert.Equal(initial.ConfirmedAtUtc, paused.ConfirmedAtUtc);
+        Assert.Contains(
+            "no-store",
+            admin.Headers.CacheControl?.ToString() ?? string.Empty,
+            StringComparison.Ordinal);
+        Assert.Contains(admin.Headers.Pragma, value => value.Name == "no-cache");
+
+        using var missingConfirmationRequest = CreateGenerationControlPolicyRequest(
+            "policy-limit-unconfirmed-api",
+            new GenerationControlPolicyRequestBody(
+                2, "Raise confirmed provider limit", false, 40, 2, 38, false));
+        using var missingConfirmation = await application.Client.SendAsync(missingConfirmationRequest);
+        Assert.Equal(HttpStatusCode.BadRequest, missingConfirmation.StatusCode);
+        Assert.Contains(
+            TemplatesErrors.GenerationControlConcurrencyConfirmationRequired.Code,
+            await missingConfirmation.Content.ReadAsStringAsync(),
+            StringComparison.Ordinal);
+
+        await Task.Delay(5);
+        using var confirmedRequest = CreateGenerationControlPolicyRequest(
+            "policy-limit-confirmed-api",
+            new GenerationControlPolicyRequestBody(
+                2, "Confirmed in the fal.ai Dashboard", false, 40, 2, 38, true));
+        using var confirmed = await application.Client.SendAsync(confirmedRequest);
+        var confirmedPayload = await confirmed.Content
+            .ReadFromJsonAsync<AdminTemplateGenerationControlResponse>();
+        Assert.Equal(HttpStatusCode.OK, confirmed.StatusCode);
+        Assert.NotNull(confirmedPayload);
+        Assert.Equal(40, confirmedPayload.ConfirmedFalConcurrencyLimit);
+        Assert.True(confirmedPayload.ConfirmedAtUtc > initial.ConfirmedAtUtc);
+
+        using var invalidReasonRequest = CreateGenerationControlPolicyRequest(
+            "policy-invalid-reason-api",
+            new GenerationControlPolicyRequestBody(3, "x", false, 40, 2, 38, false));
+        using var invalidReason = await application.Client.SendAsync(invalidReasonRequest);
+        Assert.Equal(HttpStatusCode.BadRequest, invalidReason.StatusCode);
+
+        using var staleRequest = CreateGenerationControlPolicyRequest(
+            "policy-stale-api",
+            new GenerationControlPolicyRequestBody(
+                2, "Stale policy update", false, 40, 2, 38, false));
+        using var stale = await application.Client.SendAsync(staleRequest);
+        Assert.Equal(HttpStatusCode.Conflict, stale.StatusCode);
+    }
+
+    [Fact]
+    public async Task GenerationControlProviderRefresh_ShouldRequireAdmin_AndReturnExplicitOutcome()
+    {
+        await using var application = await TestApplication.CreateAsync(startGenerationWorker: false);
+        using var unauthenticatedRequest = new HttpRequestMessage(
+            HttpMethod.Post,
+            "/api/admin/templates/generation-control/provider/refresh");
+        unauthenticatedRequest.Headers.Add("X-Test-Unauthenticated", "true");
+        using var unauthenticated = await application.Client.SendAsync(unauthenticatedRequest);
+
+        using var moderatorRequest = new HttpRequestMessage(
+            HttpMethod.Post,
+            "/api/admin/templates/generation-control/provider/refresh");
+        moderatorRequest.Headers.Add("X-Test-Role", "Moderator");
+        using var moderator = await application.Client.SendAsync(moderatorRequest);
+
+        using var admin = await application.Client.PostAsync(
+            "/api/admin/templates/generation-control/provider/refresh",
+            content: null);
+        var payload = await admin.Content
+            .ReadFromJsonAsync<AdminTemplateGenerationProviderRefreshResponse>();
+
+        Assert.Equal(HttpStatusCode.Unauthorized, unauthenticated.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, moderator.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, admin.StatusCode);
+        Assert.NotNull(payload);
+        Assert.Equal("refreshed", payload.Outcome);
+        Assert.Null(payload.ErrorCode);
+        Assert.NotNull(payload.CheckedAtUtc);
+        Assert.NotNull(payload.LastSuccessfulAtUtc);
+        Assert.Equal(1, payload.Control.Revision);
+        Assert.Contains(
+            "no-store",
+            admin.Headers.CacheControl?.ToString() ?? string.Empty,
+            StringComparison.Ordinal);
+        Assert.Contains(admin.Headers.Pragma, value => value.Name == "no-cache");
+    }
+
+    [Fact]
+    public async Task GenerationControlProviderRefresh_ShouldReturnSafeFailureOutcome()
+    {
+        var checkedAtUtc = DateTime.UtcNow;
+        var snapshot = new TemplateProviderRuntimeSnapshot
+        {
+            Id = TemplateGenerationControlPolicyDefaults.FalSnapshotId,
+            Provider = "fal",
+            BalanceState = TemplateProviderBalanceState.Unknown,
+            StatusChangedAtUtc = checkedAtUtc,
+            CheckedAtUtc = checkedAtUtc,
+            LastErrorCode = "http_429",
+            UpdatedAtUtc = checkedAtUtc
+        };
+        await using var application = await TestApplication.CreateAsync(
+            startGenerationWorker: false,
+            falProviderRuntimeSnapshotService: new FailedFalProviderRuntimeSnapshotService(snapshot));
+
+        using var response = await application.Client.PostAsync(
+            "/api/admin/templates/generation-control/provider/refresh",
+            content: null);
+        var payload = await response.Content
+            .ReadFromJsonAsync<AdminTemplateGenerationProviderRefreshResponse>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(payload);
+        Assert.Equal("failed", payload.Outcome);
+        Assert.Equal(checkedAtUtc, payload.CheckedAtUtc);
+        Assert.Null(payload.LastSuccessfulAtUtc);
+        Assert.Equal("http_429", payload.ErrorCode);
+        Assert.DoesNotContain("fal-runtime-test-key", await response.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ProviderAttemptRecovery_ShouldRequireAdmin_ValidatePaging_AndReturnOnlySafeManualRows()
+    {
+        await using var application = await TestApplication.CreateAsync(startGenerationWorker: false);
+        var now = DateTime.UtcNow;
+        var manualOldest = CreateProviderAttemptRecoveryRow(
+            now.AddMinutes(-10),
+            TemplateGenerationProviderAttemptState.SubmissionUnknown,
+            nextPollAtUtc: null,
+            providerRequestId: null,
+            ordinal: 1);
+        manualOldest.SubmissionTokenHash = new string('F', 64);
+        manualOldest.ProviderResponseUrl = "https://provider.invalid/response?api_key=never-return-this";
+        manualOldest.LastErrorCode = "templates.provider_submission_reconciliation_required";
+        var manualNewest = CreateProviderAttemptRecoveryRow(
+            now.AddMinutes(-5),
+            TemplateGenerationProviderAttemptState.SubmissionUnknown,
+            nextPollAtUtc: null,
+            providerRequestId: "fal_request_2",
+            ordinal: 2);
+        var scheduled = CreateProviderAttemptRecoveryRow(
+            now.AddMinutes(-20),
+            TemplateGenerationProviderAttemptState.SubmissionUnknown,
+            nextPollAtUtc: now.AddSeconds(30),
+            providerRequestId: null,
+            ordinal: 3);
+        var queued = CreateProviderAttemptRecoveryRow(
+            now.AddMinutes(-30),
+            TemplateGenerationProviderAttemptState.ProviderQueued,
+            nextPollAtUtc: null,
+            providerRequestId: "fal_request_queued",
+            ordinal: 4);
+        await using (var scope = application.Services.CreateAsyncScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<TemplatesDbContext>();
+            dbContext.TemplateGenerationProviderAttempts.AddRange(
+                manualOldest,
+                manualNewest,
+                scheduled,
+                queued);
+            await dbContext.SaveChangesAsync();
+        }
+
+        using var unauthenticatedRequest = new HttpRequestMessage(
+            HttpMethod.Get,
+            "/api/admin/templates/generation-control/provider-attempts/recovery?skip=0&take=1");
+        unauthenticatedRequest.Headers.Add("X-Test-Unauthenticated", "true");
+        using var unauthenticated = await application.Client.SendAsync(unauthenticatedRequest);
+
+        using var moderatorRequest = new HttpRequestMessage(
+            HttpMethod.Get,
+            "/api/admin/templates/generation-control/provider-attempts/recovery?skip=0&take=1");
+        moderatorRequest.Headers.Add("X-Test-Role", "Moderator");
+        using var moderator = await application.Client.SendAsync(moderatorRequest);
+
+        using var admin = await application.Client.GetAsync(
+            "/api/admin/templates/generation-control/provider-attempts/recovery?skip=0&take=1");
+        var body = await admin.Content.ReadAsStringAsync();
+        var payload = JsonSerializer.Deserialize<AdminTemplateProviderAttemptRecoveryPageResponse>(
+            body,
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        using var invalid = await application.Client.GetAsync(
+            "/api/admin/templates/generation-control/provider-attempts/recovery?take=101");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, unauthenticated.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, moderator.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, admin.StatusCode);
+        Assert.NotNull(payload);
+        Assert.Equal(2, payload.TotalCount);
+        Assert.True(payload.HasMore);
+        var item = Assert.Single(payload.Items);
+        Assert.Equal(manualOldest.Id, item.AttemptId);
+        Assert.Equal(manualOldest.GenerationJobId, item.GenerationId);
+        Assert.Equal(manualOldest.Version, item.AttemptVersion);
+        Assert.Equal("submission_unknown", item.State);
+        Assert.Equal("correlated_accepted_or_confirmed_not_found", item.EvidenceNeeded);
+        Assert.DoesNotContain(manualOldest.SubmissionTokenHash, body, StringComparison.Ordinal);
+        Assert.DoesNotContain("never-return-this", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("providerResponseUrl", body, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(
+            "no-store",
+            admin.Headers.CacheControl?.ToString() ?? string.Empty,
+            StringComparison.Ordinal);
+        Assert.Contains(admin.Headers.Pragma, value => value.Name == "no-cache");
+        Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
+        Assert.Contains(
+            TemplatesErrors.ProviderAttemptRecoveryQueryInvalid.Code,
+            await invalid.Content.ReadAsStringAsync(),
+            StringComparison.Ordinal);
     }
 
     [Fact]
@@ -141,6 +383,39 @@ public sealed partial class TemplatesApiIntegrationTests
             payload.Alerts,
             alert => alert.AlertId == "generation-worker-runtime-config-unknown"
                 && alert.Severity == "critical");
+    }
+
+    [Fact]
+    public async Task GenerationControl_ShouldAlertWithStableTransition_WhenMoreThanOneWorkerIsActive()
+    {
+        await using var application = await TestApplication.CreateAsync(startGenerationWorker: false);
+        var now = DateTime.UtcNow;
+        var firstWorker = CreateWorkerFingerprint(now.AddSeconds(-5), true, 4, 4, 1, 1);
+        var secondWorker = CreateWorkerFingerprint(now, true, 4, 4, 1, 1);
+        await using (var scope = application.Services.CreateAsyncScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<TemplatesDbContext>();
+            dbContext.TemplateRuntimeConfigFingerprints.AddRange(firstWorker, secondWorker);
+            await dbContext.SaveChangesAsync();
+        }
+
+        var first = await application.Client.GetFromJsonAsync<AdminTemplateGenerationControlResponse>(
+            "/api/admin/templates/generation-control");
+        var second = await application.Client.GetFromJsonAsync<AdminTemplateGenerationControlResponse>(
+            "/api/admin/templates/generation-control");
+
+        Assert.NotNull(first);
+        Assert.NotNull(second);
+        Assert.Equal(2, first.Worker.InstanceCount);
+        var firstAlert = Assert.Single(
+            first.Alerts,
+            alert => alert.AlertId == "generation-worker-instance-count-unexpected");
+        var secondAlert = Assert.Single(
+            second.Alerts,
+            alert => alert.AlertId == "generation-worker-instance-count-unexpected");
+        Assert.Equal("critical", firstAlert.Severity);
+        Assert.Equal(secondWorker.StartedAtUtc, firstAlert.StatusChangedAtUtc);
+        Assert.Equal(firstAlert.StatusChangedAtUtc, secondAlert.StatusChangedAtUtc);
     }
 
     [Fact]
@@ -374,6 +649,56 @@ public sealed partial class TemplatesApiIntegrationTests
             GenerationMaintenanceConcurrency = maintenanceConcurrency
         };
 
+    private static TemplateGenerationProviderAttempt CreateProviderAttemptRecoveryRow(
+        DateTime createdAtUtc,
+        TemplateGenerationProviderAttemptState state,
+        DateTime? nextPollAtUtc,
+        string? providerRequestId,
+        int ordinal) => new()
+        {
+            Id = Guid.NewGuid(),
+            GenerationJobId = Guid.NewGuid(),
+            Stage = TemplateGenerationProviderAttemptStage.ImageGeneration,
+            Ordinal = ordinal,
+            State = state,
+            Provider = "fal",
+            SubmissionTokenHash = ordinal.ToString("X64"),
+            ProviderRequestId = providerRequestId,
+            NextPollAtUtc = nextPollAtUtc,
+            SubmissionDeadlineAtUtc = createdAtUtc.AddMinutes(3),
+            ProcessingDeadlineAtUtc = createdAtUtc.AddMinutes(30),
+            ReconciliationDeadlineAtUtc = createdAtUtc.AddMinutes(40),
+            Version = ordinal,
+            CreatedAtUtc = createdAtUtc,
+            UpdatedAtUtc = createdAtUtc.AddMinutes(1)
+        };
+
+    private static HttpRequestMessage CreateGenerationControlPolicyRequest(
+        string idempotencyKey,
+        GenerationControlPolicyRequestBody body,
+        string? role = null,
+        bool unauthenticated = false)
+    {
+        var request = new HttpRequestMessage(
+            HttpMethod.Put,
+            "/api/admin/templates/generation-control/policy")
+        {
+            Content = JsonContent.Create(body)
+        };
+        request.Headers.Add("Idempotency-Key", idempotencyKey);
+        if (role is not null)
+        {
+            request.Headers.Add("X-Test-Role", role);
+        }
+
+        if (unauthenticated)
+        {
+            request.Headers.Add("X-Test-Unauthenticated", "true");
+        }
+
+        return request;
+    }
+
     private static async Task<SeededSubmissionUnknownAttempt> SeedSubmissionUnknownAttemptAsync(
         IServiceProvider services,
         bool charged)
@@ -477,6 +802,33 @@ public sealed partial class TemplatesApiIntegrationTests
         Guid GenerationId,
         long Version,
         DateTime CreatedAtUtc);
+
+    private sealed record GenerationControlPolicyRequestBody(
+        long ExpectedRevision,
+        string Reason,
+        bool AdmissionEnabled,
+        int ConfirmedFalConcurrencyLimit,
+        int ReservedHeadroom,
+        int ApplicationHardCeiling,
+        bool ConfirmFalConcurrencyLimit);
+
+    private sealed class FailedFalProviderRuntimeSnapshotService(
+        TemplateProviderRuntimeSnapshot snapshot) : IFalProviderRuntimeSnapshotService
+    {
+        public Task<TemplateProviderRuntimeSnapshot> GetSnapshotAsync(CancellationToken cancellationToken) =>
+            Task.FromResult(snapshot);
+
+        public Task<TemplateProviderRuntimeSnapshot> RefreshAsync(
+            bool force,
+            CancellationToken cancellationToken) => Task.FromResult(snapshot);
+
+        public Task<TemplateProviderRuntimeRefreshResult> RefreshWithOutcomeAsync(
+            bool force,
+            CancellationToken cancellationToken) => Task.FromResult(new TemplateProviderRuntimeRefreshResult(
+                snapshot,
+                TemplateProviderRuntimeRefreshOutcome.Failed,
+                "http_429"));
+    }
 
     private sealed record ProviderAttemptResolutionRequestBody(
         long ExpectedAttemptVersion,

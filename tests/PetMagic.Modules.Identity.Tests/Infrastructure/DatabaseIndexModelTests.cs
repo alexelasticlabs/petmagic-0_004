@@ -117,6 +117,16 @@ public sealed class DatabaseIndexModelTests
         AssertHasUniqueIndex<TemplateGenerationWatermarkUnlock>(dbContext, ["UserId", "GenerationJobId"]);
         AssertHasUniqueIndex<TemplateAiProviderRequestPermit>(dbContext, ["Provider", "BucketUtc", "PermitNumber"]);
         AssertHasUniqueIndex<TemplateCatalogChange>(dbContext, ["Version"]);
+        var generationResultIdentity = Assert.Single(
+            dbContext.Model.FindEntityType(typeof(TemplateMediaRecord))!.GetIndexes(),
+            index => index.GetDatabaseName() == "UX_tmr_GenerationResult_GenerationId_MediaType");
+        Assert.True(generationResultIdentity.IsUnique);
+        Assert.Equal(
+            [nameof(TemplateMediaRecord.GenerationId), nameof(TemplateMediaRecord.MediaType)],
+            generationResultIdentity.Properties.Select(property => property.Name));
+        Assert.Equal(
+            "\"GenerationId\" IS NOT NULL AND \"SourceType\" = 'generation_result'",
+            generationResultIdentity.GetFilter());
         AssertHasIndex<TemplateItem>(dbContext, ["Status", "UpdatedAtUtc", "Id"]);
         AssertHasIndex<TemplateItem>(dbContext, ["Status", "PublishedAtUtc", "Id"]);
         AssertHasIndex<TemplateItem>(dbContext, ["Status", "IsQaOnly", "TemplateType", "IsPremium", "PublishedAtUtc", "Id"]);
@@ -169,6 +179,41 @@ public sealed class DatabaseIndexModelTests
         Assert.Contains("DROP INDEX CONCURRENTLY IF EXISTS", migration);
         Assert.Contains("suppressTransaction: true", migration);
         Assert.DoesNotContain("migrationBuilder.CreateIndex(", migration);
+    }
+
+    [Fact]
+    public void GenerationResultMediaIdentityMigration_ShouldBeDiscoverableAndPreflightExistingRows()
+    {
+        using var dbContext = new TemplatesDbContext(
+            new DbContextOptionsBuilder<TemplatesDbContext>()
+                .UseNpgsql("Host=localhost;Database=petmagic_migration_discovery;Username=postgres;Password=unused")
+                .Options);
+        var migrations = dbContext.GetService<IMigrationsAssembly>().Migrations;
+        Assert.Contains("20260729184500_EnforceGenerationResultMediaIdentity", migrations.Keys);
+
+        var migration = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Infrastructure",
+            "Data",
+            "Migrations",
+            "20260729184500_EnforceGenerationResultMediaIdentity.cs"));
+
+        Assert.Contains("SET \"GenerationId\" = \"GenerationJobId\"", migration, StringComparison.Ordinal);
+        Assert.Contains("GROUP BY \"GenerationId\", \"MediaType\"", migration, StringComparison.Ordinal);
+        Assert.Contains("Generation-result media identity migration found duplicate rows.", migration, StringComparison.Ordinal);
+        Assert.Contains("preserve original, watermarked and preview paths", migration, StringComparison.Ordinal);
+        Assert.Contains("UX_tmr_GenerationResult_GenerationId_MediaType", migration, StringComparison.Ordinal);
+        Assert.Contains("\"GenerationId\" IS NOT NULL AND \"SourceType\" = 'generation_result'", migration, StringComparison.Ordinal);
+        Assert.Contains("CREATE UNIQUE INDEX CONCURRENTLY", migration, StringComparison.Ordinal);
+        Assert.Contains("DROP INDEX CONCURRENTLY IF EXISTS", migration, StringComparison.Ordinal);
+        Assert.Equal(3, Regex.Matches(migration, "suppressTransaction: true", RegexOptions.CultureInvariant).Count);
+        Assert.DoesNotContain("migrationBuilder.CreateIndex(", migration, StringComparison.Ordinal);
+        Assert.DoesNotContain("migrationBuilder.DropIndex(", migration, StringComparison.Ordinal);
+        Assert.DoesNotContain("DELETE FROM templates_media_records", migration, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("DropColumn", migration, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -732,6 +732,10 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
             entity.HasIndex(x => x.Url).IsUnique();
             entity.HasIndex(x => new { x.UserId, x.MediaType, x.IsDeleted });
             entity.HasIndex(x => x.GenerationId);
+            entity.HasIndex(x => new { x.GenerationId, x.MediaType })
+                .IsUnique()
+                .HasDatabaseName("UX_tmr_GenerationResult_GenerationId_MediaType")
+                .HasFilter("\"GenerationId\" IS NOT NULL AND \"SourceType\" = 'generation_result'");
             entity.HasIndex(x => new { x.LifecycleState, x.ExpiresAtUtc });
             entity.HasIndex(x => new { x.TemplateId, x.LifecycleState });
             entity.HasIndex(x => new { x.GenerationJobId, x.LifecycleState });

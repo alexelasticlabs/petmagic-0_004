@@ -170,6 +170,110 @@ public sealed class FalProviderHealthServiceTests
     }
 
     [Fact]
+    public async Task EnsureCanAcceptGenerationAsync_ShouldKeepRemainingCapacity_WhenOneSubmissionRequiresManualReconciliation()
+    {
+        await using var dbContext = CreateDbContext();
+        var now = DateTime.UtcNow;
+        dbContext.TemplateGenerationProviderAttempts.Add(new TemplateGenerationProviderAttempt
+        {
+            Id = Guid.NewGuid(),
+            GenerationJobId = Guid.NewGuid(),
+            Stage = TemplateGenerationProviderAttemptStage.VideoGeneration,
+            Ordinal = 1,
+            State = TemplateGenerationProviderAttemptState.SubmissionUnknown,
+            Provider = "fal",
+            SubmissionTokenHash = "manual-reconciliation-token",
+            NextPollAtUtc = null,
+            SubmissionDeadlineAtUtc = now.AddMinutes(-10),
+            ProcessingDeadlineAtUtc = now.AddMinutes(-5),
+            ReconciliationDeadlineAtUtc = now.AddMinutes(-1),
+            CreatedAtUtc = now.AddMinutes(-15),
+            UpdatedAtUtc = now
+        });
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateService(
+            dbContext,
+            CreatePolicy(effectiveGlobal: 8),
+            CreateSnapshot(TemplateProviderBalanceState.Fresh, balanceUsd: 20m));
+
+        var result = await service.EnsureCanAcceptGenerationAsync("image", "premium", CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task EnsureCanAcceptGenerationAsync_ShouldFailClosed_WhenManualReconciliationExhaustsCapacity()
+    {
+        await using var dbContext = CreateDbContext();
+        var now = DateTime.UtcNow;
+        for (var index = 0; index < 8; index++)
+        {
+            dbContext.TemplateGenerationProviderAttempts.Add(new TemplateGenerationProviderAttempt
+            {
+                Id = Guid.NewGuid(),
+                GenerationJobId = Guid.NewGuid(),
+                Stage = TemplateGenerationProviderAttemptStage.VideoGeneration,
+                Ordinal = 1,
+                State = TemplateGenerationProviderAttemptState.SubmissionUnknown,
+                Provider = "fal",
+                SubmissionTokenHash = $"manual-reconciliation-token-{index}",
+                NextPollAtUtc = null,
+                SubmissionDeadlineAtUtc = now.AddMinutes(-10),
+                ProcessingDeadlineAtUtc = now.AddMinutes(-5),
+                ReconciliationDeadlineAtUtc = now.AddMinutes(-1),
+                CreatedAtUtc = now.AddMinutes(-15),
+                UpdatedAtUtc = now
+            });
+        }
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateService(
+            dbContext,
+            CreatePolicy(effectiveGlobal: 8),
+            CreateSnapshot(TemplateProviderBalanceState.Fresh, balanceUsd: 20m));
+
+        var result = await service.EnsureCanAcceptGenerationAsync("image", "premium", CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(TemplatesErrors.ProviderCapacityUnavailable.Code, result.Error.Code);
+        Assert.Equal("provider_reconciliation_required", result.Error.Metadata!["reason"]);
+    }
+
+    [Fact]
+    public async Task EnsureCanAcceptGenerationAsync_ShouldContinue_WhenUnknownSubmissionHasScheduledReconciliation()
+    {
+        await using var dbContext = CreateDbContext();
+        var now = DateTime.UtcNow;
+        dbContext.TemplateGenerationProviderAttempts.Add(new TemplateGenerationProviderAttempt
+        {
+            Id = Guid.NewGuid(),
+            GenerationJobId = Guid.NewGuid(),
+            Stage = TemplateGenerationProviderAttemptStage.ImageGeneration,
+            Ordinal = 1,
+            State = TemplateGenerationProviderAttemptState.SubmissionUnknown,
+            Provider = "fal",
+            SubmissionTokenHash = "scheduled-reconciliation-token",
+            NextPollAtUtc = now.AddSeconds(30),
+            SubmissionDeadlineAtUtc = now.AddMinutes(-1),
+            ProcessingDeadlineAtUtc = now.AddMinutes(5),
+            ReconciliationDeadlineAtUtc = now.AddMinutes(10),
+            CreatedAtUtc = now.AddMinutes(-2),
+            UpdatedAtUtc = now
+        });
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateService(
+            dbContext,
+            CreatePolicy(effectiveGlobal: 8),
+            CreateSnapshot(TemplateProviderBalanceState.Fresh, balanceUsd: 20m));
+
+        var result = await service.EnsureCanAcceptGenerationAsync("video", "premium", CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
     public async Task EnsureCanAcceptGenerationAsync_ShouldUseStaticConcurrency_WhenSchedulerV2IsDisabled()
     {
         await using var dbContext = CreateDbContext();

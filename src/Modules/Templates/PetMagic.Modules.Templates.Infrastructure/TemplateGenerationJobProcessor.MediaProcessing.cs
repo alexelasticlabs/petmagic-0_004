@@ -3,6 +3,8 @@ using System.Security.Cryptography;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
+using Npgsql;
+
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Domain;
@@ -14,6 +16,9 @@ namespace PetMagic.Modules.Templates.Infrastructure;
 
 internal sealed partial class TemplateGenerationJobProcessor
 {
+    private const string GenerationResultMediaIdentityIndex =
+        "UX_tmr_GenerationResult_GenerationId_MediaType";
+
     private static string PreparePrompt(TemplateGenerationJob job, string basePrompt)
     {
         if (job.GenerationMode != TemplateGenerationMode.Similar)
@@ -543,6 +548,112 @@ internal sealed partial class TemplateGenerationJobProcessor
                     && x.SourceType == "generation_result"
                     && x.MediaType == mediaTypeText,
                 cancellationToken);
+    }
+
+    internal async Task<bool> TryRecoverGenerationOutputMediaRecordInsertRaceAsync(
+        TemplateGenerationJob job,
+        DbUpdateException exception,
+        CancellationToken cancellationToken)
+    {
+        if (!IsGenerationResultMediaIdentityViolation(exception))
+        {
+            return false;
+        }
+
+        var pendingEntry = dbContext.ChangeTracker
+            .Entries<TemplateMediaRecord>()
+            .FirstOrDefault(entry => entry.State == EntityState.Added
+                && entry.Entity.GenerationId == job.Id
+                && string.Equals(entry.Entity.SourceType, "generation_result", StringComparison.Ordinal)
+                && (string.Equals(entry.Entity.MediaType, "image", StringComparison.Ordinal)
+                    || string.Equals(entry.Entity.MediaType, "video", StringComparison.Ordinal)));
+        if (pendingEntry is null)
+        {
+            return false;
+        }
+
+        var pending = pendingEntry.Entity;
+        pendingEntry.State = EntityState.Detached;
+        job.MediaRecords.Remove(pending);
+
+        var persisted = await dbContext.TemplateMediaRecords
+            .SingleOrDefaultAsync(
+                record => record.GenerationId == pending.GenerationId
+                    && record.SourceType == "generation_result"
+                    && record.MediaType == pending.MediaType,
+                cancellationToken);
+        if (persisted is null)
+        {
+            return false;
+        }
+
+        MergeGenerationOutputCheckpoint(persisted, pending);
+        if (job.ResultMediaAssetId == pending.Id)
+        {
+            job.ResultMediaAssetId = persisted.Id;
+        }
+
+        if (dbContext.Entry(job).Collection(x => x.MediaRecords).IsLoaded
+            && job.MediaRecords.All(record => record.Id != persisted.Id))
+        {
+            job.MediaRecords.Add(persisted);
+        }
+
+        logger.LogInformation(
+            "Template generation media checkpoint insert race resolved by reloading the durable record. GenerationIdHash={GenerationIdHash} MediaType={MediaType}",
+            TemplateLogSanitizer.SafeId(job.Id),
+            pending.MediaType);
+        return true;
+    }
+
+    private static bool IsGenerationResultMediaIdentityViolation(Exception exception)
+    {
+        for (var current = exception; current is not null; current = current.InnerException)
+        {
+            if (current is PostgresException
+                {
+                    SqlState: PostgresErrorCodes.UniqueViolation,
+                    ConstraintName: GenerationResultMediaIdentityIndex
+                })
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static void MergeGenerationOutputCheckpoint(
+        TemplateMediaRecord persisted,
+        TemplateMediaRecord pending)
+    {
+        persisted.UserId ??= pending.UserId;
+        persisted.GenerationId ??= pending.GenerationId;
+        persisted.GenerationJobId ??= pending.GenerationJobId;
+        persisted.StoragePath = string.IsNullOrWhiteSpace(persisted.StoragePath)
+            ? pending.StoragePath
+            : persisted.StoragePath;
+        persisted.Url = string.IsNullOrWhiteSpace(persisted.Url)
+            ? pending.Url
+            : persisted.Url;
+        persisted.FileName = string.IsNullOrWhiteSpace(persisted.FileName)
+            ? pending.FileName
+            : persisted.FileName;
+        persisted.ContentType = string.IsNullOrWhiteSpace(persisted.ContentType)
+            ? pending.ContentType
+            : persisted.ContentType;
+        persisted.FileSizeBytes ??= pending.FileSizeBytes;
+        persisted.WatermarkedStoragePath ??= pending.WatermarkedStoragePath;
+        persisted.PreviewUrl ??= pending.PreviewUrl;
+        persisted.WatermarkedPreviewUrl ??= pending.WatermarkedPreviewUrl;
+        persisted.Role = pending.Role;
+        persisted.LifecycleState = TemplateMediaLifecycleState.AttachedToGeneration;
+        persisted.AttachedAtUtc ??= pending.AttachedAtUtc;
+        persisted.ExpiresAtUtc = null;
+        persisted.DeletedAtUtc = null;
+        persisted.IsDeleted = false;
+        persisted.FailureCode = null;
+        persisted.FailureMessage = null;
     }
 
     private static StoredMediaResponse? RestoreOriginalMediaCheckpoint(TemplateMediaRecord? mediaRecord)

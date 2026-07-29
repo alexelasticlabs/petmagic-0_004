@@ -56,7 +56,7 @@ internal sealed class HttpGeneratedMediaImporter(
             totalBytes += bytesRead;
             if (totalBytes > maxBytes)
             {
-                throw new InvalidOperationException("Generated media exceeds configured size limit.");
+                throw new GeneratedMediaSizeLimitExceededException();
             }
 
             await destination.WriteAsync(buffer.AsMemory(0, bytesRead), cancellationToken);
@@ -146,11 +146,23 @@ internal sealed class HttpGeneratedMediaImporter(
             }
 
             await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-            using var memoryStream = new MemoryStream();
-            await CopyWithLimitAsync(stream, memoryStream, maxFileSizeBytes, cancellationToken);
-            memoryStream.Position = 0;
+            var temporaryPath = Path.Combine(
+                Path.GetTempPath(),
+                $"petmagic-generated-media-{generationId:N}-{Guid.NewGuid():N}.tmp");
+            await using var temporaryStream = new FileStream(
+                temporaryPath,
+                FileMode.CreateNew,
+                FileAccess.ReadWrite,
+                FileShare.None,
+                bufferSize: 81_920,
+                FileOptions.Asynchronous | FileOptions.SequentialScan | FileOptions.DeleteOnClose);
+            await CopyWithLimitAsync(stream, temporaryStream, maxFileSizeBytes, cancellationToken);
+            await temporaryStream.FlushAsync(cancellationToken);
+            temporaryStream.Position = 0;
 
-            var detectedContentType = DetectContentType(memoryStream.GetBuffer().AsSpan(0, (int)memoryStream.Length));
+            var header = new byte[32];
+            var headerLength = await ReadHeaderAsync(temporaryStream, header, cancellationToken);
+            var detectedContentType = DetectContentType(header.AsSpan(0, headerLength));
             if (detectedContentType is null
                 || !detectedContentType.StartsWith(expectedContentTypePrefix, StringComparison.OrdinalIgnoreCase)
                 || !MatchesDeclaredContentType(detectedContentType, declaredContentType))
@@ -159,14 +171,14 @@ internal sealed class HttpGeneratedMediaImporter(
                 return Result.Failure<StoredMediaResponse>(TemplatesErrors.GeneratedMediaImportFailed);
             }
 
-            memoryStream.Position = 0;
+            temporaryStream.Position = 0;
             var extension = resolveExtension(detectedContentType, uri);
             var upload = new MediaUploadCommand(
                 $"generated-{generationId:N}{extension}",
                 detectedContentType,
                 Content: null,
-                ContentStream: memoryStream,
-                ContentLengthBytes: memoryStream.Length,
+                ContentStream: temporaryStream,
+                ContentLengthBytes: temporaryStream.Length,
                 PreferredStorageKey: $"generations/{generationId:N}/original{extension}");
             var storeResult = await mediaStorage.StoreAsync(upload, cancellationToken);
             if (storeResult.IsFailure)
@@ -182,7 +194,7 @@ internal sealed class HttpGeneratedMediaImporter(
         {
             throw;
         }
-        catch (InvalidOperationException)
+        catch (GeneratedMediaSizeLimitExceededException)
         {
             TemplateGenerationMetrics.RecordMediaImportFailure(mediaType, "too_large");
             return Result.Failure<StoredMediaResponse>(TemplatesErrors.GeneratedMediaTooLarge);
@@ -196,6 +208,28 @@ internal sealed class HttpGeneratedMediaImporter(
                 SafeLogValues.ExceptionType(exception));
             return Result.Failure<StoredMediaResponse>(TemplatesErrors.GeneratedMediaImportFailed);
         }
+    }
+
+    private static async Task<int> ReadHeaderAsync(
+        Stream stream,
+        byte[] header,
+        CancellationToken cancellationToken)
+    {
+        var totalRead = 0;
+        while (totalRead < header.Length)
+        {
+            var read = await stream.ReadAsync(
+                header.AsMemory(totalRead, header.Length - totalRead),
+                cancellationToken);
+            if (read == 0)
+            {
+                break;
+            }
+
+            totalRead += read;
+        }
+
+        return totalRead;
     }
 
     private static bool IsAllowedGeneratedMediaUri(Uri uri)
@@ -355,5 +389,9 @@ internal sealed class HttpGeneratedMediaImporter(
         return string.Equals(trimmed, sanitized, StringComparison.Ordinal)
             ? sanitized ?? TemplatesErrors.MediaStorageFailed.Code
             : TemplatesErrors.MediaStorageFailed.Code;
+    }
+
+    private sealed class GeneratedMediaSizeLimitExceededException : Exception
+    {
     }
 }

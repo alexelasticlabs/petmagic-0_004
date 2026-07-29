@@ -52,6 +52,13 @@ internal sealed class FalProviderHealthService(
 
             confirmedConcurrency = policy.ConfirmedFalConcurrencyLimit;
             inflightRequests = await CountInflightProviderAttemptsAsync(cancellationToken);
+            var manualUnresolvedSubmissions = await CountManualUnresolvedProviderSubmissionsAsync(
+                cancellationToken);
+            if (manualUnresolvedSubmissions >= policy.EffectiveProfile.GlobalMaxConcurrentGenerations)
+            {
+                RecordSnapshot(confirmedConcurrency, balanceUsd: null, inflightRequests);
+                return Reject("provider_reconciliation_required", mediaType, tier);
+            }
         }
         else
         {
@@ -107,6 +114,17 @@ internal sealed class FalProviderHealthService(
         return dbContext.TemplateGenerationProviderAttempts
             .AsNoTracking()
             .LongCountAsync(x => ActiveAttemptStates.Contains(x.State), cancellationToken);
+    }
+
+    private Task<long> CountManualUnresolvedProviderSubmissionsAsync(CancellationToken cancellationToken)
+    {
+        return dbContext.TemplateGenerationProviderAttempts
+            .AsNoTracking()
+            .LongCountAsync(
+                x => x.State == TemplateGenerationProviderAttemptState.SubmissionUnknown
+                    && x.NextPollAtUtc == null
+                    && x.Provider == "fal",
+                cancellationToken);
     }
 
     private Task<long> CountLegacyInflightProviderRequestsAsync(CancellationToken cancellationToken)

@@ -390,29 +390,41 @@ internal sealed class TemplateGenerationProviderAttemptStore(
         CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(providerRequestId);
-        var attempt = await dbContext.TemplateGenerationProviderAttempts
-            .Include(x => x.GenerationJob)
-            .SingleAsync(x => x.Id == attemptId, cancellationToken);
-        if (attempt.State is TemplateGenerationProviderAttemptState.Completed
-            or TemplateGenerationProviderAttemptState.Cancelled
-            or TemplateGenerationProviderAttemptState.Failed)
+        try
         {
-            return;
-        }
+            var attempt = await dbContext.TemplateGenerationProviderAttempts
+                .Include(x => x.GenerationJob)
+                .SingleAsync(x => x.Id == attemptId, cancellationToken);
+            if (attempt.State is TemplateGenerationProviderAttemptState.Completed
+                or TemplateGenerationProviderAttemptState.Cancelled
+                or TemplateGenerationProviderAttemptState.Failed)
+            {
+                return;
+            }
 
-        var now = DateTime.UtcNow;
-        attempt.State = TemplateGenerationProviderAttemptState.ProviderQueued;
-        attempt.ProviderRequestId = providerRequestId;
-        attempt.ProviderStatusUrl = statusUrl;
-        attempt.ProviderResponseUrl = responseUrl;
-        attempt.ProviderCancelUrl = cancelUrl;
-        attempt.NextPollAtUtc = nextPollAtUtc;
-        attempt.SubmittedAtUtc ??= now;
-        attempt.UpdatedAtUtc = now;
-        attempt.LastErrorCode = null;
-        attempt.Version++;
-        ApplyLegacySubmission(attempt.GenerationJob, attempt, now);
-        await dbContext.SaveChangesAsync(cancellationToken);
+            var now = DateTime.UtcNow;
+            attempt.State = TemplateGenerationProviderAttemptState.ProviderQueued;
+            attempt.ProviderRequestId = providerRequestId;
+            attempt.ProviderStatusUrl = statusUrl;
+            attempt.ProviderResponseUrl = responseUrl;
+            attempt.ProviderCancelUrl = cancelUrl;
+            attempt.NextPollAtUtc = nextPollAtUtc;
+            attempt.SubmittedAtUtc ??= now;
+            attempt.UpdatedAtUtc = now;
+            attempt.LastErrorCode = null;
+            attempt.Version++;
+            ApplyLegacySubmission(attempt.GenerationJob, attempt, now);
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch
+        {
+            // A provider response can arrive immediately before a failed/ambiguous database
+            // write. Never let the mutated ProviderQueued graph poison the fallback query:
+            // reload durable state so it is either accepted-with-request-id or can safely be
+            // moved from Submitting to SubmissionUnknown without a blind resubmit.
+            dbContext.ChangeTracker.Clear();
+            throw;
+        }
     }
 
     public async Task MarkSubmittingAsync(Guid attemptId, CancellationToken cancellationToken)
@@ -437,27 +449,37 @@ internal sealed class TemplateGenerationProviderAttemptStore(
         DateTime nextPollAtUtc,
         CancellationToken cancellationToken)
     {
-        var attempt = await dbContext.TemplateGenerationProviderAttempts
-            .Include(x => x.GenerationJob)
-            .SingleAsync(x => x.Id == attemptId, cancellationToken);
-        if (attempt.State != TemplateGenerationProviderAttemptState.SubmitReserved
-            && attempt.State != TemplateGenerationProviderAttemptState.Submitting)
+        try
         {
-            return;
-        }
+            var attempt = await dbContext.TemplateGenerationProviderAttempts
+                .Include(x => x.GenerationJob)
+                .SingleAsync(x => x.Id == attemptId, cancellationToken);
+            if (attempt.State != TemplateGenerationProviderAttemptState.SubmitReserved
+                && attempt.State != TemplateGenerationProviderAttemptState.Submitting)
+            {
+                return;
+            }
 
-        var now = DateTime.UtcNow;
-        attempt.State = TemplateGenerationProviderAttemptState.SubmissionUnknown;
-        attempt.NextPollAtUtc = nextPollAtUtc;
-        attempt.LastErrorCode = Truncate(errorCode, 128);
-        attempt.UpdatedAtUtc = now;
-        attempt.Version++;
-        attempt.GenerationJob.Status = TemplateGenerationStatus.SubmittingToProvider;
-        attempt.GenerationJob.CurrentProviderStage = ToProviderStage(attempt.Stage);
-        attempt.GenerationJob.ProviderStatus = "SUBMISSION_UNKNOWN";
-        attempt.GenerationJob.ProviderStatusCheckedAtUtc = now;
-        attempt.GenerationJob.UpdatedAtUtc = now;
-        await dbContext.SaveChangesAsync(cancellationToken);
+            var now = DateTime.UtcNow;
+            attempt.State = TemplateGenerationProviderAttemptState.SubmissionUnknown;
+            attempt.NextPollAtUtc = nextPollAtUtc;
+            attempt.LastErrorCode = Truncate(errorCode, 128);
+            attempt.UpdatedAtUtc = now;
+            attempt.Version++;
+            attempt.GenerationJob.Status = TemplateGenerationStatus.SubmittingToProvider;
+            attempt.GenerationJob.CurrentProviderStage = ToProviderStage(attempt.Stage);
+            attempt.GenerationJob.ProviderStatus = "SUBMISSION_UNKNOWN";
+            attempt.GenerationJob.ProviderStatusCheckedAtUtc = now;
+            attempt.GenerationJob.LockedAtUtc = null;
+            attempt.GenerationJob.LockedBy = null;
+            attempt.GenerationJob.UpdatedAtUtc = now;
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch
+        {
+            dbContext.ChangeTracker.Clear();
+            throw;
+        }
     }
 
     public async Task MarkSubmissionFailedAsync(
@@ -990,6 +1012,8 @@ internal sealed class TemplateGenerationProviderAttemptStore(
         job.NextAttemptEarliestAtUtc = attempt.NextPollAtUtc;
         job.LastErrorCode = null;
         job.LastErrorMessage = null;
+        job.LockedAtUtc = null;
+        job.LockedBy = null;
         job.UpdatedAtUtc = now;
     }
 

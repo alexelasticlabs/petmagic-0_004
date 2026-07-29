@@ -347,10 +347,18 @@ internal sealed partial class TemplateGenerationService
         int providerCompletedAtSeconds;
         if (normalizedMediaType == TemplateGenerationQueue.MediaTypeVideo)
         {
-            var preprocessingSlots = ResolveVideoPreprocessingSlotsForEstimate(capacityContext);
-            var generationSlots = ResolveEffectiveSlotsForEstimate(normalizedMediaType, capacityContext);
             var activePreprocessing = capacityContext?.ActiveVideoPreprocessingProvider ?? 0;
             var activeGeneration = capacityContext?.ActiveVideoGenerationProvider ?? 0;
+            var videoCapacitySlots = ResolveEffectiveSlotsForEstimate(normalizedMediaType, capacityContext);
+            var preprocessingSlots = Math.Min(
+                videoCapacitySlots,
+                ResolveVideoPreprocessingSlotsForEstimate(capacityContext));
+            var generationSlots = ResolveVideoGenerationSlotsForEstimate(
+                videoCapacitySlots,
+                preprocessingSlots,
+                hasPreprocessingWork: activePreprocessing > 0
+                    || videoStages.QueuedAheadNeedsPreprocessing > 0
+                    || videoStages.OwnNeedsPreprocessing);
             var videoTimeline = EstimateVideoProviderTimeline(
                 activePreprocessing,
                 activeGeneration,
@@ -374,13 +382,34 @@ internal sealed partial class TemplateGenerationService
                 capacityContext?.QueuedImage ?? 0,
                 includeOwn: false,
                 imageGenerationSeconds,
-                ResolveEffectiveSlotsForEstimate(TemplateGenerationQueue.MediaTypeImage, capacityContext));
+                ResolveEffectiveSlotsForEstimate(
+                    TemplateGenerationQueue.MediaTypeImage,
+                    capacityContext,
+                    videoSlotsToPreserve: videoCapacitySlots));
             providerImportArrivals.AddRange(imageTimeline.AheadCompletionTimes.Select(
                 completedAt => new ImportArrival(completedAt, imageImportSeconds, IsOwn: false)));
         }
         else
         {
-            var generationSlots = ResolveEffectiveSlotsForEstimate(normalizedMediaType, capacityContext);
+            var videoCapacitySlots = ResolveEffectiveSlotsForEstimate(
+                TemplateGenerationQueue.MediaTypeVideo,
+                capacityContext);
+            var videoPreprocessingSlots = Math.Min(
+                videoCapacitySlots,
+                ResolveVideoPreprocessingSlotsForEstimate(capacityContext));
+            var videoGenerationSlots = ResolveVideoGenerationSlotsForEstimate(
+                videoCapacitySlots,
+                videoPreprocessingSlots,
+                hasPreprocessingWork: (capacityContext?.ActiveVideoPreprocessingProvider ?? 0) > 0
+                    || (capacityContext?.QueuedVideoNeedsPreprocessing ?? 0) > 0);
+            var hasVideoWork = capacityContext is { } contextWithVideoWork
+                && (contextWithVideoWork.ActiveVideo > 0
+                    || contextWithVideoWork.QueuedVideoNeedsPreprocessing > 0
+                    || contextWithVideoWork.QueuedVideoReadyForGeneration > 0);
+            var generationSlots = ResolveEffectiveSlotsForEstimate(
+                normalizedMediaType,
+                capacityContext,
+                videoSlotsToPreserve: hasVideoWork ? videoCapacitySlots : 0);
             var activeGeneration = capacityContext?.ActiveImageProvider ?? 0;
             var imageTimeline = EstimateSingleStageProviderTimeline(
                 activeGeneration,
@@ -402,8 +431,8 @@ internal sealed partial class TemplateGenerationService
                 ownNeedsPreprocessing: false,
                 videoPreprocessingSeconds,
                 videoGenerationSeconds,
-                ResolveVideoPreprocessingSlotsForEstimate(capacityContext),
-                ResolveEffectiveSlotsForEstimate(TemplateGenerationQueue.MediaTypeVideo, capacityContext));
+                videoPreprocessingSlots,
+                videoGenerationSlots);
             providerImportArrivals.AddRange(videoTimeline.AheadCompletionTimes.Select(
                 completedAt => new ImportArrival(completedAt, videoImportSeconds, IsOwn: false)));
         }
@@ -683,22 +712,35 @@ internal sealed partial class TemplateGenerationService
         return ordered[Math.Clamp(index, 0, ordered.Length - 1)];
     }
 
-    private int ResolveEffectiveSlotsForEstimate(string normalizedMediaType, QueueCapacityContext? capacityContext)
+    private int ResolveEffectiveSlotsForEstimate(
+        string normalizedMediaType,
+        QueueCapacityContext? capacityContext,
+        int videoSlotsToPreserve = 0)
     {
         var runtimeProfile = capacityContext?.RuntimeProfile;
         if (normalizedMediaType == TemplateGenerationQueue.MediaTypeVideo)
         {
             var reserved = runtimeProfile?.VideoReservedConcurrentGenerations
                 ?? ResolveVideoReservedConcurrency();
-            if (!CanEstimateVideoBorrow(capacityContext))
+            var estimatedSlots = !CanEstimateVideoBorrow(capacityContext)
+                ? Math.Max(1, reserved)
+                : Math.Max(1, Math.Min(
+                    runtimeProfile?.VideoMaxConcurrentGenerations ?? options.VideoMaxConcurrentGenerations,
+                    reserved + (runtimeProfile?.VideoBorrowMaxConcurrentGenerations
+                        ?? ResolveVideoBorrowMaxConcurrency())));
+            if (capacityContext is null)
             {
-                return Math.Max(1, reserved);
+                return estimatedSlots;
             }
 
-            return Math.Max(1, Math.Min(
-                runtimeProfile?.VideoMaxConcurrentGenerations ?? options.VideoMaxConcurrentGenerations,
-                reserved + (runtimeProfile?.VideoBorrowMaxConcurrentGenerations
-                    ?? ResolveVideoBorrowMaxConcurrency())));
+            // Image and video attempts consume the same durable provider capacity. Keep the ETA
+            // lane count inside the global limit even when the media-specific limits overlap.
+            var videoGlobalMax = runtimeProfile?.GlobalMaxConcurrentGenerations
+                ?? options.GlobalMaxConcurrentGenerations;
+            var globalSlotsAvailableAlongsideActiveImages = Math.Max(
+                1,
+                videoGlobalMax - ToSaturatedInt(capacityContext.Value.ActiveImage));
+            return Math.Max(1, Math.Min(estimatedSlots, globalSlotsAvailableAlongsideActiveImages));
         }
 
         if (capacityContext is null)
@@ -709,17 +751,20 @@ internal sealed partial class TemplateGenerationService
         var context = capacityContext.Value;
         var imageMax = runtimeProfile?.ImageMaxConcurrentGenerations
             ?? options.ImageMaxConcurrentGenerations;
-        var imageProtected = runtimeProfile?.ImageProtectedConcurrentGenerations
-            ?? ResolveImageProtectedConcurrency();
         var globalMax = runtimeProfile?.GlobalMaxConcurrentGenerations
             ?? options.GlobalMaxConcurrentGenerations;
         var videoReserved = runtimeProfile?.VideoReservedConcurrentGenerations
             ?? ResolveVideoReservedConcurrency();
-        var borrowedVideo = Math.Max(0, context.ActiveVideo - videoReserved);
-        var globalSlotsAvailableAfterBorrowedVideo = Math.Max(
-            imageProtected,
-            globalMax - (int)borrowedVideo);
-        return Math.Max(1, Math.Min(imageMax, globalSlotsAvailableAfterBorrowedVideo));
+        var hasVideoBacklog = videoSlotsToPreserve > 0
+            || context.QueuedVideoNeedsPreprocessing > 0
+            || context.QueuedVideoReadyForGeneration > 0;
+        var videoCapacityToPreserve = hasVideoBacklog
+            ? Math.Max(context.ActiveVideo, Math.Max(videoReserved, videoSlotsToPreserve))
+            : context.ActiveVideo;
+        var globalSlotsAvailableAlongsideVideo = Math.Max(
+            1,
+            globalMax - ToSaturatedInt(videoCapacityToPreserve));
+        return Math.Max(1, Math.Min(imageMax, globalSlotsAvailableAlongsideVideo));
     }
 
     private int ResolveVideoPreprocessingSlotsForEstimate(QueueCapacityContext? capacityContext)
@@ -728,6 +773,25 @@ internal sealed partial class TemplateGenerationService
             1,
             capacityContext?.RuntimeProfile?.VideoPreprocessingMaxConcurrentGenerations
                 ?? options.VideoPreprocessingMaxConcurrentGenerations);
+    }
+
+    private static int ResolveVideoGenerationSlotsForEstimate(
+        int videoCapacitySlots,
+        int preprocessingSlots,
+        bool hasPreprocessingWork)
+    {
+        var boundedVideoCapacity = Math.Max(1, videoCapacitySlots);
+        if (!hasPreprocessingWork || boundedVideoCapacity == 1)
+        {
+            return boundedVideoCapacity;
+        }
+
+        // Preprocessing and motion generation reserve attempts from the same video/global
+        // provider capacity. Keep their ETA lanes disjoint while preprocessing is backlogged;
+        // otherwise the estimate can admit work that the durable scheduler cannot run.
+        return Math.Max(
+            1,
+            boundedVideoCapacity - Math.Min(preprocessingSlots, boundedVideoCapacity - 1));
     }
 
     private static ProviderTimeline EstimateVideoProviderTimeline(

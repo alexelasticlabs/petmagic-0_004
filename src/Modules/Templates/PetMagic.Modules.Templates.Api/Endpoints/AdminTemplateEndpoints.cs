@@ -56,6 +56,8 @@ public static partial class AdminTemplateEndpoints
         group.MapPost("/generation-control/provider/refresh", RefreshGenerationControlProviderAsync)
             .WithMetadata(new RequestSizeLimitAttribute(MaxAdminTemplateSmallJsonRequestBodyBytes))
             .RequireAuthorization("AdminOnly");
+        group.MapGet("/generation-control/provider-attempts/recovery", ListGenerationControlProviderAttemptRecoveryAsync)
+            .RequireAuthorization("AdminOnly");
         group.MapPost("/generation-control/provider-attempts/{attemptId:guid}/resolve", ResolveGenerationControlProviderAttemptAsync)
             .WithMetadata(new RequestSizeLimitAttribute(MaxAdminTemplateSmallJsonRequestBodyBytes))
             .RequireAuthorization("AdminOnly");

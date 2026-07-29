@@ -1867,6 +1867,11 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
 
                     b.HasIndex("GenerationId");
 
+                    b.HasIndex("GenerationId", "MediaType")
+                        .IsUnique()
+                        .HasDatabaseName("UX_tmr_GenerationResult_GenerationId_MediaType")
+                        .HasFilter("\"GenerationId\" IS NOT NULL AND \"SourceType\" = 'generation_result'");
+
                     b.HasIndex("Url")
                         .IsUnique();
 

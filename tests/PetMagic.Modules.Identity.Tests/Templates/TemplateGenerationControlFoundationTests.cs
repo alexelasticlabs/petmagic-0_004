@@ -160,6 +160,20 @@ public sealed class TemplateGenerationControlFoundationTests
             StringComparison.Ordinal);
         Assert.Contains("scheduler_v2_bootstrap_legacy_admission_open", source, StringComparison.Ordinal);
         Assert.Contains("ON CONFLICT (\"GenerationJobId\", \"Stage\", \"Ordinal\") DO NOTHING", source, StringComparison.Ordinal);
+        Assert.Contains(
+            "CREATE INDEX CONCURRENTLY IF NOT EXISTS \"IX_tgj_ImportingMedia_NextAttempt\"",
+            source,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "DROP INDEX CONCURRENTLY IF EXISTS \"IX_tgj_ImportingMedia_NextAttempt\"",
+            source,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "ON templates_generation_jobs (\"Status\", \"MediaImportNextAttemptAtUtc\")",
+            source,
+            StringComparison.Ordinal);
+        Assert.Contains("WHERE \"Status\" = 10", source, StringComparison.Ordinal);
+        Assert.Equal(2, CountOccurrences(source, "suppressTransaction: true"));
         Assert.DoesNotContain("templates_categories", source, StringComparison.Ordinal);
         Assert.DoesNotContain("templates_items", source, StringComparison.Ordinal);
         Assert.DoesNotContain("templates_push_outbox", source, StringComparison.Ordinal);
@@ -182,13 +196,42 @@ public sealed class TemplateGenerationControlFoundationTests
             path => !path.EndsWith(".Designer.cs", StringComparison.Ordinal));
         var source = File.ReadAllText(migrationPath);
 
-        Assert.Equal(4, CountOccurrences(source, "migrationBuilder.CreateIndex("));
+        Assert.Equal(4, CountOccurrences(source, "CREATE INDEX CONCURRENTLY IF NOT EXISTS"));
+        Assert.Equal(4, CountOccurrences(source, "DROP INDEX CONCURRENTLY IF EXISTS"));
+        Assert.Equal(8, CountOccurrences(source, "suppressTransaction: true"));
         Assert.Contains("IX_tgpa_Completed_Stage_ProviderCompletedAtUtc", source, StringComparison.Ordinal);
         Assert.Contains("IX_tgj_Completed_MediaType_ImportCompletedAtUtc", source, StringComparison.Ordinal);
         Assert.Contains("IX_tgj_UserId_QueueTier_LastAttemptAtUtc", source, StringComparison.Ordinal);
         Assert.Contains("IX_tpwbi_Processing_LockedAtUtc_NextAttemptAtUtc", source, StringComparison.Ordinal);
-        Assert.Equal(2, CountOccurrences(source, ".Annotation(\"Npgsql:IndexInclude\""));
-        Assert.Equal(3, CountOccurrences(source, "descending: new[]"));
+        Assert.Equal(2, CountOccurrences(source, "INCLUDE ("));
+        Assert.Equal(3, CountOccurrences(source, " DESC"));
+        Assert.Contains(
+            "ON templates_generation_provider_attempts (\"Stage\", \"ProviderCompletedAtUtc\" DESC)",
+            source,
+            StringComparison.Ordinal);
+        Assert.Contains("INCLUDE (\"SubmittedAtUtc\")", source, StringComparison.Ordinal);
+        Assert.Contains("WHERE \"State\" = 6", source, StringComparison.Ordinal);
+        Assert.Contains(
+            "ON templates_generation_jobs (\"QueueMediaType\", \"MediaImportCompletedAtUtc\" DESC)",
+            source,
+            StringComparison.Ordinal);
+        Assert.Contains("INCLUDE (\"ImportStartedAtUtc\")", source, StringComparison.Ordinal);
+        Assert.Contains("WHERE \"Status\" = 3", source, StringComparison.Ordinal);
+        Assert.Contains(
+            "ON templates_generation_jobs (\"UserId\", \"QueueTier\", \"LastAttemptAtUtc\" DESC)",
+            source,
+            StringComparison.Ordinal);
+        Assert.Contains("WHERE \"LastAttemptAtUtc\" IS NOT NULL", source, StringComparison.Ordinal);
+        Assert.Contains(
+            "ON templates_provider_webhook_inbox (\"LockedAtUtc\", \"NextAttemptAtUtc\")",
+            source,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "WHERE \"Status\" = 2 AND \"LockedAtUtc\" IS NOT NULL",
+            source,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("migrationBuilder.CreateIndex(", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("migrationBuilder.DropIndex(", source, StringComparison.Ordinal);
         Assert.DoesNotContain("migrationBuilder.AddColumn", source, StringComparison.Ordinal);
         Assert.DoesNotContain("migrationBuilder.DropColumn", source, StringComparison.Ordinal);
         Assert.DoesNotContain("migrationBuilder.CreateTable", source, StringComparison.Ordinal);

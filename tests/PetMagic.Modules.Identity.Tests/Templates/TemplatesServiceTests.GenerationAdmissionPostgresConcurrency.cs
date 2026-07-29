@@ -202,7 +202,8 @@ public sealed partial class TemplatesServiceTests
                     AdmissionEnabled: false,
                     policyBeforePause.ConfirmedFalConcurrencyLimit,
                     policyBeforePause.ReservedHeadroom,
-                    policyBeforePause.ApplicationHardCeiling),
+                    policyBeforePause.ApplicationHardCeiling,
+                    ConfirmFalConcurrencyLimit: false),
                 CancellationToken.None);
 
             await Task.Delay(200);

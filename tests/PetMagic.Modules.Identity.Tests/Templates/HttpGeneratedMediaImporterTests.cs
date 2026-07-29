@@ -152,6 +152,96 @@ public sealed class HttpGeneratedMediaImporterTests
     }
 
     [Fact]
+    public async Task ImportVideoAsync_ShouldSpoolProviderPayloadToFileInsteadOfBufferingItInMemory()
+    {
+        var payload = new byte[2 * 1024 * 1024];
+        payload[4] = 0x66;
+        payload[5] = 0x74;
+        payload[6] = 0x79;
+        payload[7] = 0x70;
+        payload[8] = 0x69;
+        payload[9] = 0x73;
+        payload[10] = 0x6F;
+        payload[11] = 0x6D;
+        var handler = new RecordingHandler("video/mp4", payload);
+        var storage = new RecordingMediaStorage(copyContent: true);
+        var importer = CreateImporter(handler, storage);
+
+        var result = await importer.ImportVideoAsync(
+            "https://cdn.example.com/generated.mp4",
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(storage.LastAsset?.ContentStream);
+        Assert.IsType<FileStream>(storage.LastAsset.ContentStream);
+        Assert.Equal(payload.Length, storage.CopiedContentLength);
+        Assert.NotNull(storage.LastSpoolPath);
+        Assert.False(File.Exists(storage.LastSpoolPath));
+    }
+
+    [Fact]
+    public async Task ImportImageAsync_ShouldDeleteSpoolWhenUnknownLengthPayloadExceedsLimit()
+    {
+        var generationId = Guid.NewGuid();
+        var payload = PngPayload().Concat(new byte[64]).ToArray();
+        var handler = new RecordingHandler("image/png", payload, omitContentLength: true);
+        var storage = new RecordingMediaStorage();
+        var importer = CreateImporter(
+            handler,
+            storage,
+            generatedImageMaxFileSizeBytes: PngPayload().Length);
+
+        var result = await importer.ImportImageAsync(
+            "https://cdn.example.com/generated.png",
+            generationId,
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(TemplatesErrors.GeneratedMediaTooLarge.Code, result.Error.Code);
+        Assert.Equal(0, storage.StoreCount);
+        AssertNoSpoolFiles(generationId);
+    }
+
+    [Fact]
+    public async Task ImportImageAsync_ShouldDeleteSpoolWhenStorageThrows()
+    {
+        var generationId = Guid.NewGuid();
+        var handler = new RecordingHandler("image/png", PngPayload());
+        var storage = new RecordingMediaStorage(throwDuringStore: true);
+        var importer = CreateImporter(handler, storage);
+
+        var result = await importer.ImportImageAsync(
+            "https://cdn.example.com/generated.png",
+            generationId,
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(TemplatesErrors.GeneratedMediaImportFailed.Code, result.Error.Code);
+        Assert.NotNull(storage.LastSpoolPath);
+        Assert.False(File.Exists(storage.LastSpoolPath));
+        AssertNoSpoolFiles(generationId);
+    }
+
+    [Fact]
+    public async Task ImportImageAsync_ShouldDeleteSpoolWhenStorageCancels()
+    {
+        var generationId = Guid.NewGuid();
+        var handler = new RecordingHandler("image/png", PngPayload());
+        var storage = new RecordingMediaStorage(cancelDuringStore: true);
+        var importer = CreateImporter(handler, storage);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => importer.ImportImageAsync(
+            "https://cdn.example.com/generated.png",
+            generationId,
+            CancellationToken.None));
+
+        Assert.NotNull(storage.LastSpoolPath);
+        Assert.False(File.Exists(storage.LastSpoolPath));
+        AssertNoSpoolFiles(generationId);
+    }
+
+    [Fact]
     public async Task ImportImageAsync_ShouldSanitizeStorageFailureCode()
     {
         var handler = new RecordingHandler("image/png", PngPayload());
@@ -165,6 +255,8 @@ public sealed class HttpGeneratedMediaImporterTests
         Assert.DoesNotContain("import-storage-secret", result.Error.Code, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(1, handler.RequestCount);
         Assert.Equal(1, storage.StoreCount);
+        Assert.NotNull(storage.LastSpoolPath);
+        Assert.False(File.Exists(storage.LastSpoolPath));
     }
 
     [Fact]
@@ -182,7 +274,10 @@ public sealed class HttpGeneratedMediaImporterTests
         Assert.Equal(0, storage.StoreCount);
     }
 
-    private static HttpGeneratedMediaImporter CreateImporter(HttpMessageHandler handler, RecordingMediaStorage? storage = null)
+    private static HttpGeneratedMediaImporter CreateImporter(
+        HttpMessageHandler handler,
+        RecordingMediaStorage? storage = null,
+        long? generatedImageMaxFileSizeBytes = null)
     {
         storage ??= new RecordingMediaStorage();
         var options = new TemplatesOptions
@@ -195,7 +290,9 @@ public sealed class HttpGeneratedMediaImporterTests
             AllowedImageModels = ["fal-ai/test-model"],
             AllowedPreprocessingModels = ["fal-ai/test-model"],
             AllowedKlingModels = ["fal-ai/test-model"],
-            SupportedLocalizationLocales = ["en"]
+            SupportedLocalizationLocales = ["en"],
+            GeneratedImageMaxFileSizeBytes = generatedImageMaxFileSizeBytes
+                ?? 30L * 1024 * 1024
         };
 
         return new HttpGeneratedMediaImporter(
@@ -210,23 +307,38 @@ public sealed class HttpGeneratedMediaImporterTests
         public HttpClient CreateClient(string name) => client;
     }
 
-    private sealed class RecordingHandler(string contentType, byte[] payload) : HttpMessageHandler
+    private sealed class RecordingHandler(
+        string contentType,
+        byte[] payload,
+        bool omitContentLength = false) : HttpMessageHandler
     {
         public int RequestCount { get; private set; }
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             RequestCount++;
+            HttpContent content = omitContentLength
+                ? new UnknownLengthContent(payload)
+                : new ByteArrayContent(payload);
+            content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
             {
-                Content = new ByteArrayContent(payload)
-                {
-                    Headers =
-                    {
-                        ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType)
-                    }
-                }
+                Content = content
             });
+        }
+    }
+
+    private sealed class UnknownLengthContent(byte[] payload) : HttpContent
+    {
+        protected override Task SerializeToStreamAsync(Stream stream, TransportContext? context)
+        {
+            return stream.WriteAsync(payload, 0, payload.Length);
+        }
+
+        protected override bool TryComputeLength(out long length)
+        {
+            length = 0;
+            return false;
         }
     }
 
@@ -241,30 +353,57 @@ public sealed class HttpGeneratedMediaImporterTests
         }
     }
 
-    private sealed class RecordingMediaStorage(string? failureCode = null) : IMediaStorage
+    private sealed class RecordingMediaStorage(
+        string? failureCode = null,
+        bool copyContent = false,
+        bool throwDuringStore = false,
+        bool cancelDuringStore = false) : IMediaStorage
     {
         public int StoreCount { get; private set; }
 
-        public Task<Result<StoredMediaResponse>> StoreAsync(MediaUploadCommand asset, CancellationToken cancellationToken)
+        public async Task<Result<StoredMediaResponse>> StoreAsync(
+            MediaUploadCommand asset,
+            CancellationToken cancellationToken)
         {
             StoreCount++;
             LastAsset = asset;
-            if (failureCode is not null)
+            LastSpoolPath = (asset.ContentStream as FileStream)?.Name;
+            if (cancelDuringStore)
             {
-                return Task.FromResult(Result.Failure<StoredMediaResponse>(
-                    new Error(failureCode, "Media upload could not be stored.")));
+                throw new OperationCanceledException("Storage write was cancelled.", cancellationToken);
             }
 
-            return Task.FromResult(Result.Success(new StoredMediaResponse(
+            if (throwDuringStore)
+            {
+                throw new InvalidOperationException("Storage write failed.");
+            }
+
+            if (failureCode is not null)
+            {
+                return Result.Failure<StoredMediaResponse>(
+                    new Error(failureCode, "Media upload could not be stored."));
+            }
+
+            if (copyContent && asset.ContentStream is not null)
+            {
+                await asset.ContentStream.CopyToAsync(Stream.Null, cancellationToken);
+                CopiedContentLength = asset.ContentStream.Position;
+            }
+
+            return Result.Success(new StoredMediaResponse(
                 "https://cdn.example.com/stored/generated.png",
                 "templates/generated.png",
                 asset.FileName,
                 asset.ContentType,
                 asset.ContentLengthBytes,
-                null)));
+                null));
         }
 
         public MediaUploadCommand? LastAsset { get; private set; }
+
+        public string? LastSpoolPath { get; private set; }
+
+        public long CopiedContentLength { get; private set; }
 
         public Task<Result> DeleteAsync(string assetUrl, CancellationToken cancellationToken)
         {
@@ -286,5 +425,12 @@ public sealed class HttpGeneratedMediaImporterTests
             0x00, 0x00, 0x00, 0x0D,
             0x49, 0x48, 0x44, 0x52
         ];
+    }
+
+    private static void AssertNoSpoolFiles(Guid generationId)
+    {
+        Assert.Empty(Directory.GetFiles(
+            Path.GetTempPath(),
+            $"petmagic-generated-media-{generationId:N}-*.tmp"));
     }
 }

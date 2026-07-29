@@ -77,11 +77,24 @@ internal sealed partial class TemplateGenerationControlService(
         return TemplateGenerationRuntimePolicyCalculator.Calculate(policy);
     }
 
-    public async Task<Result<AdminTemplateGenerationControlResponse>> RefreshProviderAsync(
+    public async Task<Result<AdminTemplateGenerationProviderRefreshResponse>> RefreshProviderAsync(
         CancellationToken cancellationToken)
     {
-        await providerRuntimeSnapshotService.RefreshAsync(force: true, cancellationToken);
-        return await GetAsync(cancellationToken);
+        var refresh = await providerRuntimeSnapshotService.RefreshWithOutcomeAsync(
+            force: true,
+            cancellationToken);
+        var control = await GetAsync(cancellationToken);
+        if (control.IsFailure)
+        {
+            return Result.Failure<AdminTemplateGenerationProviderRefreshResponse>(control.Error);
+        }
+
+        return Result.Success(new AdminTemplateGenerationProviderRefreshResponse(
+            ToSnakeCase(refresh.Outcome.ToString()),
+            refresh.Snapshot.CheckedAtUtc,
+            refresh.Snapshot.LastSuccessfulAtUtc,
+            refresh.ErrorCode,
+            control.Value));
     }
 
     public async Task<Result<AdminTemplateGenerationControlResponse>> UpdatePolicyAsync(
@@ -125,6 +138,13 @@ internal sealed partial class TemplateGenerationControlService(
         {
             return Result.Failure<AdminTemplateGenerationControlResponse>(
                 TemplatesErrors.GenerationControlPolicyConflict);
+        }
+
+        if (currentPolicy.ConfirmedFalConcurrencyLimit != command.ConfirmedFalConcurrencyLimit
+            && !command.ConfirmFalConcurrencyLimit)
+        {
+            return Result.Failure<AdminTemplateGenerationControlResponse>(
+                TemplatesErrors.GenerationControlConcurrencyConfirmationRequired);
         }
 
         // Capacity/queue aggregation is intentionally performed before taking the
@@ -185,7 +205,9 @@ internal sealed partial class TemplateGenerationControlService(
                 TemplatesErrors.GenerationControlPolicyConflict);
         }
 
-        var oldPolicyJson = SerializeAuditPolicy(policy);
+        var oldPolicyJson = SerializeAuditPolicy(
+            policy,
+            falConcurrencyExplicitlyConfirmed: false);
         ApplyPolicyUpdate(policy, command, normalizedReason, now);
         var receiptId = CreateReceiptId(command.ActorUserId, normalizedIdempotencyKey);
         dbContext.TemplateGenerationControlPolicyCommandReceipts.Add(
@@ -206,7 +228,7 @@ internal sealed partial class TemplateGenerationControlService(
                 nameof(TemplateGenerationControlPolicy),
                 policy.Id.ToString("D"),
                 oldPolicyJson,
-                SerializeAuditPolicy(policy),
+                SerializeAuditPolicy(policy, command.ConfirmFalConcurrencyLimit),
                 normalizedReason,
                 SubjectUserId: null,
                 EventId: receiptId,
@@ -254,10 +276,11 @@ internal sealed partial class TemplateGenerationControlService(
             cancellationToken);
 
         logger?.LogWarning(
-            "ADMIN ACTION: template generation control policy updated. Revision={Revision} AdmissionEnabled={AdmissionEnabled} ConfirmedFalConcurrencyLimit={ConfirmedFalConcurrencyLimit} ReservedHeadroom={ReservedHeadroom} ApplicationHardCeiling={ApplicationHardCeiling} ActorUserIdHash={ActorUserIdHash}",
+            "ADMIN ACTION: template generation control policy updated. Revision={Revision} AdmissionEnabled={AdmissionEnabled} ConfirmedFalConcurrencyLimit={ConfirmedFalConcurrencyLimit} FalConcurrencyExplicitlyConfirmed={FalConcurrencyExplicitlyConfirmed} ReservedHeadroom={ReservedHeadroom} ApplicationHardCeiling={ApplicationHardCeiling} ActorUserIdHash={ActorUserIdHash}",
             policy.Revision,
             policy.AdmissionEnabled,
             policy.ConfirmedFalConcurrencyLimit,
+            command.ConfirmFalConcurrencyLimit,
             policy.ReservedHeadroom,
             policy.ApplicationHardCeiling,
             TemplateLogSanitizer.SafeId(command.ActorUserId));
@@ -356,6 +379,9 @@ internal sealed partial class TemplateGenerationControlService(
             .ThenByDescending(x => x.Id)
             .ToArrayAsync(cancellationToken);
         var activeWorkerCount = activeWorkers.Length;
+        var unexpectedWorkerCountChangedAtUtc = activeWorkerCount > 1
+            ? activeWorkers.Max(worker => worker.StartedAtUtc)
+            : (DateTime?)null;
         var workerRuntime = ResolveWorkerRuntime(activeWorkers);
         var latestWorker = await workerFingerprints
             .OrderByDescending(x => x.LastSeenAtUtc)
@@ -369,6 +395,7 @@ internal sealed partial class TemplateGenerationControlService(
             balance,
             latestWorker,
             activeWorkerCount,
+            unexpectedWorkerCountChangedAtUtc,
             workerRuntime,
             submissionUnknownCount,
             oldestSubmissionUnknownAtUtc,
@@ -433,6 +460,7 @@ internal sealed partial class TemplateGenerationControlService(
         TemplateProviderRuntimeSnapshot balance,
         TemplateRuntimeConfigFingerprint? latestWorker,
         int activeWorkerCount,
+        DateTime? unexpectedWorkerCountChangedAtUtc,
         WorkerRuntimeReport workerRuntime,
         int submissionUnknownCount,
         DateTime? oldestSubmissionUnknownAtUtc,
@@ -441,6 +469,16 @@ internal sealed partial class TemplateGenerationControlService(
         DateTime now)
     {
         var alerts = new List<AdminTemplateGenerationControlAlertResponse>();
+        if (activeWorkerCount > 1)
+        {
+            alerts.Add(new(
+                "generation-worker-instance-count-unexpected",
+                unexpectedWorkerCountChangedAtUtc ?? policy.UpdatedAtUtc,
+                "critical",
+                "Unexpected generation worker instance count",
+                $"Exactly one generation worker is expected, but {activeWorkerCount} active instances reported a heartbeat."));
+        }
+
         if (workerRuntime.SchedulerV2Enabled == false)
         {
             alerts.Add(new(
@@ -776,7 +814,11 @@ internal sealed partial class TemplateGenerationControlService(
         policy.Revision++;
         policy.AdmissionEnabled = command.AdmissionEnabled;
         policy.ConfirmedFalConcurrencyLimit = command.ConfirmedFalConcurrencyLimit;
-        policy.ConfirmedAtUtc = now;
+        if (command.ConfirmFalConcurrencyLimit)
+        {
+            policy.ConfirmedAtUtc = now;
+        }
+
         policy.ReservedHeadroom = command.ReservedHeadroom;
         policy.ApplicationHardCeiling = command.ApplicationHardCeiling;
         policy.UpdatedAtUtc = now;
@@ -812,6 +854,7 @@ internal sealed partial class TemplateGenerationControlService(
             normalizedReason,
             command.AdmissionEnabled,
             command.ConfirmedFalConcurrencyLimit,
+            command.ConfirmFalConcurrencyLimit,
             command.ReservedHeadroom,
             command.ApplicationHardCeiling);
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonical)));
@@ -823,13 +866,16 @@ internal sealed partial class TemplateGenerationControlService(
         return new Guid(SHA256.HashData(Encoding.UTF8.GetBytes(raw)).AsSpan(0, 16));
     }
 
-    private static string SerializeAuditPolicy(TemplateGenerationControlPolicy policy) =>
+    private static string SerializeAuditPolicy(
+        TemplateGenerationControlPolicy policy,
+        bool falConcurrencyExplicitlyConfirmed) =>
         JsonSerializer.Serialize(new
         {
             policy.Revision,
             policy.AdmissionEnabled,
             policy.ConfirmedFalConcurrencyLimit,
             policy.ConfirmedAtUtc,
+            FalConcurrencyExplicitlyConfirmed = falConcurrencyExplicitlyConfirmed,
             policy.ReservedHeadroom,
             policy.ApplicationHardCeiling
         }, JsonOptions);

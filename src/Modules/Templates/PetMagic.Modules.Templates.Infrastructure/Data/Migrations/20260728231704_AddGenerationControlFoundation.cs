@@ -249,11 +249,15 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                         onDelete: ReferentialAction.SetNull);
                 });
 
-            migrationBuilder.CreateIndex(
-                name: "IX_tgj_ImportingMedia_NextAttempt",
-                table: "templates_generation_jobs",
-                columns: new[] { "Status", "MediaImportNextAttemptAtUtc" },
-                filter: "\"Status\" = 10");
+            // This index targets an existing, potentially large queue table. Keep its build outside
+            // the EF migration transaction so generation writes are not blocked for the full scan.
+            migrationBuilder.Sql(
+                """
+                CREATE INDEX CONCURRENTLY IF NOT EXISTS "IX_tgj_ImportingMedia_NextAttempt"
+                ON templates_generation_jobs ("Status", "MediaImportNextAttemptAtUtc")
+                WHERE "Status" = 10;
+                """,
+                suppressTransaction: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_tgcp_UpdatedAtUtc",
@@ -557,9 +561,11 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
             migrationBuilder.DropTable(
                 name: "templates_generation_provider_attempts");
 
-            migrationBuilder.DropIndex(
-                name: "IX_tgj_ImportingMedia_NextAttempt",
-                table: "templates_generation_jobs");
+            migrationBuilder.Sql(
+                """
+                DROP INDEX CONCURRENTLY IF EXISTS "IX_tgj_ImportingMedia_NextAttempt";
+                """,
+                suppressTransaction: true);
 
             migrationBuilder.DropColumn(
                 name: "AppliedPolicyRevision",

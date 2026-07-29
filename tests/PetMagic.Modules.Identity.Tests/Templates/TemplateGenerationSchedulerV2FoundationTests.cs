@@ -40,6 +40,7 @@ public sealed class TemplateGenerationSchedulerV2FoundationTests
         var audit = Assert.Single(await dbContext.PushOutboxMessages.ToListAsync());
         Assert.Equal(TemplateAdminAuditOutbox.Kind, audit.Kind);
         Assert.Contains("templates.generation_control.policy_updated", audit.PayloadJson, StringComparison.Ordinal);
+        Assert.Contains("falConcurrencyExplicitlyConfirmed", audit.PayloadJson, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -86,6 +87,179 @@ public sealed class TemplateGenerationSchedulerV2FoundationTests
             .SingleAsync());
         Assert.Single(await dbContext.TemplateGenerationControlPolicyCommandReceipts.ToListAsync());
         Assert.Single(await dbContext.PushOutboxMessages.ToListAsync());
+    }
+
+    [Fact]
+    public async Task UpdatePolicyAsync_ShouldPreserveConfirmationTimestampForUnrelatedPolicyChange()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateControlService(dbContext);
+        var initial = await service.GetAsync(CancellationToken.None);
+        var command = CreatePolicyCommand(Guid.NewGuid(), "policy-pause-without-confirmation", 1) with
+        {
+            AdmissionEnabled = false,
+            ReservedHeadroom = 1,
+            ConfirmFalConcurrencyLimit = false
+        };
+
+        var updated = await service.UpdatePolicyAsync(command, CancellationToken.None);
+
+        Assert.True(initial.IsSuccess, initial.Error.Code);
+        Assert.True(updated.IsSuccess, updated.Error.Code);
+        Assert.Equal(initial.Value.ConfirmedAtUtc, updated.Value.ConfirmedAtUtc);
+        var stored = await dbContext.TemplateGenerationControlPolicies.SingleAsync();
+        Assert.Equal(initial.Value.ConfirmedAtUtc, stored.ConfirmedAtUtc);
+    }
+
+    [Fact]
+    public async Task UpdatePolicyAsync_ShouldRequireAndAuditExplicitConcurrencyConfirmation()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateControlService(dbContext);
+        var actorUserId = Guid.NewGuid();
+        var initial = await service.GetAsync(CancellationToken.None);
+        var unconfirmed = CreatePolicyCommand(actorUserId, "policy-limit-unconfirmed", 1) with
+        {
+            ConfirmedFalConcurrencyLimit = 40,
+            ConfirmFalConcurrencyLimit = false
+        };
+
+        var rejected = await service.UpdatePolicyAsync(unconfirmed, CancellationToken.None);
+        await Task.Delay(5);
+        var confirmed = await service.UpdatePolicyAsync(
+            unconfirmed with
+            {
+                IdempotencyKey = "policy-limit-confirmed",
+                ConfirmFalConcurrencyLimit = true
+            },
+            CancellationToken.None);
+
+        Assert.True(initial.IsSuccess, initial.Error.Code);
+        Assert.True(rejected.IsFailure);
+        Assert.Equal(
+            TemplatesErrors.GenerationControlConcurrencyConfirmationRequired.Code,
+            rejected.Error.Code);
+        Assert.True(confirmed.IsSuccess, confirmed.Error.Code);
+        Assert.Equal(40, confirmed.Value.ConfirmedFalConcurrencyLimit);
+        Assert.True(confirmed.Value.ConfirmedAtUtc > initial.Value.ConfirmedAtUtc);
+        Assert.Single(await dbContext.TemplateGenerationControlPolicyCommandReceipts.ToListAsync());
+        var audit = Assert.Single(await dbContext.PushOutboxMessages.ToListAsync());
+        Assert.Contains("falConcurrencyExplicitlyConfirmed", audit.PayloadJson, StringComparison.Ordinal);
+        Assert.Contains("true", audit.PayloadJson, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task UpdatePolicyAsync_ShouldIncludeConfirmationFlagInIdempotencyHash()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateControlService(dbContext);
+        var command = CreatePolicyCommand(Guid.NewGuid(), "policy-confirmation-hash", 1);
+
+        var accepted = await service.UpdatePolicyAsync(command, CancellationToken.None);
+        var conflictingReplay = await service.UpdatePolicyAsync(
+            command with { ConfirmFalConcurrencyLimit = true },
+            CancellationToken.None);
+
+        Assert.True(accepted.IsSuccess, accepted.Error.Code);
+        Assert.True(conflictingReplay.IsFailure);
+        Assert.Equal(
+            TemplatesErrors.GenerationControlIdempotencyConflict.Code,
+            conflictingReplay.Error.Code);
+    }
+
+    [Fact]
+    public async Task ListProviderAttemptRecoveryAsync_ShouldReturnOnlyManualSubmissionUnknownSafelyAndPage()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateControlService(dbContext);
+        var now = DateTime.UtcNow;
+        var oldestManual = CreateRecoveryAttempt(
+            now.AddMinutes(-10),
+            TemplateGenerationProviderAttemptState.SubmissionUnknown,
+            nextPollAtUtc: null,
+            providerRequestId: null,
+            ordinal: 1);
+        var newestManual = CreateRecoveryAttempt(
+            now.AddMinutes(-5),
+            TemplateGenerationProviderAttemptState.SubmissionUnknown,
+            nextPollAtUtc: null,
+            providerRequestId: "fal_request_safe_2",
+            ordinal: 2);
+        var scheduledRecovery = CreateRecoveryAttempt(
+            now.AddMinutes(-20),
+            TemplateGenerationProviderAttemptState.SubmissionUnknown,
+            now.AddSeconds(30),
+            providerRequestId: null,
+            ordinal: 3);
+        var providerQueued = CreateRecoveryAttempt(
+            now.AddMinutes(-30),
+            TemplateGenerationProviderAttemptState.ProviderQueued,
+            nextPollAtUtc: null,
+            providerRequestId: "fal_request_queued",
+            ordinal: 4);
+        var otherProviderManual = CreateRecoveryAttempt(
+            now.AddMinutes(-40),
+            TemplateGenerationProviderAttemptState.SubmissionUnknown,
+            nextPollAtUtc: null,
+            providerRequestId: null,
+            ordinal: 5);
+        otherProviderManual.Provider = "other-provider";
+        oldestManual.SubmissionTokenHash = new string('A', 64);
+        oldestManual.ProviderStatusUrl = "https://provider.invalid/status?secret=never-return-this";
+        oldestManual.LastErrorCode = "templates.provider_submission_reconciliation_required";
+        dbContext.TemplateGenerationProviderAttempts.AddRange(
+            oldestManual,
+            newestManual,
+            scheduledRecovery,
+            providerQueued,
+            otherProviderManual);
+        await dbContext.SaveChangesAsync();
+
+        var firstPage = await service.ListProviderAttemptRecoveryAsync(
+            new AdminTemplateProviderAttemptRecoveryQuery(Skip: 0, Take: 1),
+            CancellationToken.None);
+        var secondPage = await service.ListProviderAttemptRecoveryAsync(
+            new AdminTemplateProviderAttemptRecoveryQuery(Skip: 1, Take: 100),
+            CancellationToken.None);
+
+        Assert.True(firstPage.IsSuccess, firstPage.Error.Code);
+        Assert.True(secondPage.IsSuccess, secondPage.Error.Code);
+        Assert.Equal(2, firstPage.Value.TotalCount);
+        Assert.True(firstPage.Value.HasMore);
+        var firstItem = Assert.Single(firstPage.Value.Items);
+        Assert.Equal(oldestManual.Id, firstItem.AttemptId);
+        Assert.Equal(oldestManual.GenerationJobId, firstItem.GenerationId);
+        Assert.Equal("image_generation", firstItem.Stage);
+        Assert.Equal("submission_unknown", firstItem.State);
+        Assert.Equal(oldestManual.Version, firstItem.AttemptVersion);
+        Assert.Equal(
+            "correlated_accepted_or_confirmed_not_found",
+            firstItem.EvidenceNeeded);
+        Assert.Equal(oldestManual.LastErrorCode, firstItem.ErrorCode);
+        Assert.False(secondPage.Value.HasMore);
+        Assert.Equal(newestManual.Id, Assert.Single(secondPage.Value.Items).AttemptId);
+
+        var serialized = JsonSerializer.Serialize(firstPage.Value);
+        Assert.DoesNotContain(oldestManual.SubmissionTokenHash, serialized, StringComparison.Ordinal);
+        Assert.DoesNotContain("never-return-this", serialized, StringComparison.Ordinal);
+        Assert.DoesNotContain("providerStatusUrl", serialized, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData(-1, 50)]
+    [InlineData(0, 0)]
+    [InlineData(0, 101)]
+    public async Task ListProviderAttemptRecoveryAsync_ShouldRejectInvalidPaging(int skip, int take)
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateControlService(dbContext);
+
+        var result = await service.ListProviderAttemptRecoveryAsync(
+            new AdminTemplateProviderAttemptRecoveryQuery(skip, take),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(TemplatesErrors.ProviderAttemptRecoveryQueryInvalid.Code, result.Error.Code);
     }
 
     [Fact]
@@ -803,7 +977,8 @@ public sealed class TemplateGenerationSchedulerV2FoundationTests
             AdmissionEnabled: true,
             ConfirmedFalConcurrencyLimit: 10,
             ReservedHeadroom: 2,
-            ApplicationHardCeiling: 38);
+            ApplicationHardCeiling: 38,
+            ConfirmFalConcurrencyLimit: false);
 
     private static TemplateGenerationRuntimePolicySnapshot CreateRuntimePolicy(int confirmedFalLimit)
     {
@@ -895,6 +1070,30 @@ public sealed class TemplateGenerationSchedulerV2FoundationTests
             NextPollAtUtc = createdAtUtc.AddSeconds(5),
             CreatedAtUtc = createdAtUtc,
             UpdatedAtUtc = createdAtUtc
+        };
+
+    private static TemplateGenerationProviderAttempt CreateRecoveryAttempt(
+        DateTime createdAtUtc,
+        TemplateGenerationProviderAttemptState state,
+        DateTime? nextPollAtUtc,
+        string? providerRequestId,
+        int ordinal) => new()
+        {
+            Id = Guid.NewGuid(),
+            GenerationJobId = Guid.NewGuid(),
+            Stage = TemplateGenerationProviderAttemptStage.ImageGeneration,
+            Ordinal = ordinal,
+            State = state,
+            Provider = "fal",
+            SubmissionTokenHash = ordinal.ToString("X64"),
+            ProviderRequestId = providerRequestId,
+            NextPollAtUtc = nextPollAtUtc,
+            SubmissionDeadlineAtUtc = createdAtUtc.AddMinutes(3),
+            ProcessingDeadlineAtUtc = createdAtUtc.AddMinutes(30),
+            ReconciliationDeadlineAtUtc = createdAtUtc.AddMinutes(40),
+            Version = ordinal,
+            CreatedAtUtc = createdAtUtc,
+            UpdatedAtUtc = createdAtUtc.AddMinutes(1)
         };
 
     private static TemplateProviderWebhookInbox CreateWebhookInbox(

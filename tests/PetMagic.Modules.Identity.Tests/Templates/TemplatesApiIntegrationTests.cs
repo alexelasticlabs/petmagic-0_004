@@ -207,7 +207,8 @@ public sealed partial class TemplatesApiIntegrationTests
             IAdminAuditLog? adminAuditLog = null,
             IIdentityUserLookupService? identityUserLookupService = null,
             ITemplateAiProviderHealthService? aiProviderHealthService = null,
-            bool acceptFalWebhookSignatures = false)
+            bool acceptFalWebhookSignatures = false,
+            IFalProviderRuntimeSnapshotService? falProviderRuntimeSnapshotService = null)
         {
             var databaseRoot = new InMemoryDatabaseRoot();
             var databaseName = $"templates-api-tests-{Guid.NewGuid():N}";
@@ -366,7 +367,7 @@ public sealed partial class TemplatesApiIntegrationTests
             builder.Services.AddScoped<ITemplateGenerationControlService>(serviceProvider =>
                 serviceProvider.GetRequiredService<TemplateGenerationControlService>());
             builder.Services.AddSingleton<IFalProviderRuntimeSnapshotService>(
-                new TestFalProviderRuntimeSnapshotService());
+                falProviderRuntimeSnapshotService ?? new TestFalProviderRuntimeSnapshotService());
             if (startGenerationWorker)
             {
                 builder.Services.AddSingleton<TemplateGenerationWorkerRuntimeState>();

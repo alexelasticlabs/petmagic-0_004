@@ -7,9 +7,12 @@ using System.Text.Json;
 using System.Threading.Channels;
 
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+
+using Npgsql;
 
 using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
@@ -525,6 +528,131 @@ public sealed class TemplateGenerationJobProcessorTests
             await cleanupContext.TemplateItems
                 .Where(item => item.Id == template.Id)
                 .ExecuteDeleteAsync();
+        }
+    }
+
+    [Fact]
+    public async Task GenerationOutputCheckpointInsertRace_ShouldReloadWinnerAndKeepSingleRecordOnPostgres()
+    {
+        var baseConnectionString = Environment.GetEnvironmentVariable(
+            "PETMAGIC_POSTGRES_INTEGRATION_CONNECTION_STRING");
+        if (string.IsNullOrWhiteSpace(baseConnectionString))
+        {
+            return;
+        }
+
+        var schema = $"tmr_race_{Guid.NewGuid():N}";
+        await CreateIsolatedPostgresSchemaAsync(baseConnectionString, schema);
+        var connectionString = new NpgsqlConnectionStringBuilder(baseConnectionString)
+        {
+            SearchPath = schema
+        }.ConnectionString;
+        var postgresOptions = new DbContextOptionsBuilder<TemplatesDbContext>()
+            .UseNpgsql(connectionString)
+            .Options;
+        var template = CreateReadyImageTemplate();
+        var now = DateTime.UtcNow;
+        var job = CreateGenerationJob(template, TemplateGenerationStatus.ImportingMedia, now);
+        job.CompletedAtUtc = null;
+        job.ResultMediaAssetId = null;
+        job.LockedBy = "media-race-worker";
+        job.LockedAtUtc = now;
+        var winnerId = Guid.NewGuid();
+        var loserId = Guid.NewGuid();
+        var deterministicStoragePath = $"users/{job.UserId:N}/generations/{job.Id:N}/original.webp";
+
+        try
+        {
+            await using (var migrationContext = new TemplatesDbContext(postgresOptions))
+            {
+                await migrationContext.Database.MigrateAsync();
+            }
+
+            await using (var seedContext = new TemplatesDbContext(postgresOptions))
+            {
+                seedContext.TemplateItems.Add(template);
+                seedContext.TemplateGenerationJobs.Add(job);
+                await seedContext.SaveChangesAsync();
+            }
+
+            await using var loserContext = new TemplatesDbContext(postgresOptions);
+            var trackedJob = await loserContext.TemplateGenerationJobs
+                .Include(x => x.MediaRecords)
+                .SingleAsync(x => x.Id == job.Id);
+            var pending = new TemplateMediaRecord
+            {
+                Id = loserId,
+                UserId = job.UserId,
+                MediaType = "image",
+                StoragePath = deterministicStoragePath,
+                PreviewUrl = $"users/{job.UserId:N}/generations/{job.Id:N}/result-preview.webp",
+                SourceType = "generation_result",
+                GenerationId = job.Id,
+                Url = $"https://pending.example/{job.Id:N}/original.webp",
+                FileName = "original.webp",
+                ContentType = "image/webp",
+                FileSizeBytes = 2048,
+                Role = TemplateMediaRole.GenerationOutputImage,
+                LifecycleState = TemplateMediaLifecycleState.AttachedToGeneration,
+                GenerationJobId = job.Id,
+                UploadedAtUtc = now,
+                AttachedAtUtc = now
+            };
+            loserContext.TemplateMediaRecords.Add(pending);
+            trackedJob.ResultMediaAssetId = pending.Id;
+
+            await using (var winnerContext = new TemplatesDbContext(postgresOptions))
+            {
+                winnerContext.TemplateMediaRecords.Add(new TemplateMediaRecord
+                {
+                    Id = winnerId,
+                    UserId = job.UserId,
+                    MediaType = "image",
+                    StoragePath = deterministicStoragePath,
+                    WatermarkedStoragePath = $"users/{job.UserId:N}/generations/{job.Id:N}/watermarked.webp",
+                    SourceType = "generation_result",
+                    GenerationId = job.Id,
+                    Url = $"https://winner.example/{job.Id:N}/original.webp",
+                    FileName = "original.webp",
+                    ContentType = "image/webp",
+                    FileSizeBytes = 2048,
+                    Role = TemplateMediaRole.GenerationOutputImage,
+                    LifecycleState = TemplateMediaLifecycleState.AttachedToGeneration,
+                    GenerationJobId = job.Id,
+                    UploadedAtUtc = now,
+                    AttachedAtUtc = now
+                });
+                await winnerContext.SaveChangesAsync();
+            }
+
+            var uniqueRace = await Assert.ThrowsAsync<DbUpdateException>(
+                () => loserContext.SaveChangesAsync());
+            var processor = CreateProcessor(loserContext);
+            Assert.True(await processor.TryRecoverGenerationOutputMediaRecordInsertRaceAsync(
+                trackedJob,
+                uniqueRace,
+                CancellationToken.None));
+            await loserContext.SaveChangesAsync();
+
+            await using var verificationContext = new TemplatesDbContext(postgresOptions);
+            var persisted = Assert.Single(await verificationContext.TemplateMediaRecords
+                .AsNoTracking()
+                .Where(record => record.GenerationId == job.Id
+                    && record.SourceType == "generation_result"
+                    && record.MediaType == "image")
+                .ToArrayAsync());
+            var persistedJob = await verificationContext.TemplateGenerationJobs
+                .AsNoTracking()
+                .SingleAsync(candidate => candidate.Id == job.Id);
+            Assert.Equal(winnerId, persisted.Id);
+            Assert.Equal(deterministicStoragePath, persisted.StoragePath);
+            Assert.Equal($"users/{job.UserId:N}/generations/{job.Id:N}/watermarked.webp", persisted.WatermarkedStoragePath);
+            Assert.Equal($"users/{job.UserId:N}/generations/{job.Id:N}/result-preview.webp", persisted.PreviewUrl);
+            Assert.Equal(winnerId, persistedJob.ResultMediaAssetId);
+        }
+        finally
+        {
+            await DropIsolatedPostgresSchemaAsync(baseConnectionString, schema);
         }
     }
 
@@ -1233,6 +1361,59 @@ public sealed class TemplateGenerationJobProcessorTests
         Assert.Null(persisted.LockedAtUtc);
         Assert.Null(persisted.ResultUrl);
         Assert.Null(persisted.CompletedAtUtc);
+    }
+
+    [Fact]
+    public async Task ProcessNextDispatchAsync_ShouldPersistSubmissionUnknown_WhenAcceptedResponsePersistenceFails()
+    {
+        var persistenceFailure = new FailAcceptedProviderPersistenceOnceInterceptor();
+        await using var dbContext = CreateDbContext(persistenceFailure);
+        var template = CreateReadyImageTemplate();
+        var now = DateTime.UtcNow;
+        var job = CreateGenerationJob(template, TemplateGenerationStatus.Queued, now);
+        job.CompletedAtUtc = null;
+        dbContext.TemplateItems.Add(template);
+        dbContext.TemplateGenerationJobs.Add(job);
+        await dbContext.SaveChangesAsync();
+
+        persistenceFailure.Enabled = true;
+        var options = CreateOptions(
+            generationSchedulerV2Enabled: true,
+            aiProvider: TemplateAiProviders.Fal);
+        var runtimePolicy = CreateRuntimePolicySnapshot(now);
+        var runtimePolicyProvider = new FixedGenerationRuntimePolicyProvider(runtimePolicy);
+        var providerAttemptStore = CreateProviderAttemptStore(dbContext, runtimePolicy);
+        var generator = new AsyncSubmittingImageGenerator();
+        var processed = await CreateProcessor(
+                dbContext,
+                imageGenerator: generator,
+                options: options,
+                providerAttemptStore: providerAttemptStore,
+                runtimePolicyProvider: runtimePolicyProvider)
+            .ProcessNextDispatchAsync(CancellationToken.None);
+
+        Assert.True(processed);
+        Assert.Equal(1, generator.SubmitCount);
+        Assert.Equal(1, persistenceFailure.FailureCount);
+
+        dbContext.ChangeTracker.Clear();
+        var persistedJob = await dbContext.TemplateGenerationJobs
+            .AsNoTracking()
+            .SingleAsync(x => x.Id == job.Id);
+        var persistedAttempt = await dbContext.TemplateGenerationProviderAttempts
+            .AsNoTracking()
+            .SingleAsync(x => x.GenerationJobId == job.Id);
+        Assert.Equal(TemplateGenerationStatus.SubmittingToProvider, persistedJob.Status);
+        Assert.Equal("SUBMISSION_UNKNOWN", persistedJob.ProviderStatus);
+        Assert.Null(persistedJob.PreprocessingProviderRequestId);
+        Assert.Null(persistedJob.LockedAtUtc);
+        Assert.Null(persistedJob.LockedBy);
+        Assert.Equal(TemplateGenerationProviderAttemptState.SubmissionUnknown, persistedAttempt.State);
+        Assert.Null(persistedAttempt.ProviderRequestId);
+        Assert.Equal(
+            "templates.provider_submission_persistence_unknown",
+            persistedAttempt.LastErrorCode);
+        Assert.NotNull(persistedAttempt.NextPollAtUtc);
     }
 
     [Fact]
@@ -2567,13 +2748,16 @@ public sealed class TemplateGenerationJobProcessorTests
         Assert.Contains(job.Id, billing.RefundedGenerationIds);
     }
 
-    private static TemplatesDbContext CreateDbContext()
+    private static TemplatesDbContext CreateDbContext(params IInterceptor[] interceptors)
     {
-        var options = new DbContextOptionsBuilder<TemplatesDbContext>()
-            .UseInMemoryDatabase($"template-generation-processor-tests-{Guid.NewGuid():N}")
-            .Options;
+        var builder = new DbContextOptionsBuilder<TemplatesDbContext>()
+            .UseInMemoryDatabase($"template-generation-processor-tests-{Guid.NewGuid():N}");
+        if (interceptors.Length > 0)
+        {
+            builder.AddInterceptors(interceptors);
+        }
 
-        return new TemplatesDbContext(options);
+        return new TemplatesDbContext(builder.Options);
     }
 
     [Fact]
@@ -2733,6 +2917,28 @@ public sealed class TemplateGenerationJobProcessorTests
             : new DbContextOptionsBuilder<TemplatesDbContext>()
                 .UseNpgsql(connectionString)
                 .Options;
+    }
+
+    private static async Task CreateIsolatedPostgresSchemaAsync(
+        string connectionString,
+        string schema)
+    {
+        await using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand($"CREATE SCHEMA \"{schema}\"", connection);
+        await command.ExecuteNonQueryAsync();
+    }
+
+    private static async Task DropIsolatedPostgresSchemaAsync(
+        string connectionString,
+        string schema)
+    {
+        await using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand(
+            $"DROP SCHEMA IF EXISTS \"{schema}\" CASCADE",
+            connection);
+        await command.ExecuteNonQueryAsync();
     }
 
     private static async Task<TemplateGenerationJob?> InvokeClaimNextAsync(
@@ -3543,6 +3749,34 @@ public sealed class TemplateGenerationJobProcessorTests
                 "https://fal.example.test/generated-image.png",
                 requestId,
                 inferenceTimeSeconds));
+        }
+    }
+
+    private sealed class FailAcceptedProviderPersistenceOnceInterceptor : SaveChangesInterceptor
+    {
+        public bool Enabled { get; set; }
+
+        public int FailureCount { get; private set; }
+
+        public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
+            DbContextEventData eventData,
+            InterceptionResult<int> result,
+            CancellationToken cancellationToken = default)
+        {
+            if (Enabled
+                && FailureCount == 0
+                && eventData.Context?.ChangeTracker
+                    .Entries<TemplateGenerationProviderAttempt>()
+                    .Any(entry => entry.State == EntityState.Modified
+                        && entry.Entity.State == TemplateGenerationProviderAttemptState.ProviderQueued
+                        && !string.IsNullOrWhiteSpace(entry.Entity.ProviderRequestId)) == true)
+            {
+                FailureCount++;
+                throw new InvalidOperationException(
+                    "Injected accepted provider response persistence failure.");
+            }
+
+            return base.SavingChangesAsync(eventData, result, cancellationToken);
         }
     }
 

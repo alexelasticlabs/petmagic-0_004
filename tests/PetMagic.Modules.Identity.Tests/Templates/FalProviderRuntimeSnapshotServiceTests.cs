@@ -41,6 +41,24 @@ public sealed class FalProviderRuntimeSnapshotServiceTests
         Assert.Equal(new AuthenticationHeaderValue("Key", "fal-runtime-test-key"), handler.LastAuthorization);
     }
 
+    [Fact]
+    public async Task RefreshWithOutcomeAsync_ShouldReportSuccessfulProviderRefresh()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(
+            dbContext,
+            new StubHttpMessageHandler(_ => JsonResponse(
+                HttpStatusCode.OK,
+                "{\"credits\":{\"current_balance\":20}}")));
+
+        var result = await service.RefreshWithOutcomeAsync(force: true, CancellationToken.None);
+
+        Assert.Equal(TemplateProviderRuntimeRefreshOutcome.Refreshed, result.Outcome);
+        Assert.Null(result.ErrorCode);
+        Assert.NotNull(result.Snapshot.CheckedAtUtc);
+        Assert.NotNull(result.Snapshot.LastSuccessfulAtUtc);
+    }
+
     [Theory]
     [InlineData("5", TemplateProviderBalanceState.Critical)]
     [InlineData("9.99", TemplateProviderBalanceState.Low)]
@@ -85,6 +103,45 @@ public sealed class FalProviderRuntimeSnapshotServiceTests
         Assert.Equal(1, snapshot.ConsecutiveFailures);
         Assert.Equal(20m, snapshot.CurrentBalanceUsd);
         Assert.Equal(lastSuccessfulAtUtc, snapshot.LastSuccessfulAtUtc);
+    }
+
+    [Fact]
+    public async Task RefreshWithOutcomeAsync_ShouldExposeOnlyStableFailureCode()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(
+            dbContext,
+            new StubHttpMessageHandler(_ => JsonResponse(HttpStatusCode.TooManyRequests, "{}")));
+
+        var result = await service.RefreshWithOutcomeAsync(force: true, CancellationToken.None);
+
+        Assert.Equal(TemplateProviderRuntimeRefreshOutcome.Failed, result.Outcome);
+        Assert.Equal("http_429", result.ErrorCode);
+        Assert.Equal(TemplateProviderBalanceState.Unknown, result.Snapshot.BalanceState);
+        Assert.NotNull(result.Snapshot.CheckedAtUtc);
+        Assert.Null(result.Snapshot.LastSuccessfulAtUtc);
+    }
+
+    [Fact]
+    public async Task RefreshWithOutcomeAsync_ShouldReportCoalescedWithoutCallingProvider()
+    {
+        await using var dbContext = CreateDbContext();
+        var now = DateTime.UtcNow;
+        await SeedSnapshotAsync(dbContext, TemplateProviderBalanceState.Fresh, now);
+        var snapshot = await dbContext.TemplateProviderRuntimeSnapshots.SingleAsync();
+        snapshot.RefreshLeaseId = Guid.NewGuid();
+        snapshot.RefreshLeaseExpiresAtUtc = now.AddMinutes(1);
+        await dbContext.SaveChangesAsync();
+        var handler = new StubHttpMessageHandler(_ =>
+            throw new InvalidOperationException("Provider must not be called while refresh is leased."));
+        var service = CreateService(dbContext, handler);
+
+        var result = await service.RefreshWithOutcomeAsync(force: true, CancellationToken.None);
+
+        Assert.Equal(TemplateProviderRuntimeRefreshOutcome.Coalesced, result.Outcome);
+        Assert.Null(result.ErrorCode);
+        Assert.Equal(0, handler.RequestCount);
+        Assert.Equal(now, result.Snapshot.CheckedAtUtc);
     }
 
     [Fact]
@@ -262,6 +319,8 @@ public sealed class FalProviderRuntimeSnapshotServiceTests
     private sealed class StubHttpMessageHandler(
         Func<HttpRequestMessage, HttpResponseMessage> responseFactory) : HttpMessageHandler
     {
+        public int RequestCount { get; private set; }
+
         public Uri? LastRequestUri { get; private set; }
 
         public AuthenticationHeaderValue? LastAuthorization { get; private set; }
@@ -270,6 +329,7 @@ public sealed class FalProviderRuntimeSnapshotServiceTests
             HttpRequestMessage request,
             CancellationToken cancellationToken)
         {
+            RequestCount++;
             LastRequestUri = request.RequestUri;
             LastAuthorization = request.Headers.Authorization;
             return Task.FromResult(responseFactory(request));

@@ -40,18 +40,33 @@ public static partial class AdminTemplateEndpoints
                 request?.AdmissionEnabled ?? false,
                 request?.ConfirmedFalConcurrencyLimit ?? 0,
                 request?.ReservedHeadroom ?? 0,
-                request?.ApplicationHardCeiling ?? 0),
+                request?.ApplicationHardCeiling ?? 0,
+                request?.ConfirmFalConcurrencyLimit ?? false),
             cancellationToken);
         return result.IsFailure
             ? ToAdminTemplateProblem(result.Error)
             : TypedResults.Ok(result.Value);
     }
 
-    private static async Task<Results<Ok<AdminTemplateGenerationControlResponse>, ProblemHttpResult>> RefreshGenerationControlProviderAsync(
+    private static async Task<Results<Ok<AdminTemplateGenerationProviderRefreshResponse>, ProblemHttpResult>> RefreshGenerationControlProviderAsync(
         [FromServices] ITemplateGenerationControlService service,
         CancellationToken cancellationToken)
     {
         var result = await service.RefreshProviderAsync(cancellationToken);
+        return result.IsFailure
+            ? ToAdminTemplateProblem(result.Error)
+            : TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<AdminTemplateProviderAttemptRecoveryPageResponse>, ProblemHttpResult>> ListGenerationControlProviderAttemptRecoveryAsync(
+        [FromQuery] int? skip,
+        [FromQuery] int? take,
+        [FromServices] ITemplateGenerationControlService service,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.ListProviderAttemptRecoveryAsync(
+            new AdminTemplateProviderAttemptRecoveryQuery(skip, take),
+            cancellationToken);
         return result.IsFailure
             ? ToAdminTemplateProblem(result.Error)
             : TypedResults.Ok(result.Value);
@@ -95,7 +110,8 @@ public static partial class AdminTemplateEndpoints
         bool AdmissionEnabled,
         int ConfirmedFalConcurrencyLimit,
         int ReservedHeadroom,
-        int ApplicationHardCeiling);
+        int ApplicationHardCeiling,
+        bool ConfirmFalConcurrencyLimit);
 
     private sealed record ResolveGenerationControlProviderAttemptRequest(
         long ExpectedAttemptVersion,

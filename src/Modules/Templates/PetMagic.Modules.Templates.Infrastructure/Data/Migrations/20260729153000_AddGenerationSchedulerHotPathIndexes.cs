@@ -15,54 +15,71 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.CreateIndex(
-                    name: "IX_tgpa_Completed_Stage_ProviderCompletedAtUtc",
-                    table: "templates_generation_provider_attempts",
-                    columns: new[] { "Stage", "ProviderCompletedAtUtc" },
-                    descending: new[] { false, true },
-                    filter: "\"State\" = 6 AND \"SubmittedAtUtc\" IS NOT NULL AND \"ProviderCompletedAtUtc\" IS NOT NULL")
-                .Annotation("Npgsql:IndexInclude", new[] { "SubmittedAtUtc" });
+            migrationBuilder.Sql(
+                """
+                CREATE INDEX CONCURRENTLY IF NOT EXISTS "IX_tgpa_Completed_Stage_ProviderCompletedAtUtc"
+                ON templates_generation_provider_attempts ("Stage", "ProviderCompletedAtUtc" DESC)
+                INCLUDE ("SubmittedAtUtc")
+                WHERE "State" = 6
+                  AND "SubmittedAtUtc" IS NOT NULL
+                  AND "ProviderCompletedAtUtc" IS NOT NULL;
+                """,
+                suppressTransaction: true);
 
-            migrationBuilder.CreateIndex(
-                    name: "IX_tgj_Completed_MediaType_ImportCompletedAtUtc",
-                    table: "templates_generation_jobs",
-                    columns: new[] { "QueueMediaType", "MediaImportCompletedAtUtc" },
-                    descending: new[] { false, true },
-                    filter: "\"Status\" = 3 AND \"ImportStartedAtUtc\" IS NOT NULL AND \"MediaImportCompletedAtUtc\" IS NOT NULL")
-                .Annotation("Npgsql:IndexInclude", new[] { "ImportStartedAtUtc" });
+            migrationBuilder.Sql(
+                """
+                CREATE INDEX CONCURRENTLY IF NOT EXISTS "IX_tgj_Completed_MediaType_ImportCompletedAtUtc"
+                ON templates_generation_jobs ("QueueMediaType", "MediaImportCompletedAtUtc" DESC)
+                INCLUDE ("ImportStartedAtUtc")
+                WHERE "Status" = 3
+                  AND "ImportStartedAtUtc" IS NOT NULL
+                  AND "MediaImportCompletedAtUtc" IS NOT NULL;
+                """,
+                suppressTransaction: true);
 
-            migrationBuilder.CreateIndex(
-                name: "IX_tgj_UserId_QueueTier_LastAttemptAtUtc",
-                table: "templates_generation_jobs",
-                columns: new[] { "UserId", "QueueTier", "LastAttemptAtUtc" },
-                descending: new[] { false, false, true },
-                filter: "\"LastAttemptAtUtc\" IS NOT NULL");
+            migrationBuilder.Sql(
+                """
+                CREATE INDEX CONCURRENTLY IF NOT EXISTS "IX_tgj_UserId_QueueTier_LastAttemptAtUtc"
+                ON templates_generation_jobs ("UserId", "QueueTier", "LastAttemptAtUtc" DESC)
+                WHERE "LastAttemptAtUtc" IS NOT NULL;
+                """,
+                suppressTransaction: true);
 
-            migrationBuilder.CreateIndex(
-                name: "IX_tpwbi_Processing_LockedAtUtc_NextAttemptAtUtc",
-                table: "templates_provider_webhook_inbox",
-                columns: new[] { "LockedAtUtc", "NextAttemptAtUtc" },
-                filter: "\"Status\" = 2 AND \"LockedAtUtc\" IS NOT NULL");
+            migrationBuilder.Sql(
+                """
+                CREATE INDEX CONCURRENTLY IF NOT EXISTS "IX_tpwbi_Processing_LockedAtUtc_NextAttemptAtUtc"
+                ON templates_provider_webhook_inbox ("LockedAtUtc", "NextAttemptAtUtc")
+                WHERE "Status" = 2 AND "LockedAtUtc" IS NOT NULL;
+                """,
+                suppressTransaction: true);
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropIndex(
-                name: "IX_tgpa_Completed_Stage_ProviderCompletedAtUtc",
-                table: "templates_generation_provider_attempts");
+            migrationBuilder.Sql(
+                """
+                DROP INDEX CONCURRENTLY IF EXISTS "IX_tgpa_Completed_Stage_ProviderCompletedAtUtc";
+                """,
+                suppressTransaction: true);
 
-            migrationBuilder.DropIndex(
-                name: "IX_tgj_Completed_MediaType_ImportCompletedAtUtc",
-                table: "templates_generation_jobs");
+            migrationBuilder.Sql(
+                """
+                DROP INDEX CONCURRENTLY IF EXISTS "IX_tgj_Completed_MediaType_ImportCompletedAtUtc";
+                """,
+                suppressTransaction: true);
 
-            migrationBuilder.DropIndex(
-                name: "IX_tgj_UserId_QueueTier_LastAttemptAtUtc",
-                table: "templates_generation_jobs");
+            migrationBuilder.Sql(
+                """
+                DROP INDEX CONCURRENTLY IF EXISTS "IX_tgj_UserId_QueueTier_LastAttemptAtUtc";
+                """,
+                suppressTransaction: true);
 
-            migrationBuilder.DropIndex(
-                name: "IX_tpwbi_Processing_LockedAtUtc_NextAttemptAtUtc",
-                table: "templates_provider_webhook_inbox");
+            migrationBuilder.Sql(
+                """
+                DROP INDEX CONCURRENTLY IF EXISTS "IX_tpwbi_Processing_LockedAtUtc_NextAttemptAtUtc";
+                """,
+                suppressTransaction: true);
         }
     }
 }

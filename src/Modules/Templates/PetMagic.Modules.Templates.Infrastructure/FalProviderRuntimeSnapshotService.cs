@@ -21,7 +21,26 @@ internal interface IFalProviderRuntimeSnapshotService
     Task<TemplateProviderRuntimeSnapshot> GetSnapshotAsync(CancellationToken cancellationToken);
 
     Task<TemplateProviderRuntimeSnapshot> RefreshAsync(bool force, CancellationToken cancellationToken);
+
+    async Task<TemplateProviderRuntimeRefreshResult> RefreshWithOutcomeAsync(
+        bool force,
+        CancellationToken cancellationToken) => new(
+            await RefreshAsync(force, cancellationToken),
+            TemplateProviderRuntimeRefreshOutcome.Refreshed,
+            ErrorCode: null);
 }
+
+internal enum TemplateProviderRuntimeRefreshOutcome
+{
+    Refreshed,
+    Coalesced,
+    Failed
+}
+
+internal sealed record TemplateProviderRuntimeRefreshResult(
+    TemplateProviderRuntimeSnapshot Snapshot,
+    TemplateProviderRuntimeRefreshOutcome Outcome,
+    string? ErrorCode);
 
 internal sealed class FalProviderRuntimeSnapshotService(
     TemplatesDbContext dbContext,
@@ -57,12 +76,20 @@ internal sealed class FalProviderRuntimeSnapshotService(
 
     public async Task<TemplateProviderRuntimeSnapshot> RefreshAsync(
         bool force,
+        CancellationToken cancellationToken) =>
+        (await RefreshWithOutcomeAsync(force, cancellationToken)).Snapshot;
+
+    public async Task<TemplateProviderRuntimeRefreshResult> RefreshWithOutcomeAsync(
+        bool force,
         CancellationToken cancellationToken)
     {
         var leaseId = Guid.NewGuid();
         if (!await TryAcquireRefreshLeaseAsync(leaseId, force, cancellationToken))
         {
-            return await GetSnapshotAsync(cancellationToken);
+            return new TemplateProviderRuntimeRefreshResult(
+                await GetSnapshotAsync(cancellationToken),
+                TemplateProviderRuntimeRefreshOutcome.Coalesced,
+                ErrorCode: null);
         }
 
         BalanceRefreshResult result;
@@ -125,7 +152,7 @@ internal sealed class FalProviderRuntimeSnapshotService(
         return true;
     }
 
-    private async Task<TemplateProviderRuntimeSnapshot> CompleteRefreshAsync(
+    private async Task<TemplateProviderRuntimeRefreshResult> CompleteRefreshAsync(
         Guid leaseId,
         BalanceRefreshResult result,
         CancellationToken cancellationToken)
@@ -134,7 +161,10 @@ internal sealed class FalProviderRuntimeSnapshotService(
             .SingleAsync(x => x.Provider == ProviderName, cancellationToken);
         if (snapshot.RefreshLeaseId != leaseId)
         {
-            return snapshot;
+            return new TemplateProviderRuntimeRefreshResult(
+                snapshot,
+                TemplateProviderRuntimeRefreshOutcome.Coalesced,
+                ErrorCode: null);
         }
 
         var now = DateTime.UtcNow;
@@ -166,7 +196,12 @@ internal sealed class FalProviderRuntimeSnapshotService(
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
-        return snapshot;
+        return new TemplateProviderRuntimeRefreshResult(
+            snapshot,
+            result.IsSuccess
+                ? TemplateProviderRuntimeRefreshOutcome.Refreshed
+                : TemplateProviderRuntimeRefreshOutcome.Failed,
+            result.ErrorCode);
     }
 
     private async Task<BalanceRefreshResult> FetchBalanceAsync(CancellationToken cancellationToken)

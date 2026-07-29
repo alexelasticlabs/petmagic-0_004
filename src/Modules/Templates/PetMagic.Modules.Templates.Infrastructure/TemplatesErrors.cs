@@ -50,6 +50,8 @@ internal static class TemplatesErrors
     public static readonly Error GenerationWaitTooLong = new("GENERATION_WAIT_TOO_LONG", "Estimated generation wait is too long. Please retry later.");
     public static readonly Error ProviderCapacityUnavailable = new("PROVIDER_CAPACITY_UNAVAILABLE", "Generation provider is temporarily unavailable. Please retry later.");
     public static readonly Error GenerationControlPolicyInvalid = new("templates.generation_control_policy_invalid", "Generation control policy is invalid.");
+    public static readonly Error GenerationControlConcurrencyConfirmationRequired = new("templates.generation_control_concurrency_confirmation_required", "Changing the confirmed fal.ai concurrency limit requires an explicit provider-dashboard confirmation.");
+    public static readonly Error ProviderAttemptRecoveryQueryInvalid = new("templates.provider_attempt_recovery_query_invalid", "Provider attempt recovery paging is invalid.");
     public static readonly Error GenerationControlPolicyConflict = new("templates.generation_control_policy_conflict", "Generation control policy was changed. Reload it and try again.");
     public static readonly Error GenerationControlIdempotencyKeyInvalid = new("templates.generation_control_idempotency_key_invalid", "Generation control idempotency key is required and must not exceed 256 characters.");
     public static readonly Error GenerationControlIdempotencyConflict = new("templates.generation_control_idempotency_conflict", "The idempotency key was already used for a different generation control request.");

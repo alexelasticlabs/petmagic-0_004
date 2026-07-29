@@ -11,7 +11,12 @@ public interface ITemplateGenerationControlService
         UpdateAdminTemplateGenerationControlPolicyCommand command,
         CancellationToken cancellationToken);
 
-    Task<Result<AdminTemplateGenerationControlResponse>> RefreshProviderAsync(CancellationToken cancellationToken);
+    Task<Result<AdminTemplateGenerationProviderRefreshResponse>> RefreshProviderAsync(
+        CancellationToken cancellationToken);
+
+    Task<Result<AdminTemplateProviderAttemptRecoveryPageResponse>> ListProviderAttemptRecoveryAsync(
+        AdminTemplateProviderAttemptRecoveryQuery query,
+        CancellationToken cancellationToken);
 
     Task<Result<AdminTemplateProviderAttemptResolutionResponse>> ResolveProviderAttemptAsync(
         ResolveAdminTemplateProviderAttemptCommand command,

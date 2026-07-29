@@ -504,11 +504,7 @@ internal sealed partial class TemplateGenerationJobProcessor
                 submission.ResponseUrl,
                 submission.CancelUrl,
                 DateTime.UtcNow.AddSeconds(5),
-                cancellationToken);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
+                CancellationToken.None);
         }
         catch (Exception exception)
         {
@@ -525,12 +521,6 @@ internal sealed partial class TemplateGenerationJobProcessor
                     "templates.provider_submission_persistence_unknown",
                     DateTime.UtcNow.AddSeconds(30),
                     CancellationToken.None);
-                if (!string.IsNullOrWhiteSpace(job.LockedBy))
-                {
-                    await SaveClaimedChangesAsync(job, CancellationToken.None, releaseLock: true);
-                }
-
-                await PublishStatusChangedAsync(job, CancellationToken.None);
             }
             catch (Exception recoveryException)
             {
@@ -539,15 +529,30 @@ internal sealed partial class TemplateGenerationJobProcessor
                     TemplateLogSanitizer.SafeId(job.Id),
                     TemplateLogSanitizer.SafeId(reservation.AttemptId),
                     SafeLogValues.ExceptionType(recoveryException));
+                return;
+            }
+
+            try
+            {
+                var persistedJob = await dbContext.TemplateGenerationJobs
+                    .AsNoTracking()
+                    .Include(x => x.Template)
+                    .SingleAsync(x => x.Id == job.Id, CancellationToken.None);
+                await PublishStatusChangedAsync(persistedJob, CancellationToken.None);
+            }
+            catch (Exception notificationException)
+            {
+                logger.LogWarning(
+                    "Recovered provider submission state was persisted but realtime notification failed. GenerationIdHash={GenerationIdHash} AttemptIdHash={AttemptIdHash} ExceptionType={ExceptionType}",
+                    TemplateLogSanitizer.SafeId(job.Id),
+                    TemplateLogSanitizer.SafeId(reservation.AttemptId),
+                    SafeLogValues.ExceptionType(notificationException));
             }
 
             return;
         }
 
-        if (await SaveClaimedChangesAsync(job, cancellationToken, releaseLock: true))
-        {
-            await PublishStatusChangedAsync(job, cancellationToken);
-        }
+        await PublishStatusChangedAsync(job, cancellationToken);
     }
 
     private async Task HandleDurableProviderSubmitFailureAsync(
@@ -568,8 +573,7 @@ internal sealed partial class TemplateGenerationJobProcessor
                 reservation.AttemptId,
                 error.Code,
                 DateTime.UtcNow.AddSeconds(30),
-                cancellationToken);
-            await SaveClaimedChangesAsync(job, cancellationToken, releaseLock: true);
+                CancellationToken.None);
             await PublishStatusChangedAsync(job, cancellationToken);
             return;
         }
