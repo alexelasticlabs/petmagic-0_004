@@ -347,13 +347,34 @@ public sealed class BackendEnvironmentContractTests
             "PetMagic.Host.Api",
             "appsettings.Development.json");
 
-        Assert.Equal("api.petmagic.app", ReadJsonString(apiSettingsPath, "AllowedHosts"));
+        Assert.Equal("api.petgpt.app", ReadJsonString(apiSettingsPath, "AllowedHosts"));
 
         var developmentAllowedHosts = ReadJsonString(apiDevelopmentSettingsPath, "AllowedHosts");
         Assert.NotEqual("*", developmentAllowedHosts);
         Assert.Contains("localhost", developmentAllowedHosts, StringComparison.Ordinal);
         Assert.Contains("127.0.0.1", developmentAllowedHosts, StringComparison.Ordinal);
         Assert.Contains("[::1]", developmentAllowedHosts, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ApiBuildInfo_ShouldUseOnlyValidatedRenderCommitAsRuntimeFallback()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var program = File.ReadAllText(Path.Combine(
+            repositoryRoot,
+            "src",
+            "Host",
+            "PetMagic.Host.Api",
+            "Program.cs"));
+
+        Assert.Contains(
+            "Environment.GetEnvironmentVariable(\"RENDER_GIT_COMMIT\")",
+            program,
+            StringComparison.Ordinal);
+        Assert.Contains("candidate.Length is < 7 or > 64", program, StringComparison.Ordinal);
+        Assert.Contains("!Uri.IsHexDigit(character)", program, StringComparison.Ordinal);
+        Assert.Contains("candidate.ToLowerInvariant()", program, StringComparison.Ordinal);
+        Assert.Contains("SourceRevision: sourceRevision ?? \"unknown\"", program, StringComparison.Ordinal);
     }
 
     [Fact]

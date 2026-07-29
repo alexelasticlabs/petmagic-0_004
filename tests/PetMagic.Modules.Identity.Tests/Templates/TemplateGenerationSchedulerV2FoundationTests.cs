@@ -506,6 +506,47 @@ public sealed class TemplateGenerationSchedulerV2FoundationTests
     }
 
     [Fact]
+    public async Task TryReserveAsync_ShouldProtectVideoCapacityForMotionReadyInterstageBacklog()
+    {
+        await using var dbContext = CreateDbContext();
+        var store = CreateAttemptStore(dbContext);
+        var imageJobs = await AddJobsAsync(dbContext, TemplateGenerationQueue.MediaTypeImage, count: 7);
+        var videoJob = Assert.Single(await AddJobsAsync(
+            dbContext,
+            TemplateGenerationQueue.MediaTypeVideo,
+            count: 1,
+            TemplateGenerationStatus.ProviderQueued));
+        var now = DateTime.UtcNow;
+        videoJob.CurrentProviderStage = "video_preprocessing";
+        videoJob.ProviderCompletedAtUtc = now.AddSeconds(-1);
+        videoJob.PreprocessingCompletedAtUtc = now.AddSeconds(-1);
+        videoJob.NormalizedImageUrl = "https://cdn.example.test/normalized-motion-ready.jpg";
+        videoJob.MotionProviderRequestId = null;
+        await dbContext.SaveChangesAsync();
+
+        for (var index = 0; index < 6; index++)
+        {
+            Assert.NotNull(await store.TryReserveAsync(
+                CreateReservation(imageJobs[index].Id, index + 1),
+                CancellationToken.None));
+        }
+
+        var imageUsingReservedVideoSlot = await store.TryReserveAsync(
+            CreateReservation(imageJobs[6].Id, 7),
+            CancellationToken.None);
+        var motionAttempt = await store.TryReserveAsync(
+            CreateReservation(
+                videoJob.Id,
+                8,
+                TemplateGenerationProviderAttemptStage.VideoGeneration),
+            CancellationToken.None);
+
+        Assert.Null(imageUsingReservedVideoSlot);
+        Assert.NotNull(motionAttempt);
+        Assert.Equal(7, await dbContext.TemplateGenerationProviderAttempts.CountAsync());
+    }
+
+    [Fact]
     public async Task SubmissionUnknown_ShouldRemainActiveAndPreventBlindSecondReservation()
     {
         await using var dbContext = CreateDbContext();
@@ -612,6 +653,43 @@ public sealed class TemplateGenerationSchedulerV2FoundationTests
         Assert.Null(persisted.NextPollAtUtc);
         Assert.Null(persisted.LockedBy);
         Assert.Null(persisted.LockedAtUtc);
+    }
+
+    [Fact]
+    public async Task ReleaseClaimAsync_ShouldMakeYieldedAttemptImmediatelyClaimable()
+    {
+        await using var dbContext = CreateDbContext();
+        var store = CreateAttemptStore(dbContext);
+        var job = Assert.Single(await AddJobsAsync(dbContext, TemplateGenerationQueue.MediaTypeImage, count: 1));
+        var attempt = await store.TryReserveAsync(CreateReservation(job.Id, 1), CancellationToken.None);
+        Assert.NotNull(attempt);
+        await store.MarkSubmissionAcceptedAsync(
+            attempt!.Id,
+            "provider-request-yield-release",
+            "https://queue.fal.test/status/provider-request-yield-release",
+            "https://queue.fal.test/response/provider-request-yield-release",
+            "https://queue.fal.test/cancel/provider-request-yield-release",
+            DateTime.UtcNow.AddSeconds(-1),
+            CancellationToken.None);
+
+        var firstClaim = await store.ClaimDueAsync(
+            "yielded-worker",
+            TimeSpan.FromMinutes(1),
+            CancellationToken.None);
+        Assert.NotNull(firstClaim);
+
+        await store.ReleaseClaimAsync(
+            attempt.Id,
+            firstClaim!.ClaimToken,
+            CancellationToken.None);
+        var secondClaim = await store.ClaimDueAsync(
+            "next-worker",
+            TimeSpan.FromMinutes(1),
+            CancellationToken.None);
+
+        Assert.NotNull(secondClaim);
+        Assert.NotEqual(firstClaim.ClaimToken, secondClaim!.ClaimToken);
+        Assert.Equal(attempt.Id, secondClaim.AttemptId);
     }
 
     [Fact]

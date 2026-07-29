@@ -8,16 +8,11 @@ namespace PetMagic.Host.Api.Startup;
 internal static class PostgreSqlStartupSchemaState
 {
     public static async Task<bool> IsEmptyAsync(
-        string? connectionString,
+        NpgsqlDataSource dataSource,
         CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(connectionString))
-        {
-            return false;
-        }
-
-        await using var connection = new NpgsqlConnection(connectionString);
-        await connection.OpenAsync(cancellationToken);
+        ArgumentNullException.ThrowIfNull(dataSource);
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
 
         await using var command = connection.CreateCommand();
         command.CommandText =

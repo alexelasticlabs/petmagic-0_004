@@ -249,16 +249,6 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                         onDelete: ReferentialAction.SetNull);
                 });
 
-            // This index targets an existing, potentially large queue table. Keep its build outside
-            // the EF migration transaction so generation writes are not blocked for the full scan.
-            migrationBuilder.Sql(
-                """
-                CREATE INDEX CONCURRENTLY IF NOT EXISTS "IX_tgj_ImportingMedia_NextAttempt"
-                ON templates_generation_jobs ("Status", "MediaImportNextAttemptAtUtc")
-                WHERE "Status" = 10;
-                """,
-                suppressTransaction: true);
-
             migrationBuilder.CreateIndex(
                 name: "IX_tgcp_UpdatedAtUtc",
                 table: "templates_generation_control_policy",
@@ -364,6 +354,58 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
 
             migrationBuilder.Sql(
                 """
+                DO $migration$
+                BEGIN
+                    IF to_regclass('templates_generation_runtime_settings') IS NOT NULL THEN
+                        EXECUTE $legacy$
+                            INSERT INTO templates_generation_control_policy (
+                                "Id",
+                                "Revision",
+                                "AdmissionEnabled",
+                                "ConfirmedFalConcurrencyLimit",
+                                "ConfirmedAtUtc",
+                                "ReservedHeadroom",
+                                "ApplicationHardCeiling",
+                                "BaseGlobalMaxConcurrentGenerations",
+                                "BaseImageReservedConcurrentGenerations",
+                                "BaseImageProtectedConcurrentGenerations",
+                                "BaseImageMaxConcurrentGenerations",
+                                "BaseVideoReservedConcurrentGenerations",
+                                "BaseVideoMaxConcurrentGenerations",
+                                "BaseVideoBorrowMaxConcurrentGenerations",
+                                "BaseVideoPreprocessingMaxConcurrentGenerations",
+                                "UpdatedAtUtc",
+                                "UpdatedByAdminUserId",
+                                "LastReason")
+                            SELECT
+                                '4db56d66-a023-4a1c-a28d-174c46d23d61'::uuid,
+                                GREATEST(1, legacy."Version"),
+                                NOT legacy."NewClaimsPaused",
+                                GREATEST(1, legacy."FalConfiguredConcurrency"),
+                                legacy."UpdatedAtUtc",
+                                LEAST(
+                                    GREATEST(0, legacy."FalReservedConcurrency"),
+                                    GREATEST(0, legacy."FalConfiguredConcurrency" - 1)),
+                                GREATEST(1, legacy."GlobalMaxConcurrent"),
+                                GREATEST(1, legacy."GlobalMaxConcurrent"),
+                                GREATEST(1, LEAST(legacy."ImageProtectedConcurrent", legacy."ImageMaxConcurrent")),
+                                GREATEST(1, LEAST(legacy."ImageProtectedConcurrent", legacy."ImageMaxConcurrent")),
+                                GREATEST(1, legacy."ImageMaxConcurrent"),
+                                GREATEST(1, LEAST(legacy."VideoGuaranteedConcurrent", legacy."VideoMaxConcurrent")),
+                                GREATEST(1, legacy."VideoMaxConcurrent"),
+                                GREATEST(1, legacy."VideoBorrowMaxConcurrent"),
+                                1,
+                                legacy."UpdatedAtUtc",
+                                legacy."UpdatedByAdminId",
+                                COALESCE(NULLIF(legacy."LastChangeReason", ''), 'scheduler_v2_migrated_from_v1')
+                            FROM templates_generation_runtime_settings AS legacy
+                            WHERE legacy."Id" = 'f4d755ca-bf45-4ab7-92bf-b7a7ef6844c1'::uuid
+                            ON CONFLICT ("Id") DO NOTHING
+                        $legacy$;
+                    END IF;
+                END
+                $migration$;
+
                 INSERT INTO templates_generation_control_policy (
                     "Id",
                     "Revision",
@@ -399,7 +441,7 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                     2,
                     1,
                     NOW(),
-                    'scheduler_v2_bootstrap_legacy_admission_open')
+                    'scheduler_v2_bootstrap_default_admission_open')
                 ON CONFLICT ("Id") DO NOTHING;
 
                 INSERT INTO templates_provider_runtime_snapshots (
@@ -560,12 +602,6 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
 
             migrationBuilder.DropTable(
                 name: "templates_generation_provider_attempts");
-
-            migrationBuilder.Sql(
-                """
-                DROP INDEX CONCURRENTLY IF EXISTS "IX_tgj_ImportingMedia_NextAttempt";
-                """,
-                suppressTransaction: true);
 
             migrationBuilder.DropColumn(
                 name: "AppliedPolicyRevision",

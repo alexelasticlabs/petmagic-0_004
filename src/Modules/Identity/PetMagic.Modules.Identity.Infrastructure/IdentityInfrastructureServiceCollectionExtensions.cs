@@ -12,6 +12,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 
+using Npgsql;
+
 using PetMagic.BuildingBlocks.Images;
 using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Security;
@@ -48,9 +50,17 @@ public static class IdentityInfrastructureServiceCollectionExtensions
         ValidateJwtConfiguration(jwtOptions, environment);
         ValidateBootstrapAdminConfiguration(bootstrapAdminOptions, environment);
 
-        services.AddDbContextPool<IdentityDbContext>(options =>
+        services.AddDbContextPool<IdentityDbContext>((serviceProvider, options) =>
         {
-            options.UseNpgsql(configuration.GetConnectionString("DefaultConnection"));
+            var sharedDataSource = serviceProvider.GetService<NpgsqlDataSource>();
+            if (sharedDataSource is null)
+            {
+                options.UseNpgsql(configuration.GetConnectionString("DefaultConnection"));
+            }
+            else
+            {
+                options.UseNpgsql(sharedDataSource);
+            }
         });
 
         services.AddIdentityCore<AppUser>(options =>

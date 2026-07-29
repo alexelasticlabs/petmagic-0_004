@@ -17,7 +17,12 @@ internal static class PostgreSqlIndexIntegrityValidator
             ["IX_tgj_RefundedAtUtc"] = "20260702234729_AddGenerationBillingReconciliationIndexes",
             ["IX_tgj_UpdatedAtUtc_Id"] = "20260702234729_AddGenerationBillingReconciliationIndexes",
             ["IX_tgj_PendingGamification"] = "20260710093545_AddGamificationSyncDeliveryState",
-            ["IX_tgj_PendingGamificationShare"] = "20260710094027_AddGamificationShareDeliveryState"
+            ["IX_tgj_PendingGamificationShare"] = "20260710094027_AddGamificationShareDeliveryState",
+            ["IX_tgj_ImportingMedia_NextAttempt"] = "20260729213000_RepairGenerationSchedulerV2ExistingDeployments",
+            ["IX_tgpa_Completed_Stage_ProviderCompletedAtUtc"] = "20260729213000_RepairGenerationSchedulerV2ExistingDeployments",
+            ["IX_tgj_Completed_MediaType_ImportCompletedAtUtc"] = "20260729213000_RepairGenerationSchedulerV2ExistingDeployments",
+            ["IX_tgj_UserId_QueueTier_LastAttemptAtUtc"] = "20260729213000_RepairGenerationSchedulerV2ExistingDeployments",
+            ["IX_tpwbi_Processing_LockedAtUtc_NextAttemptAtUtc"] = "20260729213000_RepairGenerationSchedulerV2ExistingDeployments"
         };
 
     public static async Task RepairPendingMigrationIndexesAsync(
@@ -29,8 +34,16 @@ internal static class PostgreSqlIndexIntegrityValidator
             return;
         }
 
-        await using var connection = new NpgsqlConnection(connectionString);
-        await connection.OpenAsync(cancellationToken);
+        await using var dataSource = NpgsqlDataSource.Create(connectionString);
+        await RepairPendingMigrationIndexesAsync(dataSource, cancellationToken);
+    }
+
+    public static async Task RepairPendingMigrationIndexesAsync(
+        NpgsqlDataSource dataSource,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(dataSource);
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
         var invalidIndexes = await ReadInvalidIndexesAsync(connection, cancellationToken);
         if (invalidIndexes.Count == 0)
         {
@@ -74,8 +87,16 @@ internal static class PostgreSqlIndexIntegrityValidator
             return;
         }
 
-        await using var connection = new NpgsqlConnection(connectionString);
-        await connection.OpenAsync(cancellationToken);
+        await using var dataSource = NpgsqlDataSource.Create(connectionString);
+        await ValidateAsync(dataSource, cancellationToken);
+    }
+
+    public static async Task ValidateAsync(
+        NpgsqlDataSource dataSource,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(dataSource);
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
         var invalidIndexes = await ReadInvalidIndexesAsync(connection, cancellationToken);
         ThrowIfInvalidIndexesRemain(invalidIndexes);
     }

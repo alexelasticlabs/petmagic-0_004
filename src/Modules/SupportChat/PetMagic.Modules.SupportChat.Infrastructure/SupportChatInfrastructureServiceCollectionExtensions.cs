@@ -2,6 +2,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
+using Npgsql;
+
 using PetMagic.BuildingBlocks.Images;
 using PetMagic.BuildingBlocks.Security;
 using PetMagic.Modules.SupportChat.Application.Abstractions;
@@ -28,9 +30,17 @@ public static class SupportChatInfrastructureServiceCollectionExtensions
         var slaOptions = BuildSupportSlaOptions(configuration.GetSection("SupportChat:Sla"));
         ValidateProductionPushConfiguration(pushOptions, isProduction);
 
-        services.AddDbContextPool<SupportChatDbContext>(options =>
+        services.AddDbContextPool<SupportChatDbContext>((serviceProvider, options) =>
         {
-            options.UseNpgsql(configuration.GetConnectionString("DefaultConnection"));
+            var sharedDataSource = serviceProvider.GetService<NpgsqlDataSource>();
+            if (sharedDataSource is null)
+            {
+                options.UseNpgsql(configuration.GetConnectionString("DefaultConnection"));
+            }
+            else
+            {
+                options.UseNpgsql(sharedDataSource);
+            }
         });
 
         services.AddSingleton(attachmentStorageOptions);

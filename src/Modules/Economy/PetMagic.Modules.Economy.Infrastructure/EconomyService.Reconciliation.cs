@@ -145,14 +145,23 @@ public sealed partial class EconomyService
             return (true, null);
         }
 
-        var connectionString = dbContext.Database.GetConnectionString();
-        if (string.IsNullOrWhiteSpace(connectionString))
+        NpgsqlConnection connection;
+        if (_postgreSqlDataSource is not null)
         {
-            return (true, null);
+            connection = await _postgreSqlDataSource.OpenConnectionAsync(cancellationToken);
+        }
+        else
+        {
+            var connectionString = dbContext.Database.GetConnectionString();
+            if (string.IsNullOrWhiteSpace(connectionString))
+            {
+                return (true, null);
+            }
+
+            connection = new NpgsqlConnection(connectionString);
+            await connection.OpenAsync(cancellationToken);
         }
 
-        var connection = new NpgsqlConnection(connectionString);
-        await connection.OpenAsync(cancellationToken);
         try
         {
             await using var command = connection.CreateCommand();

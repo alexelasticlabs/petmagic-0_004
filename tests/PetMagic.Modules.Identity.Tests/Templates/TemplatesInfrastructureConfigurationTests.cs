@@ -161,6 +161,33 @@ public sealed class TemplatesInfrastructureConfigurationTests
         Assert.Equal(TemplateSchedulerConfigFingerprint.ApiComponent, component.Value);
     }
 
+    [Theory]
+    [InlineData(TemplateSchedulerConfigFingerprint.ApiComponent, true)]
+    [InlineData(TemplateSchedulerConfigFingerprint.GenerationWorkerComponent, false)]
+    public void AddTemplatesInfrastructure_ShouldKeepTemplatePushDispatcherOnApiHost(
+        string schedulerComponent,
+        bool expectedDispatcher)
+    {
+        var services = CreateServices();
+        var configuration = CreateConfiguration(new Dictionary<string, string?>
+        {
+            ["Templates:GenerationWorkerEnabled"] = "false",
+            ["Templates:FirebasePush:Enabled"] = "true",
+            ["Templates:FirebasePush:ProjectId"] = "petmagic-test",
+            ["Templates:FirebasePush:ServiceAccountJson"] = "{}"
+        });
+
+        services.AddTemplatesInfrastructure(
+            configuration,
+            schedulerComponent: schedulerComponent);
+
+        using var provider = services.BuildServiceProvider();
+        var dispatcherRegistered = provider.GetServices<IHostedService>()
+            .Any(service => service.GetType().Name == "TemplatePushOutboxWorker");
+
+        Assert.Equal(expectedDispatcher, dispatcherRegistered);
+    }
+
     [Fact]
     public void AddTemplatesInfrastructure_ShouldRegisterR2AndFalProviders_WhenConfigured()
     {

@@ -40,6 +40,8 @@ using Serilog;
 using Serilog.Events;
 using Serilog.Formatting.Json;
 
+using PetMagic.BuildingBlocks.Data;
+
 LoadDotEnvFileIfPresent();
 
 Log.Logger = new LoggerConfiguration()
@@ -53,6 +55,25 @@ try
 {
     var builder = WebApplication.CreateBuilder(args);
     var buildInfo = ResolveBuildInfo(builder.Environment.EnvironmentName);
+    var databaseConnectionBudget = new PostgreSqlConnectionBudget(
+        ReadPositiveDatabaseSetting(
+            builder.Configuration,
+            "Database:MaxPoolSize",
+            PostgreSqlConnectionBudget.ApiDefaultMaxPoolSize),
+        ReadPositiveDatabaseSetting(
+            builder.Configuration,
+            "Database:PeerMaxPoolSize",
+            PostgreSqlConnectionBudget.GenerationWorkerDefaultMaxPoolSize),
+        ReadPositiveDatabaseSetting(
+            builder.Configuration,
+            "Database:OperationalReserveConnections",
+            PostgreSqlConnectionBudget.DefaultOperationalReserveConnections));
+    var sharedPostgreSqlDataSource = databaseConnectionBudget.CreateDataSource(
+        builder.Configuration.GetConnectionString("DefaultConnection")
+            ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is required."),
+        "PetMagic.Host.Api");
+    builder.Configuration["ConnectionStrings:DefaultConnection"] = sharedPostgreSqlDataSource.ConnectionString;
+    builder.Services.AddSingleton(_ => sharedPostgreSqlDataSource);
 
     TemplateGenerationHostModeValidator.RequireGenerationWorkerMode(
         builder.Configuration,
@@ -538,13 +559,13 @@ try
     app.MapGamificationApiModule();
 
     await StartupMigrationLock.RunWithMigrationLockAsync(
-        app.Configuration.GetConnectionString("DefaultConnection"),
+        sharedPostgreSqlDataSource,
         async () =>
         {
             await PostgreSqlIndexIntegrityValidator.RepairPendingMigrationIndexesAsync(
-                app.Configuration.GetConnectionString("DefaultConnection"));
+                sharedPostgreSqlDataSource);
             var isEmptyPostgreSqlSchema = await PostgreSqlStartupSchemaState.IsEmptyAsync(
-                app.Configuration.GetConnectionString("DefaultConnection"));
+                sharedPostgreSqlDataSource);
             if (isEmptyPostgreSqlSchema)
             {
                 Log.Information("Initializing EF migration history for an empty PostgreSQL schema.");
@@ -560,7 +581,7 @@ try
             await app.Services.EnsureTemplatesSeedDataAsync();
             await app.Services.EnsureGamificationSeedDataAsync();
             await PostgreSqlIndexIntegrityValidator.ValidateAsync(
-                app.Configuration.GetConnectionString("DefaultConnection"));
+                sharedPostgreSqlDataSource);
         },
         acquireTimeout: TimeSpan.FromMinutes(5));
 
@@ -583,18 +604,21 @@ static HostBuildInfo ResolveBuildInfo(string environmentName)
     var informationalVersion = assembly
         .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
         ?.InformationalVersion;
-    var sourceRevision = assembly
+    var sourceRevision = NormalizeSourceRevision(assembly
         .GetCustomAttributes<AssemblyMetadataAttribute>()
         .FirstOrDefault(attribute => string.Equals(attribute.Key, "SourceRevisionId", StringComparison.Ordinal))
-        ?.Value;
+        ?.Value);
 
     if (string.IsNullOrWhiteSpace(sourceRevision)
         && informationalVersion?.IndexOf('+', StringComparison.Ordinal) is int revisionSeparator
         && revisionSeparator >= 0
         && revisionSeparator < informationalVersion.Length - 1)
     {
-        sourceRevision = informationalVersion[(revisionSeparator + 1)..];
+        sourceRevision = NormalizeSourceRevision(informationalVersion[(revisionSeparator + 1)..]);
     }
+
+    sourceRevision ??= NormalizeSourceRevision(
+        Environment.GetEnvironmentVariable("RENDER_GIT_COMMIT"));
 
     return new HostBuildInfo(
         Application: "PetMagic.Host.Api",
@@ -603,10 +627,21 @@ static HostBuildInfo ResolveBuildInfo(string environmentName)
         InformationalVersion: string.IsNullOrWhiteSpace(informationalVersion)
             ? "unknown"
             : informationalVersion,
-        SourceRevision: string.IsNullOrWhiteSpace(sourceRevision)
-            ? "unknown"
-            : sourceRevision,
+        SourceRevision: sourceRevision ?? "unknown",
         ProcessStartedAtUtc: DateTimeOffset.UtcNow);
+}
+
+static string? NormalizeSourceRevision(string? value)
+{
+    var candidate = value?.Trim();
+    if (candidate is null
+        || candidate.Length is < 7 or > 64
+        || candidate.Any(character => !Uri.IsHexDigit(character)))
+    {
+        return null;
+    }
+
+    return candidate.ToLowerInvariant();
 }
 
 static void LoadDotEnvFileIfPresent()
@@ -761,6 +796,25 @@ static string ResolveBootstrapEnvironment()
 static bool IsOtlpExporterConfigured(IConfiguration configuration) =>
     !string.IsNullOrWhiteSpace(configuration["OpenTelemetry:Otlp:Endpoint"])
     || !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT"));
+
+static int ReadPositiveDatabaseSetting(
+    IConfiguration configuration,
+    string key,
+    int fallback)
+{
+    var configured = configuration.GetValue<int?>(key);
+    if (configured is null)
+    {
+        return fallback;
+    }
+
+    if (configured <= 0)
+    {
+        throw new InvalidOperationException($"{key} must be a positive integer.");
+    }
+
+    return configured.Value;
+}
 
 internal sealed record HostBuildInfo(
     string Application,

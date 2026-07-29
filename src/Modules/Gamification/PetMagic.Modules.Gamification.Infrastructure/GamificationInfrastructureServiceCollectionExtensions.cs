@@ -2,6 +2,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
+using Npgsql;
+
 using PetMagic.Modules.Gamification.Application.Abstractions;
 using PetMagic.Modules.Gamification.Infrastructure.Data;
 using PetMagic.Modules.Gamification.Infrastructure.Entities;
@@ -16,9 +18,17 @@ public static class GamificationInfrastructureServiceCollectionExtensions
         IConfiguration configuration,
         bool includeAdminServices = true)
     {
-        services.AddDbContextPool<GamificationDbContext>(options =>
+        services.AddDbContextPool<GamificationDbContext>((serviceProvider, options) =>
         {
-            options.UseNpgsql(configuration.GetConnectionString("DefaultConnection"));
+            var sharedDataSource = serviceProvider.GetService<NpgsqlDataSource>();
+            if (sharedDataSource is null)
+            {
+                options.UseNpgsql(configuration.GetConnectionString("DefaultConnection"));
+            }
+            else
+            {
+                options.UseNpgsql(sharedDataSource);
+            }
         });
 
         services.AddScoped<IGamificationService, GamificationService>();

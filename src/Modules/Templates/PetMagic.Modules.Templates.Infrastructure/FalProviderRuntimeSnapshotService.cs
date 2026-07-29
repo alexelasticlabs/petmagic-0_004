@@ -61,6 +61,25 @@ internal sealed class FalProviderRuntimeSnapshotService(
     {
         var snapshot = await EnsureSnapshotAsync(cancellationToken);
         var now = DateTime.UtcNow;
+        if (string.Equals(dbContext.Database.ProviderName, NpgsqlProviderName, StringComparison.Ordinal))
+        {
+            DetachSnapshot(snapshot);
+            var staleBefore = now.Subtract(LastKnownGoodTtl);
+            await dbContext.TemplateProviderRuntimeSnapshots
+                .Where(x => x.Provider == ProviderName
+                    && x.BalanceState != TemplateProviderBalanceState.Unknown
+                    && (x.LastSuccessfulAtUtc == null || x.LastSuccessfulAtUtc < staleBefore))
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(x => x.BalanceState, TemplateProviderBalanceState.Unknown)
+                    .SetProperty(x => x.StatusChangedAtUtc, now)
+                    .SetProperty(x => x.UpdatedAtUtc, now),
+                    cancellationToken);
+
+            return await dbContext.TemplateProviderRuntimeSnapshots
+                .AsNoTracking()
+                .SingleAsync(x => x.Provider == ProviderName, cancellationToken);
+        }
+
         if (snapshot.BalanceState != TemplateProviderBalanceState.Unknown
             && (snapshot.LastSuccessfulAtUtc is null
                 || snapshot.LastSuccessfulAtUtc < now.Subtract(LastKnownGoodTtl)))
@@ -126,6 +145,16 @@ internal sealed class FalProviderRuntimeSnapshotService(
         }
 
         var snapshot = await EnsureSnapshotAsync(cancellationToken);
+        if (transaction is not null)
+        {
+            DetachSnapshot(snapshot);
+            snapshot = await dbContext.TemplateProviderRuntimeSnapshots
+                .FromSqlRaw(
+                    "SELECT * FROM templates_provider_runtime_snapshots WHERE \"Provider\" = {0} FOR UPDATE",
+                    ProviderName)
+                .SingleAsync(cancellationToken);
+        }
+
         var now = DateTime.UtcNow;
         var recentlyChecked = snapshot.CheckedAtUtc >= now.Subtract(RefreshInterval);
         var activelyLeased = snapshot.RefreshLeaseId is not null
@@ -137,6 +166,7 @@ internal sealed class FalProviderRuntimeSnapshotService(
                 await transaction.CommitAsync(cancellationToken);
             }
 
+            DetachSnapshot(snapshot);
             return false;
         }
 
@@ -149,6 +179,7 @@ internal sealed class FalProviderRuntimeSnapshotService(
             await transaction.CommitAsync(cancellationToken);
         }
 
+        DetachSnapshot(snapshot);
         return true;
     }
 
@@ -157,10 +188,23 @@ internal sealed class FalProviderRuntimeSnapshotService(
         BalanceRefreshResult result,
         CancellationToken cancellationToken)
     {
-        var snapshot = await dbContext.TemplateProviderRuntimeSnapshots
-            .SingleAsync(x => x.Provider == ProviderName, cancellationToken);
+        await using var transaction = await BeginTransactionAsync(cancellationToken);
+        DetachTrackedSnapshots();
+        var snapshot = transaction is null
+            ? await dbContext.TemplateProviderRuntimeSnapshots
+                .SingleAsync(x => x.Provider == ProviderName, cancellationToken)
+            : await dbContext.TemplateProviderRuntimeSnapshots
+                .FromSqlRaw(
+                    "SELECT * FROM templates_provider_runtime_snapshots WHERE \"Provider\" = {0} FOR UPDATE",
+                    ProviderName)
+                .SingleAsync(cancellationToken);
         if (snapshot.RefreshLeaseId != leaseId)
         {
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync(cancellationToken);
+            }
+
             return new TemplateProviderRuntimeRefreshResult(
                 snapshot,
                 TemplateProviderRuntimeRefreshOutcome.Coalesced,
@@ -196,6 +240,11 @@ internal sealed class FalProviderRuntimeSnapshotService(
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+        if (transaction is not null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+        }
+
         return new TemplateProviderRuntimeRefreshResult(
             snapshot,
             result.IsSuccess
@@ -293,6 +342,23 @@ internal sealed class FalProviderRuntimeSnapshotService(
 
     private async Task<IDbContextTransaction?> BeginNpgsqlTransactionAsync(CancellationToken cancellationToken) =>
         await dbContext.Database.BeginTransactionAsync(cancellationToken);
+
+    private void DetachTrackedSnapshots()
+    {
+        foreach (var entry in dbContext.ChangeTracker.Entries<TemplateProviderRuntimeSnapshot>())
+        {
+            entry.State = EntityState.Detached;
+        }
+    }
+
+    private void DetachSnapshot(TemplateProviderRuntimeSnapshot snapshot)
+    {
+        var entry = dbContext.Entry(snapshot);
+        if (entry.State != EntityState.Detached)
+        {
+            entry.State = EntityState.Detached;
+        }
+    }
 
     private TemplateProviderBalanceState ResolveFreshBalanceState(decimal balanceUsd)
     {

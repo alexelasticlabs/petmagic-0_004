@@ -190,6 +190,7 @@ public sealed class DatabaseIndexModelTests
                 .Options);
         var migrations = dbContext.GetService<IMigrationsAssembly>().Migrations;
         Assert.Contains("20260729184500_EnforceGenerationResultMediaIdentity", migrations.Keys);
+        Assert.Contains("20260729213000_RepairGenerationSchedulerV2ExistingDeployments", migrations.Keys);
 
         var migration = File.ReadAllText(Path.Combine(
             FindRepositoryRoot(),
@@ -275,6 +276,16 @@ public sealed class DatabaseIndexModelTests
             Assert.Contains("suppressTransaction: true", migration, StringComparison.Ordinal);
         }
 
+        var schedulerHotPathMigration = File.ReadAllText(Path.Combine(
+            migrationsRoot,
+            "20260729153000_AddGenerationSchedulerHotPathIndexes.cs"));
+        Assert.Contains("DROP INDEX CONCURRENTLY IF EXISTS", schedulerHotPathMigration, StringComparison.Ordinal);
+        Assert.Contains("CREATE INDEX CONCURRENTLY", schedulerHotPathMigration, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "CREATE INDEX CONCURRENTLY IF NOT EXISTS",
+            schedulerHotPathMigration,
+            StringComparison.Ordinal);
+
         var validator = File.ReadAllText(Path.Combine(
             FindRepositoryRoot(),
             "src",
@@ -300,6 +311,8 @@ public sealed class DatabaseIndexModelTests
         Assert.Contains("20260702234729_AddGenerationBillingReconciliationIndexes", validator, StringComparison.Ordinal);
         Assert.Contains("20260710093545_AddGamificationSyncDeliveryState", validator, StringComparison.Ordinal);
         Assert.Contains("20260710094027_AddGamificationShareDeliveryState", validator, StringComparison.Ordinal);
+        Assert.Contains("20260729213000_RepairGenerationSchedulerV2ExistingDeployments", validator, StringComparison.Ordinal);
+        Assert.Contains("IX_tgj_ImportingMedia_NextAttempt", validator, StringComparison.Ordinal);
     }
 
     [Fact]

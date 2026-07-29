@@ -3,6 +3,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
+using Npgsql;
+
 using PetMagic.BuildingBlocks.Security;
 using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Economy.Infrastructure.Data;
@@ -152,9 +154,17 @@ public static class EconomyInfrastructureServiceCollectionExtensions
 
         services.AddSingleton<IOptions<EconomyOptions>>(Microsoft.Extensions.Options.Options.Create(economyOptions));
 
-        services.AddDbContextPool<EconomyDbContext>(options =>
+        services.AddDbContextPool<EconomyDbContext>((serviceProvider, options) =>
         {
-            options.UseNpgsql(configuration.GetConnectionString("DefaultConnection"));
+            var sharedDataSource = serviceProvider.GetService<NpgsqlDataSource>();
+            if (sharedDataSource is null)
+            {
+                options.UseNpgsql(configuration.GetConnectionString("DefaultConnection"));
+            }
+            else
+            {
+                options.UseNpgsql(sharedDataSource);
+            }
         });
 
         services.AddScoped<EconomyAdminAuditOutbox>();
@@ -224,9 +234,17 @@ public static class EconomyInfrastructureServiceCollectionExtensions
         services.AddMemoryCache();
         services.AddSingleton<IOptions<EconomyOptions>>(
             Microsoft.Extensions.Options.Options.Create(economyOptions));
-        services.AddDbContextPool<EconomyDbContext>(options =>
+        services.AddDbContextPool<EconomyDbContext>((serviceProvider, options) =>
         {
-            options.UseNpgsql(configuration.GetConnectionString("DefaultConnection"));
+            var sharedDataSource = serviceProvider.GetService<NpgsqlDataSource>();
+            if (sharedDataSource is null)
+            {
+                options.UseNpgsql(configuration.GetConnectionString("DefaultConnection"));
+            }
+            else
+            {
+                options.UseNpgsql(sharedDataSource);
+            }
         });
 
         services.AddSingleton<IPaymentGateway, GenerationWorkerUnavailablePaymentGateway>();

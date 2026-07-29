@@ -158,22 +158,13 @@ public sealed class TemplateGenerationControlFoundationTests
             "reconcile duplicate active generation provider ids before rerunning the migration",
             source,
             StringComparison.Ordinal);
-        Assert.Contains("scheduler_v2_bootstrap_legacy_admission_open", source, StringComparison.Ordinal);
+        Assert.Contains("templates_generation_runtime_settings", source, StringComparison.Ordinal);
+        Assert.Contains("legacy.\"NewClaimsPaused\"", source, StringComparison.Ordinal);
+        Assert.Contains("scheduler_v2_migrated_from_v1", source, StringComparison.Ordinal);
+        Assert.Contains("scheduler_v2_bootstrap_default_admission_open", source, StringComparison.Ordinal);
         Assert.Contains("ON CONFLICT (\"GenerationJobId\", \"Stage\", \"Ordinal\") DO NOTHING", source, StringComparison.Ordinal);
-        Assert.Contains(
-            "CREATE INDEX CONCURRENTLY IF NOT EXISTS \"IX_tgj_ImportingMedia_NextAttempt\"",
-            source,
-            StringComparison.Ordinal);
-        Assert.Contains(
-            "DROP INDEX CONCURRENTLY IF EXISTS \"IX_tgj_ImportingMedia_NextAttempt\"",
-            source,
-            StringComparison.Ordinal);
-        Assert.Contains(
-            "ON templates_generation_jobs (\"Status\", \"MediaImportNextAttemptAtUtc\")",
-            source,
-            StringComparison.Ordinal);
-        Assert.Contains("WHERE \"Status\" = 10", source, StringComparison.Ordinal);
-        Assert.Equal(2, CountOccurrences(source, "suppressTransaction: true"));
+        Assert.DoesNotContain("CONCURRENTLY", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("suppressTransaction: true", source, StringComparison.Ordinal);
         Assert.DoesNotContain("templates_categories", source, StringComparison.Ordinal);
         Assert.DoesNotContain("templates_items", source, StringComparison.Ordinal);
         Assert.DoesNotContain("templates_push_outbox", source, StringComparison.Ordinal);
@@ -196,9 +187,11 @@ public sealed class TemplateGenerationControlFoundationTests
             path => !path.EndsWith(".Designer.cs", StringComparison.Ordinal));
         var source = File.ReadAllText(migrationPath);
 
-        Assert.Equal(4, CountOccurrences(source, "CREATE INDEX CONCURRENTLY IF NOT EXISTS"));
-        Assert.Equal(4, CountOccurrences(source, "DROP INDEX CONCURRENTLY IF EXISTS"));
-        Assert.Equal(8, CountOccurrences(source, "suppressTransaction: true"));
+        Assert.Equal(5, CountOccurrences(source, "CREATE INDEX CONCURRENTLY \""));
+        Assert.Equal(10, CountOccurrences(source, "DROP INDEX CONCURRENTLY IF EXISTS"));
+        Assert.Equal(15, CountOccurrences(source, "suppressTransaction: true"));
+        Assert.DoesNotContain("CREATE INDEX CONCURRENTLY IF NOT EXISTS", source, StringComparison.Ordinal);
+        Assert.Contains("IX_tgj_ImportingMedia_NextAttempt", source, StringComparison.Ordinal);
         Assert.Contains("IX_tgpa_Completed_Stage_ProviderCompletedAtUtc", source, StringComparison.Ordinal);
         Assert.Contains("IX_tgj_Completed_MediaType_ImportCompletedAtUtc", source, StringComparison.Ordinal);
         Assert.Contains("IX_tgj_UserId_QueueTier_LastAttemptAtUtc", source, StringComparison.Ordinal);
@@ -235,6 +228,33 @@ public sealed class TemplateGenerationControlFoundationTests
         Assert.DoesNotContain("migrationBuilder.AddColumn", source, StringComparison.Ordinal);
         Assert.DoesNotContain("migrationBuilder.DropColumn", source, StringComparison.Ordinal);
         Assert.DoesNotContain("migrationBuilder.CreateTable", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("migrationBuilder.DropTable", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ExistingDeploymentRepairMigration_ShouldGuardPolicyAndRebuildAllHotIndexes()
+    {
+        var migrationPath = Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Infrastructure",
+            "Data",
+            "Migrations",
+            "20260729213000_RepairGenerationSchedulerV2ExistingDeployments.cs");
+        var source = File.ReadAllText(migrationPath);
+
+        Assert.Contains("templates_generation_runtime_settings", source, StringComparison.Ordinal);
+        Assert.Contains("policy.\"Revision\" = 1", source, StringComparison.Ordinal);
+        Assert.Contains("policy.\"AdmissionEnabled\" = TRUE", source, StringComparison.Ordinal);
+        Assert.Contains("policy.\"UpdatedByAdminUserId\" IS NULL", source, StringComparison.Ordinal);
+        Assert.Contains("scheduler_v2_bootstrap_legacy_admission_open", source, StringComparison.Ordinal);
+        Assert.Contains("scheduler_v2_bootstrap_default_admission_open", source, StringComparison.Ordinal);
+        Assert.Equal(5, CountOccurrences(source, "DROP INDEX CONCURRENTLY IF EXISTS"));
+        Assert.Equal(5, CountOccurrences(source, "CREATE INDEX CONCURRENTLY \""));
+        Assert.Equal(10, CountOccurrences(source, "suppressTransaction: true"));
+        Assert.DoesNotContain("CREATE INDEX CONCURRENTLY IF NOT EXISTS", source, StringComparison.Ordinal);
         Assert.DoesNotContain("migrationBuilder.DropTable", source, StringComparison.Ordinal);
     }
 

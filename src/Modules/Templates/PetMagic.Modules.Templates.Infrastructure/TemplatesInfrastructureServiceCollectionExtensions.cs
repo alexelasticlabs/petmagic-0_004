@@ -6,6 +6,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
+using Npgsql;
+
 using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Security;
 using PetMagic.Modules.Economy.Application.Abstractions;
@@ -234,9 +236,17 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         services.AddSingleton<TemplateGenerationWorkerRuntimeState>();
         services.AddHostedService<TemplateSchedulerConfigStartupService>();
         services.AddSingleton<TemplateWatermarkSettingsStore>();
-        services.AddDbContextPool<TemplatesDbContext>(dbOptions =>
+        services.AddDbContextPool<TemplatesDbContext>((serviceProvider, dbOptions) =>
         {
-            dbOptions.UseNpgsql(configuration.GetConnectionString("DefaultConnection"));
+            var sharedDataSource = serviceProvider.GetService<NpgsqlDataSource>();
+            if (sharedDataSource is null)
+            {
+                dbOptions.UseNpgsql(configuration.GetConnectionString("DefaultConnection"));
+            }
+            else
+            {
+                dbOptions.UseNpgsql(sharedDataSource);
+            }
         });
         services.AddTemplateGenerationControlFoundation(
             string.Equals(
@@ -303,7 +313,7 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         if (options.FirebasePush.IsConfigured
             && string.Equals(
                 resolvedSchedulerComponent,
-                TemplateSchedulerConfigFingerprint.GenerationWorkerComponent,
+                TemplateSchedulerConfigFingerprint.ApiComponent,
                 StringComparison.Ordinal))
         {
             services.AddHostedService<TemplatePushOutboxWorker>();

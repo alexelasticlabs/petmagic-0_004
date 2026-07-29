@@ -8,6 +8,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Http;
 
 using PetMagic.Host.GenerationWorker;
+using PetMagic.BuildingBlocks.Data;
 using PetMagic.Modules.Economy.Infrastructure;
 using PetMagic.Modules.Gamification.Infrastructure;
 using PetMagic.Modules.Templates.Infrastructure;
@@ -28,6 +29,25 @@ Log.Logger = new LoggerConfiguration()
 try
 {
     var builder = Host.CreateApplicationBuilder(args);
+    var databaseConnectionBudget = new PostgreSqlConnectionBudget(
+        ReadPositiveDatabaseSetting(
+            builder.Configuration,
+            "Database:MaxPoolSize",
+            PostgreSqlConnectionBudget.GenerationWorkerDefaultMaxPoolSize),
+        ReadPositiveDatabaseSetting(
+            builder.Configuration,
+            "Database:PeerMaxPoolSize",
+            PostgreSqlConnectionBudget.ApiDefaultMaxPoolSize),
+        ReadPositiveDatabaseSetting(
+            builder.Configuration,
+            "Database:OperationalReserveConnections",
+            PostgreSqlConnectionBudget.DefaultOperationalReserveConnections));
+    var sharedPostgreSqlDataSource = databaseConnectionBudget.CreateDataSource(
+        builder.Configuration.GetConnectionString("DefaultConnection")
+            ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is required."),
+        "PetMagic.Host.GenerationWorker");
+    builder.Configuration["ConnectionStrings:DefaultConnection"] = sharedPostgreSqlDataSource.ConnectionString;
+    builder.Services.AddSingleton(_ => sharedPostgreSqlDataSource);
 
     TemplateGenerationHostModeValidator.RequireGenerationWorkerMode(
         builder.Configuration,
@@ -177,3 +197,22 @@ static string ResolveBootstrapEnvironment()
 static bool IsOtlpExporterConfigured(IConfiguration configuration) =>
     !string.IsNullOrWhiteSpace(configuration["OpenTelemetry:Otlp:Endpoint"])
     || !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT"));
+
+static int ReadPositiveDatabaseSetting(
+    IConfiguration configuration,
+    string key,
+    int fallback)
+{
+    var configured = configuration.GetValue<int?>(key);
+    if (configured is null)
+    {
+        return fallback;
+    }
+
+    if (configured <= 0)
+    {
+        throw new InvalidOperationException($"{key} must be a positive integer.");
+    }
+
+    return configured.Value;
+}

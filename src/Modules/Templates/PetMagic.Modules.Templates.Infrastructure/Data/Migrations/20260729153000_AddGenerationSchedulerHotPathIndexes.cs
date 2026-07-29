@@ -17,7 +17,27 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
         {
             migrationBuilder.Sql(
                 """
-                CREATE INDEX CONCURRENTLY IF NOT EXISTS "IX_tgpa_Completed_Stage_ProviderCompletedAtUtc"
+                DROP INDEX CONCURRENTLY IF EXISTS "IX_tgj_ImportingMedia_NextAttempt";
+                """,
+                suppressTransaction: true);
+
+            migrationBuilder.Sql(
+                """
+                CREATE INDEX CONCURRENTLY "IX_tgj_ImportingMedia_NextAttempt"
+                ON templates_generation_jobs ("Status", "MediaImportNextAttemptAtUtc")
+                WHERE "Status" = 10;
+                """,
+                suppressTransaction: true);
+
+            migrationBuilder.Sql(
+                """
+                DROP INDEX CONCURRENTLY IF EXISTS "IX_tgpa_Completed_Stage_ProviderCompletedAtUtc";
+                """,
+                suppressTransaction: true);
+
+            migrationBuilder.Sql(
+                """
+                CREATE INDEX CONCURRENTLY "IX_tgpa_Completed_Stage_ProviderCompletedAtUtc"
                 ON templates_generation_provider_attempts ("Stage", "ProviderCompletedAtUtc" DESC)
                 INCLUDE ("SubmittedAtUtc")
                 WHERE "State" = 6
@@ -28,7 +48,13 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
 
             migrationBuilder.Sql(
                 """
-                CREATE INDEX CONCURRENTLY IF NOT EXISTS "IX_tgj_Completed_MediaType_ImportCompletedAtUtc"
+                DROP INDEX CONCURRENTLY IF EXISTS "IX_tgj_Completed_MediaType_ImportCompletedAtUtc";
+                """,
+                suppressTransaction: true);
+
+            migrationBuilder.Sql(
+                """
+                CREATE INDEX CONCURRENTLY "IX_tgj_Completed_MediaType_ImportCompletedAtUtc"
                 ON templates_generation_jobs ("QueueMediaType", "MediaImportCompletedAtUtc" DESC)
                 INCLUDE ("ImportStartedAtUtc")
                 WHERE "Status" = 3
@@ -39,7 +65,13 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
 
             migrationBuilder.Sql(
                 """
-                CREATE INDEX CONCURRENTLY IF NOT EXISTS "IX_tgj_UserId_QueueTier_LastAttemptAtUtc"
+                DROP INDEX CONCURRENTLY IF EXISTS "IX_tgj_UserId_QueueTier_LastAttemptAtUtc";
+                """,
+                suppressTransaction: true);
+
+            migrationBuilder.Sql(
+                """
+                CREATE INDEX CONCURRENTLY "IX_tgj_UserId_QueueTier_LastAttemptAtUtc"
                 ON templates_generation_jobs ("UserId", "QueueTier", "LastAttemptAtUtc" DESC)
                 WHERE "LastAttemptAtUtc" IS NOT NULL;
                 """,
@@ -47,7 +79,13 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
 
             migrationBuilder.Sql(
                 """
-                CREATE INDEX CONCURRENTLY IF NOT EXISTS "IX_tpwbi_Processing_LockedAtUtc_NextAttemptAtUtc"
+                DROP INDEX CONCURRENTLY IF EXISTS "IX_tpwbi_Processing_LockedAtUtc_NextAttemptAtUtc";
+                """,
+                suppressTransaction: true);
+
+            migrationBuilder.Sql(
+                """
+                CREATE INDEX CONCURRENTLY "IX_tpwbi_Processing_LockedAtUtc_NextAttemptAtUtc"
                 ON templates_provider_webhook_inbox ("LockedAtUtc", "NextAttemptAtUtc")
                 WHERE "Status" = 2 AND "LockedAtUtc" IS NOT NULL;
                 """,
@@ -57,6 +95,12 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.Sql(
+                """
+                DROP INDEX CONCURRENTLY IF EXISTS "IX_tgj_ImportingMedia_NextAttempt";
+                """,
+                suppressTransaction: true);
+
             migrationBuilder.Sql(
                 """
                 DROP INDEX CONCURRENTLY IF EXISTS "IX_tgpa_Completed_Stage_ProviderCompletedAtUtc";

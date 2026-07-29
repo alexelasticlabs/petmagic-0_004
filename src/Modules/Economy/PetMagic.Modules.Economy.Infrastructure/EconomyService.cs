@@ -9,6 +9,8 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
+using Npgsql;
+
 using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Abstractions;
@@ -36,8 +38,11 @@ public sealed partial class EconomyService(
     IStoreWebhookSecurityValidator? storeWebhookSecurityValidator = null,
     IGenerationBillingReconciliationService? generationBillingReconciliation = null,
     IHttpContextAccessor? httpContextAccessor = null,
-    ILoggerFactory? loggerFactory = null) : IEconomyService, IEconomyAdminService
+    ILoggerFactory? loggerFactory = null,
+    NpgsqlDataSource? postgreSqlDataSource = null) : IEconomyService, IEconomyAdminService
 {
+    private readonly NpgsqlDataSource? _postgreSqlDataSource = postgreSqlDataSource;
+
     private readonly EconomyAdminConfigurationService _adminConfigurationService =
         new(
             dbContext,

@@ -16,20 +16,12 @@ internal static class StartupMigrationLock
     private const long LockKey = 0x5065744D67_01;
 
     public static async Task RunWithMigrationLockAsync(
-        string? connectionString,
+        NpgsqlDataSource dataSource,
         Func<Task> migrateAndSeed,
         TimeSpan acquireTimeout)
     {
-        if (string.IsNullOrWhiteSpace(connectionString))
-        {
-            // Non-relational/test hosting (e.g. integration tests with in-memory providers):
-            // nothing to lock against, run directly.
-            await migrateAndSeed();
-            return;
-        }
-
-        await using var connection = new NpgsqlConnection(connectionString);
-        await connection.OpenAsync();
+        ArgumentNullException.ThrowIfNull(dataSource);
+        await using var connection = await dataSource.OpenConnectionAsync();
 
         Log.Information(
             "Acquiring startup migration advisory lock. LockKey={LockKey} TimeoutSeconds={TimeoutSeconds}",
