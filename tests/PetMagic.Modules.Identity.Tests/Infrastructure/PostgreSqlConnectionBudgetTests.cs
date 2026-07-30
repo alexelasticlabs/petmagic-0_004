@@ -38,6 +38,65 @@ public sealed class PostgreSqlConnectionBudgetTests
     }
 
     [Fact]
+    public async Task RenderPostgreSqlUri_ShouldBeConvertedAndBudgeted()
+    {
+        var budget = new PostgreSqlConnectionBudget(
+            PostgreSqlConnectionBudget.ApiDefaultMaxPoolSize,
+            PostgreSqlConnectionBudget.GenerationWorkerDefaultMaxPoolSize,
+            PostgreSqlConnectionBudget.DefaultOperationalReserveConnections);
+
+        await using var dataSource = budget.CreateDataSource(
+            "postgresql://render%40user:p%40ss%3Aword%2Fwith%3Fchars@internal-host:5439/petmagic%2Ddb"
+                + "?sslmode=require&connect_timeout=17&application_name=ignored",
+            "PetMagic.Host.Api.RenderTests");
+        var appliedConnectionString = new NpgsqlConnectionStringBuilder(dataSource.ConnectionString);
+
+        Assert.Equal("internal-host", appliedConnectionString.Host);
+        Assert.Equal(5439, appliedConnectionString.Port);
+        Assert.Equal("petmagic-db", appliedConnectionString.Database);
+        Assert.Equal("render@user", appliedConnectionString.Username);
+        Assert.Null(appliedConnectionString.Password);
+        Assert.Equal(SslMode.Require, appliedConnectionString.SslMode);
+        Assert.Equal(17, appliedConnectionString.Timeout);
+        Assert.Equal(PostgreSqlConnectionBudget.ApiDefaultMaxPoolSize, appliedConnectionString.MaxPoolSize);
+        Assert.Equal("PetMagic.Host.Api.RenderTests", appliedConnectionString.ApplicationName);
+    }
+
+    [Fact]
+    public async Task PostgreSqlUriWithoutExplicitPort_ShouldUsePostgreSqlDefault()
+    {
+        var budget = new PostgreSqlConnectionBudget(
+            PostgreSqlConnectionBudget.GenerationWorkerDefaultMaxPoolSize,
+            PostgreSqlConnectionBudget.ApiDefaultMaxPoolSize,
+            PostgreSqlConnectionBudget.DefaultOperationalReserveConnections);
+
+        await using var dataSource = budget.CreateDataSource(
+            "postgres://worker:password@internal-host/petmagic",
+            "PetMagic.Host.GenerationWorker.RenderTests");
+        var appliedConnectionString = new NpgsqlConnectionStringBuilder(dataSource.ConnectionString);
+
+        Assert.Equal(5432, appliedConnectionString.Port);
+        Assert.Equal("internal-host", appliedConnectionString.Host);
+        Assert.Equal("petmagic", appliedConnectionString.Database);
+    }
+
+    [Fact]
+    public void UnsupportedUriQueryParameter_ShouldBeRejectedWithoutLeakingItsValue()
+    {
+        var budget = new PostgreSqlConnectionBudget(
+            PostgreSqlConnectionBudget.ApiDefaultMaxPoolSize,
+            PostgreSqlConnectionBudget.GenerationWorkerDefaultMaxPoolSize,
+            PostgreSqlConnectionBudget.DefaultOperationalReserveConnections);
+
+        var exception = Assert.Throws<ArgumentException>(() => budget.CreateDataSource(
+            "postgresql://user:password@internal-host/petmagic?unsupported=do-not-log-this",
+            "PetMagic.Host.Api.RenderTests"));
+
+        Assert.Contains("query parameter 'unsupported' is not supported", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("do-not-log-this", exception.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void AggregateAtAcceptanceLimit_ShouldBeRejectedBeforeCreatingPools()
     {
         var budget = new PostgreSqlConnectionBudget(

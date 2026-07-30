@@ -216,6 +216,20 @@ try {
     'petmagic-staging-api is missing env Templates__FirebasePush__Enabled.'
   );
 
+  const missingEconomyPushDispatcherPath = writeFixture(
+    'render-missing-economy-push-dispatcher.yaml',
+    replaceRequired(
+      stagingBlueprint,
+      '      - key: ECONOMY_FIREBASE_PUSH_ENABLED\n        value: "true"\n',
+      ''
+    )
+  );
+  requireCheckerFailure(
+    missingEconomyPushDispatcherPath,
+    'staging',
+    'petmagic-staging-api is missing env ECONOMY_FIREBASE_PUSH_ENABLED.'
+  );
+
   const workerPushDispatcherPath = writeFixture(
     'render-worker-push-dispatcher.yaml',
     replaceOccurrenceRequired(
@@ -230,6 +244,22 @@ try {
     workerPushDispatcherPath,
     'staging',
     'petmagic-staging-generation-worker must not receive external billing/store/push setting Templates__FirebasePush__Enabled'
+  );
+
+  const workerEconomyPushDispatcherPath = writeFixture(
+    'render-worker-economy-push-dispatcher.yaml',
+    replaceOccurrenceRequired(
+      stagingBlueprint,
+      '      - key: FAL_AI_API_KEY\n        sync: false\n',
+      '      - key: FAL_AI_API_KEY\n        sync: false\n'
+        + '      - key: ECONOMY_FIREBASE_PUSH_ENABLED\n        value: "true"\n',
+      2
+    )
+  );
+  requireCheckerFailure(
+    workerEconomyPushDispatcherPath,
+    'staging',
+    'petmagic-staging-generation-worker must not receive external billing/store/push setting ECONOMY_FIREBASE_PUSH_ENABLED'
   );
 
   const inheritedWorkerBillingSecretPath = writeFixture(

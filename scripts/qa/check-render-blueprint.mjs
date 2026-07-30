@@ -168,6 +168,7 @@ if (api) {
   requireEnvValue(api, 'STRIPE_CHECKOUT_CANCEL_URL', `https://${adminDomain}/payments/cancel`);
   requireEnvValue(api, 'STRIPE_BILLING_PORTAL_RETURN_URL', `https://${adminDomain}/payments/return`);
   requireEnvValue(api, 'Templates__FirebasePush__Enabled', 'true');
+  requireEnvValue(api, 'ECONOMY_FIREBASE_PUSH_ENABLED', 'true');
   requireEnvContains(api, 'AllowedHosts', apiDomain);
   requireDatabaseBinding(api, 'ConnectionStrings__DefaultConnection', `${prefix}-db`);
   requireSecretKeys(api, [
@@ -711,6 +712,7 @@ function rejectWorkerExternalBillingConfiguration(service) {
     'STORE_ACCOUNT_BINDING_MODE',
     'ECONOMY_RECONCILIATION_ENABLED',
     'ECONOMY_PUSH_OUTBOX_DISPATCHER_ENABLED',
+    'ECONOMY_FIREBASE_PUSH_ENABLED',
     'Templates__FirebasePush__Enabled'
   ]);
 
