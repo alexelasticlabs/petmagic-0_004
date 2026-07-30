@@ -291,6 +291,21 @@ try {
     'petmagic-staging-api FAL_WEBHOOK_URL must be https://api.staging.petmagic.app/api/templates/provider/fal/webhook'
   );
 
+  const missingWorkerPublicBaseUrlPath = writeFixture(
+    'render-missing-worker-public-base-url.yaml',
+    replaceOccurrenceRequired(
+      stagingBlueprint,
+      '      - key: Templates__PublicBaseUrl\n        value: https://api.staging.petmagic.app\n',
+      '',
+      2
+    )
+  );
+  requireCheckerFailure(
+    missingWorkerPublicBaseUrlPath,
+    'staging',
+    'petmagic-staging-generation-worker is missing env Templates__PublicBaseUrl.'
+  );
+
   const shortWorkerShutdownPath = writeFixture(
     'render-short-worker-shutdown.yaml',
     replaceRequired(stagingBlueprint, '    maxShutdownDelaySeconds: 300', '    maxShutdownDelaySeconds: 60')

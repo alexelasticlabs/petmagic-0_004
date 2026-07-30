@@ -362,6 +362,8 @@ services:
         sync: false
       - key: FAL_WEBHOOK_URL
         value: https://api.staging.petmagic.app/api/templates/provider/fal/webhook
+      - key: Templates__PublicBaseUrl
+        value: https://api.staging.petmagic.app
       - key: R2_ACCOUNT_ID
         sync: false
       - key: R2_ACCESS_KEY

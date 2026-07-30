@@ -222,6 +222,7 @@ if (worker) {
   requireEnvValue(worker, 'Database__PeerMaxPoolSize', '28');
   requireEnvValue(worker, 'Database__OperationalReserveConnections', '16');
   requireEnvValue(worker, 'FAL_WEBHOOK_URL', `https://${apiDomain}/api/templates/provider/fal/webhook`);
+  requireEnvValue(worker, 'Templates__PublicBaseUrl', `https://${apiDomain}`);
   requireEnvValue(worker, 'Templates__GenerationWorkerPollIntervalMilliseconds', '500');
   requireEnvValue(worker, 'Templates__GenerationDispatchConcurrency', '4');
   requireEnvValue(worker, 'Templates__ProviderReconciliationConcurrency', '4');

@@ -335,6 +335,8 @@ services:
         sync: false
       - key: FAL_WEBHOOK_URL
         value: https://api.petgpt.app/api/templates/provider/fal/webhook
+      - key: Templates__PublicBaseUrl
+        value: https://api.petgpt.app
       - key: R2_ACCOUNT_ID
         sync: false
       - key: R2_ACCESS_KEY
