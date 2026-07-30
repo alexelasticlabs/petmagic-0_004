@@ -714,8 +714,7 @@ public sealed class RepositorySecretHygieneTests
             "docker-compose.yml",
         };
 
-        return Directory
-            .EnumerateFiles(repositoryRoot, "*", SearchOption.AllDirectories)
+        return EnumerateGitDeployableFiles(repositoryRoot)
             .Where(file => !IsIgnoredArtifactScanPath(repositoryRoot, file))
             .Where(file => IsDeployableSecretScanPath(repositoryRoot, file))
             .Where(file =>
@@ -724,6 +723,40 @@ public sealed class RepositorySecretHygieneTests
                 return allowedExactNames.Contains(fileName)
                     || allowedExtensions.Contains(Path.GetExtension(file));
             });
+    }
+
+    private static IEnumerable<string> EnumerateGitDeployableFiles(string repositoryRoot)
+    {
+        var startInfo = new ProcessStartInfo("git")
+        {
+            WorkingDirectory = repositoryRoot,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+        };
+        startInfo.ArgumentList.Add("ls-files");
+        startInfo.ArgumentList.Add("--cached");
+        startInfo.ArgumentList.Add("--others");
+        startInfo.ArgumentList.Add("--exclude-standard");
+        startInfo.ArgumentList.Add("-z");
+
+        using var process = Process.Start(startInfo)
+            ?? throw new InvalidOperationException("Could not start git while enumerating deployable files.");
+        var files = process.StandardOutput.ReadToEnd();
+        var standardError = process.StandardError.ReadToEnd();
+        process.WaitForExit();
+        if (process.ExitCode != 0)
+        {
+            throw new InvalidOperationException(
+                $"Could not enumerate deployable Git files: {standardError.Trim()}");
+        }
+
+        return files
+            .Split('\0', StringSplitOptions.RemoveEmptyEntries)
+            .Select(relativePath => Path.GetFullPath(
+                Path.Combine(repositoryRoot, relativePath.Replace('/', Path.DirectorySeparatorChar))))
+            .Where(File.Exists)
+            .Order(StringComparer.Ordinal);
     }
 
     private static IEnumerable<string> EnumerateTestSourceFiles(string repositoryRoot)
