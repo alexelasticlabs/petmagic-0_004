@@ -56,6 +56,12 @@ test("adds browser security headers to public responses", async () => {
   assert.equal(response.headers.get("cross-origin-opener-policy"), "same-origin");
   assert.equal(response.headers.get("cross-origin-resource-policy"), "same-origin");
   assert.equal(
+    response.headers.get("content-security-policy"),
+    "default-src 'self'; base-uri 'none'; connect-src 'self'; font-src 'self'; "
+      + "form-action 'self'; frame-ancestors 'none'; img-src 'self' data:; object-src 'none'; "
+      + "script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; upgrade-insecure-requests",
+  );
+  assert.equal(
     response.headers.get("permissions-policy"),
     "camera=(), geolocation=(), microphone=(), payment=(), usb=()",
   );
