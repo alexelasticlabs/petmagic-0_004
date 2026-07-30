@@ -63,15 +63,18 @@ public static class EconomyInfrastructureServiceCollectionExtensions
                 "StripeLiveWebhookSecret",
                 "STRIPE_LIVE_WEBHOOK_SECRET",
                 "STRIPE_WEBHOOK_SECRET_LIVE") ?? string.Empty,
-            StripeCheckoutSuccessUrl = ReadValue(
+            StripeCheckoutSuccessUrl = ReadEnvironmentFirstValue(
+                configuration,
                 section,
                 "StripeCheckoutSuccessUrl",
                 "STRIPE_CHECKOUT_SUCCESS_URL") ?? "https://petmagic.app/payments/success?session_id={CHECKOUT_SESSION_ID}",
-            StripeCheckoutCancelUrl = ReadValue(
+            StripeCheckoutCancelUrl = ReadEnvironmentFirstValue(
+                configuration,
                 section,
                 "StripeCheckoutCancelUrl",
                 "STRIPE_CHECKOUT_CANCEL_URL") ?? "https://petmagic.app/payments/cancel",
-            StripeBillingPortalReturnUrl = ReadValue(
+            StripeBillingPortalReturnUrl = ReadEnvironmentFirstValue(
+                configuration,
                 section,
                 "StripeBillingPortalReturnUrl",
                 "STRIPE_BILLING_PORTAL_RETURN_URL") ?? "https://petmagic.app/profile/premium",
@@ -297,6 +300,25 @@ public static class EconomyInfrastructureServiceCollectionExtensions
         }
 
         return null;
+    }
+
+    private static string? ReadEnvironmentFirstValue(
+        IConfiguration configuration,
+        IConfigurationSection section,
+        string key,
+        params string[] environmentVariables)
+    {
+        foreach (var environmentVariable in environmentVariables)
+        {
+            var value = configuration[environmentVariable]
+                ?? Environment.GetEnvironmentVariable(environmentVariable);
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                return value;
+            }
+        }
+
+        return section[key];
     }
 
     private static string NormalizePem(string? raw)

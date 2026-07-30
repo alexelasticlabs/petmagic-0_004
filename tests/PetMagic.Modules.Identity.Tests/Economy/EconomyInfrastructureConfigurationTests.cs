@@ -55,6 +55,28 @@ public sealed class EconomyInfrastructureConfigurationTests
         Assert.Equal(StripeWebhookSecret, options.StripeLiveWebhookSecret);
     }
 
+    [Fact]
+    public void AddEconomyInfrastructure_ShouldPreferStripeRedirectEnvironmentAliases_InProduction()
+    {
+        var services = CreateServices();
+        var settings = CreateProductionSettings();
+        settings["Economy:StripeCheckoutSuccessUrl"] = "petmagic://checkout/success?session_id={CHECKOUT_SESSION_ID}";
+        settings["Economy:StripeCheckoutCancelUrl"] = "petmagic://checkout/cancel";
+        settings["Economy:StripeBillingPortalReturnUrl"] = "petmagic://profile/premium";
+        settings["STRIPE_CHECKOUT_SUCCESS_URL"] = "https://admin.petgpt.app/payments/success?session_id={CHECKOUT_SESSION_ID}";
+        settings["STRIPE_CHECKOUT_CANCEL_URL"] = "https://admin.petgpt.app/payments/cancel";
+        settings["STRIPE_BILLING_PORTAL_RETURN_URL"] = "https://admin.petgpt.app/payments/return";
+
+        services.AddEconomyInfrastructure(CreateConfiguration(settings), isProduction: true);
+
+        using var provider = services.BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptions<EconomyOptions>>().Value;
+
+        Assert.Equal(settings["STRIPE_CHECKOUT_SUCCESS_URL"], options.StripeCheckoutSuccessUrl);
+        Assert.Equal(settings["STRIPE_CHECKOUT_CANCEL_URL"], options.StripeCheckoutCancelUrl);
+        Assert.Equal(settings["STRIPE_BILLING_PORTAL_RETURN_URL"], options.StripeBillingPortalReturnUrl);
+    }
+
     [Theory]
     [InlineData("Economy:StripeCheckoutSuccessUrl", "http://petmagic.app/payments/success?session_id={CHECKOUT_SESSION_ID}")]
     [InlineData("Economy:StripeCheckoutSuccessUrl", "https://localhost/payments/success?session_id={CHECKOUT_SESSION_ID}")]
