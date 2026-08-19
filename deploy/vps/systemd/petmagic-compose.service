@@ -1,0 +1,18 @@
+[Unit]
+Description=PetMagic Docker Compose stack
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/petmagic/current
+ExecStartPre=/usr/bin/bash /opt/petmagic/current/deploy/vps/scripts/runtime-preflight.sh
+ExecStart=/usr/bin/docker compose --env-file /opt/petmagic/shared/env/.env.vps -f docker-compose.yml -f deploy/vps/compose.vps.yaml up -d --remove-orphans --wait --wait-timeout 300
+ExecStop=/usr/bin/docker compose --env-file /opt/petmagic/shared/env/.env.vps -f docker-compose.yml -f deploy/vps/compose.vps.yaml stop
+TimeoutStartSec=0
+TimeoutStopSec=300
+
+[Install]
+WantedBy=multi-user.target

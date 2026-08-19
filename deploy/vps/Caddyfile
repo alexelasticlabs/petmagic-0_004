@@ -1,0 +1,24 @@
+(production_headers) {
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+}
+
+api.petgpt.app {
+	encode zstd gzip
+	import production_headers
+	log {
+		format json
+	}
+	reverse_proxy 127.0.0.1:5001
+}
+
+admin.petgpt.app {
+	encode zstd gzip
+	import production_headers
+	log {
+		format json
+	}
+	reverse_proxy 127.0.0.1:3000
+}

@@ -1,0 +1,47 @@
+services:
+  postgres:
+    restart: "on-failure:5"
+    volumes:
+      - /opt/petmagic/shared/postgres:/var/lib/postgresql/data
+      - /opt/petmagic/shared/backups/import:/var/lib/petmagic-import:ro
+    logging: &container-logging
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  mailpit:
+    restart: "on-failure:5"
+    logging: *container-logging
+
+  backend:
+    restart: "on-failure:5"
+    environment:
+      APP_VOLUME_DIRS: /var/petmagic
+      DataProtection__KeysPath: /var/petmagic/DataProtection-Keys
+      StaticFiles__ExtraWebRootPath: /var/petmagic/wwwroot
+      Identity__AvatarStorage__LocalMediaRootPath: /var/petmagic/wwwroot/user-avatars
+      SupportChat__AttachmentStorage__LocalMediaRootPath: /var/petmagic/wwwroot/support-attachments
+      Templates__LocalMediaRootPath: /var/petmagic/wwwroot/templates-media
+      ForwardedHeaders__Enabled: "true"
+      # The API port is bound to localhost only; Caddy is the sole public proxy boundary.
+      ForwardedHeaders__TrustAll: "true"
+      ForwardedHeaders__ForwardLimit: "1"
+      Cors__AllowedOrigins__0: "${CORS_ALLOWED_ORIGIN:?Set CORS_ALLOWED_ORIGIN to the HTTPS admin origin}"
+    volumes:
+      - /opt/petmagic/shared/api-data/DataProtection-Keys:/var/petmagic/DataProtection-Keys
+      - /opt/petmagic/shared/api-data/wwwroot:/var/petmagic/wwwroot
+    logging: *container-logging
+
+  generation-worker:
+    restart: "on-failure:5"
+    environment:
+      APP_VOLUME_DIRS: /var/petmagic
+      Templates__LocalMediaRootPath: /var/petmagic/wwwroot/templates-media
+    volumes:
+      - /opt/petmagic/shared/api-data/wwwroot/templates-media:/var/petmagic/wwwroot/templates-media
+    logging: *container-logging
+
+  admin-web:
+    restart: "on-failure:5"
+    logging: *container-logging

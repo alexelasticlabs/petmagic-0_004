@@ -1,0 +1,10 @@
+[Unit]
+Description=Nightly PetMagic PostgreSQL backup
+
+[Timer]
+OnCalendar=*-*-* 03:30:00 UTC
+Persistent=true
+Unit=petmagic-postgres-backup.service
+
+[Install]
+WantedBy=timers.target
