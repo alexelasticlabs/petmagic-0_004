@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-FROM node:24-alpine AS deps
+FROM node:24-alpine@sha256:d32cdf619f63fe0471182d08996dd516c6275bb5fd31ae06e55a570bd9e1ad43 AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN --mount=type=cache,id=npm-admin-web,sharing=locked,target=/root/.npm \
@@ -24,7 +24,9 @@ FROM deps AS production-deps
 WORKDIR /app
 RUN npm prune --omit=dev --engine-strict
 
-FROM node:24-alpine AS runner
+FROM node:24-alpine@sha256:d32cdf619f63fe0471182d08996dd516c6275bb5fd31ae06e55a570bd9e1ad43 AS runner
+ARG SOURCE_REVISION=unknown
+LABEL org.opencontainers.image.revision=$SOURCE_REVISION
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1

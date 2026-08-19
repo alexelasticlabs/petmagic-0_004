@@ -2,7 +2,7 @@ name: petmagic-0_004
 
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
     restart: unless-stopped
     environment:
       POSTGRES_USER: petmagic_user
@@ -33,13 +33,19 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.api
+      args:
+        SOURCE_REVISION: "${SOURCE_REVISION:-0000000000000000000000000000000000000000}"
     restart: unless-stopped
     mem_limit: "${BACKEND_MEMORY_LIMIT:-768m}"
     cpus: "${BACKEND_CPUS:-1.0}"
     environment:
       ASPNETCORE_ENVIRONMENT: "${ASPNETCORE_ENVIRONMENT:-Production}"
       ASPNETCORE_HTTP_PORTS: 5000
+      RENDER_GIT_COMMIT: "${SOURCE_REVISION:-0000000000000000000000000000000000000000}"
       ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=petmagic_db;Username=petmagic_user;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env};"
+      Database__MaxPoolSize: "${DATABASE_MAX_POOL_SIZE:-28}"
+      Database__PeerMaxPoolSize: "${DATABASE_PEER_MAX_POOL_SIZE:-24}"
+      Database__OperationalReserveConnections: "${DATABASE_OPERATIONAL_RESERVE_CONNECTIONS:-16}"
       Jwt__SigningKey: "${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY in .env. Generate with openssl rand -base64 64}"
       Jwt__Issuer: petmagic.app
       Jwt__Audience: petmagic-admin
@@ -77,8 +83,18 @@ services:
       GOOGLE_PLAY_ENVIRONMENT: "${GOOGLE_PLAY_ENVIRONMENT:-production}"
       GOOGLE_PLAY_PUBSUB_AUDIENCE: "${GOOGLE_PLAY_PUBSUB_AUDIENCE:-}"
       GOOGLE_PLAY_PUBSUB_EXPECTED_EMAIL: "${GOOGLE_PLAY_PUBSUB_EXPECTED_EMAIL:-}"
+      GOOGLE_PLAY_PACKAGE_NAME: "${GOOGLE_PLAY_PACKAGE_NAME:-com.petmagic.app}"
+      GOOGLE_PLAY_PREMIUM_MONTHLY_PRODUCT_ID: "${GOOGLE_PLAY_PREMIUM_MONTHLY_PRODUCT_ID:-}"
+      GOOGLE_PLAY_PREMIUM_YEARLY_PRODUCT_ID: "${GOOGLE_PLAY_PREMIUM_YEARLY_PRODUCT_ID:-}"
       APP_STORE_SHARED_SECRET: "${APP_STORE_SHARED_SECRET:-}"
       APP_STORE_ENVIRONMENT: "${APP_STORE_ENVIRONMENT:-production}"
+      APP_STORE_BUNDLE_ID: "${APP_STORE_BUNDLE_ID:-com.petmagic.app}"
+      APP_STORE_PREMIUM_MONTHLY_PRODUCT_ID: "${APP_STORE_PREMIUM_MONTHLY_PRODUCT_ID:-}"
+      APP_STORE_PREMIUM_YEARLY_PRODUCT_ID: "${APP_STORE_PREMIUM_YEARLY_PRODUCT_ID:-}"
+      FIREBASE_PROJECT_ID: "${FIREBASE_PROJECT_ID:-}"
+      FIREBASE_SERVICE_ACCOUNT_JSON: "${FIREBASE_SERVICE_ACCOUNT_JSON:-}"
+      Templates__FirebasePush__Enabled: "${TEMPLATES_FIREBASE_PUSH_ENABLED:-false}"
+      ECONOMY_FIREBASE_PUSH_ENABLED: "${ECONOMY_FIREBASE_PUSH_ENABLED:-false}"
       STORE_ACCOUNT_BINDING_MODE: "${STORE_ACCOUNT_BINDING_MODE:-compatibility}"
       ForwardedHeaders__Enabled: "${FORWARDED_HEADERS_ENABLED:-false}"
       ForwardedHeaders__TrustAll: "${FORWARDED_HEADERS_TRUST_ALL:-false}"
@@ -96,6 +112,7 @@ services:
       Templates__AiProvider: "${TEMPLATES_AI_PROVIDER:?Set TEMPLATES_AI_PROVIDER to Fal or Fake explicitly}"
       Templates__Watermark__Enabled: "${TEMPLATES_WATERMARK_ENABLED:-false}"
       Templates__TemplateOfTheDayAutoPickWorkerEnabled: "${TEMPLATES_TEMPLATE_OF_THE_DAY_AUTO_PICK_WORKER_ENABLED:-false}"
+      PETMAGIC_QA_FIXTURES_ENABLED: "${PETMAGIC_QA_FIXTURES_ENABLED:-false}"
       PETMAGIC_LOCAL_SMOKE_FAST_FAKE_COMPLETION: "${PETMAGIC_LOCAL_SMOKE_FAST_FAKE_COMPLETION:?Set PETMAGIC_LOCAL_SMOKE_FAST_FAKE_COMPLETION to false for production or true only for local smoke}"
       Templates__GenerationWorkerEnabled: "false"
       Templates__GenerationSchedulerV2Enabled: "${GENERATION_SCHEDULER_V2_ENABLED:-false}"
@@ -115,6 +132,7 @@ services:
       Templates__VideoPreprocessingMaxConcurrentGenerations: "${GENERATION_VIDEO_PREPROCESSING_MAX_CONCURRENT:-1}"
       Templates__FalProviderConcurrencyLimit: "${FAL_PROVIDER_CONCURRENCY_LIMIT:-0}"
       Templates__FalProviderReservedConcurrency: "${FAL_PROVIDER_RESERVED_CONCURRENCY:-1}"
+      Templates__Fal__CancelMaxAttempts: "${FAL_CANCEL_MAX_ATTEMPTS:-3}"
       Templates__FalProviderBalanceLowThresholdUsd: "${FAL_PROVIDER_BALANCE_LOW_THRESHOLD_USD:-10}"
       Templates__FalProviderBalanceCriticalThresholdUsd: "${FAL_PROVIDER_BALANCE_CRITICAL_THRESHOLD_USD:-5}"
       Templates__FalProviderSpendDailyLimitUsd: "${FAL_PROVIDER_SPEND_DAILY_LIMIT_USD:-0}"
@@ -177,6 +195,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.generation-worker
+      args:
+        SOURCE_REVISION: "${SOURCE_REVISION:-0000000000000000000000000000000000000000}"
     restart: unless-stopped
     mem_limit: "${GENERATION_WORKER_MEMORY_LIMIT:-768m}"
     cpus: "${GENERATION_WORKER_CPUS:-1.0}"
@@ -184,6 +204,9 @@ services:
       ASPNETCORE_ENVIRONMENT: "${ASPNETCORE_ENVIRONMENT:-Production}"
       DOTNET_ENVIRONMENT: "${DOTNET_ENVIRONMENT:-${ASPNETCORE_ENVIRONMENT:-Production}}"
       ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=petmagic_db;Username=petmagic_user;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env};"
+      Database__MaxPoolSize: "${WORKER_DATABASE_MAX_POOL_SIZE:-24}"
+      Database__PeerMaxPoolSize: "${WORKER_DATABASE_PEER_MAX_POOL_SIZE:-28}"
+      Database__OperationalReserveConnections: "${DATABASE_OPERATIONAL_RESERVE_CONNECTIONS:-16}"
       # Must match the API: it signs private pet media URLs that the worker sends to the generation provider.
       Jwt__SigningKey: "${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY in .env. Generate with openssl rand -base64 64}"
       FAL_AI_API_KEY: "${FAL_AI_API_KEY:-}"
@@ -197,6 +220,7 @@ services:
       Templates__StorageProvider: "${TEMPLATES_STORAGE_PROVIDER:?Set TEMPLATES_STORAGE_PROVIDER to R2 or Local explicitly}"
       Templates__AiProvider: "${TEMPLATES_AI_PROVIDER:?Set TEMPLATES_AI_PROVIDER to Fal or Fake explicitly}"
       Templates__Watermark__Enabled: "${TEMPLATES_WATERMARK_ENABLED:-false}"
+      PETMAGIC_QA_FIXTURES_ENABLED: "${PETMAGIC_QA_FIXTURES_ENABLED:-false}"
       PETMAGIC_LOCAL_SMOKE_FAST_FAKE_COMPLETION: "${PETMAGIC_LOCAL_SMOKE_FAST_FAKE_COMPLETION:?Set PETMAGIC_LOCAL_SMOKE_FAST_FAKE_COMPLETION to false for production or true only for local smoke}"
       Templates__GenerationWorkerEnabled: "true"
       Templates__GenerationSchedulerV2Enabled: "${GENERATION_SCHEDULER_V2_ENABLED:-false}"
@@ -223,6 +247,7 @@ services:
       Templates__VideoPreprocessingMaxConcurrentGenerations: "${GENERATION_VIDEO_PREPROCESSING_MAX_CONCURRENT:-1}"
       Templates__FalProviderConcurrencyLimit: "${FAL_PROVIDER_CONCURRENCY_LIMIT:-0}"
       Templates__FalProviderReservedConcurrency: "${FAL_PROVIDER_RESERVED_CONCURRENCY:-1}"
+      Templates__Fal__CancelMaxAttempts: "${FAL_CANCEL_MAX_ATTEMPTS:-3}"
       Templates__FalProviderBalanceLowThresholdUsd: "${FAL_PROVIDER_BALANCE_LOW_THRESHOLD_USD:-10}"
       Templates__FalProviderBalanceCriticalThresholdUsd: "${FAL_PROVIDER_BALANCE_CRITICAL_THRESHOLD_USD:-5}"
       Templates__FalProviderSpendDailyLimitUsd: "${FAL_PROVIDER_SPEND_DAILY_LIMIT_USD:-0}"
@@ -267,6 +292,7 @@ services:
       context: ./apps/admin-web
       dockerfile: Dockerfile
       args:
+        SOURCE_REVISION: "${SOURCE_REVISION:-0000000000000000000000000000000000000000}"
         NEXT_PUBLIC_API_BASE_URL: "${NEXT_PUBLIC_API_BASE_URL:?NEXT_PUBLIC_API_BASE_URL is required for admin web build}"
         INTERNAL_API_BASE_URL: "${INTERNAL_API_BASE_URL:?INTERNAL_API_BASE_URL is required for admin web build}"
         ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION: "${ADMIN_WEB_ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION:-false}"
