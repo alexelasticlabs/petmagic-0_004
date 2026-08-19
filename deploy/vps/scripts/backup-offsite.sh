@@ -140,8 +140,9 @@ export AWS_DEFAULT_REGION=auto
 export RESTIC_PASSWORD_FILE="$restic_password_file"
 export RESTIC_REPOSITORY="s3:https://$(env_value R2_ACCOUNT_ID).r2.cloudflarestorage.com/$(env_value PETMAGIC_BACKUP_R2_BUCKET)/petmagic-vps"
 
-if ! restic snapshots >/dev/null 2>&1; then
-  restic init
+if ! restic snapshots >/dev/null; then
+  echo "The configured restic repository is unavailable; refusing to create or replace it during a scheduled backup." >&2
+  exit 1
 fi
 
 restic backup \

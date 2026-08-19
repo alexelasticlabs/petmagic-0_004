@@ -79,6 +79,17 @@ Escrow an encrypted copy of `restic-password` outside the VPS and test its
 recovery with the owner's independent private key. Never commit either the
 plaintext password or its private decryption key.
 
+Initialize a brand-new restic repository exactly once, after reviewing the R2
+account and bucket in the root-only environment file:
+
+```bash
+sudo bash deploy/vps/scripts/init-restic-repository.sh --confirm-new-repository
+```
+
+The scheduled backup fails closed if that repository cannot be opened. It never
+initializes a replacement repository after an authentication, endpoint, bucket,
+password, or integrity error.
+
 ## Source freeze and exports
 
 Before the final exports, enable Render maintenance mode and keep admin/worker
@@ -95,7 +106,8 @@ Render database export and persistent-disk archive under
 `/opt/petmagic/shared/backups/import`, then run this exact order:
 
 ```bash
-sudo docker compose --env-file /opt/petmagic/shared/env/.env.vps -f docker-compose.yml -f deploy/vps/compose.vps.yaml build
+sudo docker compose --env-file /opt/petmagic/shared/env/.env.vps -f docker-compose.yml -f deploy/vps/compose.vps.yaml pull postgres mailpit
+sudo docker compose --env-file /opt/petmagic/shared/env/.env.vps -f docker-compose.yml -f deploy/vps/compose.vps.yaml build --pull backend generation-worker admin-web
 sudo bash deploy/vps/scripts/restore-render-postgres.sh /opt/petmagic/shared/backups/import/<render-export> <render-export-sha256>
 sudo bash deploy/vps/scripts/restore-render-disk.sh /opt/petmagic/shared/backups/import/<render-disk>.tar.gz <render-disk-sha256>
 sudo docker compose --env-file /opt/petmagic/shared/env/.env.vps -f docker-compose.yml -f deploy/vps/compose.vps.yaml up -d backend admin-web
@@ -124,7 +136,9 @@ the systemd unit for subsequent reboots. A release update must build the new
 images from a clean Git checkout before restarting the unit. The VPS override
 uses `on-failure` rather than `unless-stopped`, so Docker does not bypass the
 systemd preflight during host boot. Runtime preflight also requires each
-application image's OCI revision label to match the deployed commit.
+application image to use a commit-scoped tag and carry the deployed commit in
+its OCI revision label. The systemd unit is coupled to `docker.service`, so a
+controlled Docker restart also re-runs the PetMagic preflight and start.
 
 After the backup is verified, enable the nightly timer:
 

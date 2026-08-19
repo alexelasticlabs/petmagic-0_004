@@ -18,17 +18,20 @@ done
 
 compose=(docker compose --env-file "$env_file" -f docker-compose.yml -f deploy/vps/compose.vps.yaml)
 "${compose[@]}" config --quiet
-for service in postgres backend generation-worker admin-web; do
-  if [[ -z "$("${compose[@]}" images -q "$service")" ]]; then
-    echo "Missing built/pulled image for service: $service" >&2
-    exit 1
-  fi
-done
 
 source_revision="$(git -c safe.directory="$deploy_root" -C "$deploy_root" rev-parse HEAD)"
+declare -A service_images=(
+  [backend]="petmagic-backend:$source_revision"
+  [generation-worker]="petmagic-generation-worker:$source_revision"
+  [admin-web]="petmagic-admin-web:$source_revision"
+)
 for service in backend generation-worker admin-web; do
-  image_id="$("${compose[@]}" images -q "$service")"
-  image_revision="$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$image_id")"
+  image_ref="${service_images[$service]}"
+  if ! docker image inspect "$image_ref" >/dev/null 2>&1; then
+    echo "Missing commit-scoped image for service: $service" >&2
+    exit 1
+  fi
+  image_revision="$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$image_ref")"
   if [[ "$image_revision" != "$source_revision" ]]; then
     echo "Image revision does not match the deployed Git checkout: $service" >&2
     exit 1
