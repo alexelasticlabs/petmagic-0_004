@@ -19,7 +19,18 @@ short_timeout() {
   return "$status"
 }
 
+unit_is_stopping() {
+  local active_state=""
+  active_state="$(/usr/bin/timeout --foreground --kill-after=2s 5s \
+    /usr/bin/systemctl show petmagic-compose.service --property=ActiveState --value 2>/dev/null)" || return 1
+  [[ "$active_state" == "deactivating" ]]
+}
+
 fail() {
+  if unit_is_stopping; then
+    echo "PetMagic supervisor is exiting for a planned unit stop." >&2
+    exit 0
+  fi
   echo "$1" >&2
   short_timeout "${compose[@]}" ps >&2 || true
   exit 1
