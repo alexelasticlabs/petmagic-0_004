@@ -120,7 +120,6 @@ curl --fail --silent --show-error --header 'Host: api.petgpt.app' http://127.0.0
 curl --fail --silent --show-error --header 'Host: admin.petgpt.app' http://127.0.0.1:3000/ru >/dev/null
 sudo docker compose --env-file /opt/petmagic/shared/env/.env.vps -f docker-compose.yml -f deploy/vps/compose.vps.yaml exec -T admin-web node -e "fetch('http://backend:5000/health',{headers:{Host:'api.petgpt.app'}}).then(r=>{if(!r.ok)process.exit(1)})"
 sudo docker compose --env-file /opt/petmagic/shared/env/.env.vps -f docker-compose.yml -f deploy/vps/compose.vps.yaml exec -T postgres psql -U petmagic_user -d petmagic_db -c 'SELECT count(*) AS migrations FROM "__EFMigrationsHistory";'
-sudo bash /opt/petmagic/current/deploy/vps/scripts/backup-offsite.sh
 ```
 
 Only after database counts, media files, R2 access, and API health pass, start
@@ -131,14 +130,32 @@ sudo docker compose --env-file /opt/petmagic/shared/env/.env.vps -f docker-compo
 sudo docker compose --env-file /opt/petmagic/shared/env/.env.vps -f docker-compose.yml -f deploy/vps/compose.vps.yaml ps
 ```
 
-After the whole stack has passed the production smoke gate, install and enable
-the systemd unit for subsequent reboots. A release update must build the new
+After the whole stack has passed the production smoke gate, enable and start the
+already installed systemd unit before running the coordinated backup:
+
+```bash
+sudo systemctl enable --now petmagic-compose.service
+sudo systemctl is-active petmagic-compose.service
+sudo systemctl start petmagic-postgres-backup.service
+sudo systemctl show petmagic-postgres-backup.service -p Result -p ExecMainStatus
+```
+
+A release update must build the new
 images from a clean Git checkout before restarting the unit. The VPS override
-uses `on-failure` rather than `unless-stopped`, so Docker does not bypass the
-systemd preflight during host boot. Runtime preflight also requires each
-application image to use a commit-scoped tag and carry the deployed commit in
-its OCI revision label. The systemd unit is coupled to `docker.service`, so a
-controlled Docker restart also re-runs the PetMagic preflight and start.
+uses `restart: no`, so Docker cannot restore containers before the systemd
+preflight during host boot. The systemd supervisor starts the healthy stack,
+monitors every container, and restarts the whole stack through preflight after
+an unexpected stop or sustained unhealthy state. It recognizes the coordinated
+backup lock as the only maintenance window for API and worker. Runtime preflight
+requires each application image to use a commit-scoped tag and carry the
+deployed commit in its OCI revision label. The systemd unit is coupled to
+`docker.service`, so a controlled Docker restart also re-runs the PetMagic
+preflight and start.
+
+If repeated failures exhaust the systemd start limit, inspect
+`journalctl -u petmagic-compose.service`, correct the cause, then explicitly
+recover with `sudo systemctl reset-failed petmagic-compose.service` followed by
+`sudo systemctl start petmagic-compose.service`.
 
 After the backup is verified, enable the nightly timer:
 
@@ -150,7 +167,9 @@ The off-site job takes a coordinated snapshot: it gracefully pauses the worker
 and API, creates the PostgreSQL dump and a verified `api-data` archive, resumes
 the services, and only then uploads both artifacts with restic. This avoids a
 database/filesystem split-brain backup at the cost of a short API maintenance
-window at 03:30 UTC.
+window at 03:30 UTC. A dedicated exclusive maintenance lock covers only the
+intentional stop/snapshot/resume window; the longer encrypted upload does not
+mask unexpected API or worker failures from the systemd supervisor.
 
 Validate Caddy before enabling it:
 

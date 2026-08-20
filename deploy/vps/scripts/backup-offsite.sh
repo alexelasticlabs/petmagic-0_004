@@ -8,9 +8,13 @@ readonly restic_password_file="/opt/petmagic/shared/env/restic-password"
 readonly backup_dir="/opt/petmagic/shared/backups/postgres"
 readonly api_data_dir="/opt/petmagic/shared/api-data"
 readonly api_snapshot_dir="/opt/petmagic/shared/backups/api-data"
+readonly backup_job_lock="/run/petmagic/backup-job.lock"
+readonly maintenance_lock="/run/petmagic/maintenance.lock"
 readonly retention_days="${PETMAGIC_API_DATA_BACKUP_RETENTION_DAYS:-14}"
 api_snapshot_partial=""
 services_resumed=false
+maintenance_lock_held=false
+shutdown_requested=false
 
 env_value() {
   local key="$1"
@@ -42,23 +46,24 @@ cd "$deploy_root"
 /usr/bin/bash deploy/vps/scripts/preflight.sh "$env_file"
 compose=(docker compose --env-file "$env_file" -f docker-compose.yml -f deploy/vps/compose.vps.yaml)
 
-exec 9>/run/lock/petmagic-backup.lock
+exec 9>"$backup_job_lock"
 if ! flock -n 9; then
   echo "Another PetMagic backup is already running." >&2
   exit 1
 fi
 
-service_is_running() {
+service_is_healthy() {
   local service="$1"
-  local container_id
+  local container_id state health
   container_id="$("${compose[@]}" ps -q "$service")"
-  [[ -n "$container_id" && "$(docker inspect -f '{{.State.Running}}' "$container_id")" == "true" ]]
+  [[ -n "$container_id" ]] || return 1
+  state="$(docker inspect -f '{{.State.Status}}' "$container_id")"
+  health="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$container_id")"
+  [[ "$state" == "running" && "$health" == "healthy" ]]
 }
 
 backend_was_running=false
 worker_was_running=false
-if service_is_running backend; then backend_was_running=true; fi
-if service_is_running generation-worker; then worker_was_running=true; fi
 
 resume_services() {
   if [[ "$services_resumed" == true ]]; then
@@ -73,20 +78,51 @@ resume_services() {
   services_resumed=true
 }
 
+release_maintenance_lock() {
+  if [[ "$maintenance_lock_held" == true ]]; then
+    flock -u 8
+    exec 8>&-
+    maintenance_lock_held=false
+  fi
+}
+
 cleanup() {
   local status=$?
   set +e
   if [[ -n "$api_snapshot_partial" ]]; then
     rm -f -- "$api_snapshot_partial"
   fi
-  resume_services
-  local resume_status=$?
+  local resume_status=0
+  if [[ "$maintenance_lock_held" == true && "$shutdown_requested" != true ]]; then
+    resume_services
+    resume_status=$?
+  fi
+  if [[ "$maintenance_lock_held" == true ]]; then
+    release_maintenance_lock
+  fi
   if (( status == 0 && resume_status != 0 )); then
     status=$resume_status
   fi
   exit "$status"
 }
 trap cleanup EXIT
+trap 'shutdown_requested=true; exit 143' TERM
+trap 'shutdown_requested=true; exit 130' INT
+
+exec 8>"$maintenance_lock"
+flock -x 8
+maintenance_lock_held=true
+
+if ! systemctl is-active --quiet petmagic-compose.service; then
+  echo "PetMagic Compose supervisor must be active before a backup." >&2
+  exit 1
+fi
+if ! service_is_healthy backend || ! service_is_healthy generation-worker; then
+  echo "Backend and generation worker must both be running and healthy before a backup." >&2
+  exit 1
+fi
+backend_was_running=true
+worker_was_running=true
 
 if [[ "$worker_was_running" == true ]]; then
   "${compose[@]}" stop -t 300 generation-worker
@@ -133,6 +169,7 @@ sha256sum "$api_snapshot" | awk -v name="$(basename "$api_snapshot")" '{print $1
 )
 
 resume_services
+release_maintenance_lock
 
 export AWS_ACCESS_KEY_ID="$(env_value R2_ACCESS_KEY)"
 export AWS_SECRET_ACCESS_KEY="$(env_value R2_SECRET_KEY)"

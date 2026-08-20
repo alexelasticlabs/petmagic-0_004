@@ -1,6 +1,6 @@
 services:
   postgres:
-    restart: "on-failure:5"
+    restart: "no"
     volumes:
       - /opt/petmagic/shared/postgres:/var/lib/postgresql/data
       - /opt/petmagic/shared/backups/import:/var/lib/petmagic-import:ro
@@ -11,11 +11,11 @@ services:
         max-file: "5"
 
   mailpit:
-    restart: "on-failure:5"
+    restart: "no"
     logging: *container-logging
 
   backend:
-    restart: "on-failure:5"
+    restart: "no"
     environment:
       APP_VOLUME_DIRS: /var/petmagic
       DataProtection__KeysPath: /var/petmagic/DataProtection-Keys
@@ -34,7 +34,7 @@ services:
     logging: *container-logging
 
   generation-worker:
-    restart: "on-failure:5"
+    restart: "no"
     environment:
       APP_VOLUME_DIRS: /var/petmagic
       Templates__LocalMediaRootPath: /var/petmagic/wwwroot/templates-media
@@ -43,5 +43,5 @@ services:
     logging: *container-logging
 
   admin-web:
-    restart: "on-failure:5"
+    restart: "no"
     logging: *container-logging

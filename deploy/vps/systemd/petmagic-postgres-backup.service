@@ -1,7 +1,7 @@
 [Unit]
 Description=PetMagic PostgreSQL and API-data off-site backup
-Requires=docker.service
-After=docker.service
+BindsTo=petmagic-compose.service
+After=petmagic-compose.service
 ConditionPathExists=/opt/petmagic/shared/backups/render-restore.marker
 
 [Service]
@@ -11,3 +11,5 @@ WorkingDirectory=/opt/petmagic/current
 Environment=PETMAGIC_POSTGRES_BACKUP_RETENTION_DAYS=14
 Environment=PETMAGIC_API_DATA_BACKUP_RETENTION_DAYS=14
 ExecStart=/usr/bin/bash /opt/petmagic/current/deploy/vps/scripts/backup-offsite.sh
+TimeoutStartSec=1h
+TimeoutStopSec=420

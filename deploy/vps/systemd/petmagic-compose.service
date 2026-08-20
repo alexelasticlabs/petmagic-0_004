@@ -4,16 +4,26 @@ Requires=docker.service
 PartOf=docker.service
 After=docker.service network-online.target
 Wants=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
 
 [Service]
-Type=oneshot
-RemainAfterExit=yes
+Type=notify
+NotifyAccess=all
+RuntimeDirectory=petmagic
+RuntimeDirectoryMode=0700
+RuntimeDirectoryPreserve=restart
 WorkingDirectory=/opt/petmagic/current
 ExecStartPre=/usr/bin/bash /opt/petmagic/current/deploy/vps/scripts/runtime-preflight.sh
-ExecStart=/usr/bin/docker compose --env-file /opt/petmagic/shared/env/.env.vps -f docker-compose.yml -f deploy/vps/compose.vps.yaml up -d --remove-orphans --wait --wait-timeout 300
-ExecStop=/usr/bin/docker compose --env-file /opt/petmagic/shared/env/.env.vps -f docker-compose.yml -f deploy/vps/compose.vps.yaml stop
-TimeoutStartSec=0
-TimeoutStopSec=300
+ExecStart=/usr/bin/bash /opt/petmagic/current/deploy/vps/scripts/supervise-stack.sh
+ExecStop=-/usr/bin/bash /opt/petmagic/current/deploy/vps/scripts/stop-stack.sh
+ExecStopPost=-/usr/bin/bash /opt/petmagic/current/deploy/vps/scripts/stop-stack.sh
+Restart=on-failure
+RestartSec=5
+WatchdogSec=60
+TimeoutAbortSec=30
+TimeoutStartSec=480
+TimeoutStopSec=480
 
 [Install]
 WantedBy=multi-user.target
