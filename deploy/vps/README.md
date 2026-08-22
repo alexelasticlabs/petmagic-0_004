@@ -73,8 +73,12 @@ repository. Do not reuse an application secret:
 sudo sh -c 'umask 077; openssl rand -base64 48 > /opt/petmagic/shared/env/restic-password'
 ```
 
-`PETMAGIC_BACKUP_R2_BUCKET` must reference the private backup bucket. The R2
-credentials must be able to access it; prefer a dedicated least-privilege key.
+`PETMAGIC_BACKUP_R2_BUCKET` must reference the private backup bucket. Prefer
+dedicated least-privilege credentials in `PETMAGIC_BACKUP_R2_ACCESS_KEY` and
+`PETMAGIC_BACKUP_R2_SECRET_KEY`; they must be supplied together. If both are
+empty, the backup scripts temporarily fall back to `R2_ACCESS_KEY` and
+`R2_SECRET_KEY`, which should only be used when the application key can access
+the private backup bucket.
 Escrow an encrypted copy of `restic-password` outside the VPS and test its
 recovery with the owner's independent private key. Never commit either the
 plaintext password or its private decryption key.

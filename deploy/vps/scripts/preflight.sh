@@ -56,6 +56,16 @@ for key in "${required[@]}"; do
   fi
 done
 
+backup_r2_access_key="$(env_value PETMAGIC_BACKUP_R2_ACCESS_KEY)"
+backup_r2_secret_key="$(env_value PETMAGIC_BACKUP_R2_SECRET_KEY)"
+if [[ -n "$backup_r2_access_key" || -n "$backup_r2_secret_key" ]]; then
+  if [[ -z "$backup_r2_access_key" || -z "$backup_r2_secret_key" \
+    || "$backup_r2_access_key" == *'__REQUIRED__'* || "$backup_r2_secret_key" == *'__REQUIRED__'* ]]; then
+    echo "Dedicated backup R2 credentials must be provided together, or both left empty for the application-key fallback." >&2
+    exit 1
+  fi
+fi
+
 google_client_id="$(env_value GOOGLE_CLIENT_ID)"
 google_client_secret="$(env_value GOOGLE_CLIENT_SECRET)"
 google_audiences="$(env_value GOOGLE_AUDIENCES)"

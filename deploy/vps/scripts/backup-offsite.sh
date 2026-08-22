@@ -171,8 +171,14 @@ sha256sum "$api_snapshot" | awk -v name="$(basename "$api_snapshot")" '{print $1
 resume_services
 release_maintenance_lock
 
-export AWS_ACCESS_KEY_ID="$(env_value R2_ACCESS_KEY)"
-export AWS_SECRET_ACCESS_KEY="$(env_value R2_SECRET_KEY)"
+backup_r2_access_key="$(env_value PETMAGIC_BACKUP_R2_ACCESS_KEY)"
+backup_r2_secret_key="$(env_value PETMAGIC_BACKUP_R2_SECRET_KEY)"
+if [[ -z "$backup_r2_access_key" && -z "$backup_r2_secret_key" ]]; then
+  backup_r2_access_key="$(env_value R2_ACCESS_KEY)"
+  backup_r2_secret_key="$(env_value R2_SECRET_KEY)"
+fi
+export AWS_ACCESS_KEY_ID="$backup_r2_access_key"
+export AWS_SECRET_ACCESS_KEY="$backup_r2_secret_key"
 export AWS_DEFAULT_REGION=auto
 export RESTIC_PASSWORD_FILE="$restic_password_file"
 export RESTIC_REPOSITORY="s3:https://$(env_value R2_ACCOUNT_ID).r2.cloudflarestorage.com/$(env_value PETMAGIC_BACKUP_R2_BUCKET)/petmagic-vps"
