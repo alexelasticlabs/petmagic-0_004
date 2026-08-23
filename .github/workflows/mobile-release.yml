@@ -36,7 +36,7 @@ jobs:
             echo 'API_BASE_URL=https://api.staging.petmagic.app' >> "$GITHUB_ENV"
           else
             echo 'APP_PACKAGE_NAME=com.petmagic.app' >> "$GITHUB_ENV"
-            echo 'API_BASE_URL=https://api.petmagic.app' >> "$GITHUB_ENV"
+            echo 'API_BASE_URL=https://api.petgpt.app' >> "$GITHUB_ENV"
           fi
       - name: Verify canonical tag
         if: startsWith(github.ref, 'refs/tags/')
@@ -107,7 +107,7 @@ jobs:
             echo 'API_BASE_URL=https://api.staging.petmagic.app' >> "$GITHUB_ENV"
           else
             echo 'APP_PACKAGE_NAME=com.petmagic.app' >> "$GITHUB_ENV"
-            echo 'API_BASE_URL=https://api.petmagic.app' >> "$GITHUB_ENV"
+            echo 'API_BASE_URL=https://api.petgpt.app' >> "$GITHUB_ENV"
           fi
       - name: Verify canonical tag
         if: startsWith(github.ref, 'refs/tags/')
