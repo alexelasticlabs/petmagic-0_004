@@ -97,8 +97,10 @@ jobs:
           npx --yes firebase-tools@15.22.4 crashlytics:symbols:upload --app="$firebase_app_id" "build/symbols/$RELEASE_ENVIRONMENT"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: android-${{ inputs.environment || 'production' }}-symbols-${{ github.run_id }}
-          path: apps/petmagic-mobile/build/symbols/${{ inputs.environment || 'production' }}
+          name: android-${{ inputs.environment || 'production' }}-release-${{ github.run_id }}
+          path: |
+            apps/petmagic-mobile/build/app/outputs/bundle/${{ inputs.environment || 'production' }}Release/app-${{ inputs.environment || 'production' }}-release.aab
+            apps/petmagic-mobile/build/symbols/${{ inputs.environment || 'production' }}
           retention-days: 30
           if-no-files-found: error
       - name: Upload exact artifact to Play Internal
