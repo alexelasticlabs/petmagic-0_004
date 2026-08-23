@@ -75,10 +75,26 @@ jobs:
             --dart-define=APP_PACKAGE_NAME="$APP_PACKAGE_NAME" \
             --dart-define=API_BASE_URL="$API_BASE_URL" \
             --obfuscate --split-debug-info="build/symbols/$RELEASE_ENVIRONMENT"
-      - name: Upload Dart symbols to Crashlytics
+      - id: crashlytics_symbols
+        name: Determine Crashlytics symbol upload availability
+        shell: bash
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
-        run: npx --yes firebase-tools@15.22.4 crashlytics:symbols:upload --app=${{ secrets.FIREBASE_ANDROID_APP_ID }} "build/symbols/$RELEASE_ENVIRONMENT"
+        run: |
+          if [ -n "$FIREBASE_TOKEN" ]; then
+            echo 'upload=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'upload=false' >> "$GITHUB_OUTPUT"
+            echo 'Crashlytics symbol upload skipped: FIREBASE_TOKEN is not configured.'
+          fi
+      - name: Upload Dart symbols to Crashlytics
+        if: steps.crashlytics_symbols.outputs.upload == 'true'
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+        run: |
+          firebase_app_id="$(jq -r --arg package_name "$APP_PACKAGE_NAME" '.client[] | select(.client_info.android_client_info.package_name == $package_name) | .client_info.mobilesdk_app_id' android/app/google-services.json)"
+          test -n "$firebase_app_id" && test "$firebase_app_id" != "null"
+          npx --yes firebase-tools@15.22.4 crashlytics:symbols:upload --app="$firebase_app_id" "build/symbols/$RELEASE_ENVIRONMENT"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: android-${{ inputs.environment || 'production' }}-symbols-${{ github.run_id }}
