@@ -71,9 +71,12 @@ secret values, private keys, tokens, or service-account JSON.
       Play upload keystore, Firebase production config and Play service-account
       JSON are configured. Run `32666052824` built and signed `1.0.0+2` and
       preserved its symbols artifact; no secret values are recorded here.
-- [ ] Grant the existing Play service account permission to release PetMagic to
-      testing tracks. Run `32666052824` reached the Internal-track update but
-      Google Play rejected it with `The caller does not have permission`.
+- [x] Grant the existing Play service account permission to release PetMagic to
+      testing tracks. Run `32666052824` proved the missing permission; Play
+      Console now confirms the account has five PetMagic app permissions,
+      including `Release apps to testing tracks`.
+- [ ] Confirm follow-up run `32674447149` publishes `1.0.0+2` to Play Internal,
+      then install it on a tester device and prove connectivity to the VPS.
 - [ ] Repair the independent iOS CI signing configuration before TestFlight:
       the App Store Connect API key and Firebase iOS configuration were absent
       or malformed in the protected GitHub production environment.

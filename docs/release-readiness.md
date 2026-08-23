@@ -53,9 +53,10 @@ adding dated audit snapshots to the repository.
   upload keystore, matching Firebase production config and Play service-account
   JSON. Run `32666052824` built and signed `1.0.0+2`, preserved its symbols
   artifact and reached the Play Internal upload, but Google Play rejected the
-  track update with `The caller does not have permission`. Grant the existing
-  service account release access for testing tracks before retrying the upload.
-  The independent iOS signing/API-key chain remains unavailable or malformed.
+  track update with `The caller does not have permission`. The existing service
+  account now has `Release apps to testing tracks`; follow-up run `32674447149`
+  is the pending live upload proof. The independent iOS signing/API-key chain
+  remains unavailable or malformed.
 
 ## Automated Gates
 
@@ -104,8 +105,8 @@ do not append command transcripts to this file.
 - Privacy/legal approval for release Crashlytics collection, including the
   intended Firebase processor disclosure and retention basis.
 - Successful publication of the already-proven signed Android AAB to Play
-  Internal; the current blocker is the service account's testing-track release
-  permission, not signing or compilation.
+  Internal. Signing, compilation and the service account's testing-track
+  release permission are configured; live upload run `32674447149` is pending.
 - An iOS archive and store validation from a supported macOS/Xcode environment.
 - FAL generation and callback proof with production-like R2 upload/read paths.
 - Stripe, Google Play, and App Store sandbox purchase, replay, refund, restore,
