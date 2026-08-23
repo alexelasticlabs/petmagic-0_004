@@ -8,12 +8,19 @@ on:
         required: true
         type: choice
         options: [staging, production]
+      platform:
+        description: Platform to build and upload
+        required: true
+        default: android
+        type: choice
+        options: [android, ios, all]
 
 permissions:
   contents: read
 
 jobs:
   android:
+    if: inputs.platform != 'ios'
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment || 'production' }}
     defaults:
@@ -85,6 +92,7 @@ jobs:
         run: GOOGLE_PLAY_PACKAGE_NAME="$APP_PACKAGE_NAME" bundle exec fastlane android upload_internal
 
   ios:
+    if: inputs.platform != 'android'
     runs-on: macos-latest
     environment: ${{ inputs.environment || 'production' }}
     defaults:

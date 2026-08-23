@@ -49,6 +49,11 @@ adding dated audit snapshots to the repository.
   not resolve in DNS, so an already-published Android build using it cannot
   reach the VPS. Publish and install a new Play release before treating mobile
   connectivity as accepted.
+- GitHub Actions run `32663536470` proved the protected production signing
+  configuration is incomplete: Android release signing material and upload
+  credentials are unavailable, and the independent iOS signing/API-key chain
+  is unavailable or malformed. Do not generate a new Android keystore: an
+  update must use the existing Play signing identity.
 
 ## Automated Gates
 
