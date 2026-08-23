@@ -67,11 +67,13 @@ secret values, private keys, tokens, or service-account JSON.
       `API_BASE_URL=https://api.petgpt.app`. The prior release workflow used
       `api.petmagic.app`, which does not resolve in DNS; a Play-installed build
       using that URL cannot reach the VPS.
-- [ ] Restore the protected GitHub production signing configuration before the
-      Android update: the release workflow needs the existing Play signing
-      keystore, its password and alias, Firebase Android config, and the Play
-      upload service-account JSON. A run on 2026-08-23 proved they are absent
-      from the production environment; no values are recorded here.
+- [x] Restore the protected GitHub production Android credentials: the existing
+      Play upload keystore, Firebase production config and Play service-account
+      JSON are configured. Run `32666052824` built and signed `1.0.0+2` and
+      preserved its symbols artifact; no secret values are recorded here.
+- [ ] Grant the existing Play service account permission to release PetMagic to
+      testing tracks. Run `32666052824` reached the Internal-track update but
+      Google Play rejected it with `The caller does not have permission`.
 - [ ] Repair the independent iOS CI signing configuration before TestFlight:
       the App Store Connect API key and Firebase iOS configuration were absent
       or malformed in the protected GitHub production environment.

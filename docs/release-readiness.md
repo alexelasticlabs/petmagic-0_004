@@ -49,11 +49,13 @@ adding dated audit snapshots to the repository.
   not resolve in DNS, so an already-published Android build using it cannot
   reach the VPS. Publish and install a new Play release before treating mobile
   connectivity as accepted.
-- GitHub Actions run `32663536470` proved the protected production signing
-  configuration is incomplete: Android release signing material and upload
-  credentials are unavailable, and the independent iOS signing/API-key chain
-  is unavailable or malformed. Do not generate a new Android keystore: an
-  update must use the existing Play signing identity.
+- The protected GitHub production environment now has the existing Android
+  upload keystore, matching Firebase production config and Play service-account
+  JSON. Run `32666052824` built and signed `1.0.0+2`, preserved its symbols
+  artifact and reached the Play Internal upload, but Google Play rejected the
+  track update with `The caller does not have permission`. Grant the existing
+  service account release access for testing tracks before retrying the upload.
+  The independent iOS signing/API-key chain remains unavailable or malformed.
 
 ## Automated Gates
 
@@ -101,7 +103,9 @@ do not append command transcripts to this file.
   its required-locale gate.
 - Privacy/legal approval for release Crashlytics collection, including the
   intended Firebase processor disclosure and retention basis.
-- A signed Android AAB built with protected production signing material.
+- Successful publication of the already-proven signed Android AAB to Play
+  Internal; the current blocker is the service account's testing-track release
+  permission, not signing or compilation.
 - An iOS archive and store validation from a supported macOS/Xcode environment.
 - FAL generation and callback proof with production-like R2 upload/read paths.
 - Stripe, Google Play, and App Store sandbox purchase, replay, refund, restore,
