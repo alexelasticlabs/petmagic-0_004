@@ -1,6 +1,6 @@
 # PetMagic VPS deployment
 
-This directory defines the production runtime for the OVH VPS. It keeps the
+This directory defines the production runtime for the dedicated PetMagic VPS. It keeps the
 same application split as Render: PostgreSQL, API, one generation worker, and
 admin web. Caddy runs on the host and is the only public listener.
 
@@ -14,6 +14,74 @@ admin web. Caddy runs on the host and is the only public listener.
   environment file is `/opt/petmagic/shared/env/.env.vps`, mode `0600`.
 - Do not point production DNS or provider webhooks to the VPS until the stack,
   backup, and read-only smoke checks pass.
+
+## Current migration status
+
+This section is a configuration inventory, not evidence that a provider flow
+has been delivered successfully in production. It intentionally contains no
+secret values, private keys, tokens, or service-account JSON.
+
+### Confirmed upstream configuration
+
+- App Store Connect contains the `Pet Video Magic` iOS app with bundle ID
+  `com.petmagic.app`; the Paid Apps Agreement is active.
+- The App Store Connect catalog contains configured auto-renewable Premium
+  subscriptions and consumable token products in `Prepare for Submission`.
+  Their product IDs and entitlement mapping still need end-to-end mobile and
+  backend verification before submission.
+- App Store Server Notifications are configured for both production and Sandbox
+  at `https://api.petgpt.app/api/economy/webhooks/app-store`. This confirms the
+  destinations; a real signed Sandbox delivery is still required.
+- Sign in with Apple is enabled for the app and its server key was generated
+  and stored outside the repository. The generated client secret and real login
+  flow still need VPS verification.
+- Firebase has an iOS registration for `com.petmagic.app`; its
+  `GoogleService-Info.plist` was placed locally under
+  `apps/petmagic-mobile/ios/Runner/` and is Git-ignored. A production APNs
+  authentication key was uploaded to Firebase.
+
+### Verified private-VPS acceptance
+
+- [x] `/opt/petmagic/shared/env/.env.vps` passed the production preflight;
+      runtime secrets remain only on the VPS.
+- [x] Caddy, the Compose supervisor, PostgreSQL, API, admin web and exactly
+      one generation worker are healthy. Public `api.petgpt.app/health` and
+      `admin.petgpt.app/ru` return HTTP 200 over HTTPS.
+- [x] The application R2 credentials completed a temporary `PUT`/`GET`/`DELETE`
+      smoke check in the media bucket. The temporary object was deleted.
+- [x] A dedicated least-privilege R2 backup bucket and encrypted restic
+      repository are initialized. The nightly backup timer is enabled.
+- [x] A PostgreSQL/API-data backup was created, integrity-checked and restored
+      into a temporary database. The restore had 82 public tables and 99 EF
+      migrations; the temporary database and copied dump were removed.
+- [x] Stripe has exactly one enabled VPS webhook endpoint with all backend
+      subscription and checkout event types subscribed. This confirms provider
+      configuration, not a real signed-event delivery.
+- [x] App Store Connect production and Sandbox notification URLs both target
+      the VPS API webhook route. This confirms provider configuration, not a
+      real signed Sandbox-event delivery.
+
+### VPS cutover and acceptance still required
+
+- [ ] Publish an Android production update built with
+      `API_BASE_URL=https://api.petgpt.app`. The prior release workflow used
+      `api.petmagic.app`, which does not resolve in DNS; a Play-installed build
+      using that URL cannot reach the VPS.
+- [ ] Prove a real signed Stripe delivery and a real signed App Store Sandbox
+      notification. Provider endpoint configuration is verified, but delivery
+      and signature acceptance are not yet evidenced.
+- [ ] Run real-provider acceptance: Sign in with Apple, FCM/APNs on a physical
+      iOS device, Stripe Checkout/webhook reconciliation, App Store Sandbox
+      purchase/restore/refund or cancellation lifecycle, and idempotent token
+      crediting.
+- [ ] Complete Google Play sandbox acceptance. The service account has verified
+      PetMagic app and billing access: OAuth succeeds and the purchase API
+      reaches its expected validation path for a synthetic token. Catalog-list
+      access remains intentionally unavailable because `Manage store presence`
+      is not required for backend purchase verification and is not granted.
+- [ ] Prove restore of retained Render migration artifacts, including any
+      persistent data not covered by the current VPS backup, before discarding
+      the Render export/archive or signing off cutover.
 
 ## One-time server setup
 
@@ -54,8 +122,10 @@ sudo install -m 0600 deploy/vps/.env.vps.example /opt/petmagic/shared/env/.env.v
 sudoedit /opt/petmagic/shared/env/.env.vps
 ```
 
-Populate every `__REQUIRED__` value directly from the existing Render
-production configuration, without printing secret values in logs or chat.
+Populate every `__REQUIRED__` value from the approved protected configuration,
+without printing secret values in logs or chat. If Render is still being used
+as the migration source, read its production configuration there; otherwise use
+the owner's protected secret inventory.
 Keep `BOOTSTRAP_ADMIN_PASSWORD` empty. Validate the result before starting any
 container:
 

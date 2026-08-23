@@ -6,6 +6,50 @@ This file is the single current release-readiness summary. Keep detailed
 contracts and operating procedures in their canonical documents instead of
 adding dated audit snapshots to the repository.
 
+## Current Infrastructure Direction
+
+- The production target is the owner-managed private VPS. Do not treat Render
+  Blueprints, environment variables, or deploy status as current production
+  acceptance evidence.
+- Keep Render only as a controlled migration source and potential rollback
+  reference until VPS backup/restore, health, DNS/TLS, and provider-flow
+  acceptance have all been evidenced. Do not discard its export or persistent
+  media archive before that point.
+- Required production secrets belong in the protected VPS environment file,
+  `/opt/petmagic/shared/env/.env.vps`, never in Git or release documentation.
+- The provider-configuration inventory and remaining VPS cutover work are
+  maintained in [`deploy/vps/README.md`](../deploy/vps/README.md). Items listed
+  there as configured are not a substitute for live provider acceptance.
+
+## Verified private-VPS acceptance
+
+- The protected VPS environment passed preflight. Caddy, the Compose
+  supervisor, PostgreSQL, API, admin web and one generation worker are healthy;
+  public API and admin routes return HTTP 200 over HTTPS.
+- Application R2 media access passed a temporary `PUT`/`GET`/`DELETE` smoke
+  check. A dedicated least-privilege backup bucket, encrypted restic repository
+  and enabled nightly timer are in place.
+- The first coordinated PostgreSQL/API-data backup passed `restic check` and
+  was restored into an isolated temporary database with 82 public tables and
+  99 EF migrations. The temporary restore database and dump were removed.
+- Stripe live credentials authenticated with a read-only API request. Google
+  Play service-account OAuth and the purchase-verification API are authorized;
+  a synthetic token reached the expected validation failure path without
+  creating a purchase. Catalog-list access remains intentionally ungranted
+  because backend purchase verification does not need `Manage store presence`.
+- Stripe has one enabled VPS webhook endpoint with all backend-required checkout
+  and subscription event types. A real signed delivery is still required.
+- App Store Connect production and Sandbox notification URLs both target the
+  VPS API webhook route. A real signed Sandbox delivery is still required.
+
+## Mobile release correction pending
+
+- The production mobile-release workflow was corrected to build with
+  `API_BASE_URL=https://api.petgpt.app`. The prior `api.petmagic.app` host does
+  not resolve in DNS, so an already-published Android build using it cannot
+  reach the VPS. Publish and install a new Play release before treating mobile
+  connectivity as accepted.
+
 ## Automated Gates
 
 Run these gates against the exact release commit:
@@ -59,6 +103,9 @@ do not append command transcripts to this file.
   and subscription lifecycle proof.
 - FCM and APNs delivery proof on real devices for generation, economy, and
   support notifications.
+- Real signed Stripe and App Store Sandbox webhook delivery, plus Google Play
+  store sandbox acceptance. Endpoint and API authorization configuration is
+  already verified, but it is not delivery proof.
 - Clean and existing-database migration proof against the release commit,
   including backup and rollback evidence.
 - Staging smoke for API, generation worker, admin web, public legal routes,
@@ -71,9 +118,11 @@ do not append command transcripts to this file.
   active configs, signing keys, database dumps, or test artifacts.
 - Keep `Templates__GenerationWorkerEnabled=false` on the API and `true` on the
   generation worker.
-- Keep exactly one `Standard` generation-worker instance with `4/4/1/1` bounded lanes for the first
-  production rollout, and manually verify Render Dashboard autoscaling is disabled. Provider
-  capacity is controlled by the revisioned PostgreSQL policy, not Render replicas.
+- Keep exactly one `generation-worker` instance with `4/4/1/1` bounded lanes
+  for the first production rollout. Enforce that limit on the VPS; if Render is
+  retained during rollback readiness, keep its worker workload stopped and
+  autoscaling disabled. Provider capacity is controlled by the revisioned
+  PostgreSQL policy, not service replicas.
 - Keep `Templates__GenerationSchedulerV2Enabled=false` through additive migration/backfill and the
   compatibility canary; enable it with Manual Sync/redeploy only for V2 acceptance. Rollback returns
   the flag to `false` without removing the additive schema.
@@ -93,6 +142,8 @@ do not append command transcripts to this file.
 - `docs/notifications-contract.md`
 - `docs/economy-generation-billing.md`
 - `docs/observability.md`
+- `deploy/vps/README.md` (private-VPS deployment, migration status, and cutover acceptance)
+- `deploy/vps/.env.vps.example` (non-secret VPS environment inventory)
 - `docs/render-staging-deployment.md`
 - `docs/render-staging-secrets-checklist.md`
 - `render.yaml` (staging Blueprint)
