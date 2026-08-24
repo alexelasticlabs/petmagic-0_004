@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/core/errors/network_error_mapper.dart';
@@ -39,6 +41,23 @@ void main() {
 
     expect(NetworkErrorMapper.isConnectionUnavailable(connectionError), isTrue);
     expect(NetworkErrorMapper.isConnectionUnavailable(receiveTimeout), isFalse);
+  });
+
+  test('connectivity mapping does not hide non-network unknown errors', () {
+    final requestOptions = RequestOptions(path: '/api/test');
+    final unknownTypeError = DioException(
+      requestOptions: requestOptions,
+      type: DioExceptionType.unknown,
+      error: const FormatException('invalid response shape'),
+    );
+    final socketError = DioException(
+      requestOptions: requestOptions,
+      type: DioExceptionType.unknown,
+      error: const SocketException('connection reset'),
+    );
+
+    expect(NetworkErrorMapper.isConnectivityIssue(unknownTypeError), isFalse);
+    expect(NetworkErrorMapper.isConnectivityIssue(socketError), isTrue);
   });
 
   test('safePayloadMessage accepts only localization keys', () {

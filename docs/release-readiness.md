@@ -134,10 +134,21 @@ adding dated audit snapshots to the repository.
   configuration and unavailable-UI failures map to distinct user feedback, and
   sanitized Crashlytics non-fatals record only the SDK enum code and whether
   opaque description/details existed. It also records when an active auth
-  request is mapped to a network failure. The focused
-  network/profile/external-auth shard passes 33 tests and `flutter analyze` is
-  clean. Building, Play Internal upload and physical-device authentication
-  acceptance for `1.0.0+10` remain pending.
+  request is mapped to a network failure. Run `32717652959` built and uploaded
+  `1.0.0+10` successfully from commit `c3249a5a` in 9m26s. The installed Play
+  artifact was confirmed as `versionCode=10`; the exact offline message still
+  reproduced. At that tap the physical phone received HTTP 200 for
+  `/api/auth/external/google/mobile-config`, but no native-token exchange
+  reached the backend. Crashlytics then confirmed that the client mapped the
+  active auth outcome to `network.unavailable`. The root cause was the
+  response-rewrite path in `ApiBaseUrlFailoverInterceptor`: it converted typed
+  JSON maps to runtime-untyped maps after a successful response, while
+  `NetworkErrorMapper` classified the resulting response-less internal
+  `DioException` as connectivity loss. Android `1.0.0+11` preserves typed JSON
+  maps during URL rewriting and limits unknown connectivity failures to an
+  actual `SocketException`. The focused network/profile/external-auth shard
+  passes 49 tests and `flutter analyze` is clean. Building, Play Internal upload
+  and physical-device authentication acceptance for `1.0.0+11` remain pending.
   The complete mobile test suite currently reports `1414` passed and `13`
   failed tests outside this focused shard. Four reproduced failures are the
   pre-existing `My Pets renders in ...` visual helper cases, which stop at a

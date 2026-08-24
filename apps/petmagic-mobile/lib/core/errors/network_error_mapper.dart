@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
@@ -28,7 +30,8 @@ class NetworkErrorMapper {
         error.type == DioExceptionType.connectionTimeout ||
         error.type == DioExceptionType.receiveTimeout ||
         error.type == DioExceptionType.sendTimeout ||
-        error.response == null;
+        (error.type == DioExceptionType.unknown &&
+            error.error is SocketException);
   }
 
   static bool isConnectionUnavailable(DioException error) {

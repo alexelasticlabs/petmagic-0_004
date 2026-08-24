@@ -167,8 +167,15 @@ class ApiBaseUrlFailoverInterceptor extends Interceptor {
           .toList(growable: false);
     }
 
+    if (value is Map<String, dynamic>) {
+      return value.map<String, dynamic>(
+        (key, item) =>
+            MapEntry(key, _rewriteLocalhostUrls(item, activeBaseUrl)),
+      );
+    }
+
     if (value is Map) {
-      return value.map(
+      return value.map<dynamic, dynamic>(
         (key, item) =>
             MapEntry(key, _rewriteLocalhostUrls(item, activeBaseUrl)),
       );
