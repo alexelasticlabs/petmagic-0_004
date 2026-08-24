@@ -1,3 +1,5 @@
+import 'dart:async';
+
 export 'package:petmagic_mobile/features/profile/application/external_auth_gateway.dart'
     show
         ExternalAuthProvider,

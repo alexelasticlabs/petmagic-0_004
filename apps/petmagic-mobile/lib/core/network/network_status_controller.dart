@@ -37,7 +37,7 @@ class NetworkStatusController extends Notifier<NetworkStatusState> {
   static const Duration _recoveredBannerDuration = Duration(seconds: 3);
   static const Duration _offlineProbeInterval = Duration(seconds: 5);
   static const Duration _offlineProbeMaxInterval = Duration(seconds: 30);
-  static const Duration _internetProbeTimeout = Duration(seconds: 2);
+  static const Duration _internetProbeTimeout = Duration(seconds: 6);
   static const Duration _probeDebounceWindow = Duration(seconds: 5);
 
   final Connectivity _connectivity = Connectivity();
@@ -278,8 +278,8 @@ class NetworkStatusController extends Notifier<NetworkStatusState> {
 
     final reachableBaseUrl = await const ApiBaseUrlHealthChecker(
       probeBudget: _internetProbeTimeout,
-      connectTimeout: Duration(milliseconds: 700),
-      readTimeout: Duration(milliseconds: 1100),
+      connectTimeout: Duration(seconds: 2),
+      readTimeout: Duration(seconds: 3),
     ).findReachable(AppConfig.apiBaseUrls);
     final result = reachableBaseUrl != null;
     _lastProbeResult = result;

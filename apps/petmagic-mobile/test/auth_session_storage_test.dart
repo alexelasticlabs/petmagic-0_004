@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
+import 'package:petmagic_mobile/core/auth/auth_session.dart';
+import 'package:petmagic_mobile/core/auth/auth_session_storage.dart';
+import 'package:petmagic_mobile/features/profile/domain/profile_models.dart';
 
 void main() {
   test(
@@ -102,6 +105,46 @@ void main() {
       isNot(contains(AuthSessionStorage.sessionKey)),
     );
   });
+
+  test(
+    'keeps a session available when persistent storage write times out',
+    () async {
+      final storage = AuthSessionStorage(
+        secureStorage: _StalledWriteSecureStorage(),
+        writeTimeout: const Duration(milliseconds: 1),
+      );
+      final session = AuthSession.fromJson({
+        'accessToken': 'access-token',
+        'refreshToken': 'refresh-token',
+        'expiresAtUtc': DateTime.now()
+            .add(const Duration(hours: 1))
+            .toIso8601String(),
+        'user': const <String, dynamic>{},
+      });
+
+      await storage.save(session);
+
+      expect(await storage.read(), same(session));
+    },
+  );
+}
+
+class _StalledWriteSecureStorage extends FlutterSecureStorage {
+  _StalledWriteSecureStorage();
+
+  final _writeCompleter = Completer<void>();
+
+  @override
+  Future<void> write({
+    required String key,
+    required String? value,
+    AppleOptions? iOptions,
+    AndroidOptions? aOptions,
+    LinuxOptions? lOptions,
+    WebOptions? webOptions,
+    AppleOptions? mOptions,
+    WindowsOptions? wOptions,
+  }) => _writeCompleter.future;
 }
 
 final _session = AuthSession(

@@ -88,10 +88,14 @@ adding dated audit snapshots to the repository.
   endpoint. Run `32701367339` built, signed, archived and uploaded it to Play
   Internal; a physical device installed build `4`, but authentication still
   trusted a stale global offline status before opening the Google selector.
-- Android `1.0.0+5` is prepared so email and native-provider authentication do
-  not treat the best-effort network banner as a hard precondition. It must be
-  built, uploaded and verified on a physical device before the incident is
-  considered resolved.
+- Android `1.0.0+5` removed the best-effort network banner as a hard
+  precondition and was installed on a physical device. The VPS accepted a
+  verified email/password request (`HTTP 200`), but the client did not make
+  the subsequent `/api/auth/me` request; the native Google SDK also did not
+  reach the token exchange. Android `1.0.0+6` is prepared with in-memory
+  session continuity if Android secure-storage persistence stalls, bounded
+  Google SDK cleanup, and less aggressive API reachability probes. Its CI,
+  Play upload, and physical-device acceptance are still pending.
 - The Android release job is configured to reuse Gradle dependency, transform
   and local build-cache state between runs. The first run seeds that cache;
   a later release run must be timed and compared before any performance gain is

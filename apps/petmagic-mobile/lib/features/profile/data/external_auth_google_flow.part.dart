@@ -79,7 +79,7 @@ mixin _ExternalAuthGoogleFlow on _MobileExternalAuthRepositoryBase {
         provider: ExternalAuthProvider.google,
         status: _classifyMappedFailure(error.message),
       );
-      await _resetGoogleSession();
+      _scheduleGoogleSessionReset();
       rethrow;
     } on GoogleSignInException catch (error, stackTrace) {
       _logGoogleSignInException(error, stackTrace);
@@ -89,7 +89,7 @@ mixin _ExternalAuthGoogleFlow on _MobileExternalAuthRepositoryBase {
         provider: ExternalAuthProvider.google,
         status: _classifyGoogleSignInFailure(error),
       );
-      await _resetGoogleSession();
+      _scheduleGoogleSessionReset();
       throw mapped;
     } on GoogleSignInConfigurationException catch (error, stackTrace) {
       _logExternalAuthFailure(
@@ -101,7 +101,7 @@ mixin _ExternalAuthGoogleFlow on _MobileExternalAuthRepositoryBase {
         _MobileExternalAuthRepositoryBase._genericFailedCode,
       );
     } on DioException catch (error) {
-      await _resetGoogleSession();
+      _scheduleGoogleSessionReset();
       final mapped = _mapDioException(
         error,
         fallbackMessage: _MobileExternalAuthRepositoryBase._genericFailedCode,
@@ -123,7 +123,7 @@ mixin _ExternalAuthGoogleFlow on _MobileExternalAuthRepositoryBase {
         error,
         stackTrace,
       );
-      await _resetGoogleSession();
+      _scheduleGoogleSessionReset();
       throw const AppException(
         _MobileExternalAuthRepositoryBase._genericFailedCode,
       );
@@ -213,13 +213,21 @@ mixin _ExternalAuthGoogleFlow on _MobileExternalAuthRepositoryBase {
     return error.response?.statusCode == 403;
   }
 
+  void _scheduleGoogleSessionReset() {
+    unawaited(_resetGoogleSession());
+  }
+
   Future<void> _resetGoogleSession() async {
     try {
-      await _googleSignInAdapter.disconnect();
+      await _googleSignInAdapter.disconnect().timeout(
+        const Duration(seconds: 1),
+      );
     } catch (error, stackTrace) {
       _logExternalAuthFailure('google_disconnect_cleanup', error, stackTrace);
       try {
-        await _googleSignInAdapter.signOut();
+        await _googleSignInAdapter.signOut().timeout(
+          const Duration(seconds: 1),
+        );
       } catch (innerError, innerStackTrace) {
         _logExternalAuthFailure(
           'google_sign_out_cleanup',
@@ -261,11 +269,11 @@ mixin _ExternalAuthGoogleFlow on _MobileExternalAuthRepositoryBase {
           .map(mapMobileLinkedAccountDto)
           .toList(growable: false);
     } on AppException {
-      await _resetGoogleSession();
+      _scheduleGoogleSessionReset();
       rethrow;
     } on GoogleSignInException catch (error, stackTrace) {
       _logGoogleSignInException(error, stackTrace);
-      await _resetGoogleSession();
+      _scheduleGoogleSessionReset();
       throw _mapGoogleSignInException(error);
     } on GoogleSignInConfigurationException catch (error, stackTrace) {
       _logExternalAuthFailure(
@@ -273,7 +281,7 @@ mixin _ExternalAuthGoogleFlow on _MobileExternalAuthRepositoryBase {
         error,
         stackTrace,
       );
-      await _resetGoogleSession();
+      _scheduleGoogleSessionReset();
       throw const AppException(
         _MobileExternalAuthRepositoryBase._genericFailedCode,
       );
@@ -283,14 +291,14 @@ mixin _ExternalAuthGoogleFlow on _MobileExternalAuthRepositoryBase {
         error,
         error.stackTrace,
       );
-      await _resetGoogleSession();
+      _scheduleGoogleSessionReset();
       throw _mapDioException(
         error,
         fallbackMessage: _MobileExternalAuthRepositoryBase._genericFailedCode,
       );
     } catch (error, stackTrace) {
       _logExternalAuthFailure('link_native_google_unknown', error, stackTrace);
-      await _resetGoogleSession();
+      _scheduleGoogleSessionReset();
       throw const AppException(
         _MobileExternalAuthRepositoryBase._genericFailedCode,
       );

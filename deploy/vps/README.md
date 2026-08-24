@@ -106,10 +106,15 @@ secret values, private keys, tokens, or service-account JSON.
       Internal by run `32701367339`. A physical device installed build `4`,
       which still displayed an offline error before opening the Google account
       selector despite direct HTTPS health evidence from that same device.
-- [ ] Publish Android `1.0.0+5`. Authentication will no longer trust the
-      best-effort global network banner as a hard precondition; email and
-      native-provider flows will make their own request and surface its actual
-      result.
+- [x] Android `1.0.0+5` was installed on a physical device. The VPS accepted
+      a verified email/password request (`HTTP 200`), but the client did not
+      make the subsequent `/api/auth/me` request; the native Google SDK also
+      did not reach the token exchange. This is diagnostic evidence, not
+      authentication acceptance.
+- [ ] Publish Android `1.0.0+6`. It preserves an authenticated session in
+      memory when Android secure-storage persistence stalls, bounds Google SDK
+      cleanup, and gives the PetMagic API reachability probe realistic mobile
+      timeouts. CI, Play upload and physical-device acceptance are pending.
 - [ ] Complete real-device authentication acceptance: verified email/password
       login and native Google sign-in with a real Google account.
 - [ ] Repair the independent iOS CI signing configuration before TestFlight:

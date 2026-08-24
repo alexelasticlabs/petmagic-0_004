@@ -17,17 +17,28 @@ final authSessionStorageProvider = Provider<AuthSessionStorage>((ref) {
 });
 
 class AuthSessionStorage implements AuthSessionStore {
-  AuthSessionStorage({FlutterSecureStorage? secureStorage})
-    : _secureStorage = secureStorage ?? const FlutterSecureStorage();
-
   static const sessionKey = 'petmagic_mobile_auth_session';
   static const _readTimeout = Duration(seconds: 5);
+  static const _defaultWriteTimeout = Duration(seconds: 2);
   static const _slowReadThreshold = Duration(milliseconds: 1200);
 
+  AuthSessionStorage({
+    FlutterSecureStorage? secureStorage,
+    Duration writeTimeout = _defaultWriteTimeout,
+  }) : _secureStorage = secureStorage ?? const FlutterSecureStorage(),
+       _writeTimeout = writeTimeout;
+
   final FlutterSecureStorage _secureStorage;
+  final Duration _writeTimeout;
+  AuthSession? _cachedSession;
 
   @override
   Future<AuthSession?> read() async {
+    final cachedSession = _cachedSession;
+    if (cachedSession != null) {
+      return cachedSession;
+    }
+
     final stopwatch = Stopwatch()..start();
     String? raw;
     try {
@@ -79,6 +90,7 @@ class AuthSessionStorage implements AuthSessionStore {
         await _clearInvalidSession('deserialize_invalid_tokens_cleanup');
         return null;
       }
+      _cachedSession = session;
       return session;
     } catch (error, stackTrace) {
       AppLogger.warn(
@@ -104,14 +116,37 @@ class AuthSessionStorage implements AuthSessionStore {
       );
       throw StateError('Auth session is missing required tokens.');
     }
-    await _secureStorage.write(
-      key: sessionKey,
-      value: jsonEncode(session.toJson()),
-    );
+    _cachedSession = session;
+    try {
+      await _secureStorage
+          .write(key: sessionKey, value: jsonEncode(session.toJson()))
+          .timeout(_writeTimeout);
+    } on TimeoutException catch (error, stackTrace) {
+      AppLogger.warn(
+        feature: 'Auth.Session',
+        operation: 'auth_session_write_timeout',
+        message:
+            'Secure storage write timed out; keeping the session in memory',
+        context: {'timeout_ms': _writeTimeout.inMilliseconds},
+        error: error,
+        stackTrace: stackTrace,
+      );
+    } catch (error, stackTrace) {
+      AppLogger.error(
+        feature: 'Auth.Session',
+        operation: 'auth_session_write_failed',
+        message: 'Secure storage write failed; keeping the session in memory',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
   }
 
   @override
-  Future<void> clear() => _secureStorage.delete(key: sessionKey);
+  Future<void> clear() {
+    _cachedSession = null;
+    return _secureStorage.delete(key: sessionKey);
+  }
 
   Future<void> _clearInvalidSession(String operation) async {
     try {

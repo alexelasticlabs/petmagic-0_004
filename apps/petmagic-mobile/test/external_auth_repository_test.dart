@@ -249,6 +249,49 @@ void main() {
   );
 
   test(
+    'native google failure is surfaced without waiting for session cleanup',
+    () async {
+      final cleanup = Completer<void>();
+      addTearDown(() {
+        if (!cleanup.isCompleted) {
+          cleanup.complete();
+        }
+      });
+      final dio = Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
+        ..httpClientAdapter = _FakeHttpClientAdapter((options) async {
+          if (options.path == '/api/auth/external/google/mobile-config') {
+            return ResponseBody.fromString(
+              jsonEncode(const {'serverClientId': 'server-client-id'}),
+              200,
+              headers: {
+                Headers.contentTypeHeader: [Headers.jsonContentType],
+              },
+            );
+          }
+
+          throw StateError('Unexpected path: ${options.path}');
+        });
+      final repository = MobileExternalAuthRepository(
+        dio: dio,
+        sessionStorage: _InMemoryAuthSessionStorage(),
+        appLinks: AppLinks(),
+        googleSignInAdapter: _StalledCleanupGoogleSignInAdapter(cleanup),
+      );
+
+      await expectLater(
+        repository.authenticate(ExternalAuthProvider.google),
+        throwsA(
+          isA<AppException>().having(
+            (error) => error.message,
+            'message',
+            'auth.external_invalid',
+          ),
+        ),
+      );
+    },
+  );
+
+  test(
     'google auth treats server client id changes as configuration errors',
     () async {
       final adapter = _ConfigurationLockedGoogleSignInAdapter();
@@ -647,6 +690,25 @@ class _ConfigurationLockedGoogleSignInAdapter implements GoogleSignInAdapter {
 
   @override
   Future<void> disconnect() async {}
+
+  @override
+  Future<void> signOut() async {}
+}
+
+class _StalledCleanupGoogleSignInAdapter implements GoogleSignInAdapter {
+  _StalledCleanupGoogleSignInAdapter(this._cleanup);
+
+  final Completer<void> _cleanup;
+
+  @override
+  Future<GoogleSignInCredential> authenticate({String? serverClientId}) async {
+    throw const GoogleSignInException(
+      code: GoogleSignInExceptionCode.providerConfigurationError,
+    );
+  }
+
+  @override
+  Future<void> disconnect() => _cleanup.future;
 
   @override
   Future<void> signOut() async {}
