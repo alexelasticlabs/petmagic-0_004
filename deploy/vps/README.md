@@ -125,6 +125,18 @@ secret values, private keys, tokens, or service-account JSON.
       verified SPF and DKIM, but public DNS does not currently resolve
       `_dmarc.petgpt.app`; add and validate a monitored policy before public
       launch without changing the working Resend records.
+- [ ] Rotate `FAL_AI_API_KEY` to a dedicated fal.ai `ADMIN`-scope production
+      key before enabling real generation traffic. The current VPS API and
+      worker share the same non-empty key, but the fal.ai dashboard classifies
+      it as `API` scope and the account-billing request returns HTTP 403. The
+      persisted runtime snapshot therefore remains `Unknown` with
+      `authentication_failed` instead of a usable balance. The dashboard
+      currently shows USD 16.47 and a concurrency limit of 10; the production
+      policy also records confirmed concurrency 10 with reserved headroom 2.
+      Production has zero generation jobs and zero provider attempts, so no
+      customer generation is stranded. Create and install the new secret
+      without exposing it, rerun preflight, restart only the PetMagic stack and
+      require a fresh successful balance snapshot before a paid canary.
 
 ### VPS cutover and acceptance still required
 

@@ -375,6 +375,16 @@ do not append command transcripts to this file.
   has no `STRIPE_TEST_*` credentials; configure an isolated test key pair,
   test webhook secret and test-mode route before sandbox acceptance rather than
   sending a real charge as a test.
+- **Release blocker — fal.ai runtime authorization:** the key currently shared
+  by the VPS API and worker is present and identical, but fal.ai classifies it
+  as `API` scope. The balance endpoint returns HTTP 403, leaving the persisted
+  provider snapshot `Unknown` with `authentication_failed`; production must not
+  rely on that stale balance gate. The authenticated dashboard currently shows
+  USD 16.47 and concurrency 10, matching the database policy's confirmed limit
+  10 with reserved headroom 2. There are zero production generation jobs and
+  zero provider attempts. Rotate to a dedicated `ADMIN`-scope production key,
+  verify a fresh successful balance snapshot and only then run a paid
+  image/video callback and R2-import canary.
 - Google Play token-pack product IDs are derived from the active catalog as
   `com.petmagic.app.tokens.google.<pack-code>` rather than stored per pack.
   The Play Console now contains active standard **Buy** one-time products for
