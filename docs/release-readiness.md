@@ -103,8 +103,10 @@ adding dated audit snapshots to the repository.
   after the successful API response. Current source confirms every reported
   route state with the PetMagic API probe and ignores stale concurrent probe
   completions; the focused network/profile/external-auth test shard passes 31
-  tests. This correction is not yet installed from Play, so physical-device
-  authentication acceptance remains pending.
+  tests. Android production release `1.0.0+7` was built and uploaded to Play
+  Internal by successful run `32711648441` from commit `4e9d9d42`. Installing
+  that exact Play artifact and repeating physical-device authentication remain
+  pending.
   The complete mobile test suite currently reports `1414` passed and `13`
   failed tests outside this focused shard. Four reproduced failures are the
   pre-existing `My Pets renders in ...` visual helper cases, which stop at a
@@ -114,9 +116,11 @@ adding dated audit snapshots to the repository.
 - The Android release job is configured to reuse Gradle dependency, transform
   and local build-cache state between runs. Run `32706661084` was the first
   seed: it restored no entry, saved 2.1 GB in a 56-second post-job step, and
-  completed in 15m 51s; its signed-AAB step took 12m 48s. A later release run
-  must restore that entry and be timed before any cache performance gain is
-  claimed.
+  completed in 15m 51s; its signed-AAB step took 12m 48s. Run `32711648441`
+  restored the Flutter, pub, Gradle and Ruby caches, completed successfully in
+  9m 08s, built the signed AAB in 7m 09s and uploaded it to Play Internal in
+  40s. This is the first measured cache-hit acceptance for the optimized
+  workflow.
 
 ## Automated Gates
 
