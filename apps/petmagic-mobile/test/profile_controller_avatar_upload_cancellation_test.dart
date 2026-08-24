@@ -259,7 +259,7 @@ void main() {
   );
 
   test(
-    'login cancels in-flight auth request when network goes offline',
+    'login survives a transient offline advisory while auth is in flight',
     () async {
       final repository = _DelayedLoginProfileRepository();
       final networkController = _TestNetworkStatusController(hasInternet: true);
@@ -281,21 +281,22 @@ void main() {
       await Future<void>.delayed(Duration.zero);
 
       var state = container.read(profileControllerProvider);
-      expect(repository.loginCancelToken?.isCancelled, isTrue);
-      expect(state.isSaving, isFalse);
-      expect(state.errorMessage, 'templates.network_unavailable');
+      expect(repository.loginCancelToken?.isCancelled, isFalse);
+      expect(state.isSaving, isTrue);
+      expect(state.errorMessage, isNull);
 
       repository.completeLogin();
       await expectLater(loginFuture, completes);
 
       state = container.read(profileControllerProvider);
-      expect(repository.fetchProfileCalls, 0);
-      expect(state.profile, isNull);
+      expect(repository.fetchProfileCalls, 1);
+      expect(state.profile, isNotNull);
+      expect(state.isSaving, isFalse);
     },
   );
 
   test(
-    'register cancels in-flight auth request when network goes offline',
+    'register survives a transient offline advisory while auth is in flight',
     () async {
       final repository = _DelayedRegisterProfileRepository();
       final networkController = _TestNetworkStatusController(hasInternet: true);
@@ -323,21 +324,21 @@ void main() {
       await Future<void>.delayed(Duration.zero);
 
       var state = container.read(profileControllerProvider);
-      expect(repository.registerCancelToken?.isCancelled, isTrue);
-      expect(state.isSaving, isFalse);
-      expect(state.errorMessage, 'templates.network_unavailable');
+      expect(repository.registerCancelToken?.isCancelled, isFalse);
+      expect(state.isSaving, isTrue);
+      expect(state.errorMessage, isNull);
 
       repository.completeRegister();
       await expectLater(registerFuture, completes);
 
       state = container.read(profileControllerProvider);
-      expect(state.successMessage, isNull);
+      expect(state.successMessage, 'auth.registration_pending_verification');
       expect(state.profile, isNull);
     },
   );
 
   test(
-    'external authentication ignores delayed success when network goes offline',
+    'external authentication survives a transient offline advisory',
     () async {
       final externalAuthRepository = _DelayedExternalAuthRepository();
       final networkController = _TestNetworkStatusController(hasInternet: true);
@@ -368,60 +369,58 @@ void main() {
       var state = container.read(profileControllerProvider);
       expect(
         externalAuthRepository.authenticateCancelToken?.isCancelled,
-        isTrue,
+        isFalse,
       );
-      expect(state.isSaving, isFalse);
-      expect(state.errorMessage, 'templates.network_unavailable');
+      expect(state.isSaving, isTrue);
+      expect(state.errorMessage, isNull);
 
       externalAuthRepository.completeAuthenticate();
       await expectLater(authFuture, completes);
 
       state = container.read(profileControllerProvider);
-      expect(state.profile, isNull);
-    },
-  );
-
-  test(
-    'external account link ignores delayed success when network goes offline',
-    () async {
-      final externalAuthRepository = _DelayedExternalAuthRepository();
-      final networkController = _TestNetworkStatusController(hasInternet: true);
-      final container = _profileControllerTestContainer(
-        networkStatusController: networkController,
-        overrides: [
-          externalAuthRepositoryProvider.overrideWithValue(
-            externalAuthRepository,
-          ),
-        ],
-      );
-      addTearDown(container.dispose);
-
-      final controller = container.read(profileControllerProvider.notifier);
-      final linkFuture = controller.linkExternalAccount(
-        ExternalAuthProvider.google,
-      );
-      await externalAuthRepository.linkStarted.future;
-
-      expect(externalAuthRepository.linkCancelToken?.isCancelled, isFalse);
-
-      networkController.setHasInternet(false);
-      await Future<void>.delayed(Duration.zero);
-
-      var state = container.read(profileControllerProvider);
-      expect(externalAuthRepository.linkCancelToken?.isCancelled, isTrue);
-      expect(state.isSaving, isFalse);
-      expect(state.errorMessage, 'templates.network_unavailable');
-
-      externalAuthRepository.completeLink();
-      await expectLater(linkFuture, completes);
-
-      state = container.read(profileControllerProvider);
+      expect(state.profile, isNotNull);
       expect(state.isSaving, isFalse);
     },
   );
 
+  test('external account link survives a transient offline advisory', () async {
+    final externalAuthRepository = _DelayedExternalAuthRepository();
+    final networkController = _TestNetworkStatusController(hasInternet: true);
+    final container = _profileControllerTestContainer(
+      networkStatusController: networkController,
+      overrides: [
+        externalAuthRepositoryProvider.overrideWithValue(
+          externalAuthRepository,
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final controller = container.read(profileControllerProvider.notifier);
+    final linkFuture = controller.linkExternalAccount(
+      ExternalAuthProvider.google,
+    );
+    await externalAuthRepository.linkStarted.future;
+
+    expect(externalAuthRepository.linkCancelToken?.isCancelled, isFalse);
+
+    networkController.setHasInternet(false);
+    await Future<void>.delayed(Duration.zero);
+
+    var state = container.read(profileControllerProvider);
+    expect(externalAuthRepository.linkCancelToken?.isCancelled, isFalse);
+    expect(state.isSaving, isTrue);
+    expect(state.errorMessage, isNull);
+
+    externalAuthRepository.completeLink();
+    await expectLater(linkFuture, completes);
+
+    state = container.read(profileControllerProvider);
+    expect(state.isSaving, isFalse);
+  });
+
   test(
-    'external account unlink cancels in-flight request when network goes offline',
+    'external account unlink survives a transient offline advisory',
     () async {
       final repository = _DelayedUnlinkProfileRepository();
       final networkController = _TestNetworkStatusController(hasInternet: true);
@@ -443,9 +442,9 @@ void main() {
       await Future<void>.delayed(Duration.zero);
 
       var state = container.read(profileControllerProvider);
-      expect(repository.unlinkCancelToken?.isCancelled, isTrue);
-      expect(state.isSaving, isFalse);
-      expect(state.errorMessage, 'templates.network_unavailable');
+      expect(repository.unlinkCancelToken?.isCancelled, isFalse);
+      expect(state.isSaving, isTrue);
+      expect(state.errorMessage, isNull);
 
       repository.completeUnlink();
       await expectLater(unlinkFuture, completes);

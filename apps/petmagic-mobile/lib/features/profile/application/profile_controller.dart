@@ -176,9 +176,13 @@ class ProfileController extends Notifier<ProfileState> {
       return;
     }
 
+    final hasActiveAuth = _requestTracker.hasActiveAuth;
     _requestTracker.cancelAvatarUpload();
-    _requestTracker.cancelAuth();
     _requestTracker.cancelProfileMutation();
+    if (hasActiveAuth) {
+      return;
+    }
+
     _updateStateIfMounted(
       (state) => state.copyWith(
         isSaving: false,

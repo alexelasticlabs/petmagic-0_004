@@ -105,8 +105,16 @@ adding dated audit snapshots to the repository.
   completions; the focused network/profile/external-auth test shard passes 31
   tests. Android production release `1.0.0+7` was built and uploaded to Play
   Internal by successful run `32711648441` from commit `4e9d9d42`. Installing
-  that exact Play artifact and repeating physical-device authentication remain
-  pending.
+  that exact Play artifact on a physical Samsung device reproduced the same
+  offline message immediately after starting Google authentication even though
+  the public mobile-config and health routes returned HTTP 200. A second race
+  was then isolated in `ProfileController`: the advisory network listener
+  cancelled an already-running email or external-auth request and replaced its
+  real outcome with `templates.network_unavailable`. Android `1.0.0+8` keeps an
+  active auth request authoritative and no longer lets a transient connectivity
+  advisory cancel it; the focused network/profile/external-auth shard passes 31
+  tests and `flutter analyze` is clean. Building, Play Internal upload and
+  physical-device authentication acceptance for `1.0.0+8` remain pending.
   The complete mobile test suite currently reports `1414` passed and `13`
   failed tests outside this focused shard. Four reproduced failures are the
   pre-existing `My Pets renders in ...` visual helper cases, which stop at a
@@ -168,9 +176,9 @@ do not append command transcripts to this file.
   its required-locale gate.
 - Privacy/legal approval for release Crashlytics collection, including the
   intended Firebase processor disclosure and retention basis.
-- Real-device authentication acceptance for the uploaded Android `1.0.0+2`
-  Internal build: verified email/password login and native Google login with a
-  real account.
+- Real-device authentication acceptance for the Android `1.0.0+8` Play
+  Internal release after it is built and uploaded: verified email/password
+  login and native Google login with a real account.
 - Google Play subscriptions: the PetMagic Play Console subscription list is
   currently empty. Create the approved product, base plan, regional prices and
   tester offer before enabling Google Play subscription acceptance; the VPS

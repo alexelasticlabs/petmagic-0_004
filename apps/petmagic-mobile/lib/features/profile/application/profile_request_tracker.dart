@@ -33,6 +33,8 @@ class ProfileRequestTracker {
   bool ownsAuth(RequestCancellation cancelToken) =>
       identical(_auth, cancelToken);
 
+  bool get hasActiveAuth => _auth != null;
+
   void cancelAvatarUpload() {
     _cancel(_avatarUpload, 'profile_avatar_upload_cancelled');
     _avatarUpload = null;
