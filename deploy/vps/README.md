@@ -167,6 +167,21 @@ secret values, private keys, tokens, or service-account JSON.
       offer was created without an approved product decision; sandbox purchase,
       renewal, restore, cancellation/refund and backend-crediting acceptance
       remain pending.
+- [ ] Resolve the Premium entitlement before a public release. Google Play's
+      active monthly product promises `500 PawSpark per month`, while the
+      current VPS backend grants the global `WeeklyPremiumSpark=40` at
+      subscription start and every seven days without using the selected
+      plan's stored monthly limit. This is a product decision, not a safe
+      server-side default: align the published benefit, plan data and runtime
+      allowance, add lifecycle coverage, then complete a real sandbox purchase.
+- [ ] Complete native Google Play acceptance on an eligible internal tester.
+      The Internal track is active with release `1.0.0` and a tester list, but
+      the attached device did not expose a purchasable Google Play option while
+      Stripe remained available. The Play **One-time products** catalog is
+      empty although the VPS expects derived `starter`, `creator`, and `viral`
+      Google token-pack IDs. Create intentionally priced matching products,
+      verify Play-country/license-test eligibility, then perform the sandbox
+      acceptance before any public charge.
 - [x] The **Play app signing** SHA-1 certificate matches the Android OAuth
       client in the Firebase/Google project. The separate upload certificate is
       not used for Google Sign-In configuration.

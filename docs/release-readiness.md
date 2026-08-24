@@ -299,6 +299,27 @@ do not append command transcripts to this file.
   subscriptions with active base plans in 174 countries. A tester offer was
   not created without an approved product decision. Complete sandbox purchase,
   renewal, restore, cancellation/refund and idempotent backend-crediting proof.
+- The active Play Internal track contains release `1.0.0` and an attached
+  tester list. This proves release distribution, not Billing eligibility for
+  every Play account or country. On the physical Android device, the native
+  store selector did not expose a purchasable Google Play option; Stripe stayed
+  available. Before a sandbox charge, verify the tester account's Play-country
+  eligibility and license-testing status against the active products.
+- **Release blocker — Premium allowance consistency:** the active Google Play
+  monthly product promises `500 PawSpark per month`; the production plans also
+  store monthly limits of `500` (monthly) and `1000` (yearly). The current
+  backend allowance flow instead grants the global `WeeklyPremiumSpark=40` at
+  subscription start and then every seven days, without using the selected
+  plan's monthly limit. Do not change the published benefit, price, or runtime
+  allowance until the product owner chooses the intended entitlement; then add
+  an automated provider-lifecycle test and repeat sandbox purchase evidence.
+- Google Play token-pack product IDs are derived from the active catalog as
+  `com.petmagic.app.tokens.google.<pack-code>` rather than stored per pack.
+  The Play Console's **One-time products** catalog is currently empty, while
+  the VPS catalog has active `starter`, `creator`, and `viral` packs. Therefore
+  the Android wallet correctly disables Google Play for packs and exposes
+  Stripe instead. Create and activate intentionally priced matching Play
+  products before a sandbox purchase is verified and consumed exactly once.
 - The production and retained Render databases both currently contain zero
   template items, categories and assets; this is not a VPS migration loss.
   Populate the production catalog only with approved template content and then
