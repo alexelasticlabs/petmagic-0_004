@@ -1,4 +1,8 @@
+using System.IdentityModel.Tokens.Jwt;
+
 using Google.Apis.Auth;
+
+using Microsoft.Extensions.Logging;
 
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Identity.Application.Abstractions;
@@ -7,7 +11,9 @@ using PetMagic.Modules.Identity.Infrastructure.Options;
 
 namespace PetMagic.Modules.Identity.Infrastructure;
 
-internal sealed class GoogleIdentityTokenVerifier(ExternalAuthOptions options) : IGoogleIdentityTokenVerifier
+internal sealed class GoogleIdentityTokenVerifier(
+    ExternalAuthOptions options,
+    ILogger<GoogleIdentityTokenVerifier> logger) : IGoogleIdentityTokenVerifier
 {
     public bool IsConfigured =>
         !string.IsNullOrWhiteSpace(options.Google.ClientId) &&
@@ -29,11 +35,12 @@ internal sealed class GoogleIdentityTokenVerifier(ExternalAuthOptions options) :
 
         try
         {
+            var audiences = ResolveAudiences();
             var payload = await GoogleJsonWebSignature.ValidateAsync(
                 idToken,
                 new GoogleJsonWebSignature.ValidationSettings
                 {
-                    Audience = [.. ResolveAudiences()]
+                    Audience = [.. audiences]
                 });
 
             if (!payload.EmailVerified)
@@ -50,6 +57,12 @@ internal sealed class GoogleIdentityTokenVerifier(ExternalAuthOptions options) :
         }
         catch (InvalidJwtException)
         {
+            var diagnostic = DiagnoseRejectedToken(idToken, ResolveAudiences());
+            logger.LogWarning(
+                "Google identity token was rejected. TokenReadable={TokenReadable} AudienceMatchesConfigured={AudienceMatchesConfigured} IssuerIsGoogle={IssuerIsGoogle}",
+                diagnostic.TokenReadable,
+                diagnostic.AudienceMatchesConfigured,
+                diagnostic.IssuerIsGoogle);
             return Result.Failure<ExternalLoginCallbackCommand>(IdentityErrors.ExternalTokenInvalid);
         }
     }
@@ -67,4 +80,38 @@ internal sealed class GoogleIdentityTokenVerifier(ExternalAuthOptions options) :
 
         return string.IsNullOrWhiteSpace(options.Google.ClientId) ? [] : [options.Google.ClientId];
     }
+
+    private static RejectedGoogleTokenDiagnostic DiagnoseRejectedToken(
+        string idToken,
+        IReadOnlyCollection<string> configuredAudiences)
+    {
+        const int maximumDiagnosticTokenLength = 16_384;
+        if (idToken.Length > maximumDiagnosticTokenLength)
+        {
+            return default;
+        }
+
+        try
+        {
+            var token = new JwtSecurityTokenHandler().ReadJwtToken(idToken);
+            var audienceMatchesConfigured = token.Audiences.Any(audience =>
+                configuredAudiences.Contains(audience, StringComparer.Ordinal));
+            var issuerIsGoogle = string.Equals(token.Issuer, "accounts.google.com", StringComparison.Ordinal)
+                || string.Equals(token.Issuer, "https://accounts.google.com", StringComparison.Ordinal);
+
+            return new RejectedGoogleTokenDiagnostic(
+                TokenReadable: true,
+                AudienceMatchesConfigured: audienceMatchesConfigured,
+                IssuerIsGoogle: issuerIsGoogle);
+        }
+        catch (ArgumentException)
+        {
+            return default;
+        }
+    }
+
+    private readonly record struct RejectedGoogleTokenDiagnostic(
+        bool TokenReadable,
+        bool AudienceMatchesConfigured,
+        bool IssuerIsGoogle);
 }
