@@ -226,8 +226,8 @@ secret values, private keys, tokens, or service-account JSON.
       and signature acceptance are not yet evidenced.
 - [ ] Accept the native Stripe PaymentSheet release. The VPS backend now
       returns PaymentIntent or Subscription invoice
-      client secrets for eligible Android checkout, keeps hosted Checkout as
-      the iOS/web fallback,
+      client secrets for eligible Android checkout, keeps hosted Checkout for
+      eligible web checkout,
       and uses an idempotency key for mobile subscription creation. Flutter
       regression tests, backend gateway tests, a production-flavor debug APK and
       a minified production release AAB pass locally. Android `1.0.0+15` is active
@@ -238,7 +238,10 @@ secret values, private keys, tokens, or service-account JSON.
       webhook reconciliation and cancellation/retry proof are still required.
       Stripe is intentionally disabled for iOS until PetMagic has Apple’s
       external-purchase entitlement and implements the required StoreKit token
-      and transaction-reporting flow; iOS currently exposes App Store billing.
+      and transaction-reporting flow; migration `20260824223451` was applied
+      to the VPS on 2026-08-25 and live rows for both `*` and `EU` confirm
+      `IsEnabled=false` and `ExternalCheckoutAllowed=false`. iOS currently
+      exposes App Store billing.
       A read-only Stripe live API audit confirms the production webhook is
       enabled at the expected VPS route with the required payment, checkout,
       refund, invoice and subscription events, but the account currently has

@@ -390,7 +390,9 @@ do not append command transcripts to this file.
   accepted for build `1.0.0+15`; its provider purchase, cancellation/retry and
   signed webhook proof remain pending.
 - **iOS payment-policy guard:** the default and existing legacy iOS Stripe
-  provider routes are disabled by migration `20260824223451`. Apple external
+  provider routes are disabled by migration `20260824223451`. It was deployed
+  to the VPS on 2026-08-25; live `*` and `EU` rows confirm both
+  `IsEnabled=false` and `ExternalCheckoutAllowed=false`. Apple external
   purchases require an approved entitlement plus StoreKit token and
   transaction-reporting work that PetMagic does not yet implement. App Store
   Billing remains the only iOS in-app payment route until that separate feature
