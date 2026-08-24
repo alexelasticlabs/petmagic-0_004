@@ -136,6 +136,41 @@ public sealed class StripePaymentGatewayCorrelationTests
     }
 
     [Fact]
+    public async Task CreateSubscriptionCheckoutAsync_ShouldUseStableIdempotencyKey_ForMobilePaymentSheet()
+    {
+        var userId = Guid.NewGuid();
+        var handler = new MobileSubscriptionFailureHandler();
+        var gateway = new StripePaymentGateway(
+            new EconomyOptions
+            {
+                StripeCheckoutSuccessUrl = "https://petmagic.app/success",
+                StripeCheckoutCancelUrl = "https://petmagic.app/cancel"
+            },
+            new SingleClientFactory(new HttpClient(handler)));
+
+        var result = await gateway.CreateSubscriptionCheckoutAsync(
+            new SubscriptionCheckoutCreateRequest(
+                "stripe",
+                userId,
+                "cus_test_customer",
+                "PREMIUM_MONTHLY",
+                "Premium monthly",
+                14.99m,
+                "USD",
+                "month",
+                ApiSecretKey: "sk_test_gateway_key",
+                PublishableKey: "pk_test_gateway_key",
+                UsePaymentSheet: true,
+                StripePriceId: "price_test_monthly"),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(
+            $"economy-subscription-mobile-{userId:D}-premium_monthly",
+            handler.SubscriptionIdempotencyKey);
+    }
+
+    [Fact]
     public async Task CreatePaymentWithSavedMethodAsync_ShouldRejectNonSucceededPaymentIntentStatus()
     {
         var logger = new CapturingLogger<StripePaymentGateway>();
@@ -331,6 +366,30 @@ public sealed class StripePaymentGatewayCorrelationTests
             return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.InternalServerError)
             {
                 Content = new StringContent("""{"error":{"message":"forced payment intent failure"}}""")
+            });
+        }
+    }
+
+    private sealed class MobileSubscriptionFailureHandler : HttpMessageHandler
+    {
+        public string? SubscriptionIdempotencyKey { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            if (string.Equals(request.RequestUri?.AbsolutePath, "/v1/ephemeral_keys", StringComparison.Ordinal))
+            {
+                return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                {
+                    Content = new StringContent("""{"id":"ephkey_test","object":"ephemeral_key","secret":"ek_test_secret"}""")
+                });
+            }
+
+            Assert.Equal("/v1/subscriptions", request.RequestUri?.AbsolutePath);
+            Assert.True(request.Headers.TryGetValues("Idempotency-Key", out var values));
+            SubscriptionIdempotencyKey = Assert.Single(values);
+            return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.InternalServerError)
+            {
+                Content = new StringContent("""{"error":{"message":"forced subscription failure"}}""")
             });
         }
     }

@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Economy.Application.Contracts;
+using PetMagic.Modules.Economy.Infrastructure.Payments;
 
 namespace PetMagic.Modules.Economy.Infrastructure;
 
@@ -36,9 +37,8 @@ public sealed partial class EconomyService
             return Result.Failure<PremiumCheckoutResponse>(EconomyErrors.PaymentProviderUnavailable);
         }
 
-        // The current Flutter app does not bundle Stripe PaymentSheet. Use hosted
-        // Checkout for mobile too so the client always receives a checkout URL.
-        var usePaymentSheet = false;
+        var normalizedPlatform = EconomyPaymentProviderPolicy.NormalizePlatform(command.Platform);
+        var usePaymentSheet = normalizedPlatform == "android";
         string? stripePublishableKey = null;
         if (usePaymentSheet)
         {

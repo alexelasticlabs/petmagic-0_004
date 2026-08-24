@@ -180,7 +180,10 @@ public sealed partial class StripePaymentGateway
                                 Metadata = metadata,
                                 Expand = ["latest_invoice.payment_intent", "latest_invoice.confirmation_secret"]
                             },
-                            requestOptions: null,
+                            new RequestOptions
+                            {
+                                IdempotencyKey = $"economy-subscription-mobile-{request.UserId:D}-{request.PlanCode.ToLowerInvariant()}"
+                            },
                             cancellationToken);
                     }
                     catch (StripeException) when (shouldUseCatalogPrice)

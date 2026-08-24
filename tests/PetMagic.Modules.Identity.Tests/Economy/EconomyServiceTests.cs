@@ -86,6 +86,7 @@ public sealed partial class EconomyServiceTests
             AdRewardDailyLimit = 5,
             ReferralBonusSpark = 15,
             StripeTestSecretKey = "test_stripe_secret_key",
+            StripeTestPublishableKey = "pk_test_petmagic",
             StripeTestWebhookSecret = "test_webhook_secret",
             StripeCheckoutSuccessUrl = "http://localhost:3000/payments/success?session_id={CHECKOUT_SESSION_ID}",
             StripeCheckoutCancelUrl = "http://localhost:3000/payments/cancel",
@@ -339,6 +340,17 @@ public sealed partial class EconomyServiceTests
         public Task<Result<PaymentCreateResponse>> CreatePaymentAsync(PaymentCreateRequest request, CancellationToken cancellationToken)
         {
             LastPaymentCreateRequest = request;
+            if (request.UsePaymentSheet)
+            {
+                return Task.FromResult(Result.Success(new PaymentCreateResponse(
+                    $"pi_{request.OrderId:N}",
+                    string.Empty,
+                    $"pi_{request.OrderId:N}_secret_test",
+                    request.ExternalCustomerId,
+                    "ek_test_secret",
+                    request.PublishableKey)));
+            }
+
             var sessionId = $"cs_test_{request.OrderId:N}";
             var url = $"https://checkout.stripe.com/pay/{sessionId}";
             return Task.FromResult(Result.Success(new PaymentCreateResponse(sessionId, url)));
@@ -349,6 +361,17 @@ public sealed partial class EconomyServiceTests
             CancellationToken cancellationToken)
         {
             LastSubscriptionCheckoutRequest = request;
+            if (request.UsePaymentSheet)
+            {
+                return Task.FromResult(Result.Success(new SubscriptionCheckoutCreateResponse(
+                    $"sub_{request.UserId:N}_{request.PlanCode}",
+                    string.Empty,
+                    "pi_subscription_secret_test",
+                    request.ExternalCustomerId,
+                    "ek_test_secret",
+                    request.PublishableKey)));
+            }
+
             var sessionId = $"cs_sub_{request.UserId:N}_{request.PlanCode}";
             var url = $"https://checkout.stripe.com/pay/{sessionId}";
             return Task.FromResult(Result.Success(new SubscriptionCheckoutCreateResponse(sessionId, url)));

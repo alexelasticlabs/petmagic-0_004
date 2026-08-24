@@ -1909,7 +1909,7 @@ public sealed partial class EconomyServiceTests
     }
 
     [Fact]
-    public async Task CreatePackPurchaseAsync_ShouldUseHostedStripeCheckoutOnMobile()
+    public async Task CreatePackPurchaseAsync_ShouldUseStripePaymentSheetOnAndroid()
     {
         await using var dbContext = CreateDbContext();
 
@@ -1917,7 +1917,7 @@ public sealed partial class EconomyServiceTests
         {
             Id = Guid.NewGuid(),
             Provider = "stripe",
-            Platform = "ios",
+            Platform = "android",
             Region = "US",
             IsEnabled = true,
             IsRecommended = true,
@@ -1937,14 +1937,17 @@ public sealed partial class EconomyServiceTests
         var service = CreateService(dbContext, gateway: gateway);
 
         var result = await service.CreatePackPurchaseAsync(
-            new CreatePackPurchaseCommand(Guid.NewGuid(), packId, "USD", "stripe", "ios", "1.0.0", "US", "en-US"),
+            new CreatePackPurchaseCommand(Guid.NewGuid(), packId, "USD", "stripe", "android", "1.0.0", "US", "en-US"),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Contains("checkout.stripe.com", result.Value.CheckoutUrl, StringComparison.Ordinal);
-        Assert.Null(result.Value.PaymentIntentClientSecret);
+        Assert.Empty(result.Value.CheckoutUrl);
+        Assert.False(string.IsNullOrWhiteSpace(result.Value.PaymentIntentClientSecret));
+        Assert.False(string.IsNullOrWhiteSpace(result.Value.CustomerId));
+        Assert.False(string.IsNullOrWhiteSpace(result.Value.CustomerEphemeralKeySecret));
+        Assert.StartsWith("pk_test_", result.Value.PublishableKey, StringComparison.Ordinal);
         Assert.NotNull(gateway.LastPaymentCreateRequest);
-        Assert.False(gateway.LastPaymentCreateRequest!.UsePaymentSheet);
+        Assert.True(gateway.LastPaymentCreateRequest!.UsePaymentSheet);
     }
 
     [Fact]
@@ -1987,7 +1990,7 @@ public sealed partial class EconomyServiceTests
     }
 
     [Fact]
-    public async Task CreatePremiumCheckoutAsync_ShouldUseHostedStripeCheckoutOnMobile()
+    public async Task CreatePremiumCheckoutAsync_ShouldUseStripePaymentSheetOnAndroid()
     {
         await using var dbContext = CreateDbContext();
 
@@ -1995,7 +1998,7 @@ public sealed partial class EconomyServiceTests
         {
             Id = Guid.NewGuid(),
             Provider = "stripe",
-            Platform = "ios",
+            Platform = "android",
             Region = "US",
             IsEnabled = true,
             IsRecommended = true,
@@ -2015,14 +2018,17 @@ public sealed partial class EconomyServiceTests
         var service = CreateService(dbContext, gateway: gateway);
 
         var result = await service.CreatePremiumCheckoutAsync(
-            new CreatePremiumCheckoutCommand(Guid.NewGuid(), "yearly", "stripe", "ios", "1.0.0", "US", "en-US"),
+            new CreatePremiumCheckoutCommand(Guid.NewGuid(), "yearly", "stripe", "android", "1.0.0", "US", "en-US"),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : string.Empty);
-        Assert.Contains("checkout.stripe.com", result.Value.CheckoutUrl, StringComparison.Ordinal);
-        Assert.Null(result.Value.PaymentIntentClientSecret);
+        Assert.Empty(result.Value.CheckoutUrl);
+        Assert.False(string.IsNullOrWhiteSpace(result.Value.PaymentIntentClientSecret));
+        Assert.False(string.IsNullOrWhiteSpace(result.Value.CustomerId));
+        Assert.False(string.IsNullOrWhiteSpace(result.Value.CustomerEphemeralKeySecret));
+        Assert.StartsWith("pk_test_", result.Value.PublishableKey, StringComparison.Ordinal);
         Assert.NotNull(gateway.LastSubscriptionCheckoutRequest);
-        Assert.False(gateway.LastSubscriptionCheckoutRequest!.UsePaymentSheet);
+        Assert.True(gateway.LastSubscriptionCheckoutRequest!.UsePaymentSheet);
     }
 
     [Fact]

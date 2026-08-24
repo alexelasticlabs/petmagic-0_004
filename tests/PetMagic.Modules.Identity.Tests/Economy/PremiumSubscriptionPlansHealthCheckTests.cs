@@ -68,6 +68,26 @@ public sealed class PremiumSubscriptionPlansHealthCheckTests
     }
 
     [Fact]
+    public async Task CheckHealthAsync_ShouldBeUnhealthy_WhenWeeklyAllowanceDrifts()
+    {
+        await using var dbContext = CreateDbContext();
+        var monthly = CreatePlan("monthly", isActive: true);
+        monthly.MonthlyTokenLimit = 500;
+        dbContext.SubscriptionPlans.AddRange(
+            monthly,
+            CreatePlan("yearly", isActive: true));
+        await dbContext.SaveChangesAsync();
+
+        var result = await CreateHealthCheck(dbContext)
+            .CheckHealthAsync(new HealthCheckContext());
+
+        Assert.Equal(HealthStatus.Unhealthy, result.Status);
+        Assert.Equal(
+            ["monthly"],
+            Assert.IsType<string[]>(result.Data["allowanceMismatches"]));
+    }
+
+    [Fact]
     public async Task CheckHealthAsync_ShouldLogError_WhenVerificationThrows()
     {
         var logger = new CapturingLogger<PremiumSubscriptionPlansHealthCheck>();
@@ -110,7 +130,7 @@ public sealed class PremiumSubscriptionPlansHealthCheckTests
             BillingPeriod = id == "yearly" ? "yearly" : "monthly",
             PriceAmount = id == "yearly" ? 99.99m : 14.99m,
             CurrencyCode = "USD",
-            MonthlyTokenLimit = id == "yearly" ? 1000 : 500,
+            MonthlyTokenLimit = 40,
             IsRecommended = id == "yearly",
             IsActive = isActive,
             AppleProductId = $"com.petmagic.app.premium.{id}",
