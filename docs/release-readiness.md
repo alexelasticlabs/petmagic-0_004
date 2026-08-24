@@ -59,6 +59,13 @@ adding dated audit snapshots to the repository.
   and subscription event types. A real signed delivery is still required.
 - App Store Connect production and Sandbox notification URLs both target the
   VPS API webhook route. A real signed Sandbox delivery is still required.
+- Production transactional email uses Resend SMTP, not the local Mailpit
+  service. Resend reports `petgpt.app` verified for sending, and public DNS
+  confirms its DKIM plus the `send.petgpt.app` SPF/return-path MX records. The
+  VPS email-confirmation job reached `Sent` in one attempt, the seven-day
+  backend-log check found no SMTP/email error, and Resend records a PetMagic
+  verification message as `delivered`. This is current transport evidence;
+  recipient data and message contents were not inspected.
 - Native Google mobile authentication is configured against the Google/Firebase
   project embedded in the published Android bundle. The public mobile-config
   route returns HTTP 200 and a deliberately invalid native token reaches the
@@ -242,6 +249,11 @@ adding dated audit snapshots to the repository.
   only remaining overall `Degraded` check is the intentional
   `store_account_binding=compatibility` gate, which must stay in place until
   real Google Play and App Store purchase evidence exists.
+
+  SPF and DKIM are active for the Resend sending domain, but public DNS does not
+  currently expose `_dmarc.petgpt.app`. Publish and monitor a DMARC policy
+  before public launch; this is email-authentication hardening, not a current
+  SMTP delivery outage.
 
   The current auth/network/router/templates verification shard passes 163
   tests. Three initially failing pet-generation cases were traced to stale

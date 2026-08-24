@@ -77,6 +77,15 @@ secret values, private keys, tokens, or service-account JSON.
       notification queues healthy. The sole remaining overall `Degraded`
       signal is the intentional `store_account_binding=compatibility` release
       gate; do not switch it to `enforce` before real store-purchase evidence.
+- [x] Production email is routed through Resend SMTP rather than the bundled
+      Mailpit container. Resend reports `petgpt.app` verified with sending
+      enabled; public DNS resolves the verified DKIM record plus the
+      `send.petgpt.app` SPF and return-path MX records. The VPS dispatch table
+      records its customer email-confirmation job as `Sent` after one attempt,
+      and a seven-day backend-log filter found no SMTP/email delivery errors.
+      A Resend provider audit also reports a PetMagic verification message as
+      `delivered`. Recipient addresses, message bodies and credentials were not
+      inspected or recorded.
 - [x] The 2026-08-24 economy rollout migration
       `20260824155159_AlignPremiumAllowanceAndTestPackPrices` is applied on the
       VPS. Live database verification reports `40` for monthly and yearly
@@ -112,6 +121,10 @@ secret values, private keys, tokens, or service-account JSON.
       a matching client secret is provisioned in that same Google project.
       Native Android/iOS token verification does not use a browser OAuth client
       secret.
+- [ ] Publish a DMARC policy for `petgpt.app`. The sending domain already has
+      verified SPF and DKIM, but public DNS does not currently resolve
+      `_dmarc.petgpt.app`; add and validate a monitored policy before public
+      launch without changing the working Resend records.
 
 ### VPS cutover and acceptance still required
 
