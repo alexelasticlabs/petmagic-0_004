@@ -20,7 +20,8 @@ public sealed class AdminSystemStatusTests
                 "provider-plan-secret",
                 new InvalidOperationException("database-password")),
             ["store_account_binding"] = CreateEntry(HealthStatus.Healthy, "compatibility details"),
-            ["templates_scheduler_config"] = CreateEntry(HealthStatus.Unhealthy, "checksum-secret")
+            ["templates_scheduler_config"] = CreateEntry(HealthStatus.Unhealthy, "checksum-secret"),
+            ["templates_fal_provider"] = CreateEntry(HealthStatus.Degraded, "fal-secret")
         });
 
         var response = AdminSystemStatusService.BuildResponse(report, generatedAtUtc);
@@ -29,10 +30,10 @@ public sealed class AdminSystemStatusTests
         Assert.Equal(generatedAtUtc, response.GeneratedAtUtc);
         Assert.Equal(60, response.StaleAfterSeconds);
         Assert.Equal(
-            ["api", "subscriptionCatalog", "storeAccountBinding", "generationScheduler"],
+            ["api", "subscriptionCatalog", "storeAccountBinding", "generationScheduler", "generationProvider"],
             response.Checks.Select(check => check.Key));
         Assert.Equal(
-            ["healthy", "degraded", "healthy", "unhealthy"],
+            ["healthy", "degraded", "healthy", "unhealthy", "degraded"],
             response.Checks.Select(check => check.Status));
         Assert.All(response.Checks, check => Assert.Equal(generatedAtUtc, check.CheckedAtUtc));
 
@@ -40,6 +41,7 @@ public sealed class AdminSystemStatusTests
         Assert.DoesNotContain("provider-plan-secret", json, StringComparison.Ordinal);
         Assert.DoesNotContain("database-password", json, StringComparison.Ordinal);
         Assert.DoesNotContain("checksum-secret", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("fal-secret", json, StringComparison.Ordinal);
         Assert.DoesNotContain("economy_subscription_plans", json, StringComparison.Ordinal);
 
         var root = JsonSerializer.Deserialize<JsonElement>(json);
@@ -57,7 +59,8 @@ public sealed class AdminSystemStatusTests
         {
             ["self"] = CreateEntry(HealthStatus.Healthy, "ok"),
             ["economy_subscription_plans"] = CreateEntry(HealthStatus.Healthy, "ok"),
-            ["store_account_binding"] = CreateEntry(HealthStatus.Healthy, "ok")
+            ["store_account_binding"] = CreateEntry(HealthStatus.Healthy, "ok"),
+            ["templates_fal_provider"] = CreateEntry(HealthStatus.Healthy, "ok")
         });
 
         var response = AdminSystemStatusService.BuildResponse(report, DateTimeOffset.UtcNow);
@@ -117,6 +120,7 @@ public sealed class AdminSystemStatusTests
         Assert.Contains("\"economy_subscription_plans\"", service, StringComparison.Ordinal);
         Assert.Contains("\"store_account_binding\"", service, StringComparison.Ordinal);
         Assert.Contains("\"templates_scheduler_config\"", service, StringComparison.Ordinal);
+        Assert.Contains("\"templates_fal_provider\"", service, StringComparison.Ordinal);
         Assert.DoesNotContain("\"templates_content\"", service, StringComparison.Ordinal);
         Assert.DoesNotContain("\"push_outbox\"", service, StringComparison.Ordinal);
         Assert.DoesNotContain("\"gamification_legacy_delivery\"", service, StringComparison.Ordinal);

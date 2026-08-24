@@ -356,6 +356,7 @@ try
         .AddCheck<StoreAccountBindingModeHealthCheck>("store_account_binding")
         .AddCheck<TemplateContentHealthCheck>("templates_content")
         .AddCheck<TemplateSchedulerConfigHealthCheck>("templates_scheduler_config")
+        .AddCheck<FalProviderRuntimeHealthCheck>("templates_fal_provider")
         .AddCheck<GamificationLegacyDeliveryHealthCheck>("gamification_legacy_delivery")
         .AddCheck<PushOutboxHealthCheck>("push_outbox");
     builder.Services.AddScoped<IAdminSystemStatusService, AdminSystemStatusService>();

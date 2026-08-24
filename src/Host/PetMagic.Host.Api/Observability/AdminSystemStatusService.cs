@@ -20,7 +20,8 @@ public sealed class AdminSystemStatusService(
         new("self", "api", "API"),
         new("economy_subscription_plans", "subscriptionCatalog", "Premium subscription catalog"),
         new("store_account_binding", "storeAccountBinding", "Store account binding"),
-        new("templates_scheduler_config", "generationScheduler", "Generation scheduler configuration")
+        new("templates_scheduler_config", "generationScheduler", "Generation scheduler configuration"),
+        new("templates_fal_provider", "generationProvider", "Generation provider balance")
     ];
 
     private static readonly HashSet<string> CuratedRegistrationNames = CuratedChecks
