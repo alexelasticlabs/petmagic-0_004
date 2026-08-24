@@ -158,9 +158,10 @@ secret values, private keys, tokens, or service-account JSON.
       monitoring for delayed ingestion.
 - [ ] Repair the independent iOS CI signing configuration before TestFlight:
       Firebase iOS configuration and its App ID are now protected GitHub
-      `production` secrets. App Store Connect API access is now approved, but
-      the team API key and Match signing inputs are still required and have not
-      yet been created or stored in GitHub.
+      `production` secrets. App Store Connect API access is now approved. A
+      dedicated private `petmagic-ios-signing` Match repository, repository-only
+      deploy key and protected `MATCH_*` inputs are configured. The team API key
+      and first Match bootstrap still have to be completed before TestFlight.
 - [ ] Prove a real signed Stripe delivery and a real signed App Store Sandbox
       notification. Provider endpoint configuration is verified, but delivery
       and signature acceptance are not yet evidenced.

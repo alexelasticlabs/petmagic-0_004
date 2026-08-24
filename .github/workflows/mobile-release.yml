@@ -14,6 +14,12 @@ on:
         default: android
         type: choice
         options: [android, ios, all]
+      signing_mode:
+        description: iOS Match mode; bootstrap is only for the first signing run
+        required: true
+        default: readonly
+        type: choice
+        options: [readonly, bootstrap]
 
 permissions:
   contents: read
@@ -151,6 +157,10 @@ jobs:
           printf '%s' "$FIREBASE_IOS_CONFIG_BASE64" | base64 --decode > ios/Runner/GoogleService-Info.plist
           echo "PETMAGIC_GOOGLE_CLIENT_ID=$(/usr/libexec/PlistBuddy -c 'Print :CLIENT_ID' ios/Runner/GoogleService-Info.plist)" >> "$GITHUB_ENV"
           echo "PETMAGIC_GOOGLE_REVERSED_CLIENT_ID=$(/usr/libexec/PlistBuddy -c 'Print :REVERSED_CLIENT_ID' ios/Runner/GoogleService-Info.plist)" >> "$GITHUB_ENV"
+      - name: Load dedicated Match repository deploy key
+        uses: webfactory/ssh-agent@a6f90b1f127823b31d4d4a8d96047790581349bd # v0.9.1
+        with:
+          ssh-private-key: ${{ secrets.MATCH_GIT_PRIVATE_KEY }}
       - name: Sync signing
         env:
           APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
@@ -158,6 +168,7 @@ jobs:
           APP_STORE_CONNECT_KEY_P8: ${{ secrets.APP_STORE_CONNECT_KEY_P8 }}
           MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          MATCH_READONLY: ${{ inputs.signing_mode != 'bootstrap' }}
         run: APP_STORE_BUNDLE_ID="$APP_PACKAGE_NAME" bundle exec fastlane ios sync_signing
       - name: Build signed IPA once
         run: |

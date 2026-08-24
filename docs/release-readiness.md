@@ -85,8 +85,9 @@ adding dated audit snapshots to the repository.
   Android/iOS token verification does not use that secret. The independent iOS
   signing/API-key chain remains incomplete in GitHub `production`: Firebase
   iOS configuration and App ID are present, and App Store Connect API access is
-  approved. The team API key and Match signing inputs still need secure
-  provisioning before TestFlight.
+  approved. A dedicated private `petmagic-ios-signing` repository, scoped
+  deploy key and protected `MATCH_*` inputs are configured. The team API key
+  and first Match bootstrap remain pending before TestFlight.
 - Android `1.0.0+3`, containing corrected mobile auth-feedback mapping and
   production API routing, was built, signed, archived and uploaded to Play
   Internal by run `32698746633`. Its Play-installed device reached the VPS API,
