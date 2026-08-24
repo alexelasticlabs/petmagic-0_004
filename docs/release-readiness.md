@@ -380,6 +380,10 @@ do not append command transcripts to this file.
   scripts. Production was not overwritten and remained healthy during the
   audit; retain the source archives until final launch sign-off.
 - An iOS archive and store validation from a supported macOS/Xcode environment.
+- A protected-VPS inspection confirms the Sign in with Apple client ID and
+  audience are `com.petmagic.app`, with a configured client-secret JWT valid
+  through `2027-01-27T05:15:02Z`. This proves configuration presence and expiry,
+  not an Apple authorization-code exchange; complete the real iOS login flow.
 - FAL generation and callback proof with production-like R2 upload/read paths.
 - Stripe, Google Play, and App Store sandbox purchase, replay, refund, restore,
   and subscription lifecycle proof.

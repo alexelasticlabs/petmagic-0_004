@@ -44,8 +44,11 @@ secret values, private keys, tokens, or service-account JSON.
   at `https://api.petgpt.app/api/economy/webhooks/app-store`. This confirms the
   destinations; a real signed Sandbox delivery is still required.
 - Sign in with Apple is enabled for the app and its server key was generated
-  and stored outside the repository. The generated client secret and real login
-  flow still need VPS verification.
+  and stored outside the repository. A protected-VPS inspection confirms that
+  `APPLE_CLIENT_ID` and `APPLE_AUDIENCES` both target `com.petmagic.app`, and
+  the configured client-secret JWT is currently valid through
+  `2027-01-27T05:15:02Z`. Its value was not exposed. A real Sign in with Apple
+  flow still needs physical-device and VPS verification.
 - Firebase has an iOS registration for `com.petmagic.app`; its
   `GoogleService-Info.plist` was placed locally under
   `apps/petmagic-mobile/ios/Runner/` and is Git-ignored. A production APNs
