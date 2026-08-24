@@ -86,8 +86,14 @@ adding dated audit snapshots to the repository.
   signing/API-key chain remains incomplete in GitHub `production`: Firebase
   iOS configuration and App ID are present, and App Store Connect API access is
   approved. A dedicated private `petmagic-ios-signing` repository, scoped
-  deploy key and protected `MATCH_*` inputs are configured. The team API key
-  and first Match bootstrap remain pending before TestFlight.
+  deploy key and protected `MATCH_*` inputs are configured. The App Store
+  Connect record named `Pet Video Magic` is confirmed to use Bundle ID
+  `com.petmagic.app` and Apple ID `6796478761`; production and Sandbox server
+  notifications both target the production App Store webhook. GitHub secret
+  metadata and the Fastlane/workflow contracts agree that only
+  `APP_STORE_CONNECT_KEY_ID`, `APP_STORE_CONNECT_ISSUER_ID`, and
+  `APP_STORE_CONNECT_KEY_P8` are missing from this chain. The team API key and
+  first Match bootstrap remain pending before TestFlight.
 - Android `1.0.0+3`, containing corrected mobile auth-feedback mapping and
   production API routing, was built, signed, archived and uploaded to Play
   Internal by run `32698746633`. Its Play-installed device reached the VPS API,

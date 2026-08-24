@@ -168,8 +168,15 @@ secret values, private keys, tokens, or service-account JSON.
       Firebase iOS configuration and its App ID are now protected GitHub
       `production` secrets. App Store Connect API access is now approved. A
       dedicated private `petmagic-ios-signing` Match repository, repository-only
-      deploy key and protected `MATCH_*` inputs are configured. The team API key
-      and first Match bootstrap still have to be completed before TestFlight.
+      deploy key and protected `MATCH_*` inputs are configured. A live metadata
+      audit confirms that the App Store Connect record named `Pet Video Magic`
+      uses Bundle ID `com.petmagic.app` and Apple ID `6796478761`; its production
+      and Sandbox server-notification URLs both point to the production App
+      Store webhook. Fastlane and the workflows consistently expect exactly
+      `APP_STORE_CONNECT_KEY_ID`, `APP_STORE_CONNECT_ISSUER_ID`, and
+      `APP_STORE_CONNECT_KEY_P8`, and those three protected secrets are not yet
+      present. The team API key and first Match bootstrap still have to be
+      completed before TestFlight.
 - [ ] Prove a real signed Stripe delivery and a real signed App Store Sandbox
       notification. Provider endpoint configuration is verified, but delivery
       and signature acceptance are not yet evidenced.
