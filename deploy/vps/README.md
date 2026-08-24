@@ -231,8 +231,11 @@ secret values, private keys, tokens, or service-account JSON.
       and uses an idempotency key for mobile subscription creation. Flutter
       regression tests, backend gateway tests, a production-flavor debug APK and
       a minified production release AAB pass locally. Android `1.0.0+15` is active
-      on Play Internal; its device install, Stripe test-mode payment, webhook
-      reconciliation and cancellation/retry proof are still required.
+      on Play Internal and is installed on the physical Samsung test device. The
+      authenticated app loads server-backed wallet and Premium data, and its
+      payment-method selector renders both Stripe and Google Play. No purchase
+      was initiated: Stripe test-mode payment, explicit Google Play selection,
+      webhook reconciliation and cancellation/retry proof are still required.
       A read-only Stripe live API audit confirms the production webhook is
       enabled at the expected VPS route with the required payment, checkout,
       refund, invoice and subscription events, but the account currently has

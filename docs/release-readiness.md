@@ -358,10 +358,11 @@ do not append command transcripts to this file.
   renewal, restore, cancellation/refund and backend-crediting acceptance.
 - The active Play Internal track contains release `1.0.0` and an attached
   tester list. This proves release distribution, not Billing eligibility for
-  every Play account or country. On the physical Android device, the native
-  store selector did not expose a purchasable Google Play option; Stripe stayed
-  available. Before a sandbox charge, verify the tester account's Play-country
-  eligibility and license-testing status against the active products.
+  every Play account or country. On the physical Android device running
+  `1.0.0+15`, the payment-method selector renders both Stripe and Google Play;
+  no store or Stripe purchase was started. Verify explicit Google Play selection,
+  the tester account's Play-country eligibility and license-testing status
+  against the active products before a sandbox charge.
 - **Release blocker — Premium allowance rollout:** the owner approved
   `40 PawSpark` at purchase and every seven days while Premium remains active.
   Local plan defaults, health checks, migration and mobile copy now match the
@@ -385,7 +386,9 @@ do not append command transcripts to this file.
   inline-price fallback. Production provider routes are all `live` and the VPS
   has no `STRIPE_TEST_*` credentials; configure an isolated test key pair,
   test webhook secret and test-mode route before sandbox acceptance rather than
-  sending a real charge as a test.
+  sending a real charge as a test. The physical Android selector rendering is
+  accepted for build `1.0.0+15`; its provider purchase, cancellation/retry and
+  signed webhook proof remain pending.
 - **Release blocker — fal.ai generation canary:** runtime authorization is now
   accepted with the dedicated `petmagic-production-vps-billing` `ADMIN` key.
   The VPS env retained `0600 root:root`, preflight and supervisor restart
