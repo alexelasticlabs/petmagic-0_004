@@ -33,9 +33,14 @@ adding dated audit snapshots to the repository.
   monitoring.
 - A root-only GitHub read-only deploy key backs the VPS `origin`. The controlled
   release script deployed source revision
-  `e8a9fd64ae8b13c4677c24caa2640a83e1a20dbd`; its runtime preflight and the
+  `92c202369b7a8dde54c9ac441da41433e1d04668`; its runtime preflight and the
   public API health check passed. This is deployment evidence, not mobile or
   payment acceptance.
+- The economy migration
+  `20260824155159_AlignPremiumAllowanceAndTestPackPrices` is applied on the VPS.
+  Live rows confirm Premium allowance `40` for monthly/yearly and test pack
+  prices `0.99`/`1.49`/`1.99` in USD and EUR. Provider purchase acceptance is
+  still pending.
 - Application R2 media access passed a temporary `PUT`/`GET`/`DELETE` smoke
   check. A dedicated least-privilege backup bucket, encrypted restic repository
   and enabled nightly timer are in place.
@@ -79,10 +84,9 @@ adding dated audit snapshots to the repository.
   matching client secret is provisioned in the same Google project; native
   Android/iOS token verification does not use that secret. The independent iOS
   signing/API-key chain remains incomplete in GitHub `production`: Firebase
-  iOS configuration and App ID are present, while the App Store Connect API key
-  and Match signing inputs still need secure provisioning. The currently
-  connected App Store Connect account cannot request API access; that action is
-  limited to the Account Holder.
+  iOS configuration and App ID are present, and App Store Connect API access is
+  approved. The team API key and Match signing inputs still need secure
+  provisioning before TestFlight.
 - Android `1.0.0+3`, containing corrected mobile auth-feedback mapping and
   production API routing, was built, signed, archived and uploaded to Play
   Internal by run `32698746633`. Its Play-installed device reached the VPS API,
@@ -313,16 +317,17 @@ do not append command transcripts to this file.
 - **Release blocker — Premium allowance rollout:** the owner approved
   `40 PawSpark` at purchase and every seven days while Premium remains active.
   Local plan defaults, health checks, migration and mobile copy now match the
-  decision, with clean/existing DB migration proof. The VPS and active store/
-  Stripe product descriptions are not yet confirmed aligned, and a real
-  renewal/cancellation lifecycle still has to prove idempotent granting.
+  decision, with clean/existing DB migration proof. The VPS migration and live
+  database values are confirmed aligned. Active store/Stripe product copy and
+  a real renewal/cancellation lifecycle still have to prove idempotent granting.
 - **Release blocker — native Stripe acceptance:** eligible Android Stripe
   checkout now uses native PaymentSheet. iOS/web retain hosted Checkout or
   store billing according to policy. The optional client-secret contract,
   narrow-screen Premium UI, production-flavor debug APK and minified release
-  AAB pass locally. Deploy the backend and mobile release, then prove a Stripe
-  test-mode payment, cancellation/retry and signed webhook reconciliation on a
-  physical device before treating this as delivered.
+  AAB pass locally, and the backend is deployed on the VPS. Upload and install
+  Android `1.0.0+15`, then prove a Stripe test-mode payment,
+  cancellation/retry and signed webhook reconciliation on a physical device
+  before treating this as delivered.
 - Google Play token-pack product IDs are derived from the active catalog as
   `com.petmagic.app.tokens.google.<pack-code>` rather than stored per pack.
   The Play Console's **One-time products** catalog is currently empty, while

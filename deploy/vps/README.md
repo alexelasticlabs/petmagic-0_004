@@ -46,7 +46,7 @@ secret values, private keys, tokens, or service-account JSON.
       runtime secrets remain only on the VPS.
 - [x] A root-only GitHub read-only deploy key now backs the VPS `origin`.
       The controlled `deploy-release.sh` path fetched `master`, built and
-      deployed source revision `e8a9fd64ae8b13c4677c24caa2640a83e1a20dbd`;
+      deployed source revision `92c202369b7a8dde54c9ac441da41433e1d04668`;
       its runtime preflight and the public health check both passed.
 - [x] Caddy, the Compose supervisor, PostgreSQL, API, admin web and exactly
       one generation worker are healthy. Public `api.petgpt.app/health` and
@@ -62,6 +62,12 @@ secret values, private keys, tokens, or service-account JSON.
       notification queues healthy. The sole remaining overall `Degraded`
       signal is the intentional `store_account_binding=compatibility` release
       gate; do not switch it to `enforce` before real store-purchase evidence.
+- [x] The 2026-08-24 economy rollout migration
+      `20260824155159_AlignPremiumAllowanceAndTestPackPrices` is applied on the
+      VPS. Live database verification reports `40` for monthly and yearly
+      Premium allowance and `0.99`/`1.49`/`1.99` for the starter/creator/viral
+      USD and EUR test packs. This is database acceptance, not provider charge
+      acceptance.
 - [x] The application R2 credentials completed a temporary `PUT`/`GET`/`DELETE`
       smoke check in the media bucket. The temporary object was deleted.
 - [x] A dedicated least-privilege R2 backup bucket and encrypted restic
@@ -152,21 +158,21 @@ secret values, private keys, tokens, or service-account JSON.
       monitoring for delayed ingestion.
 - [ ] Repair the independent iOS CI signing configuration before TestFlight:
       Firebase iOS configuration and its App ID are now protected GitHub
-      `production` secrets. The App Store Connect API key and Match signing
-      inputs are still required. The currently connected App Store Connect
-      account cannot request API access; only the Account Holder can do so.
+      `production` secrets. App Store Connect API access is now approved, but
+      the team API key and Match signing inputs are still required and have not
+      yet been created or stored in GitHub.
 - [ ] Prove a real signed Stripe delivery and a real signed App Store Sandbox
       notification. Provider endpoint configuration is verified, but delivery
       and signature acceptance are not yet evidenced.
-- [ ] Deploy and accept the native Stripe PaymentSheet release. The local
-      mobile/backend contract now returns PaymentIntent or Subscription invoice
+- [ ] Accept the native Stripe PaymentSheet release. The VPS backend now
+      returns PaymentIntent or Subscription invoice
       client secrets for eligible Android checkout, keeps hosted Checkout as
       the iOS/web fallback,
       and uses an idempotency key for mobile subscription creation. Flutter
       regression tests, backend gateway tests, a production-flavor debug APK and
-      a minified production release AAB pass locally. A device payment in Stripe
-      test mode, webhook reconciliation and cancellation/retry proof are still
-      required; these local checks are not production acceptance.
+      a minified production release AAB pass locally. Android `1.0.0+15` upload
+      and a device payment in Stripe test mode, webhook reconciliation and
+      cancellation/retry proof are still required.
 - [ ] Run real-provider acceptance: Sign in with Apple, FCM/APNs on a physical
       iOS device, Stripe Checkout/webhook reconciliation, App Store Sandbox
       purchase/restore/refund or cancellation lifecycle, and idempotent token
@@ -185,9 +191,10 @@ secret values, private keys, tokens, or service-account JSON.
       release. The owner chose `40 PawSpark` at purchase and every seven days
       while Premium remains active. Local plan defaults, health checks,
       migration and mobile copy now match that decision, and clean/existing DB
-      migration checks pass. The VPS and the active Google Play/App Store/Stripe
-      product copy are not yet confirmed aligned; update them and complete a
-      real sandbox renewal/cancellation lifecycle before public charging.
+      migration checks pass. The VPS migration and live database values are
+      confirmed aligned; active Google Play/App Store/Stripe product copy and a
+      real sandbox renewal/cancellation lifecycle remain pending before public
+      charging.
 - [ ] Complete native Google Play acceptance on an eligible internal tester.
       The Internal track is active with release `1.0.0` and a tester list, but
       the attached device did not expose a purchasable Google Play option while
