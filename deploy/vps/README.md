@@ -105,7 +105,8 @@ secret values, private keys, tokens, or service-account JSON.
 - [ ] Repair the independent iOS CI signing configuration before TestFlight:
       Firebase iOS configuration and its App ID are now protected GitHub
       `production` secrets. The App Store Connect API key and Match signing
-      inputs are still required.
+      inputs are still required. The currently connected App Store Connect
+      account cannot request API access; only the Account Holder can do so.
 - [ ] Prove a real signed Stripe delivery and a real signed App Store Sandbox
       notification. Provider endpoint configuration is verified, but delivery
       and signature acceptance are not yet evidenced.

@@ -74,7 +74,9 @@ adding dated audit snapshots to the repository.
   Android/iOS token verification does not use that secret. The independent iOS
   signing/API-key chain remains incomplete in GitHub `production`: Firebase
   iOS configuration and App ID are present, while the App Store Connect API key
-  and Match signing inputs still need secure provisioning.
+  and Match signing inputs still need secure provisioning. The currently
+  connected App Store Connect account cannot request API access; that action is
+  limited to the Account Holder.
 - Android `1.0.0+3`, containing corrected mobile auth-feedback mapping and
   production API routing, was built, signed, archived and uploaded to Play
   Internal by run `32698746633`. Installation from Play Internal and real-device
