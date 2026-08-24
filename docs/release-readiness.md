@@ -26,6 +26,11 @@ adding dated audit snapshots to the repository.
 - The protected VPS environment passed preflight. Caddy, the Compose
   supervisor, PostgreSQL, API, admin web and one generation worker are healthy;
   public API and admin routes return HTTP 200 over HTTPS.
+- A 2026-08-24 edge control pass confirmed valid TLS for `petgpt.app`,
+  `admin.petgpt.app`, and `api.petgpt.app`, with HSTS, CSP, `nosniff`, and
+  frame protection on each public surface. The earliest observed certificate
+  expiry is 2026-10-28; this is current evidence, not a substitute for renewal
+  monitoring.
 - A root-only GitHub read-only deploy key backs the VPS `origin`. The controlled
   release script deployed source revision
   `e8a9fd64ae8b13c4677c24caa2640a83e1a20dbd`; its runtime preflight and the

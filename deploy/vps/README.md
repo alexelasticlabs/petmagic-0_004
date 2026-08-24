@@ -51,6 +51,11 @@ secret values, private keys, tokens, or service-account JSON.
 - [x] Caddy, the Compose supervisor, PostgreSQL, API, admin web and exactly
       one generation worker are healthy. Public `api.petgpt.app/health` and
       `admin.petgpt.app/ru` return HTTP 200 over HTTPS.
+- [x] Public TLS and edge headers were rechecked on 2026-08-24: `petgpt.app`,
+      `admin.petgpt.app`, and `api.petgpt.app` present valid certificates and
+      enforce HSTS, CSP, `nosniff`, and frame protection. Certificate expiry is
+      no earlier than 2026-10-28; automated renewal still needs normal
+      operational monitoring.
 - [x] A stale exhausted `identity_email` job addressed to the reserved
       `example.com` test domain was removed after its SMTP failure was
       confirmed isolated from customer traffic. Fresh `/health` reports all
