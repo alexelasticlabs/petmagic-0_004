@@ -54,9 +54,11 @@ adding dated audit snapshots to the repository.
   JSON. Run `32666052824` built and signed `1.0.0+2`, preserved its symbols
   artifact and reached the Play Internal upload, but Google Play rejected the
   track update with `The caller does not have permission`. The existing service
-  account now has `Release apps to testing tracks`; follow-up run `32674447149`
-  is the pending live upload proof. The independent iOS signing/API-key chain
-  remains unavailable or malformed.
+  account was granted `Release apps to testing tracks`; follow-up run
+  `32674447149` then built, archived, and uploaded `1.0.0+2` to Play Internal
+  successfully. Installation and a real-device VPS connectivity check remain
+  pending. The independent iOS signing/API-key chain remains unavailable or
+  malformed.
 
 ## Automated Gates
 
@@ -104,9 +106,8 @@ do not append command transcripts to this file.
   its required-locale gate.
 - Privacy/legal approval for release Crashlytics collection, including the
   intended Firebase processor disclosure and retention basis.
-- Successful publication of the already-proven signed Android AAB to Play
-  Internal. Signing, compilation and the service account's testing-track
-  release permission are configured; live upload run `32674447149` is pending.
+- Installation of the uploaded Android `1.0.0+2` Internal build and real-device
+  proof that it connects to the VPS at `https://api.petgpt.app`.
 - An iOS archive and store validation from a supported macOS/Xcode environment.
 - FAL generation and callback proof with production-like R2 upload/read paths.
 - Stripe, Google Play, and App Store sandbox purchase, replay, refund, restore,

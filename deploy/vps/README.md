@@ -75,8 +75,10 @@ secret values, private keys, tokens, or service-account JSON.
       testing tracks. Run `32666052824` proved the missing permission; Play
       Console now confirms the account has five PetMagic app permissions,
       including `Release apps to testing tracks`.
-- [ ] Confirm follow-up run `32674447149` publishes `1.0.0+2` to Play Internal,
-      then install it on a tester device and prove connectivity to the VPS.
+- [x] Run `32674447149` built, archived, and published Android `1.0.0+2` to
+      Play Internal after the testing-track release permission was granted.
+- [ ] Install Android `1.0.0+2` from Play Internal on a tester device and prove
+      connectivity to the VPS at `https://api.petgpt.app`.
 - [ ] Repair the independent iOS CI signing configuration before TestFlight:
       the App Store Connect API key and Firebase iOS configuration were absent
       or malformed in the protected GitHub production environment.
