@@ -60,8 +60,10 @@ secret values, private keys, tokens, or service-account JSON.
       runtime secrets remain only on the VPS.
 - [x] A root-only GitHub read-only deploy key now backs the VPS `origin`.
       The controlled `deploy-release.sh` path fetched `master`, built and
-      deployed source revision `0691b7d16818d5e3124e922d84a761caeabdca67`;
-      its runtime preflight and the public health check both passed.
+      deployed source revision `f7c7da65f2b651752e80026c38c6209f03289fe6`;
+      its runtime preflight and the public health check both passed. The live
+      database has 101 applied EF migrations, including the iOS Stripe policy
+      guard.
 - [x] Caddy, the Compose supervisor, PostgreSQL, API, admin web and exactly
       one generation worker are healthy. Public `api.petgpt.app/health` and
       `admin.petgpt.app/ru` return HTTP 200 over HTTPS.
@@ -120,10 +122,11 @@ secret values, private keys, tokens, or service-account JSON.
       a matching client secret is provisioned in that same Google project.
       Native Android/iOS token verification does not use a browser OAuth client
       secret.
-- [ ] Publish a DMARC policy for `petgpt.app`. The sending domain already has
-      verified SPF and DKIM, but public DNS does not currently resolve
-      `_dmarc.petgpt.app`; add and validate a monitored policy before public
-      launch without changing the working Resend records.
+- [x] A monitored DMARC policy is published for `petgpt.app`: public DNS
+      resolves `_dmarc.petgpt.app` to `v=DMARC1; p=none` with strict
+      `adkim`/`aspf` alignment and aggregate reports to the owner-controlled
+      operations mailbox. It does not reject or quarantine mail; review
+      aggregate reports before moving to an enforcement policy.
 - [x] `FAL_AI_API_KEY` was rotated on 2026-08-25 to the dedicated
       `petmagic-production-vps-billing` fal.ai key with `ADMIN` scope. The
       protected environment retained mode `0600` and owner `root:root`, VPS

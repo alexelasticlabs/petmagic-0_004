@@ -33,8 +33,9 @@ adding dated audit snapshots to the repository.
   monitoring.
 - A root-only GitHub read-only deploy key backs the VPS `origin`. The controlled
   release script deployed source revision
-  `0691b7d16818d5e3124e922d84a761caeabdca67`; its runtime preflight and the
-  public API health check passed. On 2026-08-25 the fal.ai credential was
+  `f7c7da65f2b651752e80026c38c6209f03289fe6`; its runtime preflight and the
+  public API health check passed. The VPS database currently has 101 applied EF
+  migrations. On 2026-08-25 the fal.ai credential was
   rotated to a dedicated `ADMIN`-scope production key; the direct billing read
   returned HTTP 200 and the persisted provider check became `Healthy`/`fresh`
   with zero consecutive failures. This is deployment and provider-authorization
@@ -69,6 +70,11 @@ adding dated audit snapshots to the repository.
   backend-log check found no SMTP/email error, and Resend records a PetMagic
   verification message as `delivered`. This is current transport evidence;
   recipient data and message contents were not inspected.
+- Public DNS now publishes an initial monitored DMARC policy for `petgpt.app`
+  (`p=none`, strict DKIM/SPF alignment and aggregate reports to the
+  owner-controlled operations mailbox). This adds authentication observability
+  without changing acceptance or delivery; review reports before enabling a
+  rejecting policy.
 - Native Google mobile authentication is configured against the Google/Firebase
   project embedded in the published Android bundle. The public mobile-config
   route returns HTTP 200 and a deliberately invalid native token reaches the
