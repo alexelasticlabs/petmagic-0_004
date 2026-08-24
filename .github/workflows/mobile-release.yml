@@ -42,6 +42,15 @@ jobs:
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
         with:
           cache-provider: basic
+      - name: Fit Gradle to the hosted runner
+        shell: bash
+        run: |
+          printf '%s\n' \
+            'org.gradle.jvmargs=-Xmx4G -XX:MaxMetaspaceSize=1G -XX:ReservedCodeCacheSize=256m' \
+            'org.gradle.parallel=false' \
+            'org.gradle.workers.max=2' \
+            'org.gradle.vfs.watch=false' \
+            >> android/gradle.properties
       - uses: ruby/setup-ruby@d45b1a4e94b71acab930e56e79c6aa188764e7f9 # v1
         with: { ruby-version: '3.3', bundler-cache: true, working-directory: apps/petmagic-mobile }
       - run: flutter pub get
@@ -79,8 +88,19 @@ jobs:
           } > android/key.properties
           printf '%s' "$GOOGLE_PLAY_SERVICE_ACCOUNT_JSON" > build-google-play-key.json
       - name: Build signed AAB
+        shell: bash
         run: |
-          flutter build appbundle --release --flavor "$RELEASE_ENVIRONMENT" \
+          heartbeat() {
+            while sleep 60; do
+              echo "Android release build is still running at $(date -u +%FT%TZ)."
+              free -h
+            done
+          }
+          heartbeat &
+          heartbeat_pid=$!
+          trap 'kill "$heartbeat_pid" 2>/dev/null || true' EXIT
+
+          flutter build appbundle --no-pub --release --flavor "$RELEASE_ENVIRONMENT" \
             --dart-define=APP_ENVIRONMENT="$RELEASE_ENVIRONMENT" \
             --dart-define=APP_PACKAGE_NAME="$APP_PACKAGE_NAME" \
             --dart-define=API_BASE_URL="$API_BASE_URL" \

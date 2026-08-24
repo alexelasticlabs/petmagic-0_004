@@ -26,6 +26,15 @@ jobs:
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
         with:
           cache-provider: basic
+      - name: Fit Gradle to the hosted runner
+        shell: bash
+        run: |
+          printf '%s\n' \
+            'org.gradle.jvmargs=-Xmx4G -XX:MaxMetaspaceSize=1G -XX:ReservedCodeCacheSize=256m' \
+            'org.gradle.parallel=false' \
+            'org.gradle.workers.max=2' \
+            'org.gradle.vfs.watch=false' \
+            >> android/gradle.properties
       - name: Resolve dependencies
         run: flutter pub get
       - name: Generate localization
@@ -76,6 +85,15 @@ jobs:
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
         with:
           cache-provider: basic
+      - name: Fit Gradle to the hosted runner
+        shell: bash
+        run: |
+          printf '%s\n' \
+            'org.gradle.jvmargs=-Xmx4G -XX:MaxMetaspaceSize=1G -XX:ReservedCodeCacheSize=256m' \
+            'org.gradle.parallel=false' \
+            'org.gradle.workers.max=2' \
+            'org.gradle.vfs.watch=false' \
+            >> android/gradle.properties
       - name: Resolve dependencies
         run: flutter pub get
       - name: Build Android staging release smoke
@@ -114,6 +132,15 @@ jobs:
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
         with:
           cache-provider: basic
+      - name: Fit Gradle to the hosted runner
+        shell: bash
+        run: |
+          printf '%s\n' \
+            'org.gradle.jvmargs=-Xmx4G -XX:MaxMetaspaceSize=1G -XX:ReservedCodeCacheSize=256m' \
+            'org.gradle.parallel=false' \
+            'org.gradle.workers.max=2' \
+            'org.gradle.vfs.watch=false' \
+            >> android/gradle.properties
       - name: Resolve dependencies
         run: flutter pub get
       - name: Build Android production release smoke
@@ -154,6 +181,15 @@ jobs:
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
         with:
           cache-provider: basic
+      - name: Fit Gradle to the hosted runner
+        shell: bash
+        run: |
+          printf '%s\n' \
+            'org.gradle.jvmargs=-Xmx4G -XX:MaxMetaspaceSize=1G -XX:ReservedCodeCacheSize=256m' \
+            'org.gradle.parallel=false' \
+            'org.gradle.workers.max=2' \
+            'org.gradle.vfs.watch=false' \
+            >> android/gradle.properties
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
