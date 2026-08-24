@@ -111,10 +111,11 @@ secret values, private keys, tokens, or service-account JSON.
       make the subsequent `/api/auth/me` request; the native Google SDK also
       did not reach the token exchange. This is diagnostic evidence, not
       authentication acceptance.
-- [ ] Publish Android `1.0.0+6`. It preserves an authenticated session in
+- [x] Android `1.0.0+6` preserves an authenticated session in
       memory when Android secure-storage persistence stalls, bounds Google SDK
       cleanup, and gives the PetMagic API reachability probe realistic mobile
-      timeouts. CI, Play upload and physical-device acceptance are pending.
+      timeouts. Run `32706661084` built, signed, archived and uploaded it to
+      Play Internal; physical-device acceptance is pending.
 - [ ] Complete real-device authentication acceptance: verified email/password
       login and native Google sign-in with a real Google account.
 - [ ] Repair the independent iOS CI signing configuration before TestFlight:

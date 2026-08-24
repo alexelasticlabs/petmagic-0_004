@@ -94,11 +94,14 @@ adding dated audit snapshots to the repository.
   the subsequent `/api/auth/me` request; the native Google SDK also did not
   reach the token exchange. Android `1.0.0+6` is prepared with in-memory
   session continuity if Android secure-storage persistence stalls, bounded
-  Google SDK cleanup, and less aggressive API reachability probes. Its CI,
-  Play upload, and physical-device acceptance are still pending.
+  Google SDK cleanup, and less aggressive API reachability probes. Run
+  `32706661084` built, signed, archived and uploaded it to Play Internal.
+  Physical-device authentication acceptance is still pending.
 - The Android release job is configured to reuse Gradle dependency, transform
-  and local build-cache state between runs. The first run seeds that cache;
-  a later release run must be timed and compared before any performance gain is
+  and local build-cache state between runs. Run `32706661084` was the first
+  seed: it restored no entry, saved 2.1 GB in a 56-second post-job step, and
+  completed in 15m 51s; its signed-AAB step took 12m 48s. A later release run
+  must restore that entry and be timed before any cache performance gain is
   claimed.
 
 ## Automated Gates
