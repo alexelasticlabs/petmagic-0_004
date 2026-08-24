@@ -38,7 +38,6 @@ class NetworkStatusController extends Notifier<NetworkStatusState> {
   static const Duration _offlineProbeInterval = Duration(seconds: 5);
   static const Duration _offlineProbeMaxInterval = Duration(seconds: 30);
   static const Duration _internetProbeTimeout = Duration(seconds: 6);
-  static const Duration _probeDebounceWindow = Duration(seconds: 5);
 
   final Connectivity _connectivity = Connectivity();
   StreamSubscription<List<ConnectivityResult>>? _subscription;
@@ -46,8 +45,7 @@ class NetworkStatusController extends Notifier<NetworkStatusState> {
   Timer? _restoreBannerTimer;
   bool _lastKnownInternet = true;
   bool _started = false;
-  bool? _lastProbeResult;
-  DateTime? _lastProbeTime;
+  int _connectivityEvaluationGeneration = 0;
   Duration _currentOfflineProbeInterval = _offlineProbeInterval;
 
   @override
@@ -151,17 +149,18 @@ class NetworkStatusController extends Notifier<NetworkStatusState> {
       return;
     }
 
-    if (!_hasAnyNetworkRoute(results)) {
-      _applyConnectionState(hasInternet: false, source: source);
-      return;
-    }
-
+    final evaluationGeneration = ++_connectivityEvaluationGeneration;
+    final hasReportedRoute = _hasAnyNetworkRoute(results);
     final hasInternet = await _probeInternet();
-    if (!ref.mounted) {
+    if (!ref.mounted ||
+        evaluationGeneration != _connectivityEvaluationGeneration) {
       return;
     }
 
-    _applyConnectionState(hasInternet: hasInternet, source: source);
+    _applyConnectionState(
+      hasInternet: hasInternet,
+      source: hasReportedRoute ? source : '${source}_route_unconfirmed',
+    );
   }
 
   void _applyConnectionState({
@@ -270,20 +269,11 @@ class NetworkStatusController extends Notifier<NetworkStatusState> {
   }
 
   Future<bool> _probeInternet() async {
-    if (_lastProbeResult != null &&
-        _lastProbeTime != null &&
-        DateTime.now().difference(_lastProbeTime!) < _probeDebounceWindow) {
-      return _lastProbeResult!;
-    }
-
     final reachableBaseUrl = await const ApiBaseUrlHealthChecker(
       probeBudget: _internetProbeTimeout,
       connectTimeout: Duration(seconds: 2),
       readTimeout: Duration(seconds: 3),
     ).findReachable(AppConfig.apiBaseUrls);
-    final result = reachableBaseUrl != null;
-    _lastProbeResult = result;
-    _lastProbeTime = DateTime.now();
-    return result;
+    return reachableBaseUrl != null;
   }
 }

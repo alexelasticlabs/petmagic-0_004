@@ -28,6 +28,22 @@ void main() {
     expect(bootstrapSetupBody, contains('if (!ref.mounted)'));
     expect(refreshBody, contains('if (!ref.mounted)'));
     expect(connectivityBody, contains('if (!ref.mounted)'));
+    expect(
+      connectivityBody,
+      contains('final evaluationGeneration ='),
+      reason: 'concurrent connectivity callbacks must not race state updates',
+    );
+    expect(
+      connectivityBody,
+      contains('evaluationGeneration != _connectivityEvaluationGeneration'),
+    );
+    expect(
+      connectivityBody,
+      isNot(contains('_applyConnectionState(hasInternet: false')),
+      reason:
+          'a transient ConnectivityResult.none must be confirmed by the API probe',
+    );
+    expect(connectivityBody, contains(r"'${source}_route_unconfirmed'"));
     expect(applyBody, contains('if (!ref.mounted)'));
     expect(
       applyBody,

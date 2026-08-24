@@ -96,7 +96,21 @@ adding dated audit snapshots to the repository.
   session continuity if Android secure-storage persistence stalls, bounded
   Google SDK cleanup, and less aggressive API reachability probes. Run
   `32706661084` built, signed, archived and uploaded it to Play Internal.
-  Physical-device authentication acceptance is still pending.
+  Physical-device build `1.0.0+6` reached both the public Google mobile-config
+  route and the API `/health` route with HTTP 200, while the UI still replaced
+  the auth flow with an offline error. The remaining race was isolated to a
+  transient Android connectivity callback cancelling an in-flight auth request
+  after the successful API response. Current source confirms every reported
+  route state with the PetMagic API probe and ignores stale concurrent probe
+  completions; the focused network/profile/external-auth test shard passes 31
+  tests. This correction is not yet installed from Play, so physical-device
+  authentication acceptance remains pending.
+  The complete mobile test suite currently reports `1414` passed and `13`
+  failed tests outside this focused shard. Four reproduced failures are the
+  pre-existing `My Pets renders in ...` visual helper cases, which stop at a
+  missing widget lookup (`Bad state: No element`); the Flutter summary folds
+  the remaining names into `... and 9 more`. No golden baselines were updated
+  as part of this connectivity release.
 - The Android release job is configured to reuse Gradle dependency, transform
   and local build-cache state between runs. Run `32706661084` was the first
   seed: it restored no entry, saved 2.1 GB in a 56-second post-job step, and
