@@ -150,12 +150,33 @@ public sealed class IdentityInfrastructureConfigurationTests
     }
 
     [Fact]
-    public void AddIdentityInfrastructure_ShouldRejectIncompleteGoogleConfiguration()
+    public async Task AddIdentityInfrastructure_ShouldConfigureNativeGoogleWithoutBrowserClientSecret()
     {
         var services = CreateServices();
         var configuration = CreateConfiguration(new Dictionary<string, string?>
         {
-            ["ExternalAuth:Google:ClientId"] = "google-client-id"
+            ["ExternalAuth:Google:ClientId"] = "google-client-id",
+            ["ExternalAuth:Google:Audiences:0"] = "google-android-client-id"
+        });
+
+        services.AddIdentityInfrastructure(configuration);
+
+        using var provider = services.BuildServiceProvider();
+        var verifier = provider.GetRequiredService<IGoogleIdentityTokenVerifier>();
+        var schemes = provider.GetRequiredService<IAuthenticationSchemeProvider>();
+
+        Assert.True(verifier.IsConfigured);
+        Assert.Equal("google-client-id", verifier.ClientId);
+        Assert.Null(await schemes.GetSchemeAsync("Google"));
+    }
+
+    [Fact]
+    public void AddIdentityInfrastructure_ShouldRejectGoogleClientSecretWithoutClientId()
+    {
+        var services = CreateServices();
+        var configuration = CreateConfiguration(new Dictionary<string, string?>
+        {
+            ["ExternalAuth:Google:ClientSecret"] = "google-client-secret"
         });
 
         var exception = Assert.Throws<InvalidOperationException>(() => services.AddIdentityInfrastructure(configuration));

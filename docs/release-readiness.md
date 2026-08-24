@@ -41,6 +41,11 @@ adding dated audit snapshots to the repository.
   and subscription event types. A real signed delivery is still required.
 - App Store Connect production and Sandbox notification URLs both target the
   VPS API webhook route. A real signed Sandbox delivery is still required.
+- Native Google mobile authentication is configured against the Google/Firebase
+  project embedded in the published Android bundle. The public mobile-config
+  route returns HTTP 200 and a deliberately invalid native token reaches the
+  expected authentication rejection path. Real Google-account sign-in on a
+  physical device remains required.
 
 ## Mobile release correction pending
 
@@ -56,9 +61,12 @@ adding dated audit snapshots to the repository.
   track update with `The caller does not have permission`. The existing service
   account was granted `Release apps to testing tracks`; follow-up run
   `32674447149` then built, archived, and uploaded `1.0.0+2` to Play Internal
-  successfully. Installation and a real-device VPS connectivity check remain
-  pending. The independent iOS signing/API-key chain remains unavailable or
-  malformed.
+  successfully. A Play-installed device has reached the VPS API, but verified
+  email/password and real Google-account sign-in acceptance remain pending.
+  Browser redirect-based Google OAuth is intentionally disabled until a
+  matching client secret is provisioned in the same Google project; native
+  Android/iOS token verification does not use that secret. The independent iOS
+  signing/API-key chain remains unavailable or malformed.
 
 ## Automated Gates
 
@@ -106,8 +114,9 @@ do not append command transcripts to this file.
   its required-locale gate.
 - Privacy/legal approval for release Crashlytics collection, including the
   intended Firebase processor disclosure and retention basis.
-- Installation of the uploaded Android `1.0.0+2` Internal build and real-device
-  proof that it connects to the VPS at `https://api.petgpt.app`.
+- Real-device authentication acceptance for the uploaded Android `1.0.0+2`
+  Internal build: verified email/password login and native Google login with a
+  real account.
 - An iOS archive and store validation from a supported macOS/Xcode environment.
 - FAL generation and callback proof with production-like R2 upload/read paths.
 - Stripe, Google Play, and App Store sandbox purchase, replay, refund, restore,

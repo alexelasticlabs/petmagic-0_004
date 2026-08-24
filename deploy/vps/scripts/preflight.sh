@@ -70,10 +70,9 @@ google_client_id="$(env_value GOOGLE_CLIENT_ID)"
 google_client_secret="$(env_value GOOGLE_CLIENT_SECRET)"
 google_audiences="$(env_value GOOGLE_AUDIENCES)"
 if [[ -n "$google_client_id" || -n "$google_client_secret" || -n "$google_audiences" ]]; then
-  if [[ -z "$google_client_id" || -z "$google_client_secret" || -z "$google_audiences" \
-    || "$google_client_id" == *'__REQUIRED__'* || "$google_client_secret" == *'__REQUIRED__'* \
-    || "$google_audiences" == *'__REQUIRED__'* ]]; then
-    echo "Google external auth must define GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_AUDIENCES together, or leave all three empty." >&2
+  if [[ -z "$google_client_id" || "$google_client_id" == *'__REQUIRED__'* \
+    || "$google_client_secret" == *'__REQUIRED__'* || "$google_audiences" == *'__REQUIRED__'* ]]; then
+    echo "Google external auth requires GOOGLE_CLIENT_ID whenever Google settings are defined. GOOGLE_CLIENT_SECRET is only required for browser OAuth; GOOGLE_AUDIENCES is optional for native token verification." >&2
     exit 1
   fi
 fi

@@ -470,9 +470,15 @@ public static class IdentityInfrastructureServiceCollectionExtensions
     {
         var googleClientIdConfigured = !string.IsNullOrWhiteSpace(options.Google.ClientId);
         var googleClientSecretConfigured = !string.IsNullOrWhiteSpace(options.Google.ClientSecret);
-        if (googleClientIdConfigured != googleClientSecretConfigured)
+        var googleAudiencesConfigured = options.Google.Audiences.Any(static audience => !string.IsNullOrWhiteSpace(audience));
+        if (googleClientSecretConfigured && !googleClientIdConfigured)
         {
-            throw new InvalidOperationException("Google external auth configuration is incomplete. Configure both ClientId and ClientSecret.");
+            throw new InvalidOperationException("Google external auth configuration is incomplete. ClientSecret requires ClientId.");
+        }
+
+        if (googleAudiencesConfigured && !googleClientIdConfigured)
+        {
+            throw new InvalidOperationException("Google external auth configuration is incomplete. Audiences require ClientId.");
         }
 
         var appleClientIdConfigured = !string.IsNullOrWhiteSpace(options.Apple.ClientId);

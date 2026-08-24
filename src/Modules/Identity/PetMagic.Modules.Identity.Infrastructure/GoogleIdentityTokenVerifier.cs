@@ -10,8 +10,8 @@ namespace PetMagic.Modules.Identity.Infrastructure;
 internal sealed class GoogleIdentityTokenVerifier(ExternalAuthOptions options) : IGoogleIdentityTokenVerifier
 {
     public bool IsConfigured =>
-        ResolveAudiences().Count > 0 &&
-        !string.IsNullOrWhiteSpace(options.Google.ClientSecret);
+        !string.IsNullOrWhiteSpace(options.Google.ClientId) &&
+        ResolveAudiences().Count > 0;
 
     public string? ClientId => IsConfigured ? options.Google.ClientId : null;
 

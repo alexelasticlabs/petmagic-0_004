@@ -60,13 +60,22 @@ secret values, private keys, tokens, or service-account JSON.
 - [x] App Store Connect production and Sandbox notification URLs both target
       the VPS API webhook route. This confirms provider configuration, not a
       real signed Sandbox-event delivery.
+- [x] Native Google sign-in is configured against the Google/Firebase project
+      embedded in the published Android bundle. The mobile configuration route
+      returns HTTP 200 and a deliberately invalid native token is rejected with
+      the expected authentication error. A real Google-account login on a
+      physical Android device is still required.
+- [ ] Browser redirect-based Google OAuth remains intentionally disabled until
+      a matching client secret is provisioned in that same Google project.
+      Native Android/iOS token verification does not use a browser OAuth client
+      secret.
 
 ### VPS cutover and acceptance still required
 
-- [ ] Publish an Android production update built with
-      `API_BASE_URL=https://api.petgpt.app`. The prior release workflow used
-      `api.petmagic.app`, which does not resolve in DNS; a Play-installed build
-      using that URL cannot reach the VPS.
+- [x] Android `1.0.0+2`, built with `API_BASE_URL=https://api.petgpt.app`, was
+      published to Play Internal by run `32674447149`. The prior
+      `api.petmagic.app` host does not resolve in DNS; do not use it for a
+      release build.
 - [x] Restore the protected GitHub production Android credentials: the existing
       Play upload keystore, Firebase production config and Play service-account
       JSON are configured. Run `32666052824` built and signed `1.0.0+2` and
@@ -77,8 +86,10 @@ secret values, private keys, tokens, or service-account JSON.
       including `Release apps to testing tracks`.
 - [x] Run `32674447149` built, archived, and published Android `1.0.0+2` to
       Play Internal after the testing-track release permission was granted.
-- [ ] Install Android `1.0.0+2` from Play Internal on a tester device and prove
-      connectivity to the VPS at `https://api.petgpt.app`.
+- [x] A Play-installed Android `1.0.0+2` device reached the VPS API; server
+      logs recorded its authentication requests.
+- [ ] Complete real-device authentication acceptance: verified email/password
+      login and native Google sign-in with a real Google account.
 - [ ] Repair the independent iOS CI signing configuration before TestFlight:
       the App Store Connect API key and Firebase iOS configuration were absent
       or malformed in the protected GitHub production environment.
@@ -141,6 +152,11 @@ Populate every `__REQUIRED__` value from the approved protected configuration,
 without printing secret values in logs or chat. If Render is still being used
 as the migration source, read its production configuration there; otherwise use
 the owner's protected secret inventory.
+
+For native Google Android/iOS token verification, `GOOGLE_CLIENT_ID` is
+required and `GOOGLE_AUDIENCES` may specify the accepted mobile client IDs. A
+`GOOGLE_CLIENT_SECRET` is only needed when enabling browser redirect-based
+Google OAuth; never reuse a secret from another Google project.
 Keep `BOOTSTRAP_ADMIN_PASSWORD` empty. Validate the result before starting any
 container:
 
