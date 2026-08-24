@@ -388,7 +388,11 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
 
   void _runAfterBuild(VoidCallback action) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_disposed) {
+      // Riverpod's WidgetRef is backed by this element's BuildContext. During
+      // route/provider-scope replacement the element can become unmounted
+      // before State.dispose() has completed, so State.mounted/_disposed alone
+      // are not a sufficient guard for deferred ref.read calls.
+      if (_disposed || !mounted || !context.mounted) {
         return;
       }
       action();

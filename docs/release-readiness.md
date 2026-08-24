@@ -50,8 +50,9 @@ adding dated audit snapshots to the repository.
   project embedded in the published Android bundle. The public mobile-config
   route returns HTTP 200 and a deliberately invalid native token reaches the
   expected authentication rejection path. The Play-distribution signing
-  certificate matches the production Android OAuth client in that project.
-  Real Google-account sign-in on a physical device remains required.
+  certificate matches the production Android OAuth client in that project. A
+  real Google-account sign-in on the Play-installed physical Android device was
+  accepted by the VPS and completed `/api/auth/me` successfully.
 
 ## Mobile release correction pending
 
@@ -166,15 +167,31 @@ adding dated audit snapshots to the repository.
   empty JSON state even though Android autofill visibly populated both fields.
   Android `1.0.0+12` snapshots the visible `TextEditingController` values before
   updating Riverpod state and submitting; its autofill regression widget test
-  and the 55-test auth/network shard pass, and `flutter analyze` is clean.
-  Building, Play Internal upload and physical email/password acceptance for
-  `1.0.0+12` remain pending. The complete mobile test suite currently reports
-  `1418` passed and `13` failed tests outside this
-  focused shard. Four reproduced failures are the
-  pre-existing `My Pets renders in ...` visual helper cases, which stop at a
-  missing widget lookup (`Bad state: No element`); the Flutter summary folds
-  the remaining names into `... and 9 more`. No golden baselines were updated
-  as part of this connectivity release.
+  and the 55-test auth/network shard pass, and `flutter analyze` is clean. Run
+  `32722408718` built, archived and uploaded that exact release from commit
+  `01d92a177858fcf130f9e692d916146c4f4ffa77` to Play Internal successfully;
+  `versionCode=12` is installed on the physical Samsung device. A cold-start
+  check restored the authenticated session, loaded wallet-backed UI and showed
+  the empty-template state without a server-unavailable result. Fresh device
+  `logcat` contained no Flutter, Dio, socket or crash-buffer error.
+
+  Crashlytics nevertheless received two build-12 events from an earlier
+  authenticated session. The matching Build ID and archived Dart symbols
+  resolve one stack to a deferred `TemplatesPage` callback reading Riverpod
+  after its element was unmounted. Android `1.0.0+13` guards deferred provider
+  work with the owning `BuildContext.mounted` state and adds an unmount
+  lifecycle regression. The production GitHub environment now also has the
+  Firebase CI credential required by the existing workflow, and build-12 Dart
+  symbols were uploaded successfully; future release jobs can upload symbols
+  instead of silently skipping that step. Build/upload/install and a
+  no-new-event Crashlytics observation are still required for `1.0.0+13`.
+
+  The current auth/network/router/templates verification shard passes 163
+  tests. Three initially failing pet-generation cases were traced to stale
+  test fixtures using the intentionally disallowed placeholder host
+  `cdn.petmagic.app`; deterministic cached-image fixtures now use the approved
+  `cdn.petgpt.app` host and the isolated pet-flow file passes all 10 cases. This
+  is test-contract evidence, not a production generation-provider acceptance.
 - The Android release job is configured to reuse Gradle dependency, transform
   and local build-cache state between runs. Run `32706661084` was the first
   seed: it restored no entry, saved 2.1 GB in a 56-second post-job step, and
@@ -234,15 +251,19 @@ do not append command transcripts to this file.
   its required-locale gate.
 - Privacy/legal approval for release Crashlytics collection, including the
   intended Firebase processor disclosure and retention basis.
-- Real-device email/password acceptance for the Android `1.0.0+12` Play
-  Internal release after it is built and uploaded. General API connectivity,
-  guest/server-backed screens and native Google login with a real account are
-  accepted on `1.0.0+11`.
-- Google Play subscriptions: the PetMagic Play Console subscription list is
-  currently empty. Create the approved product, base plan, regional prices and
-  tester offer before enabling Google Play subscription acceptance; the VPS
-  health check only confirms its internal plan catalog, not that a purchasable
-  Play product exists.
+- Build, upload and install Android `1.0.0+13`, then repeat physical-device
+  email/password, Google, guest and authenticated-navigation acceptance and
+  confirm that Crashlytics receives no new lifecycle event. General API
+  connectivity and real Google-account authentication are already accepted.
+- Google Play contains active monthly (`com.petmagic.app.premium.monthly`,
+  USD 14.99) and yearly (`com.petmagic.app.premium.yearly`, USD 99.99)
+  subscriptions with active base plans in 174 countries. A tester offer was
+  not created without an approved product decision. Complete sandbox purchase,
+  renewal, restore, cancellation/refund and idempotent backend-crediting proof.
+- The production and retained Render databases both currently contain zero
+  template items, categories and assets; this is not a VPS migration loss.
+  Populate the production catalog only with approved template content and then
+  verify R2-backed mobile feed/generation flows.
 - An iOS archive and store validation from a supported macOS/Xcode environment.
 - FAL generation and callback proof with production-like R2 upload/read paths.
 - Stripe, Google Play, and App Store sandbox purchase, replay, refund, restore,

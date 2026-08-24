@@ -106,4 +106,5 @@ postgres_data/
 
 # Local agent/tooling caches
 .agents/
+.crashlytics/
 skills-lock.json

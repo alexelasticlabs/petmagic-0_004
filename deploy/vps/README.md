@@ -66,9 +66,10 @@ secret values, private keys, tokens, or service-account JSON.
       real signed Sandbox-event delivery.
 - [x] Native Google sign-in is configured against the Google/Firebase project
       embedded in the published Android bundle. The mobile configuration route
-      returns HTTP 200 and a deliberately invalid native token is rejected with
-      the expected authentication error. A real Google-account login on a
-      physical Android device is still required.
+      returns HTTP 200, a deliberately invalid native token is rejected with
+      the expected authentication error, and a real Google-account login on a
+      Play-installed physical Android device completed successfully through
+      `/api/auth/me`.
 - [x] The Play-distribution signing certificate matches the production Android
       OAuth client in the same Google project. This is configuration evidence,
       not a successful account sign-in.
@@ -116,8 +117,16 @@ secret values, private keys, tokens, or service-account JSON.
       cleanup, and gives the PetMagic API reachability probe realistic mobile
       timeouts. Run `32706661084` built, signed, archived and uploaded it to
       Play Internal; physical-device acceptance is pending.
-- [ ] Complete real-device authentication acceptance: verified email/password
-      login and native Google sign-in with a real Google account.
+- [x] Android `1.0.0+12` was built and uploaded to Play Internal by run
+      `32722408718` from commit
+      `01d92a177858fcf130f9e692d916146c4f4ffa77`; the physical Samsung device
+      has `versionCode=12` installed. Cold start restored authentication and
+      loaded server-backed wallet/UI state without a server-unavailable result.
+- [ ] Build and install Android `1.0.0+13`, which guards deferred
+      `TemplatesPage` Riverpod access after unmount. Re-run email/password,
+      Google, guest and authenticated-navigation acceptance and confirm no new
+      matching Crashlytics event. Build-12 symbols were uploaded and the GitHub
+      production environment now allows future release symbol uploads.
 - [ ] Repair the independent iOS CI signing configuration before TestFlight:
       Firebase iOS configuration and its App ID are now protected GitHub
       `production` secrets. The App Store Connect API key and Match signing
@@ -135,13 +144,18 @@ secret values, private keys, tokens, or service-account JSON.
       reaches its expected validation path for a synthetic token. Catalog-list
       access remains intentionally unavailable because `Manage store presence`
       is not required for backend purchase verification and is not granted.
-- [ ] Create the approved Google Play subscription product, base plan, prices
-  and tester offer. The Play Console subscription list currently has no
-  subscription entries; a healthy VPS `economy_subscription_plans` check does
-  not make an Android purchase possible.
-- [ ] Match the **Play app signing** SHA-1 certificate to an Android OAuth
-  client in the Firebase/Google project. The upload-key certificate is a
-  different certificate and must not be used for Google Sign-In configuration.
+- [x] Google Play contains active monthly and yearly Premium subscription
+      products with active base plans and regional availability. No tester
+      offer was created without an approved product decision; sandbox purchase,
+      renewal, restore, cancellation/refund and backend-crediting acceptance
+      remain pending.
+- [x] The **Play app signing** SHA-1 certificate matches the Android OAuth
+      client in the Firebase/Google project. The separate upload certificate is
+      not used for Google Sign-In configuration.
+- [ ] Populate the template catalog with approved content. Read-only counts on
+      both production VPS PostgreSQL and the retained Render PostgreSQL source
+      are currently zero template items, zero categories and zero assets, so
+      the empty mobile catalog is not a migration loss.
 - [ ] Prove restore of retained Render migration artifacts, including any
       persistent data not covered by the current VPS backup, before discarding
       the Render export/archive or signing off cutover.

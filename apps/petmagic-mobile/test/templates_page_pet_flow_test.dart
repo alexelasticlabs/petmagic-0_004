@@ -1,3 +1,8 @@
+import 'dart:convert';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
+
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -27,6 +32,7 @@ import 'package:petmagic_mobile/features/templates/presentation/templates_page.d
 import 'package:petmagic_mobile/features/templates/presentation/widgets/template_flow_sheets.dart';
 import 'package:petmagic_mobile/features/wallet/application/wallet_controller.dart';
 import 'package:petmagic_mobile/shared/notifications/petmagic_notification_center.dart';
+import 'package:petmagic_mobile/shared/files/persistent_media_url.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 import 'package:visibility_detector/visibility_detector.dart';
@@ -35,8 +41,9 @@ import 'templates_page_lifecycle_test_support.dart';
 import 'test_permission_fakes.dart';
 
 void main() {
-  setUp(() {
+  setUp(() async {
     VisibilityDetectorController.instance.updateInterval = Duration.zero;
+    await _cachePetFlowPreviewImages();
   });
 
   tearDown(() async {
@@ -945,4 +952,34 @@ Widget _templatesPageForState(GoRouterState state) {
           state.uri.queryParameters[TemplatesPage.petPhotoIdQueryParam],
     ),
   );
+}
+
+Future<void> _cachePetFlowPreviewImages() async {
+  final codec = await ui.instantiateImageCodec(
+    Uint8List.fromList(
+      base64Decode(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk'
+        'YAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
+      ),
+    ),
+  );
+  final frame = await codec.getNextFrame();
+  for (final url in const [
+    'https://cdn.petgpt.app/pet-thumb.jpg',
+    'https://cdn.petgpt.app/bella-thumb.jpg',
+  ]) {
+    for (final maxWidth in const [180, 760]) {
+      final provider = CachedNetworkImageProvider(
+        url,
+        cacheKey: persistentSafeGenerationMediaUrl(url),
+        maxWidth: maxWidth,
+      );
+      PaintingBinding.instance.imageCache.putIfAbsent(
+        provider,
+        () => OneFrameImageStreamCompleter(
+          Future<ImageInfo>.value(ImageInfo(image: frame.image)),
+        ),
+      );
+    }
+  }
 }

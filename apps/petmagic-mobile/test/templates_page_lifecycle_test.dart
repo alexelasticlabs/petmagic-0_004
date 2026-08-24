@@ -167,6 +167,47 @@ void main() {
   });
 
   testWidgets(
+    'templates page drops deferred provider work after it is unmounted',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appLaunchControllerProvider.overrideWith(
+              AuthenticatedAppLaunchController.new,
+            ),
+            walletControllerProvider.overrideWith(IdleWalletController.new),
+            templatesControllerProvider.overrideWith(
+              FakeTemplatesController.new,
+            ),
+            realtimeClientProvider.overrideWith(
+              (ref) => const NoopRealtimeClient(),
+            ),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.light(),
+            locale: const Locale('en'),
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: const Scaffold(body: TemplatesPage()),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'templates page preserves active filters and visible feed on return',
     (tester) async {
       const activeQuery = TemplatesQuery(
