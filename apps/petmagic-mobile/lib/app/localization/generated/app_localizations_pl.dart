@@ -4135,11 +4135,11 @@ class AppLocalizationsPl extends AppLocalizations {
   String get premiumPaywallFeedbackOptionOther => 'Inne';
 
   @override
-  String get premiumBenefitAiGenerationsTitle =>
-      '30 pokoleń sztucznej inteligencji';
+  String get premiumBenefitAiGenerationsTitle => '40 PawSpark';
 
   @override
-  String get premiumBenefitAiGenerationsSubtitle => 'co miesiąc';
+  String get premiumBenefitAiGenerationsSubtitle =>
+      'co 7 dni, gdy Premium jest aktywne';
 
   @override
   String get premiumBenefitPremiumTemplatesTitle => 'Szablony premium';

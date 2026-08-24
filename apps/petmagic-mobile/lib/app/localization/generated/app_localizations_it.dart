@@ -4165,10 +4165,11 @@ class AppLocalizationsIt extends AppLocalizations {
   String get premiumPaywallFeedbackOptionOther => 'Altro';
 
   @override
-  String get premiumBenefitAiGenerationsTitle => '30 generazioni di IA';
+  String get premiumBenefitAiGenerationsTitle => '40 PawSpark';
 
   @override
-  String get premiumBenefitAiGenerationsSubtitle => 'ogni mese';
+  String get premiumBenefitAiGenerationsSubtitle =>
+      'ogni 7 giorni finché Premium è attivo';
 
   @override
   String get premiumBenefitPremiumTemplatesTitle => 'Modelli premium';

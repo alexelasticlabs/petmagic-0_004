@@ -129,4 +129,31 @@ void main() {
       }
     },
   );
+
+  test(
+    'premium benefit copy matches the recurring PawSpark entitlement',
+    () async {
+      const arbFiles = <String>[
+        'lib/l10n/app_en.arb',
+        'lib/l10n/app_ru.arb',
+        'lib/l10n/app_de.arb',
+        'lib/l10n/app_es.arb',
+        'lib/l10n/app_fr.arb',
+        'lib/l10n/app_it.arb',
+        'lib/l10n/app_pl.arb',
+      ];
+
+      for (final path in arbFiles) {
+        final source = await File(path).readAsString();
+        expect(
+          source,
+          contains('"premiumBenefitAiGenerationsTitle": "40 PawSpark"'),
+        );
+        expect(source, contains('"premiumBenefitAiGenerationsSubtitle"'));
+        expect(source, isNot(contains('30 AI-генераций')));
+        expect(source, isNot(contains('30 AI generations')));
+        expect(source, isNot(contains('30 KI-Generationen')));
+      }
+    },
+  );
 }

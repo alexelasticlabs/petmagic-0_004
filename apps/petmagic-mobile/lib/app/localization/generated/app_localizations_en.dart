@@ -4098,10 +4098,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get premiumPaywallFeedbackOptionOther => 'Other';
 
   @override
-  String get premiumBenefitAiGenerationsTitle => '30 AI generations';
+  String get premiumBenefitAiGenerationsTitle => '40 PawSpark';
 
   @override
-  String get premiumBenefitAiGenerationsSubtitle => 'every month';
+  String get premiumBenefitAiGenerationsSubtitle =>
+      'every 7 days while Premium is active';
 
   @override
   String get premiumBenefitPremiumTemplatesTitle => 'Premium templates';

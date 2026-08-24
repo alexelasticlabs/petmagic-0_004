@@ -7362,13 +7362,13 @@ abstract class AppLocalizations {
   /// No description provided for @premiumBenefitAiGenerationsTitle.
   ///
   /// In en, this message translates to:
-  /// **'30 AI generations'**
+  /// **'40 PawSpark'**
   String get premiumBenefitAiGenerationsTitle;
 
   /// No description provided for @premiumBenefitAiGenerationsSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'every month'**
+  /// **'every 7 days while Premium is active'**
   String get premiumBenefitAiGenerationsSubtitle;
 
   /// No description provided for @premiumBenefitPremiumTemplatesTitle.

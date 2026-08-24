@@ -4114,10 +4114,11 @@ class AppLocalizationsRu extends AppLocalizations {
   String get premiumPaywallFeedbackOptionOther => 'Другое';
 
   @override
-  String get premiumBenefitAiGenerationsTitle => '30 AI-генераций';
+  String get premiumBenefitAiGenerationsTitle => '40 PawSpark';
 
   @override
-  String get premiumBenefitAiGenerationsSubtitle => 'каждый месяц';
+  String get premiumBenefitAiGenerationsSubtitle =>
+      'каждые 7 дней, пока активен Premium';
 
   @override
   String get premiumBenefitPremiumTemplatesTitle => 'Premium-шаблоны';
