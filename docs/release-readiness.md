@@ -26,6 +26,11 @@ adding dated audit snapshots to the repository.
 - The protected VPS environment passed preflight. Caddy, the Compose
   supervisor, PostgreSQL, API, admin web and one generation worker are healthy;
   public API and admin routes return HTTP 200 over HTTPS.
+- A root-only GitHub read-only deploy key backs the VPS `origin`. The controlled
+  release script deployed source revision
+  `e8a9fd64ae8b13c4677c24caa2640a83e1a20dbd`; its runtime preflight and the
+  public API health check passed. This is deployment evidence, not mobile or
+  payment acceptance.
 - Application R2 media access passed a temporary `PUT`/`GET`/`DELETE` smoke
   check. A dedicated least-privilege backup bucket, encrypted restic repository
   and enabled nightly timer are in place.

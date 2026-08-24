@@ -44,6 +44,10 @@ secret values, private keys, tokens, or service-account JSON.
 
 - [x] `/opt/petmagic/shared/env/.env.vps` passed the production preflight;
       runtime secrets remain only on the VPS.
+- [x] A root-only GitHub read-only deploy key now backs the VPS `origin`.
+      The controlled `deploy-release.sh` path fetched `master`, built and
+      deployed source revision `e8a9fd64ae8b13c4677c24caa2640a83e1a20dbd`;
+      its runtime preflight and the public health check both passed.
 - [x] Caddy, the Compose supervisor, PostgreSQL, API, admin web and exactly
       one generation worker are healthy. Public `api.petgpt.app/health` and
       `admin.petgpt.app/ru` return HTTP 200 over HTTPS.
