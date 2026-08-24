@@ -69,6 +69,9 @@ secret values, private keys, tokens, or service-account JSON.
       returns HTTP 200 and a deliberately invalid native token is rejected with
       the expected authentication error. A real Google-account login on a
       physical Android device is still required.
+- [x] The Play-distribution signing certificate matches the production Android
+      OAuth client in the same Google project. This is configuration evidence,
+      not a successful account sign-in.
 - [ ] Browser redirect-based Google OAuth remains intentionally disabled until
       a matching client secret is provisioned in that same Google project.
       Native Android/iOS token verification does not use a browser OAuth client

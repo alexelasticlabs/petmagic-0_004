@@ -49,8 +49,9 @@ adding dated audit snapshots to the repository.
 - Native Google mobile authentication is configured against the Google/Firebase
   project embedded in the published Android bundle. The public mobile-config
   route returns HTTP 200 and a deliberately invalid native token reaches the
-  expected authentication rejection path. Real Google-account sign-in on a
-  physical device remains required.
+  expected authentication rejection path. The Play-distribution signing
+  certificate matches the production Android OAuth client in that project.
+  Real Google-account sign-in on a physical device remains required.
 
 ## Mobile release correction pending
 
