@@ -29,18 +29,17 @@ secret values, private keys, tokens, or service-account JSON.
   subscriptions and consumable token products in `Prepare for Submission`.
   The subscriptions are `com.petmagic.app.premium.monthly` (one month) and
   `com.petmagic.app.premium.yearly` (one year). Their current price matrices
-  each cover 175 countries/regions but expose the observed USD storefronts at
-  USD 0.99, so they do not yet match the active Google Play test catalog at
-  USD 14.99 and USD 99.99.
+  each cover 175 countries/regions and use the United States as the base
+  storefront at USD 14.99 and USD 99.99 respectively; Apple calculated the
+  corresponding regional prices on 2026-08-25.
   The consumables are `com.petmagic.app.tokens.apple.starter` (`20 PawSpark`,
-  USD 0.99), `com.petmagic.app.tokens.apple.creator` (`45 PawSpark`, currently
-  USD 0.99), and `com.petmagic.app.tokens.apple.viral` (`100 PawSpark`, currently
-  USD 0.99). The latter two Apple prices do not yet match the approved test
-  catalog targets of USD 1.49 and USD 1.99. All three consumables intentionally
+  USD 0.99), `com.petmagic.app.tokens.apple.creator` (`45 PawSpark`, USD 1.49),
+  and `com.petmagic.app.tokens.apple.viral` (`100 PawSpark`, USD 1.99). All three
+  consumables intentionally
   select 28 storefronts: the United States and 27 European countries/regions,
   matching the current target audience. Product IDs, entitlement mapping,
-  corrected subscription and consumable prices, and first-version submission
-  still need end-to-end mobile and backend verification before submission.
+  first-version submission and real Sandbox purchases still need end-to-end
+  mobile and backend verification before submission.
 - App Store Server Notifications are configured for both production and Sandbox
   at `https://api.petgpt.app/api/economy/webhooks/app-store`. This confirms the
   destinations; a real signed Sandbox delivery is still required.
@@ -62,9 +61,7 @@ secret values, private keys, tokens, or service-account JSON.
 - [x] A root-only GitHub read-only deploy key now backs the VPS `origin`.
       The controlled `deploy-release.sh` path fetched `master`, built and
       deployed source revision `0691b7d16818d5e3124e922d84a761caeabdca67`;
-      its runtime preflight and the public health check both passed. The public
-      health response now exposes the confirmed fal.ai authorization gap as
-      `templates_fal_provider: Degraded` with `authentication_failed`.
+      its runtime preflight and the public health check both passed.
 - [x] Caddy, the Compose supervisor, PostgreSQL, API, admin web and exactly
       one generation worker are healthy. Public `api.petgpt.app/health` and
       `admin.petgpt.app/ru` return HTTP 200 over HTTPS.
@@ -127,18 +124,16 @@ secret values, private keys, tokens, or service-account JSON.
       verified SPF and DKIM, but public DNS does not currently resolve
       `_dmarc.petgpt.app`; add and validate a monitored policy before public
       launch without changing the working Resend records.
-- [ ] Rotate `FAL_AI_API_KEY` to a dedicated fal.ai `ADMIN`-scope production
-      key before enabling real generation traffic. The current VPS API and
-      worker share the same non-empty key, but the fal.ai dashboard classifies
-      it as `API` scope and the account-billing request returns HTTP 403. The
-      persisted runtime snapshot therefore remains `Unknown` with
-      `authentication_failed` instead of a usable balance. The dashboard
-      currently shows USD 16.47 and a concurrency limit of 10; the production
-      policy also records confirmed concurrency 10 with reserved headroom 2.
-      Production has zero generation jobs and zero provider attempts, so no
-      customer generation is stranded. Create and install the new secret
-      without exposing it, rerun preflight, restart only the PetMagic stack and
-      require a fresh successful balance snapshot before a paid canary.
+- [x] `FAL_AI_API_KEY` was rotated on 2026-08-25 to the dedicated
+      `petmagic-production-vps-billing` fal.ai key with `ADMIN` scope. The
+      protected environment retained mode `0600` and owner `root:root`, VPS
+      preflight passed, the supervisor restarted the stack, and all five
+      containers returned healthy. A credential-backed read-only billing call
+      returned HTTP 200 and the persisted `templates_fal_provider` check became
+      `Healthy`/`fresh` with zero consecutive failures. The superseded
+      `petmagic-production-render` API-scope key was revoked only after this
+      acceptance. This proves authorization and balance refresh, not a paid
+      image/video generation, callback or R2-import canary.
 
 ### VPS cutover and acceptance still required
 
@@ -209,7 +204,7 @@ secret values, private keys, tokens, or service-account JSON.
       release `1.0.0 (15)`, status `completed`, version code `15`. The hosted
       Gradle tuning remains unverified until the GitHub account-level block is
       resolved; physical-device install and payment acceptance are still pending.
-- [ ] Repair the independent iOS CI signing configuration before TestFlight:
+- [ ] Complete the independent iOS CI signing bootstrap before TestFlight:
       Firebase iOS configuration and its App ID are now protected GitHub
       `production` secrets. App Store Connect API access is now approved. A
       dedicated private `petmagic-ios-signing` Match repository, repository-only
@@ -219,9 +214,13 @@ secret values, private keys, tokens, or service-account JSON.
       and Sandbox server-notification URLs both point to the production App
       Store webhook. Fastlane and the workflows consistently expect exactly
       `APP_STORE_CONNECT_KEY_ID`, `APP_STORE_CONNECT_ISSUER_ID`, and
-      `APP_STORE_CONNECT_KEY_P8`, and those three protected secrets are not yet
-      present. The team API key and first Match bootstrap still have to be
-      completed before TestFlight.
+      `APP_STORE_CONNECT_KEY_P8`. A dedicated App Manager team API key was
+      created on 2026-08-25 and all three values are now present in the protected
+      GitHub `production` environment without being recorded in Git. Bootstrap
+      run `32781360447` was rejected before its first step by the same GitHub
+      account billing/spending-limit gate as run `32767419162`; therefore no
+      Match certificate/profile state changed and the first bootstrap remains
+      pending until GitHub Billing is repaired.
 - [ ] Prove a real signed Stripe delivery and a real signed App Store Sandbox
       notification. Provider endpoint configuration is verified, but delivery
       and signature acceptance are not yet evidenced.

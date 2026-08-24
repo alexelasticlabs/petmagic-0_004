@@ -34,10 +34,11 @@ adding dated audit snapshots to the repository.
 - A root-only GitHub read-only deploy key backs the VPS `origin`. The controlled
   release script deployed source revision
   `0691b7d16818d5e3124e922d84a761caeabdca67`; its runtime preflight and the
-  public API health check passed. The health response now reports the known
-  fal.ai credential-scope gap as `templates_fal_provider: Degraded` with
-  `authentication_failed`. This is deployment evidence, not mobile, generation,
-  or payment acceptance.
+  public API health check passed. On 2026-08-25 the fal.ai credential was
+  rotated to a dedicated `ADMIN`-scope production key; the direct billing read
+  returned HTTP 200 and the persisted provider check became `Healthy`/`fresh`
+  with zero consecutive failures. This is deployment and provider-authorization
+  evidence, not mobile, paid generation, callback, or payment acceptance.
 - The economy migration
   `20260824155159_AlignPremiumAllowanceAndTestPackPrices` is applied on the VPS.
   Live rows confirm Premium allowance `40` for monthly/yearly and test pack
@@ -98,15 +99,16 @@ adding dated audit snapshots to the repository.
   Android/iOS token verification does not use that secret. The independent iOS
   signing/API-key chain remains incomplete in GitHub `production`: Firebase
   iOS configuration and App ID are present, and App Store Connect API access is
-  approved. A dedicated private `petmagic-ios-signing` repository, scoped
+  approved. A dedicated App Manager team API key and its three required
+  protected GitHub `production` secrets are now configured. A dedicated private
+  `petmagic-ios-signing` repository, scoped
   deploy key and protected `MATCH_*` inputs are configured. The App Store
   Connect record named `Pet Video Magic` is confirmed to use Bundle ID
   `com.petmagic.app` and Apple ID `6796478761`; production and Sandbox server
-  notifications both target the production App Store webhook. GitHub secret
-  metadata and the Fastlane/workflow contracts agree that only
-  `APP_STORE_CONNECT_KEY_ID`, `APP_STORE_CONNECT_ISSUER_ID`, and
-  `APP_STORE_CONNECT_KEY_P8` are missing from this chain. The team API key and
-  first Match bootstrap remain pending before TestFlight.
+  notifications both target the production App Store webhook. Match bootstrap
+  run `32781360447` was rejected before its first step by the GitHub
+  account-level billing/spending-limit gate, so no Apple signing state changed.
+  Repair GitHub Billing, then run the first Match bootstrap and TestFlight.
 - Android `1.0.0+3`, containing corrected mobile auth-feedback mapping and
   production API routing, was built, signed, archived and uploaded to Play
   Internal by run `32698746633`. Its Play-installed device reached the VPS API,
@@ -287,6 +289,10 @@ adding dated audit snapshots to the repository.
   follow-up API read confirmed Internal release `1.0.0 (15)`, status
   `completed`, version code `15`. Physical-device install and payment acceptance
   are still pending.
+- iOS Match bootstrap run `32781360447` was rejected before its first step by
+  the same GitHub Billing gate. The App Store Connect App Manager key and its
+  protected production secrets were present, but the runner never started;
+  this is not an Apple credential, Match, archive, or TestFlight result.
 
 ## Automated Gates
 
@@ -346,11 +352,10 @@ do not append command transcripts to this file.
   renewal, restore, cancellation/refund and idempotent backend-crediting proof.
 - App Store Connect contains the same monthly and yearly product IDs in
   `Prepare for Submission`, with one-month and one-year durations and current
-  price matrices for 175 countries/regions. Both Apple matrices currently show
-  the observed USD storefronts at USD 0.99, which does not match the approved
-  Google Play test catalog at USD 14.99/99.99. Correct the Apple prices before
-  sandbox purchase acceptance; no App Store price was changed during this
-  audit.
+  price matrices for 175 countries/regions. On 2026-08-25 their United States
+  base prices were changed and re-read as USD 14.99 and USD 99.99; Apple
+  calculated the corresponding regional prices. Complete Sandbox purchase,
+  renewal, restore, cancellation/refund and backend-crediting acceptance.
 - The active Play Internal track contains release `1.0.0` and an attached
   tester list. This proves release distribution, not Billing eligibility for
   every Play account or country. On the physical Android device, the native
@@ -381,16 +386,13 @@ do not append command transcripts to this file.
   has no `STRIPE_TEST_*` credentials; configure an isolated test key pair,
   test webhook secret and test-mode route before sandbox acceptance rather than
   sending a real charge as a test.
-- **Release blocker — fal.ai runtime authorization:** the key currently shared
-  by the VPS API and worker is present and identical, but fal.ai classifies it
-  as `API` scope. The balance endpoint returns HTTP 403, leaving the persisted
-  provider snapshot `Unknown` with `authentication_failed`; production must not
-  rely on that stale balance gate. The authenticated dashboard currently shows
-  USD 16.47 and concurrency 10, matching the database policy's confirmed limit
-  10 with reserved headroom 2. There are zero production generation jobs and
-  zero provider attempts. Rotate to a dedicated `ADMIN`-scope production key,
-  verify a fresh successful balance snapshot and only then run a paid
-  image/video callback and R2-import canary.
+- **Release blocker — fal.ai generation canary:** runtime authorization is now
+  accepted with the dedicated `petmagic-production-vps-billing` `ADMIN` key.
+  The VPS env retained `0600 root:root`, preflight and supervisor restart
+  passed, all containers are healthy, the billing endpoint returns HTTP 200,
+  and `templates_fal_provider` is `Healthy`/`fresh` with zero consecutive
+  failures. The superseded Render API key was revoked. A paid image/video
+  generation, callback reconciliation and R2-import canary are still required.
 - Google Play token-pack product IDs are derived from the active catalog as
   `com.petmagic.app.tokens.google.<pack-code>` rather than stored per pack.
   The Play Console now contains active standard **Buy** one-time products for
@@ -402,9 +404,8 @@ do not append command transcripts to this file.
 - App Store Connect contains the matching Apple consumables in `Prepare for
   Submission`: `com.petmagic.app.tokens.apple.starter` (20 PawSpark),
   `com.petmagic.app.tokens.apple.creator` (45 PawSpark), and
-  `com.petmagic.app.tokens.apple.viral` (100 PawSpark). All three currently use
-  USD 0.99; creator and viral therefore still require an approved App Store
-  price change to USD 1.49 and USD 1.99 before sandbox acceptance. The first
+  `com.petmagic.app.tokens.apple.viral` (100 PawSpark). Their United States base
+  prices were re-read on 2026-08-25 as USD 0.99, USD 1.49 and USD 1.99. The first
   in-app purchase must also be submitted with an app version. The three Apple
   consumables consistently target 28 storefronts: the United States plus 27
   European countries/regions, matching the intended US/Europe audience. This
