@@ -71,44 +71,47 @@ void main() {
     },
   );
 
-  test('monetization checkout keeps native PaymentSheet and hosted fallback', () {
-    final premiumPageSource = File(
-      'lib/features/premium/presentation/premium_page_checkout.part.dart',
-    ).readAsStringSync();
-    final premiumModelsSource = File(
-      'lib/features/premium/domain/premium_models.dart',
-    ).readAsStringSync();
-    final walletModelsSource = File(
-      'lib/features/wallet/domain/wallet_models.dart',
-    ).readAsStringSync();
-    final walletCheckoutSource = File(
-      'lib/features/wallet/presentation/wallet_page_checkout.part.dart',
-    ).readAsStringSync();
+  test(
+    'monetization checkout keeps native PaymentSheet and hosted fallback',
+    () {
+      final premiumPageSource = File(
+        'lib/features/premium/presentation/premium_page_checkout.part.dart',
+      ).readAsStringSync();
+      final premiumModelsSource = File(
+        'lib/features/premium/domain/premium_models.dart',
+      ).readAsStringSync();
+      final walletModelsSource = File(
+        'lib/features/wallet/domain/wallet_models.dart',
+      ).readAsStringSync();
+      final walletCheckoutSource = File(
+        'lib/features/wallet/presentation/wallet_page_checkout.part.dart',
+      ).readAsStringSync();
 
-    expect(
-      File(
-        'lib/shared/payments/stripe_paymentsheet_coordinator.dart',
-      ).existsSync(),
-      isFalse,
-    );
-    expect(premiumModelsSource, contains('hasNativeStripePaymentSheet'));
-    expect(walletModelsSource, contains('hasNativeStripePaymentSheet'));
-    expect(walletCheckoutSource, contains('StripePaymentSheetRequest('));
-    expect(walletCheckoutSource, contains('verifyStripeCheckout('));
-    expect(
-      walletCheckoutSource,
-      contains('parseSafePremiumExternalUri(checkoutUrl)'),
-    );
-    expect(premiumPageSource, contains('StripePaymentSheetRequest('));
-    expect(
-      premiumPageSource,
-      contains('final externalUrl = checkoutState.externalUrl;'),
-    );
-    expect(
-      premiumPageSource,
-      contains('status: PremiumStripeCheckoutActionStatus.success'),
-    );
-  });
+      expect(
+        File(
+          'lib/shared/payments/stripe_paymentsheet_coordinator.dart',
+        ).existsSync(),
+        isFalse,
+      );
+      expect(premiumModelsSource, contains('hasNativeStripePaymentSheet'));
+      expect(walletModelsSource, contains('hasNativeStripePaymentSheet'));
+      expect(walletCheckoutSource, contains('StripePaymentSheetRequest('));
+      expect(walletCheckoutSource, contains('verifyStripeCheckout('));
+      expect(
+        walletCheckoutSource,
+        contains('parseSafePremiumExternalUri(checkoutUrl)'),
+      );
+      expect(premiumPageSource, contains('StripePaymentSheetRequest('));
+      expect(
+        premiumPageSource,
+        contains('final externalUrl = checkoutState.externalUrl;'),
+      );
+      expect(
+        premiumPageSource,
+        contains('status: PremiumStripeCheckoutActionStatus.success'),
+      );
+    },
+  );
 }
 
 String _methodBody(String source, String signature) {
