@@ -1,6 +1,10 @@
-# Suppress optional Stripe push provisioning classes not packaged by current SDK graph.
--dontwarn com.stripe.android.pushProvisioning.PushProvisioningActivity$g
--dontwarn com.stripe.android.pushProvisioning.PushProvisioningActivityStarter$Args
--dontwarn com.stripe.android.pushProvisioning.PushProvisioningActivityStarter$Error
--dontwarn com.stripe.android.pushProvisioning.PushProvisioningActivityStarter
--dontwarn com.stripe.android.pushProvisioning.PushProvisioningEphemeralKeyProvider
+# Suppress optional Stripe Issuing push-provisioning classes. PetMagic uses
+# PaymentSheet, while this separate restricted dependency is intentionally not
+# packaged and its internal class suffixes change between Stripe SDK versions.
+-dontwarn com.stripe.android.pushProvisioning.**
+-dontwarn kotlinx.parcelize.Parceler$DefaultImpls
+-dontwarn kotlinx.parcelize.Parceler
+-dontwarn kotlinx.parcelize.Parcelize
+
+# PaymentSheet uses reflection for parts of the native Stripe SDK.
+-keep class com.stripe.** { *; }

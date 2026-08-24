@@ -133,6 +133,15 @@ void main() {
       isFalse,
     );
     expect(AppConfig.deepLinkSchemeForEnvironment('unexpected'), isNull);
+    expect(
+      AppConfig.stripeRedirectSchemeForEnvironment('production'),
+      AppConfig.productionStripeRedirectScheme,
+    );
+    expect(
+      AppConfig.stripeRedirectSchemeForEnvironment('staging'),
+      AppConfig.stagingStripeRedirectScheme,
+    );
+    expect(AppConfig.stripeRedirectSchemeForEnvironment('unexpected'), isNull);
   });
 
   test(

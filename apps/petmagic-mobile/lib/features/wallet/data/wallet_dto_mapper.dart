@@ -114,6 +114,12 @@ PurchaseCheckoutModel mapPurchaseCheckoutFromJson(Map<String, dynamic> json) {
     checkoutUrl: json['checkoutUrl'] as String? ?? '',
     externalPaymentId: json['externalPaymentId'] as String? ?? '',
     status: json['status'] as String? ?? '',
+    paymentIntentClientSecret:
+        json['paymentIntentClientSecret'] as String? ?? '',
+    customerId: json['customerId'] as String? ?? '',
+    customerEphemeralKeySecret:
+        json['customerEphemeralKeySecret'] as String? ?? '',
+    publishableKey: json['publishableKey'] as String? ?? '',
   );
 }
 

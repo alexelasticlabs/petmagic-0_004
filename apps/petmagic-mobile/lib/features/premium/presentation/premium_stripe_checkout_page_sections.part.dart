@@ -5,13 +5,11 @@ class _PlanHeroCard extends StatelessWidget {
     required this.title,
     required this.periodLabel,
     required this.price,
-    required this.tokenAllowance,
   });
 
   final String title;
   final String periodLabel;
   final String price;
-  final int tokenAllowance;
 
   @override
   Widget build(BuildContext context) {
@@ -39,54 +37,34 @@ class _PlanHeroCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 5,
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: colors.gold.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.workspace_premium_rounded,
+                  color: colors.gold,
+                  size: 14,
                 ),
-                decoration: BoxDecoration(
-                  color: colors.gold.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.workspace_premium_rounded,
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Text(
+                    text.premiumCheckoutHeroBadge,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
                       color: colors.gold,
-                      size: 14,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w800,
                     ),
-                    const SizedBox(width: 4),
-                    Text(
-                      text.premiumCheckoutHeroBadge,
-                      style: TextStyle(
-                        color: colors.gold,
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: colors.accent.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  text.premiumCheckoutTokensPerPeriod(tokenAllowance),
-                  style: TextStyle(
-                    color: colors.accent,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
           const SizedBox(height: 10),
           Text(
@@ -108,32 +86,10 @@ class _PlanHeroCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 14),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: colors.accent.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: colors.accent.withValues(alpha: 0.3)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.bolt_rounded, color: colors.accent, size: 13),
-                const SizedBox(width: 5),
-                Text(
-                  text.premiumCheckoutTokensPerPeriod(tokenAllowance),
-                  style: TextStyle(
-                    color: colors.accent,
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
+          Wrap(
+            crossAxisAlignment: WrapCrossAlignment.end,
+            spacing: 6,
+            runSpacing: 4,
             children: [
               Text(
                 price,
@@ -144,7 +100,6 @@ class _PlanHeroCard extends StatelessWidget {
                   height: 1.0,
                 ),
               ),
-              const SizedBox(width: 6),
               Padding(
                 padding: const EdgeInsets.only(bottom: 3),
                 child: Text(

@@ -9,6 +9,7 @@ import 'package:petmagic_mobile/core/errors/auth_feedback_mapper.dart';
 import 'package:petmagic_mobile/core/errors/app_unavailable_state.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
+import 'package:petmagic_mobile/core/payments/stripe_payment_sheet.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/shared/auth/auth_required_sheet.dart';
 import 'package:petmagic_mobile/shared/profile/profile_surface_widgets.dart';

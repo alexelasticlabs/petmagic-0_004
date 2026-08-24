@@ -7212,7 +7212,7 @@ abstract class AppLocalizations {
   /// No description provided for @premiumCheckoutTokensPerPeriod.
   ///
   /// In en, this message translates to:
-  /// **'{count} PawSpark every billing period'**
+  /// **'{count} PawSpark every 7 days'**
   String premiumCheckoutTokensPerPeriod(Object count);
 
   /// No description provided for @premiumCheckoutIncludesTitle.
@@ -7242,7 +7242,7 @@ abstract class AppLocalizations {
   /// No description provided for @premiumCheckoutPaymentMethodSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Card, Apple Pay or Google Pay'**
+  /// **'Cards and available payment methods'**
   String get premiumCheckoutPaymentMethodSubtitle;
 
   /// No description provided for @premiumCheckoutTrustText.

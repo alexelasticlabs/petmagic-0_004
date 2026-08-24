@@ -195,6 +195,40 @@ void main() {
     expect(find.byType(CircularProgressIndicator), findsNothing);
   });
 
+  testWidgets(
+    'premium Stripe checkout stays compact without overflow on a narrow Russian screen',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 720);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        _TestApp(
+          locale: const Locale('ru'),
+          child: PremiumStripeCheckoutPage(
+            plan: _premiumPlan,
+            paymentMethodLabel: 'Stripe',
+            onChooseAnotherMethod: () {},
+            onSubmit: () async => const PremiumStripeCheckoutSubmitResult(
+              status: PremiumStripeCheckoutActionStatus.success,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final context = tester.element(find.byType(PremiumStripeCheckoutPage));
+      final text = AppLocalizations.of(context);
+      expect(tester.takeException(), isNull);
+      expect(
+        find.text(text.premiumCheckoutTokensPerPeriod(500)),
+        findsOneWidget,
+      );
+      expect(find.text(text.premiumCheckoutSummaryTitle), findsNothing);
+    },
+  );
+
   for (final brightness in Brightness.values) {
     testWidgets(
       'wallet Stripe checkout submit spinner uses theme foreground in ${brightness.name}',
@@ -308,11 +342,13 @@ class _TestApp extends StatelessWidget {
     required this.child,
     this.hasInternet = true,
     this.brightness = Brightness.dark,
+    this.locale = const Locale('en'),
   });
 
   final Widget child;
   final bool hasInternet;
   final Brightness brightness;
+  final Locale locale;
 
   @override
   Widget build(BuildContext context) {
@@ -326,7 +362,7 @@ class _TestApp extends StatelessWidget {
         theme: brightness == Brightness.dark
             ? AppTheme.dark()
             : AppTheme.light(),
-        locale: const Locale('en'),
+        locale: locale,
         localizationsDelegates: const [
           AppLocalizations.delegate,
           GlobalMaterialLocalizations.delegate,

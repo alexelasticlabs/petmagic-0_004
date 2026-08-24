@@ -4047,7 +4047,7 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String premiumCheckoutTokensPerPeriod(Object count) {
-    return '$count PawSpark w każdym okresie rozliczeniowym';
+    return '$count PawSpark co 7 dni';
   }
 
   @override
@@ -4066,7 +4066,7 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get premiumCheckoutPaymentMethodSubtitle =>
-      'Karta, Apple Pay lub Google Pay';
+      'Karty i dostępne metody płatności';
 
   @override
   String get premiumCheckoutTrustText =>

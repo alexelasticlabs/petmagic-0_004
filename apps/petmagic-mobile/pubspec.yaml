@@ -2,7 +2,7 @@ name: petmagic_mobile
 description: "PetMagic mobile app for iOS and Android."
 publish_to: "none"
 
-version: 1.0.0+14
+version: 1.0.0+15
 
 environment:
   sdk: ^3.11.3
@@ -39,6 +39,7 @@ dependencies:
     path: third_party/flutter_plugins/photo_manager
   in_app_purchase: ^3.3.0
   in_app_purchase_android: ^0.5.1
+  flutter_stripe: ^14.0.0
   firebase_core: ^4.10.0
   firebase_crashlytics: ^5.1.0
   firebase_messaging: ^16.3.0

@@ -124,6 +124,18 @@ mixin _WalletControllerCheckout
         return null;
       }
 
+      if (checkout.hasNativeStripePaymentSheet) {
+        _updateStateIfMounted(
+          (state) => state.copyWith(
+            isBuying: false,
+            clearCheckoutUrl: true,
+            pendingCheckoutOrderId: checkout.orderId,
+            clearPendingStoreProvider: true,
+          ),
+        );
+        return checkout;
+      }
+
       final checkoutUrl = checkout.checkoutUrl.trim();
       if (checkoutUrl.isEmpty) {
         final payload = <String, Object>{

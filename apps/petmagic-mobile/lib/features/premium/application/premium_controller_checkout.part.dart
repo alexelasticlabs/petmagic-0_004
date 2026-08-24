@@ -91,6 +91,10 @@ mixin _PremiumControllerCheckout
         if (!ref.mounted || cancelToken.isCancelled) {
           return null;
         }
+        if (checkout.hasNativeStripePaymentSheet) {
+          _updateStateIfMounted((state) => state.copyWith(isBuying: false));
+          return checkout;
+        }
         final safeCheckoutUri = parseSafePremiumExternalUri(
           checkout.checkoutUrl,
         );

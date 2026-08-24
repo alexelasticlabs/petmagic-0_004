@@ -21,6 +21,8 @@ class AppConfig {
   static const productionApiBaseUrl = 'https://api.petgpt.app';
   static const stagingDeepLinkScheme = 'petmagic-staging';
   static const productionDeepLinkScheme = 'petmagic';
+  static const stagingStripeRedirectScheme = 'petmagicstripe-staging';
+  static const productionStripeRedirectScheme = 'petmagicstripe';
   static const appEnvironment = String.fromEnvironment('APP_ENVIRONMENT');
   static const appPackageName = String.fromEnvironment(
     'APP_PACKAGE_NAME',
@@ -193,6 +195,19 @@ class AppConfig {
   static String get deepLinkScheme {
     return deepLinkSchemeForEnvironment(appEnvironment) ??
         productionDeepLinkScheme;
+  }
+
+  static String get stripeRedirectScheme {
+    return stripeRedirectSchemeForEnvironment(appEnvironment) ??
+        productionStripeRedirectScheme;
+  }
+
+  static String? stripeRedirectSchemeForEnvironment(String environment) {
+    return switch (environment.trim().toLowerCase()) {
+      'staging' => stagingStripeRedirectScheme,
+      '' || 'development' || 'production' => productionStripeRedirectScheme,
+      _ => null,
+    };
   }
 
   static String? deepLinkSchemeForEnvironment(String environment) {

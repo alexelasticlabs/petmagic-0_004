@@ -162,6 +162,10 @@ class PurchaseCheckoutModel {
     required this.checkoutUrl,
     required this.externalPaymentId,
     required this.status,
+    this.paymentIntentClientSecret = '',
+    this.customerId = '',
+    this.customerEphemeralKeySecret = '',
+    this.publishableKey = '',
   });
 
   final String orderId;
@@ -169,6 +173,16 @@ class PurchaseCheckoutModel {
   final String checkoutUrl;
   final String externalPaymentId;
   final String status;
+  final String paymentIntentClientSecret;
+  final String customerId;
+  final String customerEphemeralKeySecret;
+  final String publishableKey;
+
+  bool get hasNativeStripePaymentSheet =>
+      paymentIntentClientSecret.trim().isNotEmpty &&
+      customerId.trim().isNotEmpty &&
+      customerEphemeralKeySecret.trim().isNotEmpty &&
+      publishableKey.trim().isNotEmpty;
 }
 
 class PurchaseHistoryItem {

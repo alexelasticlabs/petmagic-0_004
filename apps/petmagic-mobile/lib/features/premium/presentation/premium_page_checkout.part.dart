@@ -239,12 +239,45 @@ extension on _PremiumPageState {
             final wasPremiumBeforeCheckout = ref
                 .read(premiumControllerProvider)
                 .isPremium;
-            await controller.startCheckout();
+            final checkout = await controller.startCheckout();
             if (!mounted) {
               return const PremiumStripeCheckoutSubmitResult(
                 status: PremiumStripeCheckoutActionStatus.failed,
               );
             }
+            if (checkout?.hasNativeStripePaymentSheet == true) {
+              final paymentResult = await ref
+                  .read(stripePaymentSheetProvider)
+                  .present(
+                    StripePaymentSheetRequest(
+                      paymentIntentClientSecret:
+                          checkout!.paymentIntentClientSecret,
+                      customerId: checkout.customerId,
+                      customerEphemeralKeySecret:
+                          checkout.customerEphemeralKeySecret,
+                      publishableKey: checkout.publishableKey,
+                      primaryButtonLabel: text.premiumContinueAction,
+                    ),
+                  );
+              if (paymentResult == StripePaymentSheetResult.cancelled) {
+                return PremiumStripeCheckoutSubmitResult(
+                  status: PremiumStripeCheckoutActionStatus.cancelled,
+                  message: text.premiumPurchaseCancelled,
+                );
+              }
+
+              controller.markCheckoutOpened(
+                wasPremiumBeforeCheckout: wasPremiumBeforeCheckout,
+              );
+              await controller.verifyCheckoutStatus(
+                stripePlanCode: plan.planCode,
+                stripeExternalSubscriptionId: checkout.externalSubscriptionId,
+              );
+              return const PremiumStripeCheckoutSubmitResult(
+                status: PremiumStripeCheckoutActionStatus.success,
+              );
+            }
+
             final checkoutState = ref.read(premiumControllerProvider);
             final externalUrl = checkoutState.externalUrl;
             if (externalUrl != null && externalUrl.isNotEmpty) {

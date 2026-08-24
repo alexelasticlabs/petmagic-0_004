@@ -5,6 +5,28 @@ extension _WalletPageCheckoutStateX on _WalletPageState {
     PurchaseCheckoutModel checkout,
   ) async {
     final text = AppLocalizations.of(context);
+    if (checkout.hasNativeStripePaymentSheet) {
+      final paymentResult = await ref
+          .read(stripePaymentSheetProvider)
+          .present(
+            StripePaymentSheetRequest(
+              paymentIntentClientSecret: checkout.paymentIntentClientSecret,
+              customerId: checkout.customerId,
+              customerEphemeralKeySecret: checkout.customerEphemeralKeySecret,
+              publishableKey: checkout.publishableKey,
+              primaryButtonLabel: text.premiumContinueAction,
+            ),
+          );
+      if (paymentResult == StripePaymentSheetResult.cancelled) {
+        return ExternalCheckoutResult.cancelledResult;
+      }
+
+      await ref
+          .read(walletControllerProvider.notifier)
+          .verifyStripeCheckout(checkout.externalPaymentId);
+      return ExternalCheckoutResult.success;
+    }
+
     final checkoutUrl = checkout.checkoutUrl.trim();
     final uri = parseSafePremiumExternalUri(checkoutUrl);
     if (uri != null) {

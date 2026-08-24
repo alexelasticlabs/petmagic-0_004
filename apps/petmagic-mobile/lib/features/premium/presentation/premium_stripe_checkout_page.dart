@@ -77,7 +77,6 @@ class _PremiumStripeCheckoutPageState
             title: planLabel,
             periodLabel: periodLabel,
             price: price,
-            tokenAllowance: widget.plan.tokenAllowance,
           ),
           const SizedBox(height: 20),
           _IncludedSection(tokenAllowance: widget.plan.tokenAllowance),
@@ -85,12 +84,6 @@ class _PremiumStripeCheckoutPageState
           _PaymentMethodSection(label: widget.paymentMethodLabel),
           const SizedBox(height: 8),
           const _TrustNote(),
-          const SizedBox(height: 20),
-          _SummaryCard(
-            planLabel: planLabel,
-            periodLabel: periodLabel,
-            price: price,
-          ),
           if (_isSubmitting) ...[
             const SizedBox(height: 12),
             Row(
