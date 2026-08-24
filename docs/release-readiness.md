@@ -389,6 +389,12 @@ do not append command transcripts to this file.
   sending a real charge as a test. The physical Android selector rendering is
   accepted for build `1.0.0+15`; its provider purchase, cancellation/retry and
   signed webhook proof remain pending.
+- **iOS payment-policy guard:** the default and existing legacy iOS Stripe
+  provider routes are disabled by migration `20260824223451`. Apple external
+  purchases require an approved entitlement plus StoreKit token and
+  transaction-reporting work that PetMagic does not yet implement. App Store
+  Billing remains the only iOS in-app payment route until that separate feature
+  is implemented and accepted.
 - **Release blocker — fal.ai generation canary:** runtime authorization is now
   accepted with the dedicated `petmagic-production-vps-billing` `ADMIN` key.
   The VPS env retained `0600 root:root`, preflight and supervisor restart

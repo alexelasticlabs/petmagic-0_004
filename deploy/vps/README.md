@@ -236,6 +236,9 @@ secret values, private keys, tokens, or service-account JSON.
       payment-method selector renders both Stripe and Google Play. No purchase
       was initiated: Stripe test-mode payment, explicit Google Play selection,
       webhook reconciliation and cancellation/retry proof are still required.
+      Stripe is intentionally disabled for iOS until PetMagic has Apple’s
+      external-purchase entitlement and implements the required StoreKit token
+      and transaction-reporting flow; iOS currently exposes App Store billing.
       A read-only Stripe live API audit confirms the production webhook is
       enabled at the expected VPS route with the required payment, checkout,
       refund, invoice and subscription events, but the account currently has
