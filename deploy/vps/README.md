@@ -220,9 +220,17 @@ secret values, private keys, tokens, or service-account JSON.
       both production VPS PostgreSQL and the retained Render PostgreSQL source
       are currently zero template items, zero categories and zero assets, so
       the empty mobile catalog is not a migration loss.
-- [ ] Prove restore of retained Render migration artifacts, including any
-      persistent data not covered by the current VPS backup, before discarding
-      the Render export/archive or signing off cutover.
+- [x] The retained Render migration artifacts passed an isolated restore audit
+      on 2026-08-24 without overwriting production. The final PostgreSQL
+      directory export matched SHA-256
+      `5cbba358133f67202a4a5bd6dce987a5cabd4399f3da7328ee074cad5907be3a`
+      and restored into a temporary database with 82 public tables and 99 EF
+      migrations. The persistent-disk archive matched SHA-256
+      `50ab1bd1a80fe29a4b0550e4c597100a9d28a69b9e8a848c504a5f1789f48aec`
+      and restored one Data Protection key under the expected paths. Cleanup
+      verification found zero temporary databases, directories or scripts;
+      the production API remained healthy and `petmagic-compose.service`
+      remained active. Retain both source archives until final launch sign-off.
 
 ## One-time server setup
 

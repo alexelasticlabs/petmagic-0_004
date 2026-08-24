@@ -352,6 +352,12 @@ do not append command transcripts to this file.
   template items, categories and assets; this is not a VPS migration loss.
   Populate the production catalog only with approved template content and then
   verify R2-backed mobile feed/generation flows.
+- The retained Render PostgreSQL directory export and persistent-disk archive
+  passed an isolated restore audit on 2026-08-24. The temporary restore matched
+  the recorded source hashes, produced 82 public tables, 99 EF migrations and
+  one Data Protection key, then left zero temporary databases, directories or
+  scripts. Production was not overwritten and remained healthy during the
+  audit; retain the source archives until final launch sign-off.
 - An iOS archive and store validation from a supported macOS/Xcode environment.
 - FAL generation and callback proof with production-like R2 upload/read paths.
 - Stripe, Google Play, and App Store sandbox purchase, replay, refund, restore,
