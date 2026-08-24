@@ -17,6 +17,7 @@ void main() {
     final offlineProbeBody = _methodBody(source, '_startOfflineProbe');
     final scheduleProbeBody = _methodBody(source, '_scheduleNextOfflineProbe');
     final restoreBannerBody = _methodBody(source, '_scheduleRestoreBannerHide');
+    final internetProbeBody = _methodBody(source, '_probeInternet');
 
     expect(onDisposeBody, contains('_started = false;'));
     expect(onDisposeBody, contains('_subscription?.cancel();'));
@@ -49,12 +50,15 @@ void main() {
     expect(scheduleProbeBody, contains('_offlineProbeMaxInterval.inSeconds'));
     expect(restoreBannerBody, contains('Timer('));
     expect(restoreBannerBody, contains('if (!ref.mounted)'));
+    expect(internetProbeBody, contains('ApiBaseUrlHealthChecker'));
+    expect(internetProbeBody, contains('AppConfig.apiBaseUrls'));
+    expect(source, isNot(contains('one.one.one.one')));
   });
 }
 
 String _methodBody(String source, String methodName) {
   final methodMatch = RegExp(
-    r'(?:NetworkStatusState|Future<void>|void)\s+' + methodName + r'\s*\(',
+    r'(?:NetworkStatusState|Future<[^>]+>|void)\s+' + methodName + r'\s*\(',
   ).firstMatch(source);
   if (methodMatch == null) {
     fail('Method $methodName was not found.');

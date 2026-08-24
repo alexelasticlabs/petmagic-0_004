@@ -79,9 +79,14 @@ adding dated audit snapshots to the repository.
   limited to the Account Holder.
 - Android `1.0.0+3`, containing corrected mobile auth-feedback mapping and
   production API routing, was built, signed, archived and uploaded to Play
-  Internal by run `32698746633`. Installation from Play Internal and real-device
-  authentication acceptance are still required; this is not yet a full mobile
-  acceptance result.
+  Internal by run `32698746633`. Its Play-installed device reached the VPS API,
+  but the email login was rejected as `invalid_credentials` and the native
+  Google SDK did not reach the token-exchange endpoint. This is diagnostic
+  evidence, not authentication acceptance.
+- Android `1.0.0+4` is prepared to replace the device-wide connectivity probe
+  from an unrelated public DNS lookup with the configured PetMagic API
+  `/health` endpoint. It must be built, uploaded to Play Internal and tested on
+  a physical device before this incident is considered resolved.
 
 ## Automated Gates
 

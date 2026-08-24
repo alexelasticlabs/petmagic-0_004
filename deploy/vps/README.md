@@ -98,8 +98,14 @@ secret values, private keys, tokens, or service-account JSON.
 - [x] Android `1.0.0+3` was built, signed, archived and uploaded to Play
       Internal by run `32698746633`. It contains corrected mobile auth feedback
       and production API routing.
-- [ ] Install Android `1.0.0+3` from Play Internal and complete real-device
-      authentication acceptance.
+- [x] A Play-installed Android `1.0.0+3` reached the VPS API. The email login
+      request was rejected as `invalid_credentials`; the native Google SDK
+      loaded the server configuration but did not reach the token-exchange
+      endpoint. This is diagnostic evidence, not authentication acceptance.
+- [ ] Publish Android `1.0.0+4`. It replaces the device-wide connectivity
+      probe from an unrelated public DNS lookup with the configured PetMagic
+      API `/health` endpoint, preventing false offline status on networks that
+      cannot resolve that DNS host.
 - [ ] Complete real-device authentication acceptance: verified email/password
       login and native Google sign-in with a real Google account.
 - [ ] Repair the independent iOS CI signing configuration before TestFlight:

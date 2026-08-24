@@ -1,10 +1,10 @@
 import 'dart:async';
-import 'dart:io';
-
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:petmagic_mobile/core/config/app_config.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
+import 'package:petmagic_mobile/core/network/api_base_url_health_checker.dart';
 
 enum NetworkBannerPhase { hidden, offline, restored }
 
@@ -276,18 +276,14 @@ class NetworkStatusController extends Notifier<NetworkStatusState> {
       return _lastProbeResult!;
     }
 
-    try {
-      final lookup = await InternetAddress.lookup(
-        'one.one.one.one',
-      ).timeout(_internetProbeTimeout);
-      final result = lookup.any((item) => item.rawAddress.isNotEmpty);
-      _lastProbeResult = result;
-      _lastProbeTime = DateTime.now();
-      return result;
-    } on Object {
-      _lastProbeResult = false;
-      _lastProbeTime = DateTime.now();
-      return false;
-    }
+    final reachableBaseUrl = await const ApiBaseUrlHealthChecker(
+      probeBudget: _internetProbeTimeout,
+      connectTimeout: Duration(milliseconds: 700),
+      readTimeout: Duration(milliseconds: 1100),
+    ).findReachable(AppConfig.apiBaseUrls);
+    final result = reachableBaseUrl != null;
+    _lastProbeResult = result;
+    _lastProbeTime = DateTime.now();
+    return result;
   }
 }
