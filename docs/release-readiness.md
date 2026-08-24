@@ -362,13 +362,17 @@ do not append command transcripts to this file.
   base prices were changed and re-read as USD 14.99 and USD 99.99; Apple
   calculated the corresponding regional prices. Complete Sandbox purchase,
   renewal, restore, cancellation/refund and backend-crediting acceptance.
-- The active Play Internal track contains release `1.0.0` and an attached
-  tester list. This proves release distribution, not Billing eligibility for
-  every Play account or country. On the physical Android device running
-  `1.0.0+15`, the payment-method selector renders both Stripe and Google Play;
-  no store or Stripe purchase was started. Verify explicit Google Play selection,
-  the tester account's Play-country eligibility and license-testing status
-  against the active products before a sandbox charge.
+- The active Play Internal track contains completed release `1.0.0 (16)` and
+  an attached tester list. Android Publisher API accepted the locally signed AAB
+  from commit `2a6368d9`; an independent API read confirmed `versionCode=16`,
+  status `completed`. It replaces the stale monthly `30 AI generations` benefit
+  copy with `40 PawSpark every seven days while Premium is active`. This proves
+  release distribution, not Billing eligibility for every Play account or country.
+  The physical Android device is still running `1.0.0+15`, where the
+  payment-method selector renders both Stripe and Google Play; no store or Stripe
+  purchase was started. Install build `16`, then verify explicit Google Play
+  selection, the tester account's Play-country eligibility and license-testing
+  status against the active products before a sandbox charge.
 - **Release blocker — Premium allowance rollout:** the owner approved
   `40 PawSpark` at purchase and every seven days while Premium remains active.
   Local plan defaults, health checks, migration and mobile copy now match the
@@ -379,7 +383,7 @@ do not append command transcripts to this file.
   checkout now uses native PaymentSheet. iOS/web retain hosted Checkout or
   store billing according to policy. The optional client-secret contract,
   narrow-screen Premium UI, production-flavor debug APK and minified release
-  AAB pass locally, the backend is deployed on the VPS, and Android `1.0.0+15`
+  AAB pass locally, the backend is deployed on the VPS, and Android `1.0.0+16`
   is active on Play Internal. Focused verification on 2026-08-25 passes 224
   backend economy tests, 68 auth/store security tests, 108 Flutter auth/payment
   tests and `flutter analyze`; this proves code contracts, not provider or
@@ -393,8 +397,9 @@ do not append command transcripts to this file.
   has no `STRIPE_TEST_*` credentials; configure an isolated test key pair,
   test webhook secret and test-mode route before sandbox acceptance rather than
   sending a real charge as a test. The physical Android selector rendering is
-  accepted for build `1.0.0+15`; its provider purchase, cancellation/retry and
-  signed webhook proof remain pending.
+  accepted for build `1.0.0+15`; install build `16` before final UI acceptance.
+  Its provider purchase, cancellation/retry and signed webhook proof remain
+  pending.
 - **iOS payment-policy guard:** the default and existing legacy iOS Stripe
   provider routes are disabled by migration `20260824223451`. It was deployed
   to the VPS on 2026-08-25; live `*` and `EU` rows confirm both

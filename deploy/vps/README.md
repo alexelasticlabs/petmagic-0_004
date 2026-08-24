@@ -207,6 +207,14 @@ secret values, private keys, tokens, or service-account JSON.
       release `1.0.0 (15)`, status `completed`, version code `15`. The hosted
       Gradle tuning remains unverified until the GitHub account-level block is
       resolved; physical-device install and payment acceptance are still pending.
+- [x] Android `1.0.0+16` was built locally from commit `2a6368d9` with the
+      configured production signing identity. Its AAB SHA-256 is
+      `B33F17AF8ED262B6B9EDDA74186EF5DA387B1ED245A8BBFC107CE3EE3189DCD3`.
+      Android Publisher API accepted it for Play Internal; a separate read-only
+      API check confirms release `1.0.0 (16)`, version code `16`, status
+      `completed`. It corrects the stale Premium benefit copy to `40 PawSpark`
+      every seven days while Premium is active. This proves distribution only:
+      build `16` is not yet installed and accepted on the physical device.
 - [ ] Complete the independent iOS CI signing bootstrap before TestFlight:
       Firebase iOS configuration and its App ID are now protected GitHub
       `production` secrets. App Store Connect API access is now approved. A
@@ -233,8 +241,9 @@ secret values, private keys, tokens, or service-account JSON.
       eligible web checkout,
       and uses an idempotency key for mobile subscription creation. Flutter
       regression tests, backend gateway tests, a production-flavor debug APK and
-      a minified production release AAB pass locally. Android `1.0.0+15` is active
-      on Play Internal and is installed on the physical Samsung test device. The
+      a minified production release AAB pass locally. Android `1.0.0+16` is active
+      on Play Internal; `1.0.0+15` remains the build installed on the physical
+      Samsung test device. The
       authenticated app loads server-backed wallet and Premium data, and its
       payment-method selector renders both Stripe and Google Play. No purchase
       was initiated: Stripe test-mode payment, explicit Google Play selection,
@@ -276,9 +285,9 @@ secret values, private keys, tokens, or service-account JSON.
       real sandbox renewal/cancellation lifecycle remain pending before public
       charging.
 - [ ] Complete native Google Play acceptance on an eligible internal tester.
-      The Internal track is active with completed release `1.0.0 (15)` and a
-      tester list, but the attached device did not expose a purchasable Google
-      Play option while Stripe remained available. The Play **One-time
+      The Internal track is active with completed release `1.0.0 (16)` and a
+      tester list; the attached device is still on build `15` and did not expose
+      a purchasable Google Play option while Stripe remained available. The Play **One-time
       products** catalog now has active standard **Buy** products matching the
       VPS-derived IDs: `starter` at USD 0.99, `creator` at USD 1.49, and `viral`
       at USD 1.99. Verify
