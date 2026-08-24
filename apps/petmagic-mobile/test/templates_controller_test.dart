@@ -35,6 +35,26 @@ void main() {
     },
   );
 
+  test('rebuilds after explicit provider invalidation', () async {
+    final repository = FakeTemplatesControllerRepository();
+    final realtimeClient = FakeTemplatesControllerRealtimeClient();
+    final networkController = _TestNetworkStatusController(false);
+    final container = ProviderContainer(
+      overrides: [
+        templatesRepositoryProvider.overrideWithValue(repository),
+        realtimeClientProvider.overrideWithValue(realtimeClient),
+        networkStatusControllerProvider.overrideWith(() => networkController),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    container.read(templatesControllerProvider);
+    container.invalidate(templatesControllerProvider);
+
+    expect(() => container.read(templatesControllerProvider), returnsNormally);
+    expect(container.read(templatesControllerProvider).items, isEmpty);
+  });
+
   test('does not connect realtime while internet is unavailable', () async {
     final repository = FakeTemplatesControllerRepository();
     final realtimeClient = FakeTemplatesControllerRealtimeClient();

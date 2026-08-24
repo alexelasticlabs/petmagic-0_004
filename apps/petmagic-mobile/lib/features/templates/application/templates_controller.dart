@@ -40,12 +40,16 @@ class TemplatesController extends Notifier<TemplatesState> {
       _activeRepository ?? ref.read(templatesRepositoryProvider);
   TemplatesRepository? _activeRepository;
   RealtimeClient? _activeRealtimeClient;
-  late final TemplatesRealtimeCoordinator _realtimeCoordinator;
-  late final TemplatesPreviewWarmupCoordinator _previewWarmupCoordinator;
-  late final TemplatesMetadataCoordinator _metadataCoordinator;
-  late final TemplatesFeedRequestTracker _requestTracker;
-  late final TemplatesInitialFeedLoader _initialFeedLoader;
-  late final TemplatesPaginationLoader _paginationLoader;
+  // Riverpod can re-run Notifier.build() on the same Notifier instance after
+  // an explicit invalidation (for example, during a guest/auth session reset).
+  // These collaborators belong to one provider lifecycle and must therefore
+  // be replaceable when that lifecycle is rebuilt.
+  late TemplatesRealtimeCoordinator _realtimeCoordinator;
+  late TemplatesPreviewWarmupCoordinator _previewWarmupCoordinator;
+  late TemplatesMetadataCoordinator _metadataCoordinator;
+  late TemplatesFeedRequestTracker _requestTracker;
+  late TemplatesInitialFeedLoader _initialFeedLoader;
+  late TemplatesPaginationLoader _paginationLoader;
   bool _hasInternet = true;
   bool _isScreenVisible = true;
 

@@ -180,11 +180,23 @@ adding dated audit snapshots to the repository.
   resolve one stack to a deferred `TemplatesPage` callback reading Riverpod
   after its element was unmounted. Android `1.0.0+13` guards deferred provider
   work with the owning `BuildContext.mounted` state and adds an unmount
-  lifecycle regression. The production GitHub environment now also has the
-  Firebase CI credential required by the existing workflow, and build-12 Dart
-  symbols were uploaded successfully; future release jobs can upload symbols
-  instead of silently skipping that step. Build/upload/install and a
-  no-new-event Crashlytics observation are still required for `1.0.0+13`.
+  lifecycle regression. Run `32728145852` built, archived and uploaded that
+  exact release from commit `dfa47dffde8a28e66400203622f50d0e625edf8a`
+  to Play Internal successfully in 10m58s; signed-AAB build took 7m37s,
+  Crashlytics symbol upload 42s and Play upload 52s. The Play artifact was
+  installed and confirmed as `versionCode=13` on the physical Samsung device.
+
+  Explicit logout-to-guest and guest-to-Google transitions then exposed a
+  separate first-frame failure even though the VPS completed Google native
+  authentication and `/api/auth/me` with HTTP 200. Symbolized build-13
+  Crashlytics evidence traces the failure to `TemplatesController`
+  reconstruction after `sessionScopeResetProvider` invalidates its provider:
+  Riverpod can re-run `Notifier.build()` on the same instance, but six
+  lifecycle collaborators were declared `late final` and could not be assigned
+  again. Android `1.0.0+14` makes those collaborators replaceable and adds an
+  explicit provider-invalidation regression test. Build/upload/install,
+  repeated guest/auth transitions and a no-new-event Crashlytics observation
+  are still required for `1.0.0+14`.
 
   The current auth/network/router/templates verification shard passes 163
   tests. Three initially failing pet-generation cases were traced to stale
@@ -251,7 +263,7 @@ do not append command transcripts to this file.
   its required-locale gate.
 - Privacy/legal approval for release Crashlytics collection, including the
   intended Firebase processor disclosure and retention basis.
-- Build, upload and install Android `1.0.0+13`, then repeat physical-device
+- Build, upload and install Android `1.0.0+14`, then repeat physical-device
   email/password, Google, guest and authenticated-navigation acceptance and
   confirm that Crashlytics receives no new lifecycle event. General API
   connectivity and real Google-account authentication are already accepted.

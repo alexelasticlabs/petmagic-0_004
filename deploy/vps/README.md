@@ -122,11 +122,17 @@ secret values, private keys, tokens, or service-account JSON.
       `01d92a177858fcf130f9e692d916146c4f4ffa77`; the physical Samsung device
       has `versionCode=12` installed. Cold start restored authentication and
       loaded server-backed wallet/UI state without a server-unavailable result.
-- [ ] Build and install Android `1.0.0+13`, which guards deferred
-      `TemplatesPage` Riverpod access after unmount. Re-run email/password,
-      Google, guest and authenticated-navigation acceptance and confirm no new
-      matching Crashlytics event. Build-12 symbols were uploaded and the GitHub
-      production environment now allows future release symbol uploads.
+- [x] Android `1.0.0+13` guards deferred `TemplatesPage` Riverpod access after
+      unmount. Run `32728145852` built and uploaded it successfully from commit
+      `dfa47dffde8a28e66400203622f50d0e625edf8a`; the Play-installed physical
+      device confirms `versionCode=13`. Repeated account transitions exposed a
+      separate provider-rebuild failure, so this is release evidence rather
+      than final lifecycle acceptance.
+- [ ] Build and install Android `1.0.0+14`, which allows
+      `TemplatesController` lifecycle collaborators to be reconstructed after
+      a session-scope provider invalidation. Re-run guest-to-Google,
+      logout-to-guest and authenticated-navigation acceptance and confirm no
+      new matching Crashlytics event.
 - [ ] Repair the independent iOS CI signing configuration before TestFlight:
       Firebase iOS configuration and its App ID are now protected GitHub
       `production` secrets. The App Store Connect API key and Match signing
