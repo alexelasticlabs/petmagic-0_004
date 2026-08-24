@@ -88,6 +88,10 @@ secret values, private keys, tokens, or service-account JSON.
       Play Internal after the testing-track release permission was granted.
 - [x] A Play-installed Android `1.0.0+2` device reached the VPS API; server
       logs recorded its authentication requests.
+- [ ] Android `1.0.0+3` is prepared from the current source with corrected
+      mobile auth feedback and production API routing. It still needs a
+      successful GitHub Actions build, Play Internal upload, installation, and
+      real-device auth acceptance.
 - [ ] Complete real-device authentication acceptance: verified email/password
       login and native Google sign-in with a real Google account.
 - [ ] Repair the independent iOS CI signing configuration before TestFlight:
