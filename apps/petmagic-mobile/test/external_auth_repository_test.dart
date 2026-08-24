@@ -239,7 +239,56 @@ void main() {
           isA<AppException>().having(
             (error) => error.message,
             'message',
-            'auth.external_invalid',
+            'auth.external_not_configured',
+          ),
+        ),
+      );
+
+      expect(nativeExchangeCalls, 0);
+    },
+  );
+
+  test(
+    'native google auth maps unavailable provider UI to launch failure',
+    () async {
+      var nativeExchangeCalls = 0;
+      final dio = Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
+        ..httpClientAdapter = _FakeHttpClientAdapter((options) async {
+          if (options.path == '/api/auth/external/google/mobile-config') {
+            return ResponseBody.fromString(
+              jsonEncode(const {'serverClientId': 'server-client-id'}),
+              200,
+              headers: {
+                Headers.contentTypeHeader: [Headers.jsonContentType],
+              },
+            );
+          }
+
+          if (options.path == '/api/auth/external/google/native') {
+            nativeExchangeCalls++;
+          }
+
+          throw StateError('Unexpected path: ${options.path}');
+        });
+
+      final repository = MobileExternalAuthRepository(
+        dio: dio,
+        sessionStorage: _InMemoryAuthSessionStorage(),
+        appLinks: AppLinks(),
+        googleSignInAdapter: _FakeGoogleSignInAdapter(
+          (_) async => throw const GoogleSignInException(
+            code: GoogleSignInExceptionCode.uiUnavailable,
+          ),
+        ),
+      );
+
+      await expectLater(
+        repository.authenticate(ExternalAuthProvider.google),
+        throwsA(
+          isA<AppException>().having(
+            (error) => error.message,
+            'message',
+            'auth.external_launch_failed',
           ),
         ),
       );
@@ -284,7 +333,7 @@ void main() {
           isA<AppException>().having(
             (error) => error.message,
             'message',
-            'auth.external_invalid',
+            'auth.external_not_configured',
           ),
         ),
       );
@@ -345,7 +394,7 @@ void main() {
           isA<AppException>().having(
             (error) => error.message,
             'message',
-            'auth.external_invalid',
+            'auth.external_not_configured',
           ),
         ),
       );
@@ -364,7 +413,7 @@ void main() {
         ].map((path) => File(path).readAsString()),
       ).then((sources) => sources.join('\n'));
 
-      expect(source, contains('AppLogger.warn('));
+      expect(source, contains('AppLogger.error('));
       expect(
         source,
         contains("operation: 'authenticate_native_google_sign_in'"),

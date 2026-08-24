@@ -359,6 +359,18 @@ class ProfileController extends Notifier<ProfileState> {
     bool clearSession = false,
     bool clearProfile = false,
   }) {
+    final normalizedMessage = message.trim().toLowerCase();
+    if (_requestTracker.hasActiveAuth &&
+        (normalizedMessage == 'network.unavailable' ||
+            normalizedMessage == 'network.timeout' ||
+            normalizedMessage == 'templates.network_unavailable')) {
+      AppLogger.error(
+        feature: 'Profile.Auth',
+        operation: 'active_auth_mapped_to_network_failure',
+        message: 'Active authentication mapped to a network failure',
+        context: {'message_code': normalizedMessage},
+      );
+    }
     _updateStateIfMounted(
       (state) => state.copyWith(
         isLoading: false,

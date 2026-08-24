@@ -92,14 +92,14 @@ mixin _ExternalAuthGoogleFlow on _MobileExternalAuthRepositoryBase {
       _scheduleGoogleSessionReset();
       throw mapped;
     } on GoogleSignInConfigurationException catch (error, stackTrace) {
-      _logExternalAuthFailure(
-        'authenticate_native_google_configuration',
-        error,
-        stackTrace,
+      AppLogger.error(
+        feature: 'Profile.ExternalAuth',
+        operation: 'authenticate_native_google_configuration',
+        message: 'Google sign-in adapter configuration failed',
+        error: error,
+        stackTrace: stackTrace,
       );
-      throw const AppException(
-        _MobileExternalAuthRepositoryBase._genericFailedCode,
-      );
+      throw const AppException('auth.external_not_configured');
     } on DioException catch (error) {
       _scheduleGoogleSessionReset();
       final mapped = _mapDioException(
@@ -136,6 +136,12 @@ mixin _ExternalAuthGoogleFlow on _MobileExternalAuthRepositoryBase {
       GoogleSignInExceptionCode.interrupted => const AppException(
         _MobileExternalAuthRepositoryBase._cancelledCode,
       ),
+      GoogleSignInExceptionCode.clientConfigurationError ||
+      GoogleSignInExceptionCode.providerConfigurationError =>
+        const AppException('auth.external_not_configured'),
+      GoogleSignInExceptionCode.uiUnavailable => const AppException(
+        'auth.external_launch_failed',
+      ),
       _ => const AppException(
         _MobileExternalAuthRepositoryBase._genericFailedCode,
       ),
@@ -158,7 +164,7 @@ mixin _ExternalAuthGoogleFlow on _MobileExternalAuthRepositoryBase {
     GoogleSignInException error,
     StackTrace stackTrace,
   ) {
-    AppLogger.warn(
+    AppLogger.error(
       feature: 'Profile.ExternalAuth',
       operation: 'authenticate_native_google_sign_in',
       message: 'Google sign-in SDK failed',
@@ -276,15 +282,15 @@ mixin _ExternalAuthGoogleFlow on _MobileExternalAuthRepositoryBase {
       _scheduleGoogleSessionReset();
       throw _mapGoogleSignInException(error);
     } on GoogleSignInConfigurationException catch (error, stackTrace) {
-      _logExternalAuthFailure(
-        'link_native_google_configuration',
-        error,
-        stackTrace,
+      AppLogger.error(
+        feature: 'Profile.ExternalAuth',
+        operation: 'link_native_google_configuration',
+        message: 'Google link adapter configuration failed',
+        error: error,
+        stackTrace: stackTrace,
       );
       _scheduleGoogleSessionReset();
-      throw const AppException(
-        _MobileExternalAuthRepositoryBase._genericFailedCode,
-      );
+      throw const AppException('auth.external_not_configured');
     } on DioException catch (error) {
       _logExternalAuthFailure(
         'link_native_google_dio',

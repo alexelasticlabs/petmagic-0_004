@@ -122,11 +122,22 @@ adding dated audit snapshots to the repository.
   feedback source was the idle `ProfileController` connectivity listener: it
   could publish `templates.network_unavailable` without any profile mutation in
   progress and overwrite the actual native-auth outcome. Android `1.0.0+9`
-  makes that advisory non-authoritative while idle and retains cancellation only
-  for a real avatar/profile mutation. The focused network/profile/external-auth
-  shard passes 32 tests and `flutter analyze` is clean. Building, Play Internal
-  upload and physical-device authentication acceptance for `1.0.0+9` remain
-  pending.
+  made that advisory non-authoritative while idle and retained cancellation only
+  for a real avatar/profile mutation. Run `32715870923` built and uploaded that
+  release successfully from commit `6029dd4f` in 9m11s. The installed Play
+  artifact was confirmed as `versionCode=9` on the same physical Samsung device,
+  but the exact offline message was reproduced again. At the Google action the
+  public mobile-config and `/health` routes returned HTTP 200, no native-token
+  exchange reached the backend, Google Play Services was current, Google
+  accounts were present and Android Credential Manager had enabled providers.
+  Android `1.0.0+10` therefore preserves the real Google SDK failure category:
+  configuration and unavailable-UI failures map to distinct user feedback, and
+  sanitized Crashlytics non-fatals record only the SDK enum code and whether
+  opaque description/details existed. It also records when an active auth
+  request is mapped to a network failure. The focused
+  network/profile/external-auth shard passes 33 tests and `flutter analyze` is
+  clean. Building, Play Internal upload and physical-device authentication
+  acceptance for `1.0.0+10` remain pending.
   The complete mobile test suite currently reports `1414` passed and `13`
   failed tests outside this focused shard. Four reproduced failures are the
   pre-existing `My Pets renders in ...` visual helper cases, which stop at a
@@ -192,7 +203,7 @@ do not append command transcripts to this file.
   its required-locale gate.
 - Privacy/legal approval for release Crashlytics collection, including the
   intended Firebase processor disclosure and retention basis.
-- Real-device authentication acceptance for the Android `1.0.0+9` Play
+- Real-device authentication acceptance for the Android `1.0.0+10` Play
   Internal release after it is built and uploaded: verified email/password
   login and native Google login with a real account.
 - Google Play subscriptions: the PetMagic Play Console subscription list is
