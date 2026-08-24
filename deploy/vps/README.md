@@ -36,10 +36,11 @@ secret values, private keys, tokens, or service-account JSON.
   USD 0.99), `com.petmagic.app.tokens.apple.creator` (`45 PawSpark`, currently
   USD 0.99), and `com.petmagic.app.tokens.apple.viral` (`100 PawSpark`, currently
   USD 0.99). The latter two Apple prices do not yet match the approved test
-  catalog targets of USD 1.49 and USD 1.99. Product IDs, entitlement mapping,
-  availability, corrected subscription and consumable prices, and first-version
-  submission still need end-to-end mobile and backend verification before
-  submission.
+  catalog targets of USD 1.49 and USD 1.99. All three consumables intentionally
+  select 28 storefronts: the United States and 27 European countries/regions,
+  matching the current target audience. Product IDs, entitlement mapping,
+  corrected subscription and consumable prices, and first-version submission
+  still need end-to-end mobile and backend verification before submission.
 - App Store Server Notifications are configured for both production and Sandbox
   at `https://api.petgpt.app/api/economy/webhooks/app-store`. This confirms the
   destinations; a real signed Sandbox delivery is still required.

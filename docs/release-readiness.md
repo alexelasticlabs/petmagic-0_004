@@ -367,8 +367,11 @@ do not append command transcripts to this file.
   `com.petmagic.app.tokens.apple.viral` (100 PawSpark). All three currently use
   USD 0.99; creator and viral therefore still require an approved App Store
   price change to USD 1.49 and USD 1.99 before sandbox acceptance. The first
-  in-app purchase must also be submitted with an app version. This is catalog
-  evidence, not purchase, crediting, consumption, restore or refund proof.
+  in-app purchase must also be submitted with an app version. The three Apple
+  consumables consistently target 28 storefronts: the United States plus 27
+  European countries/regions, matching the intended US/Europe audience. This
+  is catalog and availability evidence, not purchase, crediting, consumption,
+  restore or refund proof.
 - The production and retained Render databases both currently contain zero
   template items, categories and assets; this is not a VPS migration loss.
   Populate the production catalog only with approved template content and then
