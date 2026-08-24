@@ -353,6 +353,13 @@ do not append command transcripts to this file.
   is active on Play Internal. Install that exact release, then prove a Stripe
   test-mode payment, cancellation/retry and signed webhook reconciliation on a
   physical device before treating this as delivered.
+  A read-only live API audit found the expected enabled production webhook and
+  event set, but zero active live Stripe products or prices. Both production
+  Premium rows currently have an empty `StripePriceId`, so the backend uses its
+  inline-price fallback. Production provider routes are all `live` and the VPS
+  has no `STRIPE_TEST_*` credentials; configure an isolated test key pair,
+  test webhook secret and test-mode route before sandbox acceptance rather than
+  sending a real charge as a test.
 - Google Play token-pack product IDs are derived from the active catalog as
   `com.petmagic.app.tokens.google.<pack-code>` rather than stored per pack.
   The Play Console now contains active standard **Buy** one-time products for

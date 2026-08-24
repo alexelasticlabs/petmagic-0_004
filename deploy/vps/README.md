@@ -204,6 +204,14 @@ secret values, private keys, tokens, or service-account JSON.
       a minified production release AAB pass locally. Android `1.0.0+15` is active
       on Play Internal; its device install, Stripe test-mode payment, webhook
       reconciliation and cancellation/retry proof are still required.
+      A read-only Stripe live API audit confirms the production webhook is
+      enabled at the expected VPS route with the required payment, checkout,
+      refund, invoice and subscription events, but the account currently has
+      zero active live products and prices. The production Premium rows have no
+      `StripePriceId`, so checkout uses the reviewed inline-price fallback.
+      All production provider routes are `live`, while `STRIPE_TEST_*` values
+      are absent from the VPS; do not attempt a test charge until isolated test
+      credentials, webhook signing secret and test-mode routing are configured.
 - [ ] Run real-provider acceptance: Sign in with Apple, FCM/APNs on a physical
       iOS device, Stripe Checkout/webhook reconciliation, App Store Sandbox
       purchase/restore/refund or cancellation lifecycle, and idempotent token
