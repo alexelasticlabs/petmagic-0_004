@@ -32,8 +32,8 @@ void main() {
           id: 'photo-1',
           petId: 'pet-1',
           mediaAssetId: 'media-1',
-          url: 'https://cdn.petmagic.app/original.jpg',
-          thumbnailUrl: 'https://cdn.petmagic.app/thumb.jpg',
+          url: 'https://cdn.petgpt.app/original.jpg',
+          thumbnailUrl: 'https://cdn.petgpt.app/thumb.jpg',
           fileName: 'bella.jpg',
           contentType: 'image/jpeg',
           isFavorite: true,
@@ -55,7 +55,7 @@ void main() {
     final thumbnail = tester.widget<CachedNetworkImage>(
       find.byType(CachedNetworkImage).first,
     );
-    expect(thumbnail.imageUrl, 'https://cdn.petmagic.app/thumb.jpg');
+    expect(thumbnail.imageUrl, 'https://cdn.petgpt.app/thumb.jpg');
     expect(thumbnail.memCacheWidth, 512);
     expect(thumbnail.maxWidthDiskCache, 512);
     expect(find.byTooltip('Set as avatar'), findsOneWidget);
@@ -94,8 +94,8 @@ void main() {
             id: photoId,
             petId: petId,
             mediaAssetId: 'media-1',
-            url: 'https://cdn.petmagic.app/original.jpg',
-            thumbnailUrl: 'https://cdn.petmagic.app/thumb.jpg',
+            url: 'https://cdn.petgpt.app/original.jpg',
+            thumbnailUrl: 'https://cdn.petgpt.app/thumb.jpg',
             fileName: 'bella.jpg',
             contentType: 'image/jpeg',
             isFavorite: false,
@@ -158,7 +158,7 @@ void main() {
             id: 'photo-1',
             petId: 'pet-1',
             mediaAssetId: 'media-1',
-            url: 'https://cdn.petmagic.app/original.jpg',
+            url: 'https://cdn.petgpt.app/original.jpg',
             thumbnailUrl: 'javascript:alert(1)',
             fileName: 'bella.jpg',
             contentType: 'image/jpeg',
@@ -195,7 +195,7 @@ void main() {
           .widgetList<CachedNetworkImage>(find.byType(CachedNetworkImage))
           .map((image) => image.imageUrl)
           .toList(growable: false);
-      expect(networkImages, contains('https://cdn.petmagic.app/original.jpg'));
+      expect(networkImages, contains('https://cdn.petgpt.app/original.jpg'));
       expect(networkImages, isNot(contains('javascript:alert(1)')));
       expect(networkImages, isNot(contains('file:///private/photo.jpg')));
       expect(networkImages, isNot(contains('data:image/png;base64,AAAA')));
@@ -297,7 +297,7 @@ void main() {
           createdAtUtc: DateTime.utc(2026),
           updatedAtUtc: DateTime.utc(2026),
           userMediaExpired: false,
-          outputUrl: 'https://cdn.petmagic.app/output.jpg',
+          outputUrl: 'https://cdn.petgpt.app/output.jpg',
           templateTitle: 'Generated portrait',
           templateType: 'image',
           petId: petId,
@@ -371,7 +371,7 @@ void main() {
             createdAtUtc: DateTime.utc(2026),
             updatedAtUtc: DateTime.utc(2026),
             userMediaExpired: false,
-            outputUrl: 'https://cdn.petmagic.app/output.jpg',
+            outputUrl: 'https://cdn.petgpt.app/output.jpg',
             templateTitle: 'Generated orphan photo',
             templateType: 'image',
             petPhotoId: 'photo-orphan',

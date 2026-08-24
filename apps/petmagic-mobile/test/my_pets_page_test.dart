@@ -256,7 +256,7 @@ void main() {
                 name: 'Bella',
                 type: 'dog',
                 breed: 'Corgi',
-                avatarUrl: 'https://cdn.petmagic.app/avatar.jpg',
+                avatarUrl: 'https://cdn.petgpt.app/avatar.jpg',
                 photosCount: 3,
                 generationsCount: 7,
                 createdAtUtc: DateTime.utc(2026),
@@ -274,7 +274,7 @@ void main() {
         final avatar = tester.widget<CachedNetworkImage>(
           find.byType(CachedNetworkImage).first,
         );
-        expect(avatar.imageUrl, 'https://cdn.petmagic.app/avatar.jpg');
+        expect(avatar.imageUrl, 'https://cdn.petgpt.app/avatar.jpg');
         expect(avatar.memCacheWidth, 192);
         expect(avatar.maxWidthDiskCache, 192);
         expect(tester.takeException(), isNull);
@@ -400,8 +400,8 @@ void main() {
           id: 'photo-1',
           petId: 'pet-1',
           mediaAssetId: 'media-1',
-          url: 'https://cdn.petmagic.app/original.jpg',
-          thumbnailUrl: 'https://cdn.petmagic.app/thumb.jpg',
+          url: 'https://cdn.petgpt.app/original.jpg',
+          thumbnailUrl: 'https://cdn.petgpt.app/thumb.jpg',
           fileName: 'bella.jpg',
           contentType: 'image/jpeg',
           isFavorite: false,
@@ -422,7 +422,7 @@ void main() {
           updatedAtUtc: DateTime.utc(2026),
           userMediaExpired: false,
           templateTitle: 'Magic portrait',
-          outputUrl: 'https://cdn.petmagic.app/output.jpg',
+          outputUrl: 'https://cdn.petgpt.app/output.jpg',
         ),
       ],
     );
@@ -706,7 +706,7 @@ void main() {
           id: 'photo-1',
           petId: petId,
           mediaAssetId: 'media-1',
-          url: 'https://cdn.petmagic.app/original.jpg',
+          url: 'https://cdn.petgpt.app/original.jpg',
           fileName: 'bella.jpg',
           contentType: 'image/jpeg',
           isFavorite: false,

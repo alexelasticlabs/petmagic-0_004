@@ -63,8 +63,8 @@ void main() {
           id: 'photo-1',
           petId: 'pet-1',
           mediaAssetId: 'media-1',
-          url: 'https://cdn.petmagic.app/original.jpg',
-          thumbnailUrl: 'https://cdn.petmagic.app/thumb.jpg',
+          url: 'https://cdn.petgpt.app/original.jpg',
+          thumbnailUrl: 'https://cdn.petgpt.app/thumb.jpg',
           fileName: 'bella.jpg',
           contentType: 'image/jpeg',
           isFavorite: false,
@@ -96,7 +96,7 @@ void main() {
     final thumbnail = tester.widget<CachedNetworkImage>(
       find.byType(CachedNetworkImage).first,
     );
-    expect(thumbnail.imageUrl, 'https://cdn.petmagic.app/thumb.jpg');
+    expect(thumbnail.imageUrl, 'https://cdn.petgpt.app/thumb.jpg');
     expect(find.byTooltip('Use for generation'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -121,8 +121,8 @@ void main() {
           id: 'photo-1',
           petId: 'pet-1',
           mediaAssetId: 'media-1',
-          url: 'https://cdn.petmagic.app/original.jpg',
-          thumbnailUrl: 'https://cdn.petmagic.app/thumb.jpg',
+          url: 'https://cdn.petgpt.app/original.jpg',
+          thumbnailUrl: 'https://cdn.petgpt.app/thumb.jpg',
           fileName: 'bella.jpg',
           contentType: 'image/jpeg',
           isFavorite: false,
@@ -162,7 +162,7 @@ void main() {
     final thumbnail = tester.widget<CachedNetworkImage>(
       find.byType(CachedNetworkImage).first,
     );
-    expect(thumbnail.imageUrl, 'https://cdn.petmagic.app/thumb.jpg');
+    expect(thumbnail.imageUrl, 'https://cdn.petgpt.app/thumb.jpg');
     expect(repository.petsFetchCount, 1);
     expect(repository.petPhotoFetchCount, 2);
     expect(repository.petGenerationFetchCount, 1);

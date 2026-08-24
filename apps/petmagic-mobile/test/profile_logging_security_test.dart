@@ -6,10 +6,10 @@ import 'package:petmagic_mobile/shared/files/persistent_media_url.dart';
 void main() {
   test('profile avatar cache keys strip signed URL secrets', () {
     final safeUrl = persistentSafeProfileAvatarUrl(
-      'https://cdn.petmagic.app/profile/avatars/cat.jpg?X-Amz-Signature=secret&token=raw#viewer',
+      'https://cdn.petgpt.app/profile/avatars/cat.jpg?X-Amz-Signature=secret&token=raw#viewer',
     );
 
-    expect(safeUrl, 'https://cdn.petmagic.app/profile/avatars/cat.jpg');
+    expect(safeUrl, 'https://cdn.petgpt.app/profile/avatars/cat.jpg');
     expect(safeUrl, isNot(contains('X-Amz-Signature')));
     expect(safeUrl, isNot(contains('token=raw')));
     expect(safeUrl, isNot(contains('viewer')));

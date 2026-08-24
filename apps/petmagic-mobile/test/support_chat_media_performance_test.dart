@@ -6,10 +6,10 @@ import 'package:petmagic_mobile/shared/files/persistent_media_url.dart';
 void main() {
   test('support media cache keys strip signed URL secrets', () {
     final safeUrl = persistentSafeSupportMediaUrl(
-      'https://cdn.petmagic.app/support/attachments/cat.jpg?X-Amz-Signature=secret&token=raw#viewer',
+      'https://cdn.petgpt.app/support/attachments/cat.jpg?X-Amz-Signature=secret&token=raw#viewer',
     );
 
-    expect(safeUrl, 'https://cdn.petmagic.app/support/attachments/cat.jpg');
+    expect(safeUrl, 'https://cdn.petgpt.app/support/attachments/cat.jpg');
     expect(safeUrl, isNot(contains('X-Amz-Signature')));
     expect(safeUrl, isNot(contains('token=raw')));
     expect(safeUrl, isNot(contains('viewer')));

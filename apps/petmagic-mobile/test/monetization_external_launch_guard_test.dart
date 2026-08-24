@@ -71,7 +71,7 @@ void main() {
     },
   );
 
-  test('monetization checkout does not keep unreachable PaymentSheet path', () {
+  test('monetization checkout keeps native PaymentSheet and hosted fallback', () {
     final premiumPageSource = File(
       'lib/features/premium/presentation/premium_page_checkout.part.dart',
     ).readAsStringSync();
@@ -91,9 +91,15 @@ void main() {
       ).existsSync(),
       isFalse,
     );
-    expect(premiumModelsSource, isNot(contains('usesPaymentSheet')));
-    expect(walletModelsSource, isNot(contains('usesPaymentSheet')));
-    expect(walletCheckoutSource, isNot(contains('StripePaymentSheet')));
+    expect(premiumModelsSource, contains('hasNativeStripePaymentSheet'));
+    expect(walletModelsSource, contains('hasNativeStripePaymentSheet'));
+    expect(walletCheckoutSource, contains('StripePaymentSheetRequest('));
+    expect(walletCheckoutSource, contains('verifyStripeCheckout('));
+    expect(
+      walletCheckoutSource,
+      contains('parseSafePremiumExternalUri(checkoutUrl)'),
+    );
+    expect(premiumPageSource, contains('StripePaymentSheetRequest('));
     expect(
       premiumPageSource,
       contains('final externalUrl = checkoutState.externalUrl;'),
