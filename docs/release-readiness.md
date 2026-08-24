@@ -33,9 +33,11 @@ adding dated audit snapshots to the repository.
   monitoring.
 - A root-only GitHub read-only deploy key backs the VPS `origin`. The controlled
   release script deployed source revision
-  `92c202369b7a8dde54c9ac441da41433e1d04668`; its runtime preflight and the
-  public API health check passed. This is deployment evidence, not mobile or
-  payment acceptance.
+  `0691b7d16818d5e3124e922d84a761caeabdca67`; its runtime preflight and the
+  public API health check passed. The health response now reports the known
+  fal.ai credential-scope gap as `templates_fal_provider: Degraded` with
+  `authentication_failed`. This is deployment evidence, not mobile, generation,
+  or payment acceptance.
 - The economy migration
   `20260824155159_AlignPremiumAllowanceAndTestPackPrices` is applied on the VPS.
   Live rows confirm Premium allowance `40` for monthly/yearly and test pack
