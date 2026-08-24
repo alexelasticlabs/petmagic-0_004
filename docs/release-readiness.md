@@ -72,7 +72,9 @@ adding dated audit snapshots to the repository.
   Browser redirect-based Google OAuth is intentionally disabled until a
   matching client secret is provisioned in the same Google project; native
   Android/iOS token verification does not use that secret. The independent iOS
-  signing/API-key chain remains unavailable or malformed.
+  signing/API-key chain is not configured in GitHub `production`: that
+  environment currently contains only the six Android release secrets, not
+  the App Store Connect, Firebase iOS and Match signing inputs.
 - Android `1.0.0+3`, containing corrected mobile auth-feedback mapping and
   production API routing, was built, signed, archived and uploaded to Play
   Internal by run `32698746633`. Installation from Play Internal and real-device

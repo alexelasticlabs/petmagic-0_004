@@ -103,8 +103,9 @@ secret values, private keys, tokens, or service-account JSON.
 - [ ] Complete real-device authentication acceptance: verified email/password
       login and native Google sign-in with a real Google account.
 - [ ] Repair the independent iOS CI signing configuration before TestFlight:
-      the App Store Connect API key and Firebase iOS configuration were absent
-      or malformed in the protected GitHub production environment.
+      GitHub `production` currently has only the six Android release secrets;
+      the App Store Connect API key, Firebase iOS configuration and Match
+      signing inputs are not yet present there.
 - [ ] Prove a real signed Stripe delivery and a real signed App Store Sandbox
       notification. Provider endpoint configuration is verified, but delivery
       and signature acceptance are not yet evidenced.
