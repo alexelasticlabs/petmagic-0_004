@@ -326,6 +326,13 @@ do not append command transcripts to this file.
   subscriptions with active base plans in 174 countries. A tester offer was
   not created without an approved product decision. Complete sandbox purchase,
   renewal, restore, cancellation/refund and idempotent backend-crediting proof.
+- App Store Connect contains the same monthly and yearly product IDs in
+  `Prepare for Submission`, with one-month and one-year durations and current
+  price matrices for 175 countries/regions. Both Apple matrices currently show
+  the observed USD storefronts at USD 0.99, which does not match the approved
+  Google Play test catalog at USD 14.99/99.99. Correct the Apple prices before
+  sandbox purchase acceptance; no App Store price was changed during this
+  audit.
 - The active Play Internal track contains release `1.0.0` and an attached
   tester list. This proves release distribution, not Billing eligibility for
   every Play account or country. On the physical Android device, the native
