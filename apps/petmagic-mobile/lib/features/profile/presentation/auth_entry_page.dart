@@ -327,6 +327,7 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
   Future<void> _submit() async {
     final controller = ref.read(profileControllerProvider.notifier);
     final navigator = context.appNavigator;
+    _commitVisibleCredentials(controller);
     if (_isSignUp) {
       final locale = Localizations.localeOf(context).toLanguageTag();
 
@@ -399,6 +400,21 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
       return;
     }
     navigator.go(SafeRedirectDestination(_resolvePostAuthRoute()));
+  }
+
+  void _commitVisibleCredentials(ProfileController controller) {
+    final email = _emailController.text;
+    final password = _passwordController.text;
+    final displayName = _displayNameController.text;
+    final confirmPassword = _confirmPasswordController.text;
+    controller
+      ..updateEmail(email)
+      ..updatePassword(password);
+    if (_isSignUp) {
+      controller
+        ..updateDisplayName(displayName)
+        ..updateConfirmPassword(confirmPassword);
+    }
   }
 
   Future<void> _submitExternal(ExternalAuthProvider provider) async {

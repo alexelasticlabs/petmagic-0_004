@@ -281,6 +281,33 @@ void main() {
     );
   });
 
+  testWidgets('sign in commits autofilled controller values before submit', (
+    tester,
+  ) async {
+    final profileRepository = FakeProfileRepository();
+    await pumpTestApp(
+      tester,
+      sharedPrefs: const {onboardingSeenKey: true},
+      profileRepository: profileRepository,
+    );
+
+    await tester.tap(find.text('Sign in'));
+    await tester.pumpAndSettle();
+
+    final fields = find.byType(TextField);
+    tester.widget<TextField>(fields.at(0)).controller!.text =
+        'autofill@example.com';
+    tester.widget<TextField>(fields.at(1)).controller!.text =
+        'AutofilledPassword123';
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Sign in'));
+    await tester.pumpAndSettle();
+
+    expect(profileRepository.lastLoginEmail, 'autofill@example.com');
+    expect(profileRepository.lastLoginPassword, 'AutofilledPassword123');
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('registration requires accepting terms', (tester) async {
     await pumpTestApp(
       tester,

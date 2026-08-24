@@ -158,9 +158,18 @@ adding dated audit snapshots to the repository.
   Google mobile-config route; all VPS application containers were healthy,
   Caddy was active and `api.petgpt.app` resolved directly to `40.160.84.15` with
   a valid TLS certificate. General Android-to-VPS connectivity is therefore
-  accepted for `1.0.0+11`; verified email/password and real Google-account
-  sign-in remain separate pending acceptance checks. The complete mobile test
-  suite currently reports `1418` passed and `13` failed tests outside this
+  accepted for `1.0.0+11`. Native Google sign-in was then accepted on the same
+  device: the system account chooser returned an ID token, the VPS handled
+  `POST /api/auth/external/google/native` and `/api/auth/me` with HTTP 200, and
+  the authenticated application loaded its wallet, subscription and templates.
+  The prior email/password attempt reached the correct VPS route but sent the
+  empty JSON state even though Android autofill visibly populated both fields.
+  Android `1.0.0+12` snapshots the visible `TextEditingController` values before
+  updating Riverpod state and submitting; its autofill regression widget test
+  and the 55-test auth/network shard pass, and `flutter analyze` is clean.
+  Building, Play Internal upload and physical email/password acceptance for
+  `1.0.0+12` remain pending. The complete mobile test suite currently reports
+  `1418` passed and `13` failed tests outside this
   focused shard. Four reproduced failures are the
   pre-existing `My Pets renders in ...` visual helper cases, which stop at a
   missing widget lookup (`Bad state: No element`); the Flutter summary folds
@@ -225,10 +234,10 @@ do not append command transcripts to this file.
   its required-locale gate.
 - Privacy/legal approval for release Crashlytics collection, including the
   intended Firebase processor disclosure and retention basis.
-- Real-device authentication acceptance for the Android `1.0.0+11` Play
-  Internal release: general API connectivity and guest/server-backed screens
-  are accepted; verified email/password login and native Google login with a
-  real account remain pending.
+- Real-device email/password acceptance for the Android `1.0.0+12` Play
+  Internal release after it is built and uploaded. General API connectivity,
+  guest/server-backed screens and native Google login with a real account are
+  accepted on `1.0.0+11`.
 - Google Play subscriptions: the PetMagic Play Console subscription list is
   currently empty. Create the approved product, base plan, regional prices and
   tester offer before enabling Google Play subscription acceptance; the VPS
