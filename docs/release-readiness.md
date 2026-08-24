@@ -83,10 +83,15 @@ adding dated audit snapshots to the repository.
   but the email login was rejected as `invalid_credentials` and the native
   Google SDK did not reach the token-exchange endpoint. This is diagnostic
   evidence, not authentication acceptance.
-- Android `1.0.0+4` is prepared to replace the device-wide connectivity probe
-  from an unrelated public DNS lookup with the configured PetMagic API
-  `/health` endpoint. It must be built, uploaded to Play Internal and tested on
-  a physical device before this incident is considered resolved.
+- Android `1.0.0+4` replaced the device-wide connectivity probe from an
+  unrelated public DNS lookup with the configured PetMagic API `/health`
+  endpoint. Run `32701367339` built, signed, archived and uploaded it to Play
+  Internal; a physical device installed build `4`, but authentication still
+  trusted a stale global offline status before opening the Google selector.
+- Android `1.0.0+5` is prepared so email and native-provider authentication do
+  not treat the best-effort network banner as a hard precondition. It must be
+  built, uploaded and verified on a physical device before the incident is
+  considered resolved.
 
 ## Automated Gates
 

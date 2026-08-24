@@ -106,28 +106,28 @@ void main() {
     },
   );
 
-  test('login skips offline request before repository call', () async {
-    final repository = _PasswordPolicyRepository();
-    final container = _container(
-      repository,
-      networkController: _TestNetworkStatusController(
-        initialHasInternet: false,
-      ),
-    );
-    addTearDown(container.dispose);
+  test(
+    'login delegates to the repository when network status is stale',
+    () async {
+      final repository = _PasswordPolicyRepository();
+      final container = _container(
+        repository,
+        networkController: _TestNetworkStatusController(
+          initialHasInternet: false,
+        ),
+      );
+      addTearDown(container.dispose);
 
-    final controller = container.read(profileControllerProvider.notifier)
-      ..updateEmail('pet@example.com')
-      ..updatePassword('Password123');
+      final controller = container.read(profileControllerProvider.notifier)
+        ..updateEmail('pet@example.com')
+        ..updatePassword('Password123');
 
-    await controller.login();
+      await controller.login();
 
-    expect(repository.loginCalled, isFalse);
-    expect(
-      container.read(profileControllerProvider).errorMessage,
-      'templates.network_unavailable',
-    );
-  });
+      expect(repository.loginCalled, isTrue);
+      expect(container.read(profileControllerProvider).errorMessage, isNull);
+    },
+  );
 
   test('password reset skips offline request before repository call', () async {
     final repository = _PasswordPolicyRepository();
@@ -256,6 +256,35 @@ class _PasswordPolicyRepository extends ProfileRepository {
         roles: ['user'],
         avatar: null,
       ),
+    );
+  }
+
+  @override
+  Future<MobileUserProfile> fetchProfile({
+    RequestCancellation? cancelToken,
+  }) async {
+    return const MobileUserProfile(
+      userId: 'user-1',
+      email: 'pet@example.com',
+      displayName: 'Pet Parent',
+      isPremium: false,
+      emailConfirmed: true,
+      termsOfUseAccepted: true,
+      privacyPolicyAccepted: true,
+      marketingEmailsEnabled: false,
+      legalAcceptance: MobileLegalAcceptanceStatus(
+        termsOfUseAccepted: true,
+        termsOfUseAcceptedVersion: '2026-05-20',
+        termsOfUseAcceptedAtUtc: null,
+        privacyPolicyAccepted: true,
+        privacyPolicyAcceptedVersion: '2026-05-20',
+        privacyPolicyAcceptedAtUtc: null,
+        currentTermsOfUseVersion: '2026-05-20',
+        currentPrivacyPolicyVersion: '2026-05-20',
+        requiresAcceptance: false,
+      ),
+      roles: ['user'],
+      avatar: null,
     );
   }
 

@@ -534,7 +534,7 @@ void main() {
   );
 
   test(
-    'profile write actions skip network repositories while offline',
+    'profile mutations remain offline-guarded while authentication can recover',
     () async {
       final repository = _TrackingProfileWriteRepository();
       final externalAuthRepository = _TrackingExternalAuthRepository();
@@ -567,7 +567,7 @@ void main() {
       await controller.updateCurrentProfile(displayName: 'New name');
       await controller.acceptCurrentLegalDocuments(_legalDocuments());
 
-      expect(externalAuthRepository.authenticateCalls, 0);
+      expect(externalAuthRepository.authenticateCalls, 1);
       expect(externalAuthRepository.linkCalls, 0);
       expect(repository.unlinkCalls, 0);
       expect(repository.deleteAccountCalls, 0);

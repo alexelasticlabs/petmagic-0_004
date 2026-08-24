@@ -58,9 +58,6 @@ class ProfileAuthCoordinator {
     if (_readState().isSaving) {
       return;
     }
-    if (!_ensureNetwork()) {
-      return;
-    }
 
     _writeSavingState();
     final authRequestCancellation = _requestTracker.startAuth();
@@ -188,9 +185,6 @@ class ProfileAuthCoordinator {
 
   Future<void> authenticateWithProvider(ExternalAuthProvider provider) async {
     if (_readState().isSaving) {
-      return;
-    }
-    if (!_ensureNetwork()) {
       return;
     }
 

@@ -102,10 +102,14 @@ secret values, private keys, tokens, or service-account JSON.
       request was rejected as `invalid_credentials`; the native Google SDK
       loaded the server configuration but did not reach the token-exchange
       endpoint. This is diagnostic evidence, not authentication acceptance.
-- [ ] Publish Android `1.0.0+4`. It replaces the device-wide connectivity
-      probe from an unrelated public DNS lookup with the configured PetMagic
-      API `/health` endpoint, preventing false offline status on networks that
-      cannot resolve that DNS host.
+- [x] Android `1.0.0+4` was built, signed, archived and uploaded to Play
+      Internal by run `32701367339`. A physical device installed build `4`,
+      which still displayed an offline error before opening the Google account
+      selector despite direct HTTPS health evidence from that same device.
+- [ ] Publish Android `1.0.0+5`. Authentication will no longer trust the
+      best-effort global network banner as a hard precondition; email and
+      native-provider flows will make their own request and surface its actual
+      result.
 - [ ] Complete real-device authentication acceptance: verified email/password
       login and native Google sign-in with a real Google account.
 - [ ] Repair the independent iOS CI signing configuration before TestFlight:
