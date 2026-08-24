@@ -96,6 +96,23 @@ void main() {
     },
   );
 
+  test('idle offline advisory does not create a profile error', () async {
+    final networkController = _TestNetworkStatusController(hasInternet: true);
+    final container = _profileControllerTestContainer(
+      networkStatusController: networkController,
+      overrides: const [],
+    );
+    addTearDown(container.dispose);
+
+    container.read(profileControllerProvider);
+    networkController.setHasInternet(false);
+    await Future<void>.delayed(Duration.zero);
+
+    final state = container.read(profileControllerProvider);
+    expect(state.isSaving, isFalse);
+    expect(state.errorMessage, isNull);
+  });
+
   test(
     'successful avatar upload deletes managed temporary crop file',
     () async {

@@ -177,9 +177,10 @@ class ProfileController extends Notifier<ProfileState> {
     }
 
     final hasActiveAuth = _requestTracker.hasActiveAuth;
+    final hasActiveProfileMutation = _requestTracker.hasActiveProfileMutation;
     _requestTracker.cancelAvatarUpload();
     _requestTracker.cancelProfileMutation();
-    if (hasActiveAuth) {
+    if (hasActiveAuth || !hasActiveProfileMutation) {
       return;
     }
 

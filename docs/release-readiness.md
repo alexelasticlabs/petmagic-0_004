@@ -110,11 +110,23 @@ adding dated audit snapshots to the repository.
   the public mobile-config and health routes returned HTTP 200. A second race
   was then isolated in `ProfileController`: the advisory network listener
   cancelled an already-running email or external-auth request and replaced its
-  real outcome with `templates.network_unavailable`. Android `1.0.0+8` keeps an
-  active auth request authoritative and no longer lets a transient connectivity
-  advisory cancel it; the focused network/profile/external-auth shard passes 31
-  tests and `flutter analyze` is clean. Building, Play Internal upload and
-  physical-device authentication acceptance for `1.0.0+8` remain pending.
+  real outcome with `templates.network_unavailable`. Android `1.0.0+8` kept an
+  active auth request authoritative. Run `32713508079` built and uploaded that
+  release successfully from commit `04d6cf54`; the installed Play artifact was
+  confirmed as `versionCode=8` on a physical Samsung device. The same offline
+  message still appeared immediately after the Google action even though the
+  mobile-config and health routes returned HTTP 200 and no native-token exchange
+  reached the backend. A live artifact/configuration audit confirmed that the
+  bundle's Firebase project, Android package, Play app-signing SHA-1, Android
+  OAuth client and backend web-client audience all match. The remaining false
+  feedback source was the idle `ProfileController` connectivity listener: it
+  could publish `templates.network_unavailable` without any profile mutation in
+  progress and overwrite the actual native-auth outcome. Android `1.0.0+9`
+  makes that advisory non-authoritative while idle and retains cancellation only
+  for a real avatar/profile mutation. The focused network/profile/external-auth
+  shard passes 32 tests and `flutter analyze` is clean. Building, Play Internal
+  upload and physical-device authentication acceptance for `1.0.0+9` remain
+  pending.
   The complete mobile test suite currently reports `1414` passed and `13`
   failed tests outside this focused shard. Four reproduced failures are the
   pre-existing `My Pets renders in ...` visual helper cases, which stop at a
@@ -129,6 +141,10 @@ adding dated audit snapshots to the repository.
   9m 08s, built the signed AAB in 7m 09s and uploaded it to Play Internal in
   40s. This is the first measured cache-hit acceptance for the optimized
   workflow.
+- Run `32713508079` also restored the workflow caches, completed successfully in
+  9m 19s, built the signed AAB in 7m 12s and uploaded it to Play Internal in 41s.
+  This confirms the optimized duration is repeatable; it does not prove device
+  authentication.
 
 ## Automated Gates
 
@@ -176,7 +192,7 @@ do not append command transcripts to this file.
   its required-locale gate.
 - Privacy/legal approval for release Crashlytics collection, including the
   intended Firebase processor disclosure and retention basis.
-- Real-device authentication acceptance for the Android `1.0.0+8` Play
+- Real-device authentication acceptance for the Android `1.0.0+9` Play
   Internal release after it is built and uploaded: verified email/password
   login and native Google login with a real account.
 - Google Play subscriptions: the PetMagic Play Console subscription list is
@@ -184,10 +200,6 @@ do not append command transcripts to this file.
   tester offer before enabling Google Play subscription acceptance; the VPS
   health check only confirms its internal plan catalog, not that a purchasable
   Play product exists.
-- Match the SHA-1 of the **Play app signing** certificate, not the upload-key
-  certificate, to an Android OAuth client in the Firebase/Google project. This
-  is still required to turn the native Google-login configuration audit into
-  device acceptance evidence.
 - An iOS archive and store validation from a supported macOS/Xcode environment.
 - FAL generation and callback proof with production-like R2 upload/read paths.
 - Stripe, Google Play, and App Store sandbox purchase, replay, refund, restore,

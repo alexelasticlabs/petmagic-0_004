@@ -35,6 +35,9 @@ class ProfileRequestTracker {
 
   bool get hasActiveAuth => _auth != null;
 
+  bool get hasActiveProfileMutation =>
+      _avatarUpload != null || _profileMutation != null;
+
   void cancelAvatarUpload() {
     _cancel(_avatarUpload, 'profile_avatar_upload_cancelled');
     _avatarUpload = null;
