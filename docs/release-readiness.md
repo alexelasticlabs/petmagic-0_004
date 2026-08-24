@@ -310,14 +310,19 @@ do not append command transcripts to this file.
   store selector did not expose a purchasable Google Play option; Stripe stayed
   available. Before a sandbox charge, verify the tester account's Play-country
   eligibility and license-testing status against the active products.
-- **Release blocker — Premium allowance consistency:** the active Google Play
-  monthly product promises `500 PawSpark per month`; the production plans also
-  store monthly limits of `500` (monthly) and `1000` (yearly). The current
-  backend allowance flow instead grants the global `WeeklyPremiumSpark=40` at
-  subscription start and then every seven days, without using the selected
-  plan's monthly limit. Do not change the published benefit, price, or runtime
-  allowance until the product owner chooses the intended entitlement; then add
-  an automated provider-lifecycle test and repeat sandbox purchase evidence.
+- **Release blocker — Premium allowance rollout:** the owner approved
+  `40 PawSpark` at purchase and every seven days while Premium remains active.
+  Local plan defaults, health checks, migration and mobile copy now match the
+  decision, with clean/existing DB migration proof. The VPS and active store/
+  Stripe product descriptions are not yet confirmed aligned, and a real
+  renewal/cancellation lifecycle still has to prove idempotent granting.
+- **Release blocker — native Stripe acceptance:** eligible Android Stripe
+  checkout now uses native PaymentSheet. iOS/web retain hosted Checkout or
+  store billing according to policy. The optional client-secret contract,
+  narrow-screen Premium UI, production-flavor debug APK and minified release
+  AAB pass locally. Deploy the backend and mobile release, then prove a Stripe
+  test-mode payment, cancellation/retry and signed webhook reconciliation on a
+  physical device before treating this as delivered.
 - Google Play token-pack product IDs are derived from the active catalog as
   `com.petmagic.app.tokens.google.<pack-code>` rather than stored per pack.
   The Play Console's **One-time products** catalog is currently empty, while

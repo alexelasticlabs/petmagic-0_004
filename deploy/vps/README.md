@@ -158,6 +158,15 @@ secret values, private keys, tokens, or service-account JSON.
 - [ ] Prove a real signed Stripe delivery and a real signed App Store Sandbox
       notification. Provider endpoint configuration is verified, but delivery
       and signature acceptance are not yet evidenced.
+- [ ] Deploy and accept the native Stripe PaymentSheet release. The local
+      mobile/backend contract now returns PaymentIntent or Subscription invoice
+      client secrets for eligible Android checkout, keeps hosted Checkout as
+      the iOS/web fallback,
+      and uses an idempotency key for mobile subscription creation. Flutter
+      regression tests, backend gateway tests, a production-flavor debug APK and
+      a minified production release AAB pass locally. A device payment in Stripe
+      test mode, webhook reconciliation and cancellation/retry proof are still
+      required; these local checks are not production acceptance.
 - [ ] Run real-provider acceptance: Sign in with Apple, FCM/APNs on a physical
       iOS device, Stripe Checkout/webhook reconciliation, App Store Sandbox
       purchase/restore/refund or cancellation lifecycle, and idempotent token
@@ -172,13 +181,13 @@ secret values, private keys, tokens, or service-account JSON.
       offer was created without an approved product decision; sandbox purchase,
       renewal, restore, cancellation/refund and backend-crediting acceptance
       remain pending.
-- [ ] Resolve the Premium entitlement before a public release. Google Play's
-      active monthly product promises `500 PawSpark per month`, while the
-      current VPS backend grants the global `WeeklyPremiumSpark=40` at
-      subscription start and every seven days without using the selected
-      plan's stored monthly limit. This is a product decision, not a safe
-      server-side default: align the published benefit, plan data and runtime
-      allowance, add lifecycle coverage, then complete a real sandbox purchase.
+- [ ] Deploy and accept the approved Premium entitlement before a public
+      release. The owner chose `40 PawSpark` at purchase and every seven days
+      while Premium remains active. Local plan defaults, health checks,
+      migration and mobile copy now match that decision, and clean/existing DB
+      migration checks pass. The VPS and the active Google Play/App Store/Stripe
+      product copy are not yet confirmed aligned; update them and complete a
+      real sandbox renewal/cancellation lifecycle before public charging.
 - [ ] Complete native Google Play acceptance on an eligible internal tester.
       The Internal track is active with release `1.0.0` and a tester list, but
       the attached device did not expose a purchasable Google Play option while
