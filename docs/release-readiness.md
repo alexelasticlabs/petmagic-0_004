@@ -117,6 +117,15 @@ do not append command transcripts to this file.
 - Real-device authentication acceptance for the uploaded Android `1.0.0+2`
   Internal build: verified email/password login and native Google login with a
   real account.
+- Google Play subscriptions: the PetMagic Play Console subscription list is
+  currently empty. Create the approved product, base plan, regional prices and
+  tester offer before enabling Google Play subscription acceptance; the VPS
+  health check only confirms its internal plan catalog, not that a purchasable
+  Play product exists.
+- Match the SHA-1 of the **Play app signing** certificate, not the upload-key
+  certificate, to an Android OAuth client in the Firebase/Google project. This
+  is still required to turn the native Google-login configuration audit into
+  device acceptance evidence.
 - An iOS archive and store validation from a supported macOS/Xcode environment.
 - FAL generation and callback proof with production-like R2 upload/read paths.
 - Stripe, Google Play, and App Store sandbox purchase, replay, refund, restore,

@@ -105,6 +105,13 @@ secret values, private keys, tokens, or service-account JSON.
       reaches its expected validation path for a synthetic token. Catalog-list
       access remains intentionally unavailable because `Manage store presence`
       is not required for backend purchase verification and is not granted.
+- [ ] Create the approved Google Play subscription product, base plan, prices
+  and tester offer. The Play Console subscription list currently has no
+  subscription entries; a healthy VPS `economy_subscription_plans` check does
+  not make an Android purchase possible.
+- [ ] Match the **Play app signing** SHA-1 certificate to an Android OAuth
+  client in the Firebase/Google project. The upload-key certificate is a
+  different certificate and must not be used for Google Sign-In configuration.
 - [ ] Prove restore of retained Render migration artifacts, including any
       persistent data not covered by the current VPS backup, before discarding
       the Render export/archive or signing off cutover.
