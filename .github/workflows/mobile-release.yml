@@ -162,7 +162,20 @@ jobs:
             --dart-define=APP_PACKAGE_NAME="$APP_PACKAGE_NAME" \
             --dart-define=API_BASE_URL="$API_BASE_URL" \
             --obfuscate --split-debug-info="build/symbols/ios-$RELEASE_ENVIRONMENT"
+      - id: ios_crashlytics_symbols
+        name: Determine iOS Crashlytics symbol upload availability
+        shell: bash
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+        run: |
+          if [ -n "$FIREBASE_TOKEN" ]; then
+            echo 'upload=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'upload=false' >> "$GITHUB_OUTPUT"
+            echo 'Crashlytics symbol upload skipped: FIREBASE_TOKEN is not configured.'
+          fi
       - name: Upload iOS symbols to Crashlytics
+        if: steps.ios_crashlytics_symbols.outputs.upload == 'true'
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
         run: |

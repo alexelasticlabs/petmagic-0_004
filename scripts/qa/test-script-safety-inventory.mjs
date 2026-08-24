@@ -150,6 +150,7 @@ const expectedWorkflowSecretReferences = [
   '.github/workflows/mobile-release.yml:secrets.FIREBASE_TOKEN',
   '.github/workflows/mobile-release.yml:secrets.FIREBASE_TOKEN',
   '.github/workflows/mobile-release.yml:secrets.FIREBASE_TOKEN',
+  '.github/workflows/mobile-release.yml:secrets.FIREBASE_TOKEN',
   '.github/workflows/mobile-release.yml:secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON',
   '.github/workflows/mobile-release.yml:secrets.MATCH_GIT_URL',
   '.github/workflows/mobile-release.yml:secrets.MATCH_PASSWORD',
