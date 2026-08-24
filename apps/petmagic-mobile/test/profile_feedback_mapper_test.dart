@@ -123,6 +123,34 @@ void main() {
     },
   );
 
+  testWidgets(
+    'credential errors map to login copy instead of generic fallback',
+    (tester) async {
+      late AppLocalizations text;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: const [Locale('en')],
+          home: Builder(
+            builder: (context) {
+              text = AppLocalizations.of(context);
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      );
+
+      for (final code in const [
+        'auth.invalid_credentials',
+        'auth.account_locked',
+      ]) {
+        expect(mapProfileFeedbackMessage(code, text), text.authLoginFailed);
+      }
+    },
+  );
+
   test('normalizes wrapped profile auth feedback keys', () {
     expect(
       normalizeProfileFeedbackKey(' AppException: AUTH.ACCEPT_TERMS_REQUIRED '),
@@ -135,6 +163,10 @@ void main() {
     expect(
       normalizeProfileFeedbackKey('Failure: auth.legal_documents_unavailable'),
       'auth.legal_documents_unavailable',
+    );
+    expect(
+      normalizeProfileFeedbackKey('ProblemDetails: auth.invalid_credentials'),
+      'auth.invalid_credentials',
     );
     expect(
       normalizeProfileFeedbackKey('FileSystemException: /private/user.jpg'),
