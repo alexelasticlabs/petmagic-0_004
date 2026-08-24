@@ -43,10 +43,13 @@ adding dated audit snapshots to the repository.
   still pending.
 - Application R2 media access passed a temporary `PUT`/`GET`/`DELETE` smoke
   check. A dedicated least-privilege backup bucket, encrypted restic repository
-  and enabled nightly timer are in place.
+  and enabled nightly timer are in place. The 2026-08-24 scheduled run succeeded;
+  three encrypted snapshots are present and a fresh read-only repository check
+  reports no errors.
 - The first coordinated PostgreSQL/API-data backup passed `restic check` and
-  was restored into an isolated temporary database with 82 public tables and
-  99 EF migrations. The temporary restore database and dump were removed.
+  the latest scheduled dump was independently checksum-verified and restored
+  into an isolated temporary database with 82 public tables, 99 EF migrations
+  and one user. Zero temporary verification databases remain.
 - Stripe live credentials authenticated with a read-only API request. Google
   Play service-account OAuth and the purchase-verification API are authorized;
   a synthetic token reached the expected validation failure path without

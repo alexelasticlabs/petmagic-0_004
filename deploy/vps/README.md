@@ -86,10 +86,13 @@ secret values, private keys, tokens, or service-account JSON.
 - [x] The application R2 credentials completed a temporary `PUT`/`GET`/`DELETE`
       smoke check in the media bucket. The temporary object was deleted.
 - [x] A dedicated least-privilege R2 backup bucket and encrypted restic
-      repository are initialized. The nightly backup timer is enabled.
+      repository are initialized. The nightly backup timer is enabled and its
+      2026-08-24 run completed successfully. The repository contains three
+      snapshots and a fresh read-only `restic check` reports no errors.
 - [x] A PostgreSQL/API-data backup was created, integrity-checked and restored
-      into a temporary database. The restore had 82 public tables and 99 EF
-      migrations; the temporary database and copied dump were removed.
+      into a temporary database. The latest scheduled dump was independently
+      checksum-verified and restored with 82 public tables, 99 EF migrations and
+      one user; zero temporary verification databases remain.
 - [x] Stripe has exactly one enabled VPS webhook endpoint with all backend
       subscription and checkout event types subscribed. This confirms provider
       configuration, not a real signed-event delivery.
