@@ -51,6 +51,12 @@ secret values, private keys, tokens, or service-account JSON.
 - [x] Caddy, the Compose supervisor, PostgreSQL, API, admin web and exactly
       one generation worker are healthy. Public `api.petgpt.app/health` and
       `admin.petgpt.app/ru` return HTTP 200 over HTTPS.
+- [x] A stale exhausted `identity_email` job addressed to the reserved
+      `example.com` test domain was removed after its SMTP failure was
+      confirmed isolated from customer traffic. Fresh `/health` reports all
+      notification queues healthy. The sole remaining overall `Degraded`
+      signal is the intentional `store_account_binding=compatibility` release
+      gate; do not switch it to `enforce` before real store-purchase evidence.
 - [x] The application R2 credentials completed a temporary `PUT`/`GET`/`DELETE`
       smoke check in the media bucket. The temporary object was deleted.
 - [x] A dedicated least-privilege R2 backup bucket and encrypted restic

@@ -216,6 +216,14 @@ adding dated audit snapshots to the repository.
   completed successfully and its encrypted off-site repository integrity check
   reported no errors.
 
+  A later control pass identified one exhausted `identity_email` outbox record
+  addressed to the reserved `example.com` test domain. Its SMTP failure was
+  isolated from customer traffic and the stale test record was removed. A
+  fresh `/health` check then reported all notification queues healthy; the
+  only remaining overall `Degraded` check is the intentional
+  `store_account_binding=compatibility` gate, which must stay in place until
+  real Google Play and App Store purchase evidence exists.
+
   The current auth/network/router/templates verification shard passes 163
   tests. Three initially failing pet-generation cases were traced to stale
   test fixtures using the intentionally disallowed placeholder host
