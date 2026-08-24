@@ -264,6 +264,22 @@ deployed commit in its OCI revision label. The systemd unit is coupled to
 `docker.service`, so a controlled Docker restart also re-runs the PetMagic
 preflight and start.
 
+Once the root-only read-only GitHub deploy key is installed, use the checked-in
+release script instead of copying a release bundle or editing `SOURCE_REVISION`
+by hand:
+
+```bash
+sudo bash deploy/vps/scripts/deploy-release.sh
+```
+
+It fetches `origin/master`, builds only the three application images, restarts
+the supervised stack, and verifies runtime image revisions. If any of those
+steps fails, it restores the prior Git revision and `SOURCE_REVISION` before
+attempting to restart the previous stack. An explicit `--revision <full-sha>`
+is allowed only for a commit that is already contained in `origin/master`.
+The script refuses a dirty checkout, an active off-site backup, a non-GitHub
+origin, or concurrent release.
+
 If repeated failures exhaust the systemd start limit, inspect
 `journalctl -u petmagic-compose.service`, correct the cause, then explicitly
 recover with `sudo systemctl reset-failed petmagic-compose.service` followed by
