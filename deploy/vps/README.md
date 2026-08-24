@@ -128,11 +128,17 @@ secret values, private keys, tokens, or service-account JSON.
       device confirms `versionCode=13`. Repeated account transitions exposed a
       separate provider-rebuild failure, so this is release evidence rather
       than final lifecycle acceptance.
-- [ ] Build and install Android `1.0.0+14`, which allows
-      `TemplatesController` lifecycle collaborators to be reconstructed after
-      a session-scope provider invalidation. Re-run guest-to-Google,
-      logout-to-guest and authenticated-navigation acceptance and confirm no
-      new matching Crashlytics event.
+- [x] Android `1.0.0+14` allows `TemplatesController` lifecycle collaborators
+      to be reconstructed after a session-scope provider invalidation. Run
+      `32730528049` built, archived and uploaded it from commit
+      `30626279b24c2a5f4c8733fc55c10390f00b70a6` in 10m20s. The Play-installed
+      physical device confirms `versionCode=14`; logout-to-guest,
+      guest-to-Google, repeated authenticated navigation, background/foreground
+      and cold restart passed without a fallback screen, targeted log error or
+      native crash. The VPS completed Google native auth and `/api/auth/me`
+      with HTTP 200. A short post-restart Crashlytics observation retained only
+      the five existing build-13 events and showed no build-14 event; continue
+      monitoring for delayed ingestion.
 - [ ] Repair the independent iOS CI signing configuration before TestFlight:
       Firebase iOS configuration and its App ID are now protected GitHub
       `production` secrets. The App Store Connect API key and Match signing

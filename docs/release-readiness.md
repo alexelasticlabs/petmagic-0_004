@@ -194,9 +194,27 @@ adding dated audit snapshots to the repository.
   Riverpod can re-run `Notifier.build()` on the same instance, but six
   lifecycle collaborators were declared `late final` and could not be assigned
   again. Android `1.0.0+14` makes those collaborators replaceable and adds an
-  explicit provider-invalidation regression test. Build/upload/install,
-  repeated guest/auth transitions and a no-new-event Crashlytics observation
-  are still required for `1.0.0+14`.
+  explicit provider-invalidation regression test. Run `32730528049` built,
+  archived and uploaded that exact release from commit
+  `30626279b24c2a5f4c8733fc55c10390f00b70a6` to Play Internal successfully
+  in 10m20s; signed-AAB build took 7m34s, Crashlytics symbol upload 39s and
+  Play upload 43s. The Play artifact was installed and confirmed as
+  `versionCode=14` on the physical Samsung device. Without restarting the app,
+  logout-to-guest opened the template empty state directly and guest-to-Google
+  returned to the authenticated template empty state directly; the VPS handled
+  Google native authentication and `/api/auth/me` with HTTP 200. Three
+  profile/template navigation cycles, background/foreground and a subsequent
+  cold restart also passed. Android crash-buffer and targeted Flutter/Dio logs
+  remained empty. After the restart, a short Crashlytics observation still
+  showed the existing five build-13 lifecycle events and no build-14 event;
+  continued monitoring is still required because ingestion can be delayed.
+
+  The same dated control pass confirmed all production containers healthy,
+  Caddy active, 99 EF migrations, no recent backend error/fatal/exception log,
+  and HTTP 200 with valid TLS for API health, legal, Google mobile config,
+  admin and public web routes. The latest nightly PostgreSQL/API-data backup
+  completed successfully and its encrypted off-site repository integrity check
+  reported no errors.
 
   The current auth/network/router/templates verification shard passes 163
   tests. Three initially failing pet-generation cases were traced to stale
@@ -263,10 +281,11 @@ do not append command transcripts to this file.
   its required-locale gate.
 - Privacy/legal approval for release Crashlytics collection, including the
   intended Firebase processor disclosure and retention basis.
-- Build, upload and install Android `1.0.0+14`, then repeat physical-device
-  email/password, Google, guest and authenticated-navigation acceptance and
-  confirm that Crashlytics receives no new lifecycle event. General API
-  connectivity and real Google-account authentication are already accepted.
+- Continue post-release Crashlytics monitoring beyond the short build-14
+  device-observation window. Physical-device guest, Google, authenticated
+  navigation and cold-restart acceptance are complete; email/password remains
+  accepted from the preceding production device pass because build 14 changes
+  only template-provider reconstruction.
 - Google Play contains active monthly (`com.petmagic.app.premium.monthly`,
   USD 14.99) and yearly (`com.petmagic.app.premium.yearly`, USD 99.99)
   subscriptions with active base plans in 174 countries. A tester offer was
