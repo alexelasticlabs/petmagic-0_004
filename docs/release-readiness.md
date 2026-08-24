@@ -368,7 +368,10 @@ do not append command transcripts to this file.
   store billing according to policy. The optional client-secret contract,
   narrow-screen Premium UI, production-flavor debug APK and minified release
   AAB pass locally, the backend is deployed on the VPS, and Android `1.0.0+15`
-  is active on Play Internal. Install that exact release, then prove a Stripe
+  is active on Play Internal. Focused verification on 2026-08-25 passes 224
+  backend economy tests, 68 auth/store security tests, 108 Flutter auth/payment
+  tests and `flutter analyze`; this proves code contracts, not provider or
+  physical-device acceptance. Install that exact release, then prove a Stripe
   test-mode payment, cancellation/retry and signed webhook reconciliation on a
   physical device before treating this as delivered.
   A read-only live API audit found the expected enabled production webhook and
