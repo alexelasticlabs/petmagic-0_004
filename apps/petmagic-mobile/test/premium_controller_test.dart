@@ -93,6 +93,51 @@ void main() {
     },
   );
 
+  test('payment method legal notice matches the provider being displayed', () {
+    const stripe = PremiumPaymentMethodModel(
+      provider: PremiumPaymentProvider.stripe,
+      purchaseChannel: 'external_checkout',
+      platform: 'android',
+      region: '*',
+      isEnabled: true,
+      isSelectedByDefault: true,
+      requiresExternalWarning: false,
+      requiresStoreDisclosure: false,
+      isRecommended: true,
+      bonusTokensPercent: 0,
+    );
+    const googlePlay = PremiumPaymentMethodModel(
+      provider: PremiumPaymentProvider.googlePlay,
+      purchaseChannel: 'in_app',
+      platform: 'android',
+      region: '*',
+      isEnabled: true,
+      isSelectedByDefault: false,
+      requiresExternalWarning: false,
+      requiresStoreDisclosure: true,
+      isRecommended: false,
+      bonusTokensPercent: 0,
+    );
+    const state = PremiumState(
+      paymentMethods: [stripe, googlePlay],
+      legalTexts: PremiumLegalTextsModel(
+        storeNotice: 'Google Play manages this purchase.',
+        externalCheckoutNotice: 'External checkout notice.',
+        stripeNotice: 'Stripe securely processes card data.',
+      ),
+      selectedProvider: PremiumPaymentProvider.stripe,
+    );
+
+    expect(
+      state.legalNoticeFor(stripe),
+      'Stripe securely processes card data.',
+    );
+    expect(
+      state.legalNoticeFor(googlePlay),
+      'Google Play manages this purchase.',
+    );
+  });
+
   test(
     'load selects configured non-stripe provider when store products are available',
     () async {

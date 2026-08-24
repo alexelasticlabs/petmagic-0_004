@@ -183,6 +183,7 @@ extension on _PremiumPageState {
 
     final options = availableMethods
         .map((method) {
+          final legalNotice = state.legalNoticeFor(method).trim();
           return PaymentMethodSheetOption(
             id: method.provider.value,
             title: method.displayLabel?.trim().isNotEmpty == true
@@ -196,9 +197,7 @@ extension on _PremiumPageState {
             warningTitle: method.warningTitle,
             warningMessage: method.warningMessage,
             notes: method.notes,
-            legalNotice: state.legalNotice.trim().isEmpty
-                ? null
-                : state.legalNotice,
+            legalNotice: legalNotice.isEmpty ? null : legalNotice,
           );
         })
         .toList(growable: false);

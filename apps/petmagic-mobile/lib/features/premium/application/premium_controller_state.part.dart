@@ -147,7 +147,11 @@ class PremiumState {
 
   String get legalNotice {
     final paymentMethod = selectedPaymentMethod;
-    if (legalTexts == null || paymentMethod == null) {
+    return paymentMethod == null ? '' : legalNoticeFor(paymentMethod);
+  }
+
+  String legalNoticeFor(PremiumPaymentMethodModel paymentMethod) {
+    if (legalTexts == null) {
       return '';
     }
 
