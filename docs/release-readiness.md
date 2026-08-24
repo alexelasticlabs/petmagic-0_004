@@ -76,13 +76,14 @@ adding dated audit snapshots to the repository.
   real Google-account sign-in on the Play-installed physical Android device was
   accepted by the VPS and completed `/api/auth/me` successfully.
 
-## Mobile release correction pending
+## Mobile release correction status
 
 - The production mobile-release workflow was corrected to build with
   `API_BASE_URL=https://api.petgpt.app`. The prior `api.petmagic.app` host does
-  not resolve in DNS, so an already-published Android build using it cannot
-  reach the VPS. Publish and install a new Play release before treating mobile
-  connectivity as accepted.
+  not resolve in DNS and explains the earliest unreachable Android artifacts.
+  Current Play-installed production builds use the corrected host; physical
+  device acceptance now proves API connectivity, email/password authentication,
+  native Google authentication and authenticated `/api/auth/me` restoration.
 - The protected GitHub production environment now has the existing Android
   upload keystore, matching Firebase production config and Play service-account
   JSON. Run `32666052824` built and signed `1.0.0+2`, preserved its symbols
@@ -90,8 +91,8 @@ adding dated audit snapshots to the repository.
   track update with `The caller does not have permission`. The existing service
   account was granted `Release apps to testing tracks`; follow-up run
   `32674447149` then built, archived, and uploaded `1.0.0+2` to Play Internal
-  successfully. A Play-installed device has reached the VPS API, but verified
-  email/password and real Google-account sign-in acceptance remain pending.
+  successfully. Later Play-installed builds completed verified email/password
+  and real Google-account sign-in acceptance against the VPS.
   Browser redirect-based Google OAuth is intentionally disabled until a
   matching client secret is provisioned in the same Google project; native
   Android/iOS token verification does not use that secret. The independent iOS
