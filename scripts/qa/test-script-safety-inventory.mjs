@@ -117,6 +117,7 @@ const expectedWorkflowActionUses = [
   '.github/workflows/mobile-release.yml:actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5',
   '.github/workflows/mobile-release.yml:actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02',
   '.github/workflows/mobile-release.yml:actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02',
+  '.github/workflows/mobile-release.yml:gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb',
   '.github/workflows/mobile-release.yml:ruby/setup-ruby@d45b1a4e94b71acab930e56e79c6aa188764e7f9',
   '.github/workflows/mobile-release.yml:ruby/setup-ruby@d45b1a4e94b71acab930e56e79c6aa188764e7f9',
   '.github/workflows/mobile-release.yml:subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2',

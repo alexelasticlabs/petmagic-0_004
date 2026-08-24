@@ -92,6 +92,10 @@ adding dated audit snapshots to the repository.
   not treat the best-effort network banner as a hard precondition. It must be
   built, uploaded and verified on a physical device before the incident is
   considered resolved.
+- The Android release job is configured to reuse Gradle dependency, transform
+  and local build-cache state between runs. The first run seeds that cache;
+  a later release run must be timed and compared before any performance gain is
+  claimed.
 
 ## Automated Gates
 
