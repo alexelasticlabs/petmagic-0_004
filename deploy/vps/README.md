@@ -156,6 +156,14 @@ secret values, private keys, tokens, or service-account JSON.
       with HTTP 200. A short post-restart Crashlytics observation retained only
       the five existing build-13 events and showed no build-14 event; continue
       monitoring for delayed ingestion.
+- [x] Android `1.0.0+15` was built and signed locally after GitHub-hosted run
+      `32767419162` was rejected before its first step by the account billing or
+      Actions spending-limit gate. The AAB SHA-256 is
+      `098D568155BC3F3F981D446D90D463A59F5E9FAC01003A3D59F7FE8E0A34AC5D`.
+      Android Publisher API upload and a separate API read confirm Internal
+      release `1.0.0 (15)`, status `completed`, version code `15`. The hosted
+      Gradle tuning remains unverified until the GitHub account-level block is
+      resolved; physical-device install and payment acceptance are still pending.
 - [ ] Repair the independent iOS CI signing configuration before TestFlight:
       Firebase iOS configuration and its App ID are now protected GitHub
       `production` secrets. App Store Connect API access is now approved. A
@@ -171,9 +179,9 @@ secret values, private keys, tokens, or service-account JSON.
       the iOS/web fallback,
       and uses an idempotency key for mobile subscription creation. Flutter
       regression tests, backend gateway tests, a production-flavor debug APK and
-      a minified production release AAB pass locally. Android `1.0.0+15` upload
-      and a device payment in Stripe test mode, webhook reconciliation and
-      cancellation/retry proof are still required.
+      a minified production release AAB pass locally. Android `1.0.0+15` is active
+      on Play Internal; its device install, Stripe test-mode payment, webhook
+      reconciliation and cancellation/retry proof are still required.
 - [ ] Run real-provider acceptance: Sign in with Apple, FCM/APNs on a physical
       iOS device, Stripe Checkout/webhook reconciliation, App Store Sandbox
       purchase/restore/refund or cancellation lifecycle, and idempotent token
@@ -197,11 +205,12 @@ secret values, private keys, tokens, or service-account JSON.
       real sandbox renewal/cancellation lifecycle remain pending before public
       charging.
 - [ ] Complete native Google Play acceptance on an eligible internal tester.
-      The Internal track is active with release `1.0.0` and a tester list, but
-      the attached device did not expose a purchasable Google Play option while
-      Stripe remained available. The Play **One-time products** catalog now has
-      active standard **Buy** products matching the VPS-derived IDs: `starter`
-      at USD 0.99, `creator` at USD 1.49, and `viral` at USD 1.99. Verify
+      The Internal track is active with completed release `1.0.0 (15)` and a
+      tester list, but the attached device did not expose a purchasable Google
+      Play option while Stripe remained available. The Play **One-time
+      products** catalog now has active standard **Buy** products matching the
+      VPS-derived IDs: `starter` at USD 0.99, `creator` at USD 1.49, and `viral`
+      at USD 1.99. Verify
       Play-country/license-test eligibility, then purchase, verify, credit and
       consume each product exactly once before any public charge.
 - [x] The **Play app signing** SHA-1 certificate matches the Android OAuth

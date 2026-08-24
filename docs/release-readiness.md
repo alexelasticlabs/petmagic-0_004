@@ -252,6 +252,17 @@ adding dated audit snapshots to the repository.
   9m 19s, built the signed AAB in 7m 12s and uploaded it to Play Internal in 41s.
   This confirms the optimized duration is repeatable; it does not prove device
   authentication.
+- GitHub-hosted release run `32767419162` was rejected before its first step
+  because the account has a failed payment or insufficient Actions spending
+  limit. The hosted-runner Gradle memory/worker tuning is committed but is not
+  execution-verified while that account-level block remains. As an independent
+  fallback, Android `1.0.0+15` was built and signed locally as
+  `app-production-release.aab` (SHA-256
+  `098D568155BC3F3F981D446D90D463A59F5E9FAC01003A3D59F7FE8E0A34AC5D`).
+  Google Play Android Publisher API then uploaded the exact artifact and a
+  follow-up API read confirmed Internal release `1.0.0 (15)`, status
+  `completed`, version code `15`. Physical-device install and payment acceptance
+  are still pending.
 
 ## Automated Gates
 
@@ -325,10 +336,10 @@ do not append command transcripts to this file.
   checkout now uses native PaymentSheet. iOS/web retain hosted Checkout or
   store billing according to policy. The optional client-secret contract,
   narrow-screen Premium UI, production-flavor debug APK and minified release
-  AAB pass locally, and the backend is deployed on the VPS. Upload and install
-  Android `1.0.0+15`, then prove a Stripe test-mode payment,
-  cancellation/retry and signed webhook reconciliation on a physical device
-  before treating this as delivered.
+  AAB pass locally, the backend is deployed on the VPS, and Android `1.0.0+15`
+  is active on Play Internal. Install that exact release, then prove a Stripe
+  test-mode payment, cancellation/retry and signed webhook reconciliation on a
+  physical device before treating this as delivered.
 - Google Play token-pack product IDs are derived from the active catalog as
   `com.petmagic.app.tokens.google.<pack-code>` rather than stored per pack.
   The Play Console now contains active standard **Buy** one-time products for
