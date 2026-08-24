@@ -72,10 +72,11 @@ adding dated audit snapshots to the repository.
   matching client secret is provisioned in the same Google project; native
   Android/iOS token verification does not use that secret. The independent iOS
   signing/API-key chain remains unavailable or malformed.
-- The next Android artifact is version `1.0.0+3`. It contains the corrected
-  mobile auth-feedback mapping and must still complete a fresh GitHub Actions
-  run, Play Internal upload, installation, and real-device acceptance; it is
-  not yet a published acceptance result.
+- Android `1.0.0+3`, containing corrected mobile auth-feedback mapping and
+  production API routing, was built, signed, archived and uploaded to Play
+  Internal by run `32698746633`. Installation from Play Internal and real-device
+  authentication acceptance are still required; this is not yet a full mobile
+  acceptance result.
 
 ## Automated Gates
 
