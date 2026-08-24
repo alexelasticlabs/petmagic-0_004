@@ -331,11 +331,12 @@ do not append command transcripts to this file.
   before treating this as delivered.
 - Google Play token-pack product IDs are derived from the active catalog as
   `com.petmagic.app.tokens.google.<pack-code>` rather than stored per pack.
-  The Play Console's **One-time products** catalog is currently empty, while
-  the VPS catalog has active `starter`, `creator`, and `viral` packs. Therefore
-  the Android wallet correctly disables Google Play for packs and exposes
-  Stripe instead. Create and activate intentionally priced matching Play
-  products before a sandbox purchase is verified and consumed exactly once.
+  The Play Console now contains active standard **Buy** one-time products for
+  `starter` (USD 0.99), `creator` (USD 1.49), and `viral` (USD 1.99), matching
+  the VPS catalog and derived production IDs. Catalog configuration is
+  complete; an eligible Internal tester still has to prove that each product
+  is offered, purchased, verified by the backend, credited and consumed
+  exactly once.
 - The production and retained Render databases both currently contain zero
   template items, categories and assets; this is not a VPS migration loss.
   Populate the production catalog only with approved template content and then
