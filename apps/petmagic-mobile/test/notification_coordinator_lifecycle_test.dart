@@ -272,6 +272,16 @@ void main() {
     expect(disposeBody, contains('_coordinator = null;'));
     expect(launchStateBody, contains('if (!mounted)'));
     expect(launchStateBody, contains('_flushPendingRouteIfReady(launchState)'));
+    expect(source, contains('bool _wasPushEligible = false;'));
+    expect(
+      launchStateBody,
+      contains(
+        'launchState.isAuthenticated && !launchState.requiresLegalAcceptance',
+      ),
+    );
+    expect(launchStateBody, contains('isPushEligible && !_wasPushEligible'));
+    expect(launchStateBody, contains('_wasPushEligible = true;'));
+    expect(launchStateBody, contains('_wasPushEligible = false;'));
     expect(
       launchStateBody,
       contains('_flushPendingCheckoutVerificationIfReady(launchState)'),

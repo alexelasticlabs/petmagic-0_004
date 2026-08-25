@@ -52,6 +52,7 @@ class _PushNotificationsBootstrapState
   String? _pendingCheckoutSessionId;
   bool _pendingCheckoutVerificationRequested = false;
   bool _wasAuthenticated = false;
+  bool _wasPushEligible = false;
 
   @override
   void initState() {
@@ -96,8 +97,10 @@ class _PushNotificationsBootstrapState
     _flushPendingRouteIfReady(launchState);
     _flushPendingCheckoutVerificationIfReady(launchState);
 
-    if (launchState.isAuthenticated && !_wasAuthenticated) {
-      _wasAuthenticated = true;
+    final isPushEligible =
+        launchState.isAuthenticated && !launchState.requiresLegalAcceptance;
+    if (isPushEligible && !_wasPushEligible) {
+      _wasPushEligible = true;
       Future.microtask(() {
         if (!mounted) {
           return;
@@ -110,11 +113,20 @@ class _PushNotificationsBootstrapState
 
         unawaited(coordinator.initializeForAuthenticatedUser());
       });
+    }
+
+    if (!isPushEligible) {
+      _wasPushEligible = false;
+    }
+
+    if (launchState.isAuthenticated && !_wasAuthenticated) {
+      _wasAuthenticated = true;
       return;
     }
 
     if (!launchState.isAuthenticated && _wasAuthenticated) {
       _wasAuthenticated = false;
+      _wasPushEligible = false;
       _clearPendingCheckoutVerification();
       Future.microtask(() {
         if (!mounted) {

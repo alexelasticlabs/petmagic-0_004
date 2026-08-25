@@ -490,6 +490,11 @@ do not append command transcripts to this file.
   was made by the test operator. The four focused Flutter legal-gate/auth-entry
   tests and 26 focused backend native-Google/legal-enforcement tests pass
   locally; this is regression evidence, not substitute user consent.
+  The next Android build also defers push-token bootstrap until the authenticated
+  account has accepted the current legal documents, preventing the expected
+  legal-gate `403` retries observed during this control pass. Focused
+  notification/legal Flutter tests pass; this code change is not in the
+  Play-installed `versionCode=21` artifact yet.
   The corresponding local APK is signed with the upload key and intentionally
   does not match the Google Play app-signing certificate on the installed app;
   it was not sideloaded over the Play build. Physical acceptance therefore
