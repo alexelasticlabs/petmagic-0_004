@@ -411,10 +411,12 @@ do not append command transcripts to this file.
   A read-only live API audit found the expected enabled production webhook and
   event set, but zero active live Stripe products or prices. Both production
   Premium rows currently have an empty `StripePriceId`, so the backend uses its
-  inline-price fallback. Production provider routes are all `live` and the VPS
-  has no `STRIPE_TEST_*` credentials; configure an isolated test key pair,
-  test webhook secret and test-mode route before sandbox acceptance rather than
-  sending a real charge as a test. The physical Android selector rendering is
+  inline-price fallback. Production provider routes are all `live`. An
+  isolated staging API now responds at `api.staging.petgpt.app` with separate
+  database, local paths and secrets, while production remains healthy; it has
+  no Stripe test credentials, test product catalog or webhook yet. Configure
+  those only in staging before sandbox acceptance rather than sending a real
+  charge as a test. The physical Android selector rendering is
   accepted for build `1.0.0+15`; build `17` is now installed and accepted for
   native Google authentication and provider-specific selector copy, but its
   provider purchase, cancellation/retry and

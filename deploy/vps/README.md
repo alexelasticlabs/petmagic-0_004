@@ -327,6 +327,21 @@ it must not be enabled until staging has its own TLS SMTP relay and credentials.
 
 This is infrastructure readiness, not proof of Stripe checkout, webhook
 delivery, premium entitlement, refund, cancellation or store billing.
+
+### Current staging evidence
+
+- [x] On 2026-08-25 Cloudflare received the DNS-only
+      `api.staging.petgpt.app` `A` record for the VPS. Caddy was validated,
+      reloaded without modifying the existing production routes, and both
+      `https://api.petgpt.app/health` and
+      `https://api.staging.petgpt.app/health` returned `200`.
+- [x] `petmagic-staging` runs a separate healthy PostgreSQL, Mailpit and API
+      project with distinct local secrets and paths. Its source image is the
+      already present reviewed VPS image; no new production image was built or
+      deployed for this bootstrap.
+- [ ] Stripe test credentials, test products/prices, the staging webhook,
+      a signed delivery and checkout/entitlement lifecycle are not yet
+      configured or accepted.
 - [ ] Run real-provider acceptance: Sign in with Apple, FCM/APNs on a physical
       iOS device, Stripe Checkout/webhook reconciliation, App Store Sandbox
       purchase/restore/refund or cancellation lifecycle, and idempotent token
