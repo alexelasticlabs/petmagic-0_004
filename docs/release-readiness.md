@@ -539,8 +539,14 @@ do not append command transcripts to this file.
   public paywall API returns those IDs, the same prices, `40` PawSpark per
   seven-day grant interval, and recommends the yearly plan. No real live
   charge, signed webhook delivery, renewal, cancellation, refund, or restore
-  has been accepted. Production provider routes are all `live`. An isolated
-  staging API now responds at `api.staging.petgpt.app` with separate database,
+  has been accepted. Production provider routes are all `live`.
+  On 2026-08-25 production revision `5611b40d4213d39319fd719426304804c2b03b5b`
+  corrected Android Stripe disclosure copy to match the native PaymentSheet
+  flow: the live paywall now says that the secure payment form opens inside
+  PetMagic and no longer claims that Android opens a hosted Checkout. The two
+  targeted Economy regression tests pass. This is live API/copy acceptance,
+  not payment-lifecycle acceptance.
+  An isolated staging API now responds at `api.staging.petgpt.app` with separate database,
   local paths and secrets, while production remains healthy. Its
   test credentials, test catalog and signed webhook delivery are accepted;
   an automated Android-mode PaymentSheet checkout activated Premium for an
