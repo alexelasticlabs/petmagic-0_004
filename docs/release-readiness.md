@@ -47,9 +47,12 @@ adding dated audit snapshots to the repository.
   still pending.
 - Application R2 media access passed a temporary `PUT`/`GET`/`DELETE` smoke
   check. A dedicated least-privilege backup bucket, encrypted restic repository
-  and enabled nightly timer are in place. The 2026-08-24 scheduled run succeeded;
-  three encrypted snapshots are present and a fresh read-only repository check
-  reports no errors.
+  and enabled nightly timer are in place. The 2026-08-24 scheduled run
+  succeeded. A later stale `SOURCE_REVISION` mismatch caused one scheduled
+  start to fail before backup work; after the current checkout/revision/image
+  alignment was confirmed, a controlled 2026-08-25 run completed, created a
+  fourth encrypted snapshot, and `restic check` reported no errors. The Compose
+  supervisor, timer, backend and worker were healthy after that run.
 - The first coordinated PostgreSQL/API-data backup passed `restic check` and
   the latest scheduled dump was independently checksum-verified and restored
   into an isolated temporary database with 82 public tables, 99 EF migrations
