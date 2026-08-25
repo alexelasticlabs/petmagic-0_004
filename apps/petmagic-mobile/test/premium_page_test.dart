@@ -104,6 +104,9 @@ void main() {
     expect(checkoutSource, contains('text.premiumPaymentStripe'));
     expect(checkoutSource, contains('text.premiumPaymentGooglePlay'));
     expect(checkoutSource, contains('text.premiumPaymentApple'));
+    expect(checkoutSource, contains('text.premiumPaymentStripeSubtitle'));
+    expect(checkoutSource, contains('text.premiumPaymentGooglePlaySubtitle'));
+    expect(checkoutSource, contains('text.premiumPaymentAppleSubtitle'));
     expect(checkoutSource, isNot(contains("=> 'Stripe'")));
     expect(checkoutSource, isNot(contains("=> 'Google Play'")));
     expect(checkoutSource, isNot(contains("=> 'App Store'")));

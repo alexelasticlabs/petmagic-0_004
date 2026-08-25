@@ -195,7 +195,7 @@ public sealed partial class EconomyService
             .ToListAsync(cancellationToken);
 
         var availablePaymentMethods = await BuildAvailablePaymentMethodsAsync(query, cancellationToken);
-        var legalTexts = BuildPaywallLegalTexts();
+        var legalTexts = BuildPaywallLegalTexts(query.Locale);
 
         return Result.Success(new PaywallConfigResponse(
             plans,

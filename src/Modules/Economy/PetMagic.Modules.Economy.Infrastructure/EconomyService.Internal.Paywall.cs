@@ -220,12 +220,51 @@ public sealed partial class EconomyService
         return string.Equals(provider, "stripe", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static PaywallLegalTextsResponse BuildPaywallLegalTexts()
+    private static PaywallLegalTextsResponse BuildPaywallLegalTexts(string? locale)
     {
-        return new PaywallLegalTextsResponse(
-            "Payments for in-app subscriptions are processed by Apple App Store or Google Play. You can manage or cancel the subscription in your store account settings.",
-            "Alternative billing with Stripe is completed inside the app and may require additional provider disclosures depending on your region.",
-            "Stripe payments open in secure Stripe-hosted Checkout. PetMagic does not store raw card details.");
+        return NormalizePaywallLocale(locale) switch
+        {
+            "de" => new PaywallLegalTextsResponse(
+                "Zahlungen für In-App-Abonnements werden über den Apple App Store oder Google Play abgewickelt. Du kannst dein Abonnement in den Kontoeinstellungen des jeweiligen Stores verwalten oder kündigen.",
+                "Eine alternative Zahlung mit Stripe wird in der App abgeschlossen und kann abhängig von deiner Region zusätzliche Hinweise des Zahlungsanbieters erfordern.",
+                "Stripe-Zahlungen werden in der sicheren, von Stripe gehosteten Checkout-Umgebung abgewickelt. PetMagic speichert keine vollständigen Kartendaten."),
+            "es" => new PaywallLegalTextsResponse(
+                "Los pagos de suscripciones dentro de la aplicación se procesan mediante Apple App Store o Google Play. Puedes gestionar o cancelar la suscripción desde la configuración de tu cuenta en la tienda.",
+                "La facturación alternativa con Stripe se completa dentro de la aplicación y puede requerir avisos adicionales del proveedor según tu región.",
+                "Los pagos con Stripe se abren en el Checkout seguro alojado por Stripe. PetMagic no almacena los datos completos de la tarjeta."),
+            "fr" => new PaywallLegalTextsResponse(
+                "Les paiements des abonnements intégrés sont traités par l’App Store d’Apple ou Google Play. Vous pouvez gérer ou annuler votre abonnement dans les réglages de votre compte de la boutique.",
+                "La facturation alternative avec Stripe est effectuée dans l’application et peut nécessiter des informations supplémentaires du prestataire selon votre région.",
+                "Les paiements Stripe s’ouvrent dans le Checkout sécurisé hébergé par Stripe. PetMagic ne stocke pas les données complètes de votre carte."),
+            "it" => new PaywallLegalTextsResponse(
+                "I pagamenti degli abbonamenti in-app vengono elaborati da Apple App Store o Google Play. Puoi gestire o annullare l’abbonamento nelle impostazioni dell’account dello store.",
+                "La fatturazione alternativa con Stripe viene completata nell’app e potrebbe richiedere ulteriori informative del fornitore in base alla tua area geografica.",
+                "I pagamenti Stripe si aprono nel Checkout sicuro ospitato da Stripe. PetMagic non memorizza i dati completi della carta."),
+            "pl" => new PaywallLegalTextsResponse(
+                "Płatności za subskrypcje w aplikacji są przetwarzane przez Apple App Store lub Google Play. Subskrypcją można zarządzać lub ją anulować w ustawieniach konta w sklepie.",
+                "Alternatywne rozliczenie przez Stripe jest realizowane w aplikacji i może wymagać dodatkowych informacji od dostawcy, zależnie od regionu.",
+                "Płatności Stripe otwierają się w bezpiecznym Checkout hostowanym przez Stripe. PetMagic nie przechowuje pełnych danych karty."),
+            "ru" => new PaywallLegalTextsResponse(
+                "Оплата подписок в приложении обрабатывается через Apple App Store или Google Play. Управлять подпиской или отменить её можно в настройках аккаунта соответствующего магазина.",
+                "Альтернативная оплата через Stripe завершается внутри приложения и в зависимости от региона может требовать дополнительных раскрытий от платёжного провайдера.",
+                "Оплата через Stripe открывается в защищённом Checkout, который размещает Stripe. PetMagic не хранит полные данные банковской карты."),
+            _ => new PaywallLegalTextsResponse(
+                "Payments for in-app subscriptions are processed by Apple App Store or Google Play. You can manage or cancel your subscription in your store account settings.",
+                "Alternative billing with Stripe is completed inside the app and may require additional provider disclosures depending on your region.",
+                "Stripe payments open in secure Stripe-hosted Checkout. PetMagic does not store full card details.")
+        };
+    }
+
+    private static string NormalizePaywallLocale(string? locale)
+    {
+        var normalized = locale?.Trim().Replace('_', '-').ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return "en";
+        }
+
+        var separatorIndex = normalized.IndexOf('-');
+        return separatorIndex < 0 ? normalized : normalized[..separatorIndex];
     }
 
     [GeneratedRegex("\\s+", RegexOptions.CultureInvariant)]

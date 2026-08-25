@@ -479,6 +479,7 @@
   "premiumPaymentGooglePlay": "Google Play",
   "premiumPaymentGooglePlaySubtitle": "Оплата через Google Play",
   "premiumPaymentApple": "Apple Pay / App Store",
+  "premiumPaymentAppleSubtitle": "Оплата через App Store",
   "premiumPaymentOther": "Другой способ оплаты",
   "premiumPaymentRecommendedBadge": "Рекомендуем",
   "premiumPaymentDefaultBadge": "По умолчанию",

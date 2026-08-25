@@ -319,6 +319,7 @@
   "premiumPaymentGooglePlay": "Google Play",
   "premiumPaymentGooglePlaySubtitle": "Zahlung über Google Play",
   "premiumPaymentApple": "Apple Pay / App Store",
+  "premiumPaymentAppleSubtitle": "Zahlung über den App Store",
   "premiumPaymentOther": "Andere Zahlungsmethode",
   "premiumComparisonTitle": "Was sich mit Premium ändert",
   "premiumFreeColumn": "Kostenlos",

@@ -2784,6 +2784,12 @@ abstract class AppLocalizations {
   /// **'Apple Pay / App Store'**
   String get premiumPaymentApple;
 
+  /// No description provided for @premiumPaymentAppleSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment via the App Store'**
+  String get premiumPaymentAppleSubtitle;
+
   /// No description provided for @premiumPaymentOther.
   ///
   /// In en, this message translates to:

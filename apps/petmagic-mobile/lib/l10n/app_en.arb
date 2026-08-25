@@ -483,6 +483,7 @@
   "premiumPaymentGooglePlay": "Google Play",
   "premiumPaymentGooglePlaySubtitle": "Payment via Google Play",
   "premiumPaymentApple": "Apple Pay / App Store",
+  "premiumPaymentAppleSubtitle": "Payment via the App Store",
   "premiumPaymentOther": "Other payment method",
   "premiumPaymentRecommendedBadge": "Recommended",
   "premiumPaymentDefaultBadge": "Default",

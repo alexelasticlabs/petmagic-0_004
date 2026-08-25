@@ -186,10 +186,8 @@ extension on _PremiumPageState {
           final legalNotice = state.legalNoticeFor(method).trim();
           return PaymentMethodSheetOption(
             id: method.provider.value,
-            title: method.displayLabel?.trim().isNotEmpty == true
-                ? method.displayLabel!.trim()
-                : _providerLabel(text, method.provider),
-            subtitle: method.displaySubtitle,
+            title: _providerLabel(text, method.provider),
+            subtitle: _providerSubtitle(text, method.provider),
             icon: _providerIcon(method.provider),
             badge: method.isRecommended
                 ? text.premiumPaymentRecommendedBadge
@@ -337,6 +335,17 @@ String _providerLabel(AppLocalizations text, PremiumPaymentProvider provider) {
     PremiumPaymentProvider.stripe => text.premiumPaymentStripe,
     PremiumPaymentProvider.googlePlay => text.premiumPaymentGooglePlay,
     PremiumPaymentProvider.appStore => text.premiumPaymentApple,
+  };
+}
+
+String _providerSubtitle(
+  AppLocalizations text,
+  PremiumPaymentProvider provider,
+) {
+  return switch (provider) {
+    PremiumPaymentProvider.stripe => text.premiumPaymentStripeSubtitle,
+    PremiumPaymentProvider.googlePlay => text.premiumPaymentGooglePlaySubtitle,
+    PremiumPaymentProvider.appStore => text.premiumPaymentAppleSubtitle,
   };
 }
 

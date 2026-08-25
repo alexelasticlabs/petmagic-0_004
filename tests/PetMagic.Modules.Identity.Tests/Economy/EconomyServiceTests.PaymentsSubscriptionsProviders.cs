@@ -18,6 +18,25 @@ namespace PetMagic.Modules.Identity.Tests.Economy;
 public sealed partial class EconomyServiceTests
 {
     [Fact]
+    public async Task GetPaywallConfigAsync_ShouldLocalizeLegalTextsAndFallbackToEnglish()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+
+        var russian = await service.GetPaywallConfigAsync(
+            new GetPaywallConfigQuery("android", "1.0.0", "RU", "ru-RU"),
+            CancellationToken.None);
+        var unsupported = await service.GetPaywallConfigAsync(
+            new GetPaywallConfigQuery("android", "1.0.0", "US", "uk-UA"),
+            CancellationToken.None);
+
+        Assert.True(russian.IsSuccess);
+        Assert.True(unsupported.IsSuccess);
+        Assert.StartsWith("Оплата подписок", russian.Value.LegalTexts.StoreNotice);
+        Assert.StartsWith("Payments for in-app subscriptions", unsupported.Value.LegalTexts.StoreNotice);
+    }
+
+    [Fact]
     public void VerifyStripeSignatureFallback_ShouldAcceptFreshTimestamp()
     {
         const string payload = "{\"id\":\"evt_test\",\"object\":\"event\"}";

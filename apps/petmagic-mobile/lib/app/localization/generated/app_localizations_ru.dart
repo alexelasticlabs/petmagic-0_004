@@ -1499,6 +1499,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get premiumPaymentApple => 'Apple Pay / App Store';
 
   @override
+  String get premiumPaymentAppleSubtitle => 'Оплата через App Store';
+
+  @override
   String get premiumPaymentOther => 'Другой способ оплаты';
 
   @override

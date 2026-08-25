@@ -1518,6 +1518,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get premiumPaymentApple => 'Apple Pay / App Store';
 
   @override
+  String get premiumPaymentAppleSubtitle => 'Paiement via l’App Store';
+
+  @override
   String get premiumPaymentOther => 'Autre moyen de paiement';
 
   @override

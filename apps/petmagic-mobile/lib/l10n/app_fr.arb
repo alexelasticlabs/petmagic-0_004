@@ -318,6 +318,7 @@
   "premiumPaymentGooglePlay": "Google Play",
   "premiumPaymentGooglePlaySubtitle": "Paiement via Google Play",
   "premiumPaymentApple": "Apple Pay / App Store",
+  "premiumPaymentAppleSubtitle": "Paiement via l’App Store",
   "premiumPaymentOther": "Autre moyen de paiement",
   "premiumPaymentTrustStripeProcesses": "Les données de carte sont traitées de manière sécurisée par Stripe.",
   "premiumPaymentTrustNoStorage": "PetMagic ne stocke pas les informations de votre carte.",
