@@ -80,6 +80,9 @@ void main() {
       final premiumModelsSource = File(
         'lib/features/premium/domain/premium_models.dart',
       ).readAsStringSync();
+      final premiumRepositorySource = File(
+        'lib/features/premium/data/premium_repository.dart',
+      ).readAsStringSync();
       final walletModelsSource = File(
         'lib/features/wallet/domain/wallet_models.dart',
       ).readAsStringSync();
@@ -94,6 +97,10 @@ void main() {
         isFalse,
       );
       expect(premiumModelsSource, contains('hasNativeStripePaymentSheet'));
+      expect(
+        premiumRepositorySource,
+        contains('checkout.hasNativeStripePaymentSheet'),
+      );
       expect(walletModelsSource, contains('hasNativeStripePaymentSheet'));
       expect(walletCheckoutSource, contains('StripePaymentSheetRequest('));
       expect(walletCheckoutSource, contains('verifyStripeCheckout('));

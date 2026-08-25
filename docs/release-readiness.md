@@ -425,8 +425,12 @@ do not append command transcripts to this file.
   the physical Android device on 2026-08-25; it resolved
   `api.staging.petgpt.app` to the dedicated VPS and loaded the guest start
   screen without a server-unavailable state. This confirms the staging mobile
-  endpoint, DNS and VPS route are aligned. Native PaymentSheet presentation,
-  cancellation, renewal and refund remain pending. The
+  endpoint, DNS and VPS route are aligned. The same isolated staging APK then
+  presented Stripe's native Android `PaymentSheet` (with its `TEST` marker),
+  accepted a Stripe test card and returned to the app; the staging subscription
+  endpoint subsequently reported `isPremium=true` and `status=Active`. This
+  accepts device-level sandbox presentation and activation only. Cancellation,
+  renewal and refund remain pending. The
   physical Android selector rendering is
   accepted for build `1.0.0+15`; build `17` is now installed and accepted for
   native Google authentication and provider-specific selector copy, but its

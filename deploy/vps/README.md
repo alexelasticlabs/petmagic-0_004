@@ -269,7 +269,7 @@ secret values, private keys, tokens, or service-account JSON.
 - [ ] Prove a real signed Stripe delivery and a real signed App Store Sandbox
       notification. Provider endpoint configuration is verified, but delivery
       and signature acceptance are not yet evidenced.
-- [ ] Accept the native Stripe PaymentSheet release. The VPS backend now
+- [ ] Accept the native Stripe PaymentSheet production release. The VPS backend now
       returns PaymentIntent or Subscription invoice
       client secrets for eligible Android checkout, keeps hosted Checkout for
       eligible web checkout,
@@ -279,8 +279,11 @@ secret values, private keys, tokens, or service-account JSON.
       on Play Internal and installed on the physical Samsung test device. The
       authenticated app loads server-backed wallet and Premium data, and its
       payment-method selector renders both Stripe and Google Play. No purchase
-      was initiated: Stripe test-mode payment, explicit Google Play selection,
-      webhook reconciliation and cancellation/retry proof are still required.
+      was initiated on this production build: explicit Google Play selection,
+      production webhook reconciliation and cancellation/retry proof are still
+      required. A separate staging debug APK has now completed physical Android
+      Stripe test-mode presentation and activation; that evidence is isolated
+      below and is not a production release acceptance.
       Stripe is intentionally disabled for iOS until PetMagic has Apple’s
       external-purchase entitlement and implements the required StoreKit token
       and transaction-reporting flow; migration `20260824223451` was applied
@@ -351,12 +354,16 @@ delivery, premium entitlement, refund, cancellation or store billing.
       `https://api.staging.petgpt.app` was installed on the physical Android
       device on 2026-08-25. The device resolved that hostname to the dedicated
       VPS and loaded the guest start screen without a server-unavailable state.
-      This is device-level routing acceptance only; it does not prove native
-      PaymentSheet presentation or a purchase lifecycle.
-- [ ] This staging acceptance is not production billing acceptance: complete a
-      physical-device sandbox run, cancellation/refund/renewal and idempotent
-      seven-day grant checks before enabling or charging against the live
-      Stripe catalog.
+      The same APK authenticated an isolated staging account, opened Stripe's
+      native Android `PaymentSheet` with its `TEST` indicator, accepted a test
+      card and returned to the app. A subsequent authenticated staging API read
+      reported `isPremium=true` and `status=Active`. This accepts physical-device
+      sandbox presentation and entitlement activation; no live Stripe charge,
+      production account or production database was used.
+- [ ] This staging acceptance is not production billing acceptance: complete
+      cancellation/refund/renewal, webhook reconciliation and idempotent
+      seven-day grant checks before enabling or charging against the live Stripe
+      catalog.
 - [ ] Run real-provider acceptance: Sign in with Apple, FCM/APNs on a physical
       iOS device, Stripe Checkout/webhook reconciliation, App Store Sandbox
       purchase/restore/refund or cancellation lifecycle, and idempotent token

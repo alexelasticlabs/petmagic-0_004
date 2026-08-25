@@ -148,7 +148,9 @@ class PremiumRepository implements PremiumRepositoryPort {
     );
 
     final checkout = mapPremiumCheckoutFromJson(response.data ?? const {});
-    if (platform == 'web' || checkout.checkoutUrl.trim().isNotEmpty) {
+    if (platform == 'web' ||
+        checkout.hasNativeStripePaymentSheet ||
+        checkout.checkoutUrl.trim().isNotEmpty) {
       return checkout;
     }
 
