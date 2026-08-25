@@ -25,7 +25,10 @@ adding dated audit snapshots to the repository.
 
 - The protected VPS environment passed preflight. Caddy, the Compose
   supervisor, PostgreSQL, API, admin web and one generation worker are healthy;
-  public API and admin routes return HTTP 200 over HTTPS.
+  public API and admin routes return HTTP 200 over HTTPS. On 2026-08-25,
+  unreferenced Docker build cache was pruned without touching active images,
+  containers, volumes or release directories; root-disk free space increased
+  from 15 GB to 40 GB and all eight containers remained healthy.
 - A 2026-08-24 edge control pass confirmed valid TLS for `petgpt.app`,
   `admin.petgpt.app`, and `api.petgpt.app`, with HSTS, CSP, `nosniff`, and
   frame protection on each public surface. The earliest observed certificate
