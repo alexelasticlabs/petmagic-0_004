@@ -449,6 +449,11 @@ do not append command transcripts to this file.
   an account-billing gate, not an Android build failure. Release `1.0.0+20`
   remains the current Play Internal artifact until that gate is resolved or a
   separately authorized local signed-build/upload fallback is used.
+- A local signed production AAB for `1.0.0+21` was built from the same code
+  revision after the GitHub rejection. Its SHA-256 is
+  `E585E77DA55E2F6D7C704B455629D9FF3B9D5C6830E134BDCA317DA80791DFCE`.
+  The artifact has not been uploaded to Play, so it is a verified local
+  fallback artifact, not a distributed or device-accepted release.
 - **Release blocker — Premium allowance rollout:** the owner approved
   `40 PawSpark` at purchase and every seven days while Premium remains active.
   Local plan defaults, health checks, migration and mobile copy now match the
