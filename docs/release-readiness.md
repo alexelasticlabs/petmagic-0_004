@@ -417,7 +417,8 @@ do not append command transcripts to this file.
   `7E99AAE3BCFA87E59331B1259FAD5ECF76B2E899E6FBD2113CCD714F9B28BEB4`.
   It includes the native Stripe PaymentSheet response-preservation fix. It has
   not been uploaded to Google Play, so it is not yet a tester-available or
-  device-accepted release.
+  device-accepted release. The focused native-PaymentSheet/hosted-fallback
+  Flutter test passes locally; this is code evidence only.
 - **Release blocker — Premium allowance rollout:** the owner approved
   `40 PawSpark` at purchase and every seven days while Premium remains active.
   Local plan defaults, health checks, migration and mobile copy now match the
