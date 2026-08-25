@@ -482,10 +482,15 @@ do not append command transcripts to this file.
 - A separate `petmagic-play-release-prod` Google Cloud service account now
   exists in project `petmagic-500309`, with no Google Cloud role and no key.
   It is reserved for a least-privilege Internal-release publisher integration;
-  it has not been granted a Play Console user/app permission or issued a
-  credential, so it cannot yet upload an artifact. The available Play Console
-  session exposes no user-invitation control, therefore this remains an
-  owner-permission gate rather than a configured release path.
+  the owner reports that its PetMagic testing-track permission has been added,
+  but publisher API access remains unverified until a transient credential can
+  be used without retaining it. The available Play Console session previously
+  exposed no user-invitation control, so this needs explicit API proof rather
+  than being treated as a configured release path.
+  A temporary key-generation attempt on 2026-08-25 could not be safely used
+  because its browser download was unavailable to the controlled environment;
+  that exact key was immediately revoked. No private credential was retained,
+  committed, or copied to the VPS.
 - **Release blocker — Premium allowance rollout:** the owner approved
   `40 PawSpark` at purchase and every seven days while Premium remains active.
   Local plan defaults, health checks, migration and mobile copy now match the
