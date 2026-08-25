@@ -487,7 +487,8 @@ do not append command transcripts to this file.
   its current legal-acceptance gate without a transport or authentication
   error. The account must accept the displayed Terms and Privacy Policy before
   the authenticated application workspace can be asserted; no legal acceptance
-  was made by the test operator.
+  was made by the test operator. The four focused Flutter legal-gate/auth-entry
+  tests pass locally; this is regression evidence, not substitute user consent.
   The corresponding local APK is signed with the upload key and intentionally
   does not match the Google Play app-signing certificate on the installed app;
   it was not sideloaded over the Play build. Physical acceptance therefore
