@@ -218,6 +218,12 @@ secret values, private keys, tokens, or service-account JSON.
       Google Sign-In opened the account chooser and returned to the authenticated
       app screen without a `network.unavailable`, Dio or Flutter error. This does
       not constitute Google Play Billing or Stripe payment acceptance.
+- [x] Android `1.0.0+17` from commit `0055930e` was accepted by the Google Play
+      Internal track and installed from Play on the physical Samsung test device.
+      It fixes the payment-method selector so each option renders its own legal
+      notice: after selecting Google Play, the device showed the store-billing
+      notice rather than the Stripe Checkout notice. No checkout or purchase was
+      initiated during this UI acceptance.
 - [ ] Complete the independent iOS CI signing bootstrap before TestFlight:
       Firebase iOS configuration and its App ID are now protected GitHub
       `production` secrets. App Store Connect API access is now approved. A
@@ -244,7 +250,7 @@ secret values, private keys, tokens, or service-account JSON.
       eligible web checkout,
       and uses an idempotency key for mobile subscription creation. Flutter
       regression tests, backend gateway tests, a production-flavor debug APK and
-      a minified production release AAB pass locally. Android `1.0.0+16` is active
+      a minified production release AAB pass locally. Android `1.0.0+17` is active
       on Play Internal and installed on the physical Samsung test device. The
       authenticated app loads server-backed wallet and Premium data, and its
       payment-method selector renders both Stripe and Google Play. No purchase
@@ -287,9 +293,10 @@ secret values, private keys, tokens, or service-account JSON.
       real sandbox renewal/cancellation lifecycle remain pending before public
       charging.
 - [ ] Complete native Google Play acceptance on an eligible internal tester.
-      The Internal track is active with completed release `1.0.0 (16)` and a
-      tester list; build `16` authenticates through native Google Sign-In. The
-      earlier payment-selector observation on build `15` did not expose a purchasable Google Play option while Stripe remained available. The Play **One-time
+      The Internal track is active with release `1.0.0 (17)` and a tester list;
+      build `17` authenticates through native Google Sign-In and its payment
+      selector renders both Stripe and Google Play with provider-appropriate
+      legal notices. The Play **One-time
       products** catalog now has active standard **Buy** products matching the
       VPS-derived IDs: `starter` at USD 0.99, `creator` at USD 1.49, and `viral`
       at USD 1.99. Verify
