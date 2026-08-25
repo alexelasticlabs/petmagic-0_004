@@ -79,6 +79,11 @@ adding dated audit snapshots to the repository.
   account configuration, while `/health` reports `push_outbox=Healthy` with no
   queued or dead-lettered delivery. This proves configuration presence and
   queue health only; FCM and APNs delivery on real devices remain required.
+- A 2026-08-25 recheck found one new exhausted `identity_email` test job for
+  the reserved `example.com` domain. Its exact failed record was removed after
+  confirming that it contained no customer recipient; `/health` now reports no
+  email dead letters. The only remaining `Degraded` health check is the
+  intentional `store_account_binding=compatibility` release gate.
 - Public DNS now publishes an initial monitored DMARC policy for `petgpt.app`
   (`p=none`, strict DKIM/SPF alignment and aggregate reports to the
   owner-controlled operations mailbox). This adds authentication observability
@@ -465,6 +470,13 @@ do not append command transcripts to this file.
   and `1.0.0+20` remains the active Internal-track artifact. Upload therefore
   still requires either resolving the GitHub Actions billing gate or selecting
   the already-built AAB in the native Play upload dialog.
+- A separate `petmagic-play-release-prod` Google Cloud service account now
+  exists in project `petmagic-500309`, with no Google Cloud role and no key.
+  It is reserved for a least-privilege Internal-release publisher integration;
+  it has not been granted a Play Console user/app permission or issued a
+  credential, so it cannot yet upload an artifact. The available Play Console
+  session exposes no user-invitation control, therefore this remains an
+  owner-permission gate rather than a configured release path.
 - **Release blocker — Premium allowance rollout:** the owner approved
   `40 PawSpark` at purchase and every seven days while Premium remains active.
   Local plan defaults, health checks, migration and mobile copy now match the
