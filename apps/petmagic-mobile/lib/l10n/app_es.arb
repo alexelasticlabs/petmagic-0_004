@@ -528,6 +528,7 @@
   "authSignInRequired": "Se requiere iniciar sesión.",
   "authSessionExpired": "La sesión ha expirado.",
   "authLoginFailed": "No se pudo iniciar sesión. Inténtalo de nuevo.",
+  "authEmailInvalid": "Introduce una dirección de correo electrónico válida.",
   "authRegistrationFailed": "No se pudo completar el registro. Inténtalo de nuevo.",
   "authPasswordResetRequestFailed": "No se pudo enviar la solicitud de restablecimiento de contraseña. Inténtalo de nuevo.",
   "authPasswordResetFailed": "No se pudo restablecer la contraseña. Inténtalo de nuevo.",

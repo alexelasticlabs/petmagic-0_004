@@ -528,6 +528,7 @@
   "authSignInRequired": "Wymagane jest zalogowanie.",
   "authSessionExpired": "Sesja wygasła.",
   "authLoginFailed": "Logowanie nie powiodło się. Spróbuj ponownie.",
+  "authEmailInvalid": "Wpisz prawidłowy adres e-mail.",
   "authRegistrationFailed": "Rejestracja nie powiodła się. Spróbuj ponownie.",
   "authPasswordResetRequestFailed": "Nie udało się wysłać żądania resetu hasła. Spróbuj ponownie.",
   "authPasswordResetFailed": "Nie udało się zresetować hasła. Spróbuj ponownie.",

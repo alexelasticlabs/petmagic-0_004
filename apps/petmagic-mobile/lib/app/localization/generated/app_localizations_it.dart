@@ -3105,6 +3105,9 @@ class AppLocalizationsIt extends AppLocalizations {
   String get authLoginFailed => 'Accesso non riuscito. Riprova.';
 
   @override
+  String get authEmailInvalid => 'Inserisci un indirizzo email valido.';
+
+  @override
   String get authRegistrationFailed => 'Registrazione non riuscita. Riprova.';
 
   @override

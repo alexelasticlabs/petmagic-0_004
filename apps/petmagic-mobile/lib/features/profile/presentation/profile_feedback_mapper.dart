@@ -25,6 +25,7 @@ const _safeProfileFeedbackKeys = <String>[
   'auth.sign_in_required',
   'auth.session_expired',
   'auth.invalid_refresh',
+  'auth.email_invalid',
   'auth.invalid_credentials',
   'auth.account_locked',
   'auth.login_failed',
@@ -128,6 +129,8 @@ String mapProfileFeedbackMessage(String raw, AppLocalizations text) {
       return text.authSessionExpired;
     case 'auth.invalid_refresh':
       return text.authSessionExpired;
+    case 'auth.email_invalid':
+      return text.authEmailInvalid;
     case 'auth.invalid_credentials':
     case 'auth.account_locked':
     case 'auth.login_failed':

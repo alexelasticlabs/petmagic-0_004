@@ -3105,6 +3105,10 @@ class AppLocalizationsEs extends AppLocalizations {
       'No se pudo iniciar sesión. Inténtalo de nuevo.';
 
   @override
+  String get authEmailInvalid =>
+      'Introduce una dirección de correo electrónico válida.';
+
+  @override
   String get authRegistrationFailed =>
       'No se pudo completar el registro. Inténtalo de nuevo.';
 

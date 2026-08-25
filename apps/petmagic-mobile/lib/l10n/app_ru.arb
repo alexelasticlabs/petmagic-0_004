@@ -947,6 +947,7 @@
   "authSignInRequired": "Требуется вход в аккаунт.",
   "authSessionExpired": "Сессия истекла.",
   "authLoginFailed": "Не удалось войти. Попробуйте снова.",
+  "authEmailInvalid": "Введите корректный email.",
   "authRegistrationFailed": "Не удалось зарегистрироваться. Попробуйте снова.",
   "authPasswordResetRequestFailed": "Не удалось отправить запрос на сброс пароля. Попробуйте снова.",
   "authPasswordResetFailed": "Не удалось сбросить пароль. Попробуйте снова.",

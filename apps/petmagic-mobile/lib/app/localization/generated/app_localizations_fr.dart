@@ -3118,6 +3118,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get authLoginFailed => 'Échec de la connexion. Veuillez réessayer.';
 
   @override
+  String get authEmailInvalid => 'Saisissez une adresse e-mail valide.';
+
+  @override
   String get authRegistrationFailed =>
       'Échec de l\'inscription. Veuillez réessayer.';
 

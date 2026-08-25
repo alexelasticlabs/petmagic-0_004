@@ -528,6 +528,7 @@
   "authSignInRequired": "È richiesto l'accesso.",
   "authSessionExpired": "Sessione scaduta.",
   "authLoginFailed": "Accesso non riuscito. Riprova.",
+  "authEmailInvalid": "Inserisci un indirizzo email valido.",
   "authRegistrationFailed": "Registrazione non riuscita. Riprova.",
   "authPasswordResetRequestFailed": "Richiesta di reimpostazione password non riuscita. Riprova.",
   "authPasswordResetFailed": "Reimpostazione password non riuscita. Riprova.",

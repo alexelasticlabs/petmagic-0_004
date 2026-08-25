@@ -951,6 +951,7 @@
   "authSignInRequired": "Sign in is required.",
   "authSessionExpired": "Session expired.",
   "authLoginFailed": "Login failed. Please try again.",
+  "authEmailInvalid": "Enter a valid email address.",
   "authRegistrationFailed": "Registration failed. Please try again.",
   "authPasswordResetRequestFailed": "Password reset request failed. Please try again.",
   "authPasswordResetFailed": "Password reset failed. Please try again.",

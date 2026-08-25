@@ -151,6 +151,35 @@ void main() {
     },
   );
 
+  testWidgets('email validation maps to specific localized copy', (
+    tester,
+  ) async {
+    late AppLocalizations text;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: const [Locale('en')],
+        home: Builder(
+          builder: (context) {
+            text = AppLocalizations.of(context);
+            return const SizedBox.shrink();
+          },
+        ),
+      ),
+    );
+
+    expect(
+      mapProfileFeedbackMessage('auth.email_invalid', text),
+      text.authEmailInvalid,
+    );
+    expect(
+      normalizeProfileFeedbackKey('ValidationProblem: auth.email_invalid'),
+      'auth.email_invalid',
+    );
+  });
+
   test('normalizes wrapped profile auth feedback keys', () {
     expect(
       normalizeProfileFeedbackKey(' AppException: AUTH.ACCEPT_TERMS_REQUIRED '),

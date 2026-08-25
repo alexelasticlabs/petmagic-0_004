@@ -3063,6 +3063,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get authLoginFailed => 'Login failed. Please try again.';
 
   @override
+  String get authEmailInvalid => 'Enter a valid email address.';
+
+  @override
   String get authRegistrationFailed => 'Registration failed. Please try again.';
 
   @override

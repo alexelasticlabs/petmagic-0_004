@@ -3104,6 +3104,9 @@ class AppLocalizationsDe extends AppLocalizations {
       'Anmeldung fehlgeschlagen. Bitte versuchen Sie es erneut.';
 
   @override
+  String get authEmailInvalid => 'Geben Sie eine gültige E-Mail-Adresse ein.';
+
+  @override
   String get authRegistrationFailed =>
       'Registrierung fehlgeschlagen. Bitte versuchen Sie es erneut.';
 

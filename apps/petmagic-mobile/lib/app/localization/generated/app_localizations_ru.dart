@@ -3072,6 +3072,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get authLoginFailed => 'Не удалось войти. Попробуйте снова.';
 
   @override
+  String get authEmailInvalid => 'Введите корректный email.';
+
+  @override
   String get authRegistrationFailed =>
       'Не удалось зарегистрироваться. Попробуйте снова.';
 

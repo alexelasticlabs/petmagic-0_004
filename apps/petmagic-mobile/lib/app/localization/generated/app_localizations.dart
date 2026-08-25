@@ -5544,6 +5544,12 @@ abstract class AppLocalizations {
   /// **'Login failed. Please try again.'**
   String get authLoginFailed;
 
+  /// No description provided for @authEmailInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid email address.'**
+  String get authEmailInvalid;
+
   /// No description provided for @authRegistrationFailed.
   ///
   /// In en, this message translates to:

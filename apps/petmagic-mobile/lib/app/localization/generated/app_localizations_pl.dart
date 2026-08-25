@@ -3090,6 +3090,9 @@ class AppLocalizationsPl extends AppLocalizations {
   String get authLoginFailed => 'Logowanie nie powiodło się. Spróbuj ponownie.';
 
   @override
+  String get authEmailInvalid => 'Wpisz prawidłowy adres e-mail.';
+
+  @override
   String get authRegistrationFailed =>
       'Rejestracja nie powiodła się. Spróbuj ponownie.';
 

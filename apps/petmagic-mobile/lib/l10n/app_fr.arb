@@ -528,6 +528,7 @@
   "authSignInRequired": "La connexion est requise.",
   "authSessionExpired": "Session expirée.",
   "authLoginFailed": "Échec de la connexion. Veuillez réessayer.",
+  "authEmailInvalid": "Saisissez une adresse e-mail valide.",
   "authRegistrationFailed": "Échec de l'inscription. Veuillez réessayer.",
   "authPasswordResetRequestFailed": "Échec de la demande de réinitialisation du mot de passe. Veuillez réessayer.",
   "authPasswordResetFailed": "Échec de la réinitialisation du mot de passe. Veuillez réessayer.",

@@ -518,6 +518,7 @@
   "authSignInRequired": "Anmeldung erforderlich.",
   "authSessionExpired": "Sitzung abgelaufen.",
   "authLoginFailed": "Anmeldung fehlgeschlagen. Bitte versuchen Sie es erneut.",
+  "authEmailInvalid": "Geben Sie eine gültige E-Mail-Adresse ein.",
   "authRegistrationFailed": "Registrierung fehlgeschlagen. Bitte versuchen Sie es erneut.",
   "authPasswordResetRequestFailed": "Anfrage zum Zurücksetzen des Passworts fehlgeschlagen. Bitte versuchen Sie es erneut.",
   "authPasswordResetFailed": "Zurücksetzen des Passworts fehlgeschlagen. Bitte versuchen Sie es erneut.",
