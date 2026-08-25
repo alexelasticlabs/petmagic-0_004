@@ -11,7 +11,7 @@ services:
 
   backend:
     restart: "no"
-    ports: !reset
+    ports: !override
       - "127.0.0.1:${BACKEND_HOST_PORT:-15001}:5000"
     environment:
       APP_VOLUME_DIRS: /var/petmagic
