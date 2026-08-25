@@ -75,6 +75,10 @@ adding dated audit snapshots to the repository.
   backend-log check found no SMTP/email error, and Resend records a PetMagic
   verification message as `delivered`. This is current transport evidence;
   recipient data and message contents were not inspected.
+- The protected VPS backend runtime contains the Firebase project and service
+  account configuration, while `/health` reports `push_outbox=Healthy` with no
+  queued or dead-lettered delivery. This proves configuration presence and
+  queue health only; FCM and APNs delivery on real devices remain required.
 - Public DNS now publishes an initial monitored DMARC policy for `petgpt.app`
   (`p=none`, strict DKIM/SPF alignment and aggregate reports to the
   owner-controlled operations mailbox). This adds authentication observability
