@@ -441,6 +441,14 @@ do not append command transcripts to this file.
   server-unavailable screen; its focused Flutter regression test passes, but
   that UX correction still requires a release newer than `1.0.0+20` for device
   acceptance.
+- Android `1.0.0+21` is prepared at commit `edbe2d327`. Its focused
+  `app_unavailable_state_test.dart` regression suite and release-version check
+  pass locally. GitHub Actions run `32844447065` was rejected before its first
+  build step, artifact creation, or Play upload because recent account payments
+  have failed or the GitHub Actions spending limit must be increased. This is
+  an account-billing gate, not an Android build failure. Release `1.0.0+20`
+  remains the current Play Internal artifact until that gate is resolved or a
+  separately authorized local signed-build/upload fallback is used.
 - **Release blocker — Premium allowance rollout:** the owner approved
   `40 PawSpark` at purchase and every seven days while Premium remains active.
   Local plan defaults, health checks, migration and mobile copy now match the
