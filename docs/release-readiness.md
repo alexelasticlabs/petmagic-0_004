@@ -362,16 +362,15 @@ do not append command transcripts to this file.
   base prices were changed and re-read as USD 14.99 and USD 99.99; Apple
   calculated the corresponding regional prices. Complete Sandbox purchase,
   renewal, restore, cancellation/refund and backend-crediting acceptance.
-- The active Play Internal track contains release `1.0.0 (18)` and an attached
-  tester list. Android Publisher API accepted the locally signed AAB from commit
-  `3d88d997`; an independent API read confirmed `versionCode=18`, status
-  `completed`. Its SHA-256 is
-  `2578B98DA311C3F0CF2C346DF73938A03D5E58ED176E71B8716C47CB3E163EAB`.
+- The active Play Internal track contains release `1.0.0 (19)` and an attached
+  tester list. The prior `1.0.0 (18)` AAB from commit `3d88d997` remains
+  documented below as payment-selector acceptance evidence; `1.0.0 (19)` is
+  the current distribution and supersedes it for device testing.
   The matching VPS revision completed controlled deployment, all containers were
   healthy, runtime preflight passed, and the public paywall API returns localized
   legal notices for `locale=ru-RU`. This proves release distribution and API
   deployment, not Billing eligibility for every Play account or country.
-  A physical Android device now runs the Play-installed `1.0.0+18` build. The
+  A physical Android device now runs the Play-installed `1.0.0+19` build. The
   preceding build `17` completed native Google Sign-In acceptance after logout:
   it opened the account chooser and returned to the authenticated app without a
   `network.unavailable`, Dio or Flutter error. Build `18` accepts the

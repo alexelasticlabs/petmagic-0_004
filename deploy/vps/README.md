@@ -275,7 +275,7 @@ secret values, private keys, tokens, or service-account JSON.
       eligible web checkout,
       and uses an idempotency key for mobile subscription creation. Flutter
       regression tests, backend gateway tests, a production-flavor debug APK and
-      a minified production release AAB pass locally. Android `1.0.0+18` is active
+      a minified production release AAB pass locally. Android `1.0.0+19` is active
       on Play Internal and installed on the physical Samsung test device. The
       authenticated app loads server-backed wallet and Premium data, and its
       payment-method selector renders both Stripe and Google Play. No purchase
@@ -318,7 +318,7 @@ secret values, private keys, tokens, or service-account JSON.
       real sandbox renewal/cancellation lifecycle remain pending before public
       charging.
 - [ ] Complete native Google Play acceptance on an eligible internal tester.
-      The Internal track is active with release `1.0.0 (18)` and a tester list;
+      The Internal track is active with release `1.0.0 (19)` and a tester list;
       build `17` authenticates through native Google Sign-In and its payment
       selector renders both Stripe and Google Play with provider-appropriate
       legal notices; build `18` adds localized provider titles/subtitles and
