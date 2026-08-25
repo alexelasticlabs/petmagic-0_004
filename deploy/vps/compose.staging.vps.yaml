@@ -1,0 +1,40 @@
+services:
+  postgres:
+    restart: "no"
+    ports: !reset []
+    volumes: !reset
+      - /opt/petmagic-staging/shared/postgres:/var/lib/postgresql/data
+
+  mailpit:
+    restart: "no"
+    ports: !reset []
+
+  backend:
+    restart: "no"
+    ports: !reset
+      - "127.0.0.1:${BACKEND_HOST_PORT:-15001}:5000"
+    environment:
+      APP_VOLUME_DIRS: /var/petmagic
+      DataProtection__KeysPath: /var/petmagic/DataProtection-Keys
+      StaticFiles__ExtraWebRootPath: /var/petmagic/wwwroot
+      Identity__AvatarStorage__LocalMediaRootPath: /var/petmagic/wwwroot/user-avatars
+      SupportChat__AttachmentStorage__LocalMediaRootPath: /var/petmagic/wwwroot/support-attachments
+      Templates__LocalMediaRootPath: /var/petmagic/wwwroot/templates-media
+      ForwardedHeaders__Enabled: "true"
+      ForwardedHeaders__TrustAll: "true"
+      ForwardedHeaders__ForwardLimit: "1"
+      Cors__AllowedOrigins__0: "${CORS_ALLOWED_ORIGIN:?Set CORS_ALLOWED_ORIGIN to the staging HTTPS admin origin}"
+    volumes: !reset
+      - /opt/petmagic-staging/shared/api-data/DataProtection-Keys:/var/petmagic/DataProtection-Keys
+      - /opt/petmagic-staging/shared/api-data/wwwroot:/var/petmagic/wwwroot
+
+  generation-worker:
+    profiles: ["generation"]
+    restart: "no"
+    volumes: !reset
+      - /opt/petmagic-staging/shared/api-data/wwwroot/templates-media:/var/petmagic/wwwroot/templates-media
+
+  admin-web:
+    profiles: ["admin"]
+    restart: "no"
+    ports: !reset []

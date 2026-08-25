@@ -22,3 +22,14 @@ admin.petgpt.app {
 	}
 	reverse_proxy 127.0.0.1:3000
 }
+
+# This backend is an isolated, test-only payment staging environment. It is
+# intentionally separate from the production Compose project and data paths.
+api.staging.petgpt.app {
+	encode zstd gzip
+	import production_headers
+	log {
+		format json
+	}
+	reverse_proxy 127.0.0.1:15001
+}

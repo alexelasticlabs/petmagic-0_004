@@ -295,6 +295,36 @@ secret values, private keys, tokens, or service-account JSON.
       All production provider routes are `live`, while `STRIPE_TEST_*` values
       are absent from the VPS; do not attempt a test charge until isolated test
       credentials, webhook signing secret and test-mode routing are configured.
+
+## Isolated Stripe staging bootstrap
+
+Production Stripe checkout must not be used to prove sandbox behaviour. The
+repository therefore provides a minimal isolated staging Compose project for
+the API, PostgreSQL and Mailpit only. It intentionally does not mount
+`/opt/petmagic/shared`, start the generation worker, or receive production
+fal.ai, R2, OAuth, Firebase, store, SMTP or Stripe live credentials.
+
+1. Create `/opt/petmagic-staging/env/.env.staging` with mode `0600` from
+   [`.env.vps.staging.example`](.env.vps.staging.example). Generate a distinct
+   PostgreSQL password and JWT signing key. Use an already present VPS image
+   tag for `SOURCE_REVISION`; do not build a duplicate image merely to create
+   the payment test environment.
+2. Create the DNS-only `A` record `api.staging.petgpt.app` pointing to the VPS.
+   Do this before installing the Caddy configuration so certificate issuance
+   has a valid public name.
+3. Install the reviewed `Caddyfile`, validate it with `caddy validate`, then
+   reload Caddy. The staging API listens only on `127.0.0.1:15001`; Caddy is
+   its sole public boundary.
+4. Run `sudo /opt/petmagic/current/deploy/vps/scripts/bootstrap-staging-payments.sh`.
+   It starts only `postgres`, `mailpit` and `backend` under the
+   `petmagic-staging` project name.
+5. Require a `200` from `https://api.staging.petgpt.app/health` before creating
+   a Stripe test webhook. The endpoint must be
+   `https://api.staging.petgpt.app/api/economy/webhooks/stripe` and use a
+   test-mode signing secret stored only in the staging environment file.
+
+This is infrastructure readiness, not proof of Stripe checkout, webhook
+delivery, premium entitlement, refund, cancellation or store billing.
 - [ ] Run real-provider acceptance: Sign in with Apple, FCM/APNs on a physical
       iOS device, Stripe Checkout/webhook reconciliation, App Store Sandbox
       purchase/restore/refund or cancellation lifecycle, and idempotent token
