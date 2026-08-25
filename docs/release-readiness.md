@@ -424,6 +424,20 @@ do not append command transcripts to this file.
   is release-distribution evidence only; physical-device acceptance remains
   pending. The focused native-PaymentSheet/hosted-fallback Flutter test passes
   locally; this is code evidence only.
+- **Android OAuth remediation in progress (2026-08-25):** a direct device
+  inspection confirms that the connected Samsung currently runs Play-installed
+  `versionCode=19`, while Play Internal offers `1.0.0+20`. The public API and
+  mobile Google configuration endpoint respond successfully. Crashlytics proves
+  the observed password attempt reached the VPS and was rejected with
+  `auth.email_invalid` (HTTP 400), not by DNS or server unavailability. The
+  Firebase production Android app `com.petmagic.app` has no registered SHA
+  certificate fingerprints, while the installed Play APK is signed with the
+  Google Play app-signing certificate. Add that SHA-1 in Firebase, replace only
+  the protected `FIREBASE_ANDROID_CONFIG_BASE64` GitHub production secret with
+  the downloaded configuration, then build and install a newer AAB for
+  physical-device Google Sign-In acceptance. Commit `c0e5adf3` also prevents
+  known email and external-auth failures from being rendered as a generic
+  server-unavailable screen; its focused Flutter regression test passes.
 - **Release blocker — Premium allowance rollout:** the owner approved
   `40 PawSpark` at purchase and every seven days while Premium remains active.
   Local plan defaults, health checks, migration and mobile copy now match the
