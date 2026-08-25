@@ -458,6 +458,13 @@ do not append command transcripts to this file.
   does not match the Google Play app-signing certificate on the installed app;
   it was not sideloaded over the Play build. Physical acceptance therefore
   still requires the normal Internal-track AAB distribution path.
+- A direct, owner-authorized Google Play Internal upload was attempted for that
+  local AAB on 2026-08-25. The available browser surface rendered the release
+  form but did not expose a usable native file-selection control; no app bundle
+  was attached or uploaded. The resulting empty draft release was discarded,
+  and `1.0.0+20` remains the active Internal-track artifact. Upload therefore
+  still requires either resolving the GitHub Actions billing gate or selecting
+  the already-built AAB in the native Play upload dialog.
 - **Release blocker — Premium allowance rollout:** the owner approved
   `40 PawSpark` at purchase and every seven days while Premium remains active.
   Local plan defaults, health checks, migration and mobile copy now match the
