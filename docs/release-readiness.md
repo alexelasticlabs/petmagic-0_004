@@ -468,7 +468,10 @@ do not append command transcripts to this file.
   A least-privilege Android Publisher API upload accepted the exact artifact
   into Play Internal and an independent API read confirmed release
   `1.0.0 (21)`, status `completed`, version code `21`. This is distribution
-  evidence, not yet device-acceptance evidence.
+  evidence. The connected physical Samsung then installed the Play update as
+  `versionCode=21`; a cold start restored the authenticated session and loaded
+  server-backed template/profile UI without a server-unavailable state. This
+  is session-restoration acceptance, not a fresh password-login attempt.
   The corresponding local APK is signed with the upload key and intentionally
   does not match the Google Play app-signing certificate on the installed app;
   it was not sideloaded over the Play build. Physical acceptance therefore
