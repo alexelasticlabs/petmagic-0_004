@@ -155,6 +155,7 @@ public sealed partial class EconomyService
         var title = config.WarningTitle;
         var message = config.WarningMessage;
         var note = config.Notes;
+        var usesNativeAndroidPaymentSheet = string.Equals(platform, "android", StringComparison.OrdinalIgnoreCase);
         var isEuRegion = string.Equals(region, "EU", StringComparison.OrdinalIgnoreCase)
             || EconomyPaymentProviderPolicy.IsEuRegion(region);
         if (string.IsNullOrWhiteSpace(title))
@@ -162,7 +163,13 @@ public sealed partial class EconomyService
             title = "Pay with Stripe";
         }
 
-        if (string.IsNullOrWhiteSpace(message))
+        if (usesNativeAndroidPaymentSheet)
+        {
+            message = isEuRegion
+                ? "Stripe payment opens in a secure payment form inside PetMagic. Provider terms and support may differ from Google Play."
+                : "Stripe payment opens in a secure payment form inside PetMagic. Your payment details are processed securely by Stripe.";
+        }
+        else if (string.IsNullOrWhiteSpace(message))
         {
             message = isEuRegion
                 ? "Stripe billing opens in secure Stripe-hosted Checkout. Provider terms and support may differ from App Store or Google Play."
@@ -220,8 +227,19 @@ public sealed partial class EconomyService
         return string.Equals(provider, "stripe", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static PaywallLegalTextsResponse BuildPaywallLegalTexts(string? locale)
+    private static PaywallLegalTextsResponse BuildPaywallLegalTexts(string? locale, string? platform)
     {
+        if (string.Equals(
+            EconomyPaymentProviderPolicy.NormalizePlatform(platform),
+            "android",
+            StringComparison.Ordinal))
+        {
+            return new PaywallLegalTextsResponse(
+                BuildPaywallStoreNotice(locale),
+                BuildPaywallExternalCheckoutNotice(locale),
+                BuildNativeAndroidStripeNotice(locale));
+        }
+
         return NormalizePaywallLocale(locale) switch
         {
             "de" => new PaywallLegalTextsResponse(
@@ -252,6 +270,30 @@ public sealed partial class EconomyService
                 "Payments for in-app subscriptions are processed by Apple App Store or Google Play. You can manage or cancel your subscription in your store account settings.",
                 "Alternative billing with Stripe is completed inside the app and may require additional provider disclosures depending on your region.",
                 "Stripe payments open in secure Stripe-hosted Checkout. PetMagic does not store full card details.")
+        };
+    }
+
+    private static string BuildPaywallStoreNotice(string? locale)
+    {
+        return BuildPaywallLegalTexts(locale, "web").StoreNotice;
+    }
+
+    private static string BuildPaywallExternalCheckoutNotice(string? locale)
+    {
+        return BuildPaywallLegalTexts(locale, "web").ExternalCheckoutNotice;
+    }
+
+    private static string BuildNativeAndroidStripeNotice(string? locale)
+    {
+        return NormalizePaywallLocale(locale) switch
+        {
+            "de" => "Stripe-Zahlungen werden in einem sicheren Zahlungsformular innerhalb von PetMagic abgewickelt. PetMagic speichert keine vollständigen Kartendaten.",
+            "es" => "Los pagos con Stripe se realizan en un formulario de pago seguro dentro de PetMagic. PetMagic no almacena los datos completos de la tarjeta.",
+            "fr" => "Les paiements Stripe sont effectués dans un formulaire de paiement sécurisé au sein de PetMagic. PetMagic ne stocke pas les données complètes de la carte.",
+            "it" => "I pagamenti Stripe vengono elaborati in un modulo di pagamento sicuro all’interno di PetMagic. PetMagic non memorizza i dati completi della carta.",
+            "pl" => "Płatności Stripe są realizowane w bezpiecznym formularzu płatności wewnątrz PetMagic. PetMagic nie przechowuje pełnych danych karty.",
+            "ru" => "Оплата через Stripe проходит в защищённой платёжной форме внутри PetMagic. PetMagic не хранит полные данные банковской карты.",
+            _ => "Stripe payments are completed in a secure payment form inside PetMagic. PetMagic does not store full card details."
         };
     }
 

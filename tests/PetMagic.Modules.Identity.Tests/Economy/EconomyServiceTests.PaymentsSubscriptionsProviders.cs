@@ -33,7 +33,57 @@ public sealed partial class EconomyServiceTests
         Assert.True(russian.IsSuccess);
         Assert.True(unsupported.IsSuccess);
         Assert.StartsWith("Оплата подписок", russian.Value.LegalTexts.StoreNotice);
+        Assert.Contains("внутри PetMagic", russian.Value.LegalTexts.StripeNotice, StringComparison.Ordinal);
+        Assert.DoesNotContain("Checkout", russian.Value.LegalTexts.StripeNotice, StringComparison.Ordinal);
         Assert.StartsWith("Payments for in-app subscriptions", unsupported.Value.LegalTexts.StoreNotice);
+        Assert.Contains("inside PetMagic", unsupported.Value.LegalTexts.StripeNotice, StringComparison.Ordinal);
+
+        var web = await service.GetPaywallConfigAsync(
+            new GetPaywallConfigQuery("web", "1.0.0", "US", "en-US"),
+            CancellationToken.None);
+
+        Assert.True(web.IsSuccess);
+        Assert.Contains("Stripe-hosted Checkout", web.Value.LegalTexts.StripeNotice, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GetPaywallConfigAsync_ShouldDescribeNativeStripePaymentSheetOnAndroid()
+    {
+        await using var dbContext = CreateDbContext();
+        dbContext.PaymentProviderConfigurations.Add(new PaymentProviderConfiguration
+        {
+            Id = Guid.NewGuid(),
+            Provider = "stripe",
+            Platform = "android",
+            Region = "*",
+            IsEnabled = true,
+            IsRecommended = true,
+            IsSelectedByDefault = true,
+            RequiresExternalWarning = true,
+            RequiresStoreDisclosure = false,
+            AllowedFromAppVersion = "0.0.0",
+            ExternalCheckoutAllowed = true,
+            BonusTokensPercent = 0,
+            DisplayLabel = "Stripe",
+            DisplaySubtitle = "Pay securely via Stripe",
+            WarningTitle = "Payment via Stripe",
+            WarningMessage = "Stripe billing opens in secure Stripe-hosted Checkout.",
+            Mode = "test",
+            Notes = "Global Stripe billing route for Android.",
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        await dbContext.SaveChangesAsync();
+
+        var result = await CreateService(dbContext).GetPaywallConfigAsync(
+            new GetPaywallConfigQuery("android", "1.0.0", "US", "en-US"),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var stripe = Assert.Single(result.Value.AvailablePaymentMethods);
+        Assert.Equal("stripe", stripe.Provider);
+        Assert.Contains("inside PetMagic", stripe.WarningMessage, StringComparison.Ordinal);
+        Assert.DoesNotContain("Stripe-hosted", stripe.WarningMessage, StringComparison.Ordinal);
     }
 
     [Fact]
