@@ -60,6 +60,10 @@ adding dated audit snapshots to the repository.
   the latest scheduled dump was independently checksum-verified and restored
   into an isolated temporary database with 82 public tables, 99 EF migrations
   and one user. Zero temporary verification databases remain.
+- The connected Android test device now grants `POST_NOTIFICATIONS`; after a
+  cold restart, production holds one active FCM token in each of the economy,
+  templates and support delivery scopes. This proves permission and token
+  registration, not a delivered foreground/background notification.
 - Stripe live credentials authenticated with a read-only API request. Google
   Play service-account OAuth and the purchase-verification API are authorized;
   a synthetic token reached the expected validation failure path without
