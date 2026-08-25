@@ -339,9 +339,18 @@ delivery, premium entitlement, refund, cancellation or store billing.
       project with distinct local secrets and paths. Its source image is the
       already present reviewed VPS image; no new production image was built or
       deployed for this bootstrap.
-- [ ] Stripe test credentials, test products/prices, the staging webhook,
-      a signed delivery and checkout/entitlement lifecycle are not yet
-      configured or accepted.
+- [x] Stripe sandbox acceptance completed on 2026-08-25 without a live
+      charge: staging holds only test credentials and a test-mode webhook;
+      separate monthly/yearly prices and three one-time pack prices are
+      present only in the test catalog. A signed `payment_intent.succeeded`
+      delivery returned HTTP 200, and an isolated test user completed the
+      Android PaymentSheet checkout path through Premium activation. The
+      staging email worker remains disabled after the run because Mailpit has
+      no TLS and is never an external delivery service.
+- [ ] This staging acceptance is not production billing acceptance: complete a
+      physical-device sandbox run, cancellation/refund/renewal and idempotent
+      seven-day grant checks before enabling or charging against the live
+      Stripe catalog.
 - [ ] Run real-provider acceptance: Sign in with Apple, FCM/APNs on a physical
       iOS device, Stripe Checkout/webhook reconciliation, App Store Sandbox
       purchase/restore/refund or cancellation lifecycle, and idempotent token

@@ -61,6 +61,11 @@ adding dated audit snapshots to the repository.
   because backend purchase verification does not need `Manage store presence`.
 - Stripe has one enabled VPS webhook endpoint with all backend-required checkout
   and subscription event types. A real signed delivery is still required.
+- Isolated Stripe staging now has separate test credentials, test catalog,
+  webhook signing secret and database. On 2026-08-25 a signed sandbox
+  `payment_intent.succeeded` delivery received HTTP 200, and the Android
+  PaymentSheet checkout path activated Premium for an isolated staging user.
+  This does not prove a live delivery or public-charge lifecycle.
 - App Store Connect production and Sandbox notification URLs both target the
   VPS API webhook route. A real signed Sandbox delivery is still required.
 - Production transactional email uses Resend SMTP, not the local Mailpit
@@ -413,10 +418,12 @@ do not append command transcripts to this file.
   Premium rows currently have an empty `StripePriceId`, so the backend uses its
   inline-price fallback. Production provider routes are all `live`. An
   isolated staging API now responds at `api.staging.petgpt.app` with separate
-  database, local paths and secrets, while production remains healthy; it has
-  no Stripe test credentials, test product catalog or webhook yet. Configure
-  those only in staging before sandbox acceptance rather than sending a real
-  charge as a test. The physical Android selector rendering is
+  database, local paths and secrets, while production remains healthy. Its
+  test credentials, test catalog and signed webhook delivery are accepted;
+  an automated Android-mode PaymentSheet checkout activated Premium for an
+  isolated staging user. This is sandbox backend acceptance only: physical
+  device presentation, cancellation, renewal and refund remain pending. The
+  physical Android selector rendering is
   accepted for build `1.0.0+15`; build `17` is now installed and accepted for
   native Google authentication and provider-specific selector copy, but its
   provider purchase, cancellation/retry and
