@@ -366,14 +366,17 @@ do not append command transcripts to this file.
   accepted from the preceding production device pass because build 14 changes
   only template-provider reconstruction.
 - Google Play contains active monthly (`com.petmagic.app.premium.monthly`,
-  USD 14.99) and yearly (`com.petmagic.app.premium.yearly`, USD 99.99)
-  subscriptions with active base plans in 174 countries. A tester offer was
-  not created without an approved product decision. Complete sandbox purchase,
-  renewal, restore, cancellation/refund and idempotent backend-crediting proof.
+  USD 0.99) and yearly (`com.petmagic.app.premium.yearly`, USD 1.99)
+  subscriptions with active base plans. On 2026-08-25 the base prices were
+  updated through Play Console for all 177 selected countries/regions and
+  re-read for the United States. A tester offer was not created without an
+  approved product decision. Complete sandbox purchase, renewal, restore,
+  cancellation/refund and idempotent backend-crediting proof.
 - App Store Connect contains the same monthly and yearly product IDs in
   `Prepare for Submission`, with one-month and one-year durations and current
-  price matrices for 175 countries/regions. On 2026-08-25 their United States
-  base prices were changed and re-read as USD 14.99 and USD 99.99; Apple
+  price matrices for 175 countries/regions, while sale availability is currently
+  configured for only 28 of those countries/regions. On 2026-08-25 their United States
+  base prices were changed and re-read as USD 0.99 and USD 1.99; Apple
   calculated the corresponding regional prices. Complete Sandbox purchase,
   renewal, restore, cancellation/refund and backend-crediting acceptance.
 - The active Play Internal track contains release `1.0.0 (20)` and an attached
