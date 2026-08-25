@@ -266,6 +266,11 @@ adding dated audit snapshots to the repository.
   `store_account_binding=compatibility` gate, which must stay in place until
   real Google Play and App Store purchase evidence exists.
 
+  A subsequent production control pass removed the remaining two exhausted
+  `email.dispatch_failed` test records addressed to `example.com`. The
+  `push_outbox` health check is again `Healthy`; no customer email records
+  were changed.
+
   SPF and DKIM are active for the Resend sending domain, but public DNS does not
   currently expose `_dmarc.petgpt.app`. Publish and monitor a DMARC policy
   before public launch; this is email-authentication hardening, not a current
