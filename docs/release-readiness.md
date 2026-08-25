@@ -482,6 +482,12 @@ do not append command transcripts to this file.
   `versionCode=21`; a cold start restored the authenticated session and loaded
   server-backed template/profile UI without a server-unavailable state. This
   is session-restoration acceptance, not a fresh password-login attempt.
+  A fresh native Google sign-in was then exercised on that same Play-installed
+  build: Android displayed the system account chooser and returned PetMagic to
+  its current legal-acceptance gate without a transport or authentication
+  error. The account must accept the displayed Terms and Privacy Policy before
+  the authenticated application workspace can be asserted; no legal acceptance
+  was made by the test operator.
   The corresponding local APK is signed with the upload key and intentionally
   does not match the Google Play app-signing certificate on the installed app;
   it was not sideloaded over the Play build. Physical acceptance therefore
