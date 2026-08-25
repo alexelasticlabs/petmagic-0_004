@@ -23,6 +23,7 @@ services:
       ForwardedHeaders__Enabled: "true"
       ForwardedHeaders__TrustAll: "true"
       ForwardedHeaders__ForwardLimit: "1"
+      Email__DispatchWorkerEnabled: "${Email__DispatchWorkerEnabled:-false}"
       Cors__AllowedOrigins__0: "${CORS_ALLOWED_ORIGIN:?Set CORS_ALLOWED_ORIGIN to the staging HTTPS admin origin}"
     volumes: !reset
       - /opt/petmagic-staging/shared/api-data/DataProtection-Keys:/var/petmagic/DataProtection-Keys
