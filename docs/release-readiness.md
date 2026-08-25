@@ -408,6 +408,12 @@ do not append command transcripts to this file.
   character; no matching production user exists. The actual account is active,
   email-confirmed, has a password credential and is not locked. This is a
   user-input diagnosis, not an auth, DNS, Cloudflare or VPS outage.
+- A locally signed production AAB built after commit `0e07fe2f` is prepared
+  as `1.0.0+20`; its SHA-256 is
+  `7E99AAE3BCFA87E59331B1259FAD5ECF76B2E899E6FBD2113CCD714F9B28BEB4`.
+  It includes the native Stripe PaymentSheet response-preservation fix. It has
+  not been uploaded to Google Play, so it is not yet a tester-available or
+  device-accepted release.
 - **Release blocker — Premium allowance rollout:** the owner approved
   `40 PawSpark` at purchase and every seven days while Premium remains active.
   Local plan defaults, health checks, migration and mobile copy now match the
