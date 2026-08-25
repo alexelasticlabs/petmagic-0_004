@@ -110,6 +110,10 @@ adding dated audit snapshots to the repository.
   email-confirmed production profile, wallet and Premium entry point were
   rendered without a server-unavailable state. This confirms current session
   restoration and API-backed profile data, not a new password-login attempt.
+- The current source passed 550 Identity/economy/external-auth backend tests
+  and 45 focused Flutter auth/session/external-auth tests on 2026-08-25. These
+  are regression evidence only; they do not replace an Internal-track update
+  or real provider lifecycle acceptance.
 - The protected GitHub production environment now has the existing Android
   upload keystore, matching Firebase production config and Play service-account
   JSON. Run `32666052824` built and signed `1.0.0+2`, preserved its symbols
