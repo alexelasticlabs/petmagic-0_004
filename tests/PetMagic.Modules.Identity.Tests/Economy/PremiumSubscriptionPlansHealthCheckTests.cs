@@ -113,6 +113,22 @@ public sealed class PremiumSubscriptionPlansHealthCheckTests
     }
 
     [Fact]
+    public async Task CheckHealthAsync_ShouldBeUnhealthy_WhenRecommendedPlanDrifts()
+    {
+        await using var dbContext = CreateDbContext();
+        var yearly = CreatePlan("yearly", isActive: true);
+        yearly.IsRecommended = false;
+        dbContext.SubscriptionPlans.AddRange(CreatePlan("monthly", isActive: true), yearly);
+        await dbContext.SaveChangesAsync();
+
+        var result = await CreateHealthCheck(dbContext)
+            .CheckHealthAsync(new HealthCheckContext());
+
+        Assert.Equal(HealthStatus.Unhealthy, result.Status);
+        Assert.Equal(["yearly"], Assert.IsType<string[]>(result.Data["recommendationMismatches"]));
+    }
+
+    [Fact]
     public async Task CheckHealthAsync_ShouldLogError_WhenVerificationThrows()
     {
         var logger = new CapturingLogger<PremiumSubscriptionPlansHealthCheck>();

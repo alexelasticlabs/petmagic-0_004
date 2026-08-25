@@ -33,6 +33,7 @@ public sealed class PremiumSubscriptionPlansHealthCheck(
                 {
                     plan.Id,
                     plan.IsActive,
+                    plan.IsRecommended,
                     plan.PriceAmount,
                     plan.MonthlyTokenLimit,
                     plan.AppleProductId,
@@ -100,6 +101,18 @@ public sealed class PremiumSubscriptionPlansHealthCheck(
                 .Order(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
 
+            var recommendationMismatches = configuredPlans
+                .Join(
+                    expectedPlans,
+                    configured => configured.Id,
+                    expected => expected.PlanCode,
+                    (configured, expected) => new { configured, expected },
+                    StringComparer.OrdinalIgnoreCase)
+                .Where(pair => pair.configured.IsRecommended != pair.expected.IsPopular)
+                .Select(pair => pair.configured.Id)
+                .Order(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
             var stripePriceIdMismatches = configuredPlans
                 .Join(
                     expectedPlans,
@@ -129,18 +142,20 @@ public sealed class PremiumSubscriptionPlansHealthCheck(
                 && productIdMismatches.Length == 0
                 && allowanceMismatches.Length == 0
                 && priceMismatches.Length == 0
+                && recommendationMismatches.Length == 0
                 && stripePriceIdMismatches.Length == 0)
             {
                 return HealthCheckResult.Healthy("Premium subscription plans are configured in SubscriptionPlans.");
             }
 
             logger?.LogWarning(
-                "Premium subscription plan health check found configuration drift. MissingPlanCodes={MissingPlanCodes} InactivePlanCodes={InactivePlanCodes} ProductIdMismatches={ProductIdMismatches} AllowanceMismatches={AllowanceMismatches} PriceMismatches={PriceMismatches} StripePriceIdMismatches={StripePriceIdMismatches}",
+                "Premium subscription plan health check found configuration drift. MissingPlanCodes={MissingPlanCodes} InactivePlanCodes={InactivePlanCodes} ProductIdMismatches={ProductIdMismatches} AllowanceMismatches={AllowanceMismatches} PriceMismatches={PriceMismatches} RecommendationMismatches={RecommendationMismatches} StripePriceIdMismatches={StripePriceIdMismatches}",
                 missingPlanCodes,
                 inactivePlanCodes,
                 productIdMismatches,
                 allowanceMismatches,
                 priceMismatches,
+                recommendationMismatches,
                 stripePriceIdMismatches);
 
             IReadOnlyDictionary<string, object> diagnosticData = new Dictionary<string, object>
@@ -150,6 +165,7 @@ public sealed class PremiumSubscriptionPlansHealthCheck(
                 ["productIdMismatches"] = productIdMismatches,
                 ["allowanceMismatches"] = allowanceMismatches,
                 ["priceMismatches"] = priceMismatches,
+                ["recommendationMismatches"] = recommendationMismatches,
                 ["stripePriceIdMismatches"] = stripePriceIdMismatches
             };
 
