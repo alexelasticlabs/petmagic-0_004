@@ -401,6 +401,13 @@ do not append command transcripts to this file.
   rather than the generic request failure. This is acceptance for mobile API
   reachability, native OAuth and validation feedback—not a successful real
   email/password sign-in or a provider-purchase lifecycle.
+  A subsequent direct recheck signed the same physical device out and back in
+  with Google: the account chooser completed, the VPS returned HTTP 200 for
+  `/api/auth/external/google/native` and the following `/api/auth/me` request.
+  The reported password failure used an email local-part with a missing
+  character; no matching production user exists. The actual account is active,
+  email-confirmed, has a password credential and is not locked. This is a
+  user-input diagnosis, not an auth, DNS, Cloudflare or VPS outage.
 - **Release blocker — Premium allowance rollout:** the owner approved
   `40 PawSpark` at purchase and every seven days while Premium remains active.
   Local plan defaults, health checks, migration and mobile copy now match the
@@ -419,7 +426,8 @@ do not append command transcripts to this file.
   test-mode payment, cancellation/retry and signed webhook reconciliation on a
   physical device before treating this as delivered.
   A read-only live API audit found the expected enabled production webhook and
-  event set, but zero active live Stripe products or prices. Both production
+  event set. A follow-up Stripe Dashboard audit found one active live
+  `PetMagic Premium Monthly` product but no live prices; both production
   Premium rows currently have an empty `StripePriceId`, so the backend uses its
   inline-price fallback. Production provider routes are all `live`. An
   isolated staging API now responds at `api.staging.petgpt.app` with separate
