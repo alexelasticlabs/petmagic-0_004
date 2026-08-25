@@ -88,6 +88,31 @@ public sealed class PremiumSubscriptionPlansHealthCheckTests
     }
 
     [Fact]
+    public async Task CheckHealthAsync_ShouldBeUnhealthy_WhenPriceOrConfiguredStripePriceIdDrifts()
+    {
+        await using var dbContext = CreateDbContext();
+        var monthly = CreatePlan("monthly", isActive: true);
+        monthly.PriceAmount = 14.99m;
+        monthly.StripePriceId = "price_unexpected";
+        dbContext.SubscriptionPlans.AddRange(
+            monthly,
+            CreatePlan("yearly", isActive: true));
+        await dbContext.SaveChangesAsync();
+
+        var result = await CreateHealthCheck(
+                dbContext,
+                options: new EconomyOptions
+                {
+                    StripePremiumMonthlyPriceId = "price_monthly"
+                })
+            .CheckHealthAsync(new HealthCheckContext());
+
+        Assert.Equal(HealthStatus.Unhealthy, result.Status);
+        Assert.Equal(["monthly"], Assert.IsType<string[]>(result.Data["priceMismatches"]));
+        Assert.Equal(["monthly"], Assert.IsType<string[]>(result.Data["stripePriceIdMismatches"]));
+    }
+
+    [Fact]
     public async Task CheckHealthAsync_ShouldLogError_WhenVerificationThrows()
     {
         var logger = new CapturingLogger<PremiumSubscriptionPlansHealthCheck>();
@@ -113,11 +138,12 @@ public sealed class PremiumSubscriptionPlansHealthCheckTests
 
     private static PremiumSubscriptionPlansHealthCheck CreateHealthCheck(
         EconomyDbContext dbContext,
-        ILogger<PremiumSubscriptionPlansHealthCheck>? logger = null)
+        ILogger<PremiumSubscriptionPlansHealthCheck>? logger = null,
+        EconomyOptions? options = null)
     {
         return new PremiumSubscriptionPlansHealthCheck(
             dbContext,
-            Options.Create(new EconomyOptions()),
+            Options.Create(options ?? new EconomyOptions()),
             logger);
     }
 
@@ -128,10 +154,10 @@ public sealed class PremiumSubscriptionPlansHealthCheckTests
             Id = id,
             Name = $"Plan {id}",
             BillingPeriod = id == "yearly" ? "yearly" : "monthly",
-            PriceAmount = id == "yearly" ? 99.99m : 14.99m,
+            PriceAmount = id == "yearly" ? 1.99m : 0.99m,
             CurrencyCode = "USD",
             MonthlyTokenLimit = 40,
-            IsRecommended = id == "yearly",
+            IsRecommended = false,
             IsActive = isActive,
             AppleProductId = $"com.petmagic.app.premium.{id}",
             GoogleProductId = $"com.petmagic.app.premium.{id}",

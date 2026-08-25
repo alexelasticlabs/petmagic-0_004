@@ -99,11 +99,11 @@ public sealed partial class EconomyService
                     x.Id,
                     x.BillingPeriod == "yearly" ? "year" : "month",
                     x.PriceAmount,
-                    x.BillingPeriod == "yearly" ? 149.99m : null,
+                    null,
                     x.CurrencyCode,
                     x.MonthlyTokenLimit,
                     x.IsRecommended,
-                    x.BillingPeriod == "yearly" ? 33 : null,
+                    null,
                     x.DisplayOrder,
                     stripeEnabled,
                     x.GoogleProductId,
@@ -191,7 +191,7 @@ public sealed partial class EconomyService
                 x.StripePriceId,
                 x.DisplayOrder,
                 x.BillingPeriod == "yearly" ? decimal.Round(x.PriceAmount / 12m, 2, MidpointRounding.AwayFromZero) : null,
-                x.BillingPeriod == "yearly" ? 33 : null))
+                null))
             .ToListAsync(cancellationToken);
 
         var availablePaymentMethods = await BuildAvailablePaymentMethodsAsync(query, cancellationToken);

@@ -33,9 +33,11 @@ public sealed class PremiumSubscriptionPlansHealthCheck(
                 {
                     plan.Id,
                     plan.IsActive,
+                    plan.PriceAmount,
                     plan.MonthlyTokenLimit,
                     plan.AppleProductId,
-                    plan.GoogleProductId
+                    plan.GoogleProductId,
+                    plan.StripePriceId
                 })
                 .ToListAsync(cancellationToken);
 
@@ -86,31 +88,73 @@ public sealed class PremiumSubscriptionPlansHealthCheck(
                 .Order(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
 
+            var priceMismatches = configuredPlans
+                .Join(
+                    expectedPlans,
+                    configured => configured.Id,
+                    expected => expected.PlanCode,
+                    (configured, expected) => new { configured, expected },
+                    StringComparer.OrdinalIgnoreCase)
+                .Where(pair => pair.configured.PriceAmount != pair.expected.PriceAmount)
+                .Select(pair => pair.configured.Id)
+                .Order(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            var stripePriceIdMismatches = configuredPlans
+                .Join(
+                    expectedPlans,
+                    configured => configured.Id,
+                    expected => expected.PlanCode,
+                    (configured, expected) => new { configured, expected },
+                    StringComparer.OrdinalIgnoreCase)
+                .Where(pair =>
+                    (string.Equals(pair.configured.Id, "monthly", StringComparison.OrdinalIgnoreCase)
+                        && !string.IsNullOrWhiteSpace(options.Value.StripePremiumMonthlyPriceId)
+                        && !string.Equals(
+                            pair.configured.StripePriceId,
+                            options.Value.StripePremiumMonthlyPriceId,
+                            StringComparison.Ordinal))
+                    || (string.Equals(pair.configured.Id, "yearly", StringComparison.OrdinalIgnoreCase)
+                        && !string.IsNullOrWhiteSpace(options.Value.StripePremiumYearlyPriceId)
+                        && !string.Equals(
+                            pair.configured.StripePriceId,
+                            options.Value.StripePremiumYearlyPriceId,
+                            StringComparison.Ordinal)))
+                .Select(pair => pair.configured.Id)
+                .Order(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
             if (missingPlanCodes.Length == 0
                 && inactivePlanCodes.Length == 0
                 && productIdMismatches.Length == 0
-                && allowanceMismatches.Length == 0)
+                && allowanceMismatches.Length == 0
+                && priceMismatches.Length == 0
+                && stripePriceIdMismatches.Length == 0)
             {
                 return HealthCheckResult.Healthy("Premium subscription plans are configured in SubscriptionPlans.");
             }
 
             logger?.LogWarning(
-                "Premium subscription plan health check found configuration drift. MissingPlanCodes={MissingPlanCodes} InactivePlanCodes={InactivePlanCodes} ProductIdMismatches={ProductIdMismatches} AllowanceMismatches={AllowanceMismatches}",
+                "Premium subscription plan health check found configuration drift. MissingPlanCodes={MissingPlanCodes} InactivePlanCodes={InactivePlanCodes} ProductIdMismatches={ProductIdMismatches} AllowanceMismatches={AllowanceMismatches} PriceMismatches={PriceMismatches} StripePriceIdMismatches={StripePriceIdMismatches}",
                 missingPlanCodes,
                 inactivePlanCodes,
                 productIdMismatches,
-                allowanceMismatches);
+                allowanceMismatches,
+                priceMismatches,
+                stripePriceIdMismatches);
 
             IReadOnlyDictionary<string, object> diagnosticData = new Dictionary<string, object>
             {
                 ["missingPlanCodes"] = missingPlanCodes,
                 ["inactivePlanCodes"] = inactivePlanCodes,
                 ["productIdMismatches"] = productIdMismatches,
-                ["allowanceMismatches"] = allowanceMismatches
+                ["allowanceMismatches"] = allowanceMismatches,
+                ["priceMismatches"] = priceMismatches,
+                ["stripePriceIdMismatches"] = stripePriceIdMismatches
             };
 
             return HealthCheckResult.Unhealthy(
-                "Premium subscription plans are missing, inactive, or do not match the expected provider catalog and allowance.",
+                "Premium subscription plans are missing, inactive, or do not match the expected provider catalog, price, allowance, or Stripe Price IDs.",
                 data: diagnosticData);
         }
         catch (Exception exception)

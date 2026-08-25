@@ -63,6 +63,14 @@ public static class EconomyInfrastructureServiceCollectionExtensions
                 "StripeLiveWebhookSecret",
                 "STRIPE_LIVE_WEBHOOK_SECRET",
                 "STRIPE_WEBHOOK_SECRET_LIVE") ?? string.Empty,
+            StripePremiumMonthlyPriceId = ReadValue(
+                section,
+                "StripePremiumMonthlyPriceId",
+                "STRIPE_PREMIUM_MONTHLY_PRICE_ID") ?? string.Empty,
+            StripePremiumYearlyPriceId = ReadValue(
+                section,
+                "StripePremiumYearlyPriceId",
+                "STRIPE_PREMIUM_YEARLY_PRICE_ID") ?? string.Empty,
             StripeCheckoutSuccessUrl = ReadEnvironmentFirstValue(
                 configuration,
                 section,
@@ -644,13 +652,14 @@ public static class EconomyInfrastructureServiceCollectionExtensions
                 Id = "monthly",
                 Name = "PetMagic Premium Monthly",
                 BillingPeriod = "monthly",
-                PriceAmount = 14.99m,
+                PriceAmount = 0.99m,
                 CurrencyCode = "USD",
                 MonthlyTokenLimit = 40,
                 IsRecommended = false,
                 IsActive = true,
                 AppleProductId = options.AppStorePremiumMonthlyProductId,
                 GoogleProductId = options.GooglePlayPremiumMonthlyProductId,
+                StripePriceId = options.StripePremiumMonthlyPriceId,
                 DisplayOrder = 1,
                 CreatedAtUtc = now,
                 UpdatedAtUtc = now
@@ -660,13 +669,14 @@ public static class EconomyInfrastructureServiceCollectionExtensions
                 Id = "yearly",
                 Name = "PetMagic Premium Yearly",
                 BillingPeriod = "yearly",
-                PriceAmount = 99.99m,
+                PriceAmount = 1.99m,
                 CurrencyCode = "USD",
                 MonthlyTokenLimit = 40,
-                IsRecommended = true,
+                IsRecommended = false,
                 IsActive = true,
                 AppleProductId = options.AppStorePremiumYearlyProductId,
                 GoogleProductId = options.GooglePlayPremiumYearlyProductId,
+                StripePriceId = options.StripePremiumYearlyPriceId,
                 DisplayOrder = 2,
                 CreatedAtUtc = now,
                 UpdatedAtUtc = now
@@ -697,6 +707,11 @@ public static class EconomyInfrastructureServiceCollectionExtensions
             if (string.IsNullOrWhiteSpace(existing.GoogleProductId))
             {
                 existing.GoogleProductId = plan.GoogleProductId;
+            }
+
+            if (!string.IsNullOrWhiteSpace(plan.StripePriceId))
+            {
+                existing.StripePriceId = plan.StripePriceId;
             }
             existing.DisplayOrder = plan.DisplayOrder;
             existing.UpdatedAtUtc = now;
