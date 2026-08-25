@@ -157,7 +157,7 @@ public sealed class PremiumSubscriptionPlansHealthCheckTests
             PriceAmount = id == "yearly" ? 1.99m : 0.99m,
             CurrencyCode = "USD",
             MonthlyTokenLimit = 40,
-            IsRecommended = false,
+            IsRecommended = id == "yearly",
             IsActive = isActive,
             AppleProductId = $"com.petmagic.app.premium.{id}",
             GoogleProductId = $"com.petmagic.app.premium.{id}",

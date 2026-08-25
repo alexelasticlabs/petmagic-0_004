@@ -28,7 +28,7 @@ internal static class PremiumPlanCatalog
             null,
             "USD",
             40,
-            false,
+            true,
             null,
             1,
             options.GooglePlayPremiumMonthlyProductId,

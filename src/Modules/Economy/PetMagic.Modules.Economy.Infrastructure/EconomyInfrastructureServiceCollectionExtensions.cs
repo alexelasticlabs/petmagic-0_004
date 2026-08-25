@@ -655,7 +655,7 @@ public static class EconomyInfrastructureServiceCollectionExtensions
                 PriceAmount = 0.99m,
                 CurrencyCode = "USD",
                 MonthlyTokenLimit = 40,
-                IsRecommended = false,
+                IsRecommended = true,
                 IsActive = true,
                 AppleProductId = options.AppStorePremiumMonthlyProductId,
                 GoogleProductId = options.GooglePlayPremiumMonthlyProductId,
