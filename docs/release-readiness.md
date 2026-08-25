@@ -381,6 +381,17 @@ do not append command transcripts to this file.
   Stripe purchase was started. Verify the tester
   account's Play-country eligibility and license-testing status against the active
   products before a sandbox charge.
+- Android `1.0.0+19` from commit `9210b101c` was built locally with the
+  configured production signing identity; its AAB SHA-256 is
+  `19A84CDC48E5331A437B8E788036C1F787EB03519AACECBC42BE4940AECEE5B3`.
+  Android Publisher API accepted the artifact on Play Internal and an
+  independent read confirmed `versionCode=19`. The physical Samsung device
+  installed that Play build. Guest access opened the templates screen, native
+  Google Sign-In completed into the authenticated templates screen, and a
+  malformed email request showed the specific localized validation message
+  rather than the generic request failure. This is acceptance for mobile API
+  reachability, native OAuth and validation feedback—not a successful real
+  email/password sign-in or a provider-purchase lifecycle.
 - **Release blocker — Premium allowance rollout:** the owner approved
   `40 PawSpark` at purchase and every seven days while Premium remains active.
   Local plan defaults, health checks, migration and mobile copy now match the

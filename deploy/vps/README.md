@@ -237,6 +237,18 @@ secret values, private keys, tokens, or service-account JSON.
       Stripe and Google Play titles/subtitles rendered correctly, and selecting
       Google Play switched to the Russian store-billing notice. The selector was
       closed before checkout; no purchase was made.
+- [x] Android `1.0.0+19` from commit `9210b101c` was built locally with the
+      configured production signing identity (AAB SHA-256
+      `19A84CDC48E5331A437B8E788036C1F787EB03519AACECBC42BE4940AECEE5B3`).
+      Android Publisher API accepted it on Play Internal and a separate API
+      read confirmed version code `19`. The physical Samsung test device then
+      installed that Play build: guest access opened the templates screen,
+      native Google Sign-In returned to the authenticated templates screen, and
+      malformed email input displayed the specific Russian validation message
+      rather than the generic request failure. This proves the mobile
+      reachability/auth-routing and validation-feedback paths; it does not
+      replace a successful real email/password sign-in or any billing purchase
+      acceptance.
 - [ ] Complete the independent iOS CI signing bootstrap before TestFlight:
       Firebase iOS configuration and its App ID are now protected GitHub
       `production` secrets. App Store Connect API access is now approved. A
