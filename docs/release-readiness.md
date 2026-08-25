@@ -454,6 +454,10 @@ do not append command transcripts to this file.
   `E585E77DA55E2F6D7C704B455629D9FF3B9D5C6830E134BDCA317DA80791DFCE`.
   The artifact has not been uploaded to Play, so it is a verified local
   fallback artifact, not a distributed or device-accepted release.
+  The corresponding local APK is signed with the upload key and intentionally
+  does not match the Google Play app-signing certificate on the installed app;
+  it was not sideloaded over the Play build. Physical acceptance therefore
+  still requires the normal Internal-track AAB distribution path.
 - **Release blocker — Premium allowance rollout:** the owner approved
   `40 PawSpark` at purchase and every seven days while Premium remains active.
   Local plan defaults, health checks, migration and mobile copy now match the
