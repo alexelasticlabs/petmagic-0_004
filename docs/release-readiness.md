@@ -376,10 +376,12 @@ do not append command transcripts to this file.
   base prices were changed and re-read as USD 14.99 and USD 99.99; Apple
   calculated the corresponding regional prices. Complete Sandbox purchase,
   renewal, restore, cancellation/refund and backend-crediting acceptance.
-- The active Play Internal track contains release `1.0.0 (19)` and an attached
-  tester list. The prior `1.0.0 (18)` AAB from commit `3d88d997` remains
-  documented below as payment-selector acceptance evidence; `1.0.0 (19)` is
-  the current distribution and supersedes it for device testing.
+- The active Play Internal track contains release `1.0.0 (20)` and an attached
+  tester list. The uploaded production AAB has SHA-256
+  `7E99AAE3BCFA87E59331B1259FAD5ECF76B2E899E6FBD2113CCD714F9B28BEB4`.
+  The prior `1.0.0 (18)` AAB from commit `3d88d997` remains documented below as
+  payment-selector acceptance evidence; `1.0.0 (20)` is the current
+  distribution and still requires physical-device acceptance.
   The matching VPS revision completed controlled deployment, all containers were
   healthy, runtime preflight passed, and the public paywall API returns localized
   legal notices for `locale=ru-RU`. This proves release distribution and API
@@ -412,37 +414,41 @@ do not append command transcripts to this file.
   character; no matching production user exists. The actual account is active,
   email-confirmed, has a password credential and is not locked. This is a
   user-input diagnosis, not an auth, DNS, Cloudflare or VPS outage.
-- A locally signed production AAB built after commit `0e07fe2f` is prepared
-  as `1.0.0+20`; its SHA-256 is
+- The locally signed production AAB built after commit `0e07fe2f` was uploaded
+  to Play Internal as `1.0.0+20`; its SHA-256 is
   `7E99AAE3BCFA87E59331B1259FAD5ECF76B2E899E6FBD2113CCD714F9B28BEB4`.
-  It includes the native Stripe PaymentSheet response-preservation fix. It has
-  not been uploaded to Google Play, so it is not yet a tester-available or
-  device-accepted release. The focused native-PaymentSheet/hosted-fallback
-  Flutter test passes locally; this is code evidence only.
+  It includes the native Stripe PaymentSheet response-preservation fix. Upload
+  is release-distribution evidence only; physical-device acceptance remains
+  pending. The focused native-PaymentSheet/hosted-fallback Flutter test passes
+  locally; this is code evidence only.
 - **Release blocker — Premium allowance rollout:** the owner approved
   `40 PawSpark` at purchase and every seven days while Premium remains active.
   Local plan defaults, health checks, migration and mobile copy now match the
   decision, with clean/existing DB migration proof. The VPS migration and live
-  database values are confirmed aligned. Active store/Stripe product copy and
-  a real renewal/cancellation lifecycle still have to prove idempotent granting.
+  database values are confirmed aligned. Active store product copy and a real
+  renewal/cancellation lifecycle still have to prove idempotent granting.
 - **Release blocker — native Stripe acceptance:** eligible Android Stripe
   checkout now uses native PaymentSheet. iOS/web retain hosted Checkout or
   store billing according to policy. The optional client-secret contract,
   narrow-screen Premium UI, production-flavor debug APK and minified release
-  AAB pass locally, the backend is deployed on the VPS, and Android `1.0.0+18`
-  is active on Play Internal. Focused verification on 2026-08-25 passes 224
+  AAB pass locally, the backend is deployed on the VPS at commit `1f08a322`,
+  and Android `1.0.0+20` is active on Play Internal. Focused verification on
+  2026-08-25 passes 224
   backend economy tests, 68 auth/store security tests, 108 Flutter auth/payment
   tests and `flutter analyze`; this proves code contracts, not provider or
   physical-device acceptance. Install that exact release, then prove a Stripe
   test-mode payment, cancellation/retry and signed webhook reconciliation on a
   physical device before treating this as delivered.
   A read-only live API audit found the expected enabled production webhook and
-  event set. A follow-up Stripe Dashboard audit found one active live
-  `PetMagic Premium Monthly` product but no live prices; both production
-  Premium rows currently have an empty `StripePriceId`, so the backend uses its
-  inline-price fallback. Production provider routes are all `live`. An
-  isolated staging API now responds at `api.staging.petgpt.app` with separate
-  database, local paths and secrets, while production remains healthy. Its
+  event set. The live Stripe catalog now has separate monthly and yearly
+  Premium Prices at USD 0.99 and USD 1.99. The protected VPS environment and
+  both production Premium rows contain their matching Stripe Price IDs; the
+  public paywall API returns those IDs, the same prices, `40` PawSpark per
+  seven-day grant interval, and recommends the yearly plan. No real live
+  charge, signed webhook delivery, renewal, cancellation, refund, or restore
+  has been accepted. Production provider routes are all `live`. An isolated
+  staging API now responds at `api.staging.petgpt.app` with separate database,
+  local paths and secrets, while production remains healthy. Its
   test credentials, test catalog and signed webhook delivery are accepted;
   an automated Android-mode PaymentSheet checkout activated Premium for an
   isolated staging user. A freshly built staging debug APK was installed on
