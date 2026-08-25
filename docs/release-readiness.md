@@ -460,37 +460,34 @@ do not append command transcripts to this file.
   pass locally. GitHub Actions run `32844447065` was rejected before its first
   build step, artifact creation, or Play upload because recent account payments
   have failed or the GitHub Actions spending limit must be increased. This is
-  an account-billing gate, not an Android build failure. Release `1.0.0+20`
-  remains the current Play Internal artifact until that gate is resolved or a
-  separately authorized local signed-build/upload fallback is used.
+  an account-billing gate, not an Android build failure. A separately
+  authorized local signed-build/upload path was subsequently used instead.
 - A local signed production AAB for `1.0.0+21` was built from the same code
   revision after the GitHub rejection. Its SHA-256 is
   `E585E77DA55E2F6D7C704B455629D9FF3B9D5C6830E134BDCA317DA80791DFCE`.
-  The artifact has not been uploaded to Play, so it is a verified local
-  fallback artifact, not a distributed or device-accepted release.
+  A least-privilege Android Publisher API upload accepted the exact artifact
+  into Play Internal and an independent API read confirmed release
+  `1.0.0 (21)`, status `completed`, version code `21`. This is distribution
+  evidence, not yet device-acceptance evidence.
   The corresponding local APK is signed with the upload key and intentionally
   does not match the Google Play app-signing certificate on the installed app;
   it was not sideloaded over the Play build. Physical acceptance therefore
-  still requires the normal Internal-track AAB distribution path.
+  still requires installation through the normal Internal-track distribution
+  path and a physical-device acceptance check.
 - A direct, owner-authorized Google Play Internal upload was attempted for that
   local AAB on 2026-08-25. The available browser surface rendered the release
   form but did not expose a usable native file-selection control; no app bundle
   was attached or uploaded. The resulting empty draft release was discarded,
-  and `1.0.0+20` remains the active Internal-track artifact. Upload therefore
-  still requires either resolving the GitHub Actions billing gate or selecting
-  the already-built AAB in the native Play upload dialog.
+  and `1.0.0+20` remained active at that point. The later Publisher API upload
+  described above supersedes this fallback attempt; the empty draft has no
+  release effect.
 - A separate `petmagic-play-release-prod` Google Cloud service account now
-  exists in project `petmagic-500309`, with no Google Cloud role and no key.
-  It is reserved for a least-privilege Internal-release publisher integration;
-  the owner reports that its PetMagic testing-track permission has been added,
-  but publisher API access remains unverified until a transient credential can
-  be used without retaining it. The available Play Console session previously
-  exposed no user-invitation control, so this needs explicit API proof rather
-  than being treated as a configured release path.
-  A temporary key-generation attempt on 2026-08-25 could not be safely used
-  because its browser download was unavailable to the controlled environment;
-  that exact key was immediately revoked. No private credential was retained,
-  committed, or copied to the VPS.
+  exists in project `petmagic-500309`, with no Google Cloud role and no active
+  key. Its narrow testing-track permission was proven by a one-time Android
+  Publisher API upload of `1.0.0+21` and subsequent Internal-track read on
+  2026-08-25. The temporary JSON credential was immediately revoked in Google
+  Cloud after verification and deleted locally; no private credential was
+  committed or copied to the VPS.
 - **Release blocker — Premium allowance rollout:** the owner approved
   `40 PawSpark` at purchase and every seven days while Premium remains active.
   Local plan defaults, health checks, migration and mobile copy now match the
