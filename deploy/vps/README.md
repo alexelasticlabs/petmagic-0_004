@@ -303,6 +303,8 @@ repository therefore provides a minimal isolated staging Compose project for
 the API, PostgreSQL and Mailpit only. It intentionally does not mount
 `/opt/petmagic/shared`, start the generation worker, or receive production
 fal.ai, R2, OAuth, Firebase, store, SMTP or Stripe live credentials.
+The email dispatch worker is disabled by default because Mailpit is local-only;
+it must not be enabled until staging has its own TLS SMTP relay and credentials.
 
 1. Create `/opt/petmagic-staging/env/.env.staging` with mode `0600` from
    [`.env.vps.staging.example`](.env.vps.staging.example). Generate a distinct
