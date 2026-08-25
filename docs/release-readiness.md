@@ -590,6 +590,9 @@ do not append command transcripts to this file.
   scripts. Production was not overwritten and remained healthy during the
   audit; retain the source archives until final launch sign-off.
 - An iOS archive and store validation from a supported macOS/Xcode environment.
+- App Store Connect currently contains no TestFlight builds for `Pet Video Magic`.
+  Upload the first signed archive before attempting Sandbox authentication,
+  StoreKit purchase, restore, notification-delivery, or TestFlight acceptance.
 - A protected-VPS inspection confirms the Sign in with Apple client ID and
   audience are `com.petmagic.app`, with a configured client-secret JWT valid
   through `2027-01-27T05:15:02Z`. This proves configuration presence and expiry,
