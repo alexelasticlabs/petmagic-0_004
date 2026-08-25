@@ -105,6 +105,11 @@ adding dated audit snapshots to the repository.
   Current Play-installed production builds use the corrected host; physical
   device acceptance now proves API connectivity, email/password authentication,
   native Google authentication and authenticated `/api/auth/me` restoration.
+- On 2026-08-25 the connected physical Android device was read-only checked
+  while running the Play-installed `versionCode=20`: an authenticated,
+  email-confirmed production profile, wallet and Premium entry point were
+  rendered without a server-unavailable state. This confirms current session
+  restoration and API-backed profile data, not a new password-login attempt.
 - The protected GitHub production environment now has the existing Android
   upload keystore, matching Firebase production config and Play service-account
   JSON. Run `32666052824` built and signed `1.0.0+2`, preserved its symbols
