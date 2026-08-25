@@ -560,6 +560,12 @@ do not append command transcripts to this file.
   endpoint subsequently reported `isPremium=true` and `status=Active`. This
   accepts device-level sandbox presentation and activation only. Cancellation,
   renewal and refund remain pending. The
+  staging email worker remains disabled: its local Mailpit configuration is
+  incomplete for the production-grade email-worker validation, and the staging
+  health check therefore reports two queued confirmation-email jobs as overdue.
+  This is isolated from production and does not send email externally. Before
+  staging is used for email acceptance, complete its non-production SMTP/Mailpit
+  configuration, enable the worker, and prove delivery to Mailpit.
   physical Android selector rendering is
   accepted for build `1.0.0+15`; build `17` is now installed and accepted for
   native Google authentication and provider-specific selector copy, but its
