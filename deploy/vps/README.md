@@ -347,6 +347,12 @@ delivery, premium entitlement, refund, cancellation or store billing.
       Android PaymentSheet checkout path through Premium activation. The
       staging email worker remains disabled after the run because Mailpit has
       no TLS and is never an external delivery service.
+- [x] A freshly built staging debug APK using
+      `https://api.staging.petgpt.app` was installed on the physical Android
+      device on 2026-08-25. The device resolved that hostname to the dedicated
+      VPS and loaded the guest start screen without a server-unavailable state.
+      This is device-level routing acceptance only; it does not prove native
+      PaymentSheet presentation or a purchase lifecycle.
 - [ ] This staging acceptance is not production billing acceptance: complete a
       physical-device sandbox run, cancellation/refund/renewal and idempotent
       seven-day grant checks before enabling or charging against the live

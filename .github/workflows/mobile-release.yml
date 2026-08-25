@@ -59,7 +59,7 @@ jobs:
         run: |
           if [ "$RELEASE_ENVIRONMENT" = "staging" ]; then
             echo 'APP_PACKAGE_NAME=com.petmagic.app.staging' >> "$GITHUB_ENV"
-            echo 'API_BASE_URL=https://api.staging.petmagic.app' >> "$GITHUB_ENV"
+            echo 'API_BASE_URL=https://api.staging.petgpt.app' >> "$GITHUB_ENV"
           else
             echo 'APP_PACKAGE_NAME=com.petmagic.app' >> "$GITHUB_ENV"
             echo 'API_BASE_URL=https://api.petgpt.app' >> "$GITHUB_ENV"
@@ -160,7 +160,7 @@ jobs:
         run: |
           if [ "$RELEASE_ENVIRONMENT" = "staging" ]; then
             echo 'APP_PACKAGE_NAME=com.petmagic.app.staging' >> "$GITHUB_ENV"
-            echo 'API_BASE_URL=https://api.staging.petmagic.app' >> "$GITHUB_ENV"
+            echo 'API_BASE_URL=https://api.staging.petgpt.app' >> "$GITHUB_ENV"
           else
             echo 'APP_PACKAGE_NAME=com.petmagic.app' >> "$GITHUB_ENV"
             echo 'API_BASE_URL=https://api.petgpt.app' >> "$GITHUB_ENV"

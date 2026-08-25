@@ -421,8 +421,12 @@ do not append command transcripts to this file.
   database, local paths and secrets, while production remains healthy. Its
   test credentials, test catalog and signed webhook delivery are accepted;
   an automated Android-mode PaymentSheet checkout activated Premium for an
-  isolated staging user. This is sandbox backend acceptance only: physical
-  device presentation, cancellation, renewal and refund remain pending. The
+  isolated staging user. A freshly built staging debug APK was installed on
+  the physical Android device on 2026-08-25; it resolved
+  `api.staging.petgpt.app` to the dedicated VPS and loaded the guest start
+  screen without a server-unavailable state. This confirms the staging mobile
+  endpoint, DNS and VPS route are aligned. Native PaymentSheet presentation,
+  cancellation, renewal and refund remain pending. The
   physical Android selector rendering is
   accepted for build `1.0.0+15`; build `17` is now installed and accepted for
   native Google authentication and provider-specific selector copy, but its

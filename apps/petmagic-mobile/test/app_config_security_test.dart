@@ -46,14 +46,14 @@ void main() {
   test('release flavor configuration must match API and package identity', () {
     expect(
       AppConfig.normalizeReleaseBaseUrl(
-        'https://api.staging.petmagic.app',
+        'https://api.staging.petgpt.app',
         environment: 'staging',
       ),
       AppConfig.stagingApiBaseUrl,
     );
     expect(
       AppConfig.normalizeReleaseBaseUrl(
-        'https://api.staging.petmagic.app',
+        'https://api.staging.petgpt.app',
         environment: 'production',
       ),
       isNull,

@@ -138,7 +138,7 @@ android {
                     "com.petmagic.app"
                 }
                 val expectedApiBaseUrl = if (environment == "staging") {
-                    "https://api.staging.petmagic.app"
+                    "https://api.staging.petgpt.app"
                 } else {
                     "https://api.petgpt.app"
                 }

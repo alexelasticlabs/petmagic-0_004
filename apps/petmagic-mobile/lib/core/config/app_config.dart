@@ -17,7 +17,7 @@ class AndroidLoopbackBackendHintConfig {
 class AppConfig {
   const AppConfig._();
 
-  static const stagingApiBaseUrl = 'https://api.staging.petmagic.app';
+  static const stagingApiBaseUrl = 'https://api.staging.petgpt.app';
   static const productionApiBaseUrl = 'https://api.petgpt.app';
   static const stagingDeepLinkScheme = 'petmagic-staging';
   static const productionDeepLinkScheme = 'petmagic';
@@ -335,7 +335,7 @@ class AppConfig {
     }
 
     final expectedHost = switch (environment.trim().toLowerCase()) {
-      'staging' => 'api.staging.petmagic.app',
+      'staging' => 'api.staging.petgpt.app',
       'production' => 'api.petgpt.app',
       _ => null,
     };

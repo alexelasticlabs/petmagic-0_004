@@ -165,7 +165,7 @@ flutter build appbundle --release --flavor staging \
   --android-project-arg=allowPlaceholderFirebase=true \
   --dart-define=APP_ENVIRONMENT=staging \
   --dart-define=APP_PACKAGE_NAME=com.petmagic.app.staging \
-  --dart-define=API_BASE_URL=https://api.staging.petmagic.app \
+  --dart-define=API_BASE_URL=https://api.staging.petgpt.app \
   --obfuscate --split-debug-info=build/symbols/staging
 ```
 

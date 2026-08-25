@@ -68,7 +68,7 @@ void main() {
     expect(resolver, contains('normalizeReleaseBaseUrl('));
     expect(resolver, contains('return [productionBaseUrl];'));
     expect(config, contains('validateReleaseConfiguration'));
-    expect(config, contains("'staging' => 'api.staging.petmagic.app'"));
+    expect(config, contains("'staging' => 'api.staging.petgpt.app'"));
     expect(config, contains("static const productionApiBaseUrl = 'https://"));
     expect(
       config,
