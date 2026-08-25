@@ -224,6 +224,19 @@ secret values, private keys, tokens, or service-account JSON.
       notice: after selecting Google Play, the device showed the store-billing
       notice rather than the Stripe Checkout notice. No checkout or purchase was
       initiated during this UI acceptance.
+- [x] VPS revision `3d88d99757c731b94008395463e48354590415da` completed the
+      controlled release path on 2026-08-25: all application containers became
+      healthy and the runtime preflight passed. The public paywall-config route
+      now returns Russian provider notices for `locale=ru-RU`. Android
+      `1.0.0+18` was built locally from that revision with the configured
+      production signing identity (AAB SHA-256
+      `2578B98DA311C3F0CF2C346DF73938A03D5E58ED176E71B8716C47CB3E163EAB`)
+      and independently read back from Play Internal as version code `18`,
+      status `completed`. A physical Samsung test device then installed the
+      matching Play build and accepted the payment-method selector: its Russian
+      Stripe and Google Play titles/subtitles rendered correctly, and selecting
+      Google Play switched to the Russian store-billing notice. The selector was
+      closed before checkout; no purchase was made.
 - [ ] Complete the independent iOS CI signing bootstrap before TestFlight:
       Firebase iOS configuration and its App ID are now protected GitHub
       `production` secrets. App Store Connect API access is now approved. A
@@ -250,7 +263,7 @@ secret values, private keys, tokens, or service-account JSON.
       eligible web checkout,
       and uses an idempotency key for mobile subscription creation. Flutter
       regression tests, backend gateway tests, a production-flavor debug APK and
-      a minified production release AAB pass locally. Android `1.0.0+17` is active
+      a minified production release AAB pass locally. Android `1.0.0+18` is active
       on Play Internal and installed on the physical Samsung test device. The
       authenticated app loads server-backed wallet and Premium data, and its
       payment-method selector renders both Stripe and Google Play. No purchase
@@ -293,10 +306,14 @@ secret values, private keys, tokens, or service-account JSON.
       real sandbox renewal/cancellation lifecycle remain pending before public
       charging.
 - [ ] Complete native Google Play acceptance on an eligible internal tester.
-      The Internal track is active with release `1.0.0 (17)` and a tester list;
+      The Internal track is active with release `1.0.0 (18)` and a tester list;
       build `17` authenticates through native Google Sign-In and its payment
       selector renders both Stripe and Google Play with provider-appropriate
-      legal notices. The Play **One-time
+      legal notices; build `18` adds localized provider titles/subtitles and
+      receives server-localized notices. A physical-device acceptance selected
+      Google Play, confirmed the Russian store-billing notice, and closed before
+      checkout; no purchase was started.
+      The Play **One-time
       products** catalog now has active standard **Buy** products matching the
       VPS-derived IDs: `starter` at USD 0.99, `creator` at USD 1.49, and `viral`
       at USD 1.99. Verify

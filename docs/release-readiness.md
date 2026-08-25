@@ -362,17 +362,22 @@ do not append command transcripts to this file.
   base prices were changed and re-read as USD 14.99 and USD 99.99; Apple
   calculated the corresponding regional prices. Complete Sandbox purchase,
   renewal, restore, cancellation/refund and backend-crediting acceptance.
-- The active Play Internal track contains release `1.0.0 (17)` and an attached
+- The active Play Internal track contains release `1.0.0 (18)` and an attached
   tester list. Android Publisher API accepted the locally signed AAB from commit
-  `0055930e`; an independent API read confirmed that `versionCode=17` is present
-  on the Internal track. It retains the corrected Premium benefit
-  copy with `40 PawSpark every seven days while Premium is active`. This proves
-  release distribution, not Billing eligibility for every Play account or country.
-  The physical Android device now runs `1.0.0+17`: after logout, native Google
-  Sign-In opened the account chooser and returned to the authenticated app screen
-  without a `network.unavailable`, Dio or Flutter error. The payment-method
-  selector renders both Stripe and Google Play; selecting Google Play replaces
-  the Stripe-only Checkout notice with the store-billing notice. No store or
+  `3d88d997`; an independent API read confirmed `versionCode=18`, status
+  `completed`. Its SHA-256 is
+  `2578B98DA311C3F0CF2C346DF73938A03D5E58ED176E71B8716C47CB3E163EAB`.
+  The matching VPS revision completed controlled deployment, all containers were
+  healthy, runtime preflight passed, and the public paywall API returns localized
+  legal notices for `locale=ru-RU`. This proves release distribution and API
+  deployment, not Billing eligibility for every Play account or country.
+  A physical Android device now runs the Play-installed `1.0.0+18` build. The
+  preceding build `17` completed native Google Sign-In acceptance after logout:
+  it opened the account chooser and returned to the authenticated app without a
+  `network.unavailable`, Dio or Flutter error. Build `18` accepts the
+  payment-method selector with Russian Stripe and Google Play titles/subtitles;
+  selecting Google Play replaces the Stripe Checkout notice with the Russian
+  store-billing notice. The selector was closed before checkout. No store or
   Stripe purchase was started. Verify the tester
   account's Play-country eligibility and license-testing status against the active
   products before a sandbox charge.
@@ -386,7 +391,7 @@ do not append command transcripts to this file.
   checkout now uses native PaymentSheet. iOS/web retain hosted Checkout or
   store billing according to policy. The optional client-secret contract,
   narrow-screen Premium UI, production-flavor debug APK and minified release
-  AAB pass locally, the backend is deployed on the VPS, and Android `1.0.0+17`
+  AAB pass locally, the backend is deployed on the VPS, and Android `1.0.0+18`
   is active on Play Internal. Focused verification on 2026-08-25 passes 224
   backend economy tests, 68 auth/store security tests, 108 Flutter auth/payment
   tests and `flutter analyze`; this proves code contracts, not provider or
