@@ -421,23 +421,26 @@ do not append command transcripts to this file.
   to Play Internal as `1.0.0+20`; its SHA-256 is
   `7E99AAE3BCFA87E59331B1259FAD5ECF76B2E899E6FBD2113CCD714F9B28BEB4`.
   It includes the native Stripe PaymentSheet response-preservation fix. Upload
-  is release-distribution evidence only; physical-device acceptance remains
-  pending. The focused native-PaymentSheet/hosted-fallback Flutter test passes
-  locally; this is code evidence only.
-- **Android OAuth remediation in progress (2026-08-25):** a direct device
-  inspection confirms that the connected Samsung currently runs Play-installed
-  `versionCode=19`, while Play Internal offers `1.0.0+20`. The public API and
-  mobile Google configuration endpoint respond successfully. Crashlytics proves
-  the observed password attempt reached the VPS and was rejected with
-  `auth.email_invalid` (HTTP 400), not by DNS or server unavailability. The
-  Firebase production Android app `com.petmagic.app` has no registered SHA
-  certificate fingerprints, while the installed Play APK is signed with the
-  Google Play app-signing certificate. Add that SHA-1 in Firebase, replace only
-  the protected `FIREBASE_ANDROID_CONFIG_BASE64` GitHub production secret with
-  the downloaded configuration, then build and install a newer AAB for
-  physical-device Google Sign-In acceptance. Commit `c0e5adf3` also prevents
-  known email and external-auth failures from being rendered as a generic
-  server-unavailable screen; its focused Flutter regression test passes.
+  is release-distribution evidence only for the native Stripe path. The focused
+  native-PaymentSheet/hosted-fallback Flutter test passes locally; this is code
+  evidence only.
+- **Android OAuth device acceptance (2026-08-25):** the connected physical
+  Samsung was updated from Play Internal to `versionCode=20`, then signed out
+  and back in through the Android system Google account chooser. PetMagic
+  returned to the authenticated application state and its wallet data loaded.
+  The public API and mobile Google configuration endpoint were available
+  throughout the check. Google Cloud contains the production Android OAuth
+  client for `com.petmagic.app` with the matching Google Play app-signing
+  certificate, and the VPS native-token verifier is configured for the matching
+  web-client audience. The Firebase General page's empty certificate display is
+  therefore not an OAuth defect; no Firebase or GitHub secret was changed.
+  Crashlytics had already shown that the reported password attempt reached the
+  VPS and was rejected with `auth.email_invalid` (HTTP 400), not by DNS or
+  server unavailability. Commit `c0e5adf3` additionally prevents known email
+  and external-auth failures from being rendered as a generic
+  server-unavailable screen; its focused Flutter regression test passes, but
+  that UX correction still requires a release newer than `1.0.0+20` for device
+  acceptance.
 - **Release blocker — Premium allowance rollout:** the owner approved
   `40 PawSpark` at purchase and every seven days while Premium remains active.
   Local plan defaults, health checks, migration and mobile copy now match the
