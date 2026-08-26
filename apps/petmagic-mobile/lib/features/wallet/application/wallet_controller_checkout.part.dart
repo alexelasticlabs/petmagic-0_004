@@ -359,6 +359,21 @@ mixin _WalletControllerCheckout
   }
 
   @override
+  Future<void> cancelStripeCheckout(String orderId) async {
+    try {
+      await _repository.cancelStripePurchase(orderId: orderId);
+    } on Object catch (error, stackTrace) {
+      AppLogger.warn(
+        feature: 'Wallet.Checkout',
+        operation: 'cancel_stripe_checkout',
+        message: 'Unable to cancel the server-side Stripe checkout.',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
+  @override
   Future<void> restoreStorePurchases() {
     _ensureCheckoutCoordinators();
     return _storePurchaseCoordinator!.restoreStorePurchases();

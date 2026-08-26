@@ -69,6 +69,24 @@ mixin _WalletActionsRepositoryMixin on _WalletRepositoryBase {
   }
 
   @override
+  Future<PurchaseHistoryItem> cancelStripePurchase({
+    required String orderId,
+    RequestCancellation? cancelToken,
+  }) async {
+    final encodedOrderId = _walletPathSegment(orderId);
+    final response = await _authorizedRequest<Map<String, dynamic>>(
+      (session) => _dio.post<Map<String, dynamic>>(
+        '/api/economy/purchases/$encodedOrderId/cancel',
+        options: authenticatedRequestOptions(session.accessToken),
+        cancelToken: cancelToken.toDioCancelToken(),
+      ),
+      retryTransientFailures: false,
+    );
+
+    return mapPurchaseHistoryItemFromJson(response.data ?? const {});
+  }
+
+  @override
   Future<void> registerPushToken({
     required String token,
     required String platform,

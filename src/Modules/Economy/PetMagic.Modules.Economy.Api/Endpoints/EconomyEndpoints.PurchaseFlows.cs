@@ -95,6 +95,29 @@ public static partial class EconomyEndpoints
         return TypedResults.Ok(result.Value);
     }
 
+    private static async Task<Results<Ok<PurchaseOrderResponse>, ProblemHttpResult>> CancelPurchaseAsync(
+        HttpContext context,
+        Guid orderId,
+        IEconomyService service,
+        CancellationToken cancellationToken)
+    {
+        var (userId, _, subjectError) = TryGetSubject(context);
+        if (subjectError is not null)
+        {
+            return ToClientEconomyProblem(subjectError);
+        }
+
+        var result = await service.CancelPackPurchaseAsync(
+            new CancelPackPurchaseCommand(userId!.Value, orderId),
+            cancellationToken);
+        if (result.IsFailure)
+        {
+            return ToClientEconomyProblem(result.Error);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
     private static async Task<Results<Ok<PurchaseOrderResponse>, ValidationProblem, ProblemHttpResult>> VerifyStoreCheckoutAsync(
         HttpContext context,
         Guid orderId,

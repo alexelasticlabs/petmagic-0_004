@@ -24,6 +24,10 @@ public interface IPaymentGateway
 
     Task<Result<PaymentCreateResponse>> CreatePaymentWithSavedMethodAsync(PaymentSavedMethodCreateRequest request, CancellationToken cancellationToken);
 
+    Task<Result<PaymentCancelResponse>> CancelPaymentAsync(PaymentCancelRequest request, CancellationToken cancellationToken);
+
+    Task<Result<PaymentStateResponse>> GetPaymentStateAsync(PaymentStateRequest request, CancellationToken cancellationToken);
+
     Task<Result<PaymentRefundResponse>> RefundPaymentAsync(PaymentRefundRequest request, CancellationToken cancellationToken);
 }
 
@@ -99,6 +103,24 @@ public sealed record PaymentSavedMethodCreateRequest(
     string ExternalCustomerId,
     string ExternalPaymentMethodId,
     string? ApiSecretKey = null);
+
+public sealed record PaymentCancelRequest(
+    string Provider,
+    Guid OrderId,
+    string ExternalPaymentId,
+    string? ApiSecretKey = null);
+
+public sealed record PaymentCancelResponse(string Status, bool IsTerminalWithoutPayment);
+
+public sealed record PaymentStateRequest(
+    string Provider,
+    string ExternalPaymentId,
+    string? ApiSecretKey = null);
+
+public sealed record PaymentStateResponse(
+    string Status,
+    bool IsPaid,
+    bool IsTerminalWithoutPayment);
 
 public sealed record PaymentRefundRequest(
     string Provider,

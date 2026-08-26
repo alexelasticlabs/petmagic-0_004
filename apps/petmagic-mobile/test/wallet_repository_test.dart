@@ -43,6 +43,7 @@ void main() {
         orderId: orderId,
         stripeReferenceId: 'cs_test_validSession123',
       );
+      await repository.cancelStripePurchase(orderId: orderId);
       await repository.verifyStorePurchase(
         orderId: orderId,
         paymentMethod: const WalletPaymentMethodModel(
@@ -65,6 +66,7 @@ void main() {
       expect(paths, [
         '/api/economy/purchases/$encodedOrderId',
         '/api/economy/purchases/$encodedOrderId/verify-stripe',
+        '/api/economy/purchases/$encodedOrderId/cancel',
         '/api/economy/purchases/$encodedOrderId/verify-store',
       ]);
     },

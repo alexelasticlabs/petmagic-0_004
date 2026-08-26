@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 
 using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
+using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Economy.Application.Contracts;
 using PetMagic.Modules.Economy.Domain.Enums;
 using PetMagic.Modules.Economy.Infrastructure.Entities;
@@ -17,6 +18,44 @@ namespace PetMagic.Modules.Economy.Infrastructure;
 
 public sealed partial class EconomyService
 {
+    public async Task<Result<PurchaseOrderResponse>> CancelPackPurchaseAsync(
+        CancelPackPurchaseCommand command,
+        CancellationToken cancellationToken)
+    {
+        var order = await dbContext.PurchaseOrders
+            .FirstOrDefaultAsync(x => x.Id == command.OrderId && x.UserId == command.UserId, cancellationToken);
+        if (order is null)
+        {
+            return Result.Failure<PurchaseOrderResponse>(EconomyErrors.PurchaseNotFound);
+        }
+
+        if (string.Equals(order.Status, PurchaseOrderStatus.Failed, StringComparison.Ordinal))
+        {
+            return Result.Success(ToPurchaseOrderResponse(order));
+        }
+
+        if (!string.Equals(order.Status, PurchaseOrderStatus.Pending, StringComparison.Ordinal)
+            || !string.Equals(order.PaymentProvider, "stripe", StringComparison.OrdinalIgnoreCase)
+            || string.IsNullOrWhiteSpace(order.ExternalPaymentId))
+        {
+            return Result.Failure<PurchaseOrderResponse>(EconomyErrors.PurchaseAlreadyProcessed);
+        }
+
+        var cancellation = await paymentGateway.CancelPaymentAsync(
+            new PaymentCancelRequest(order.PaymentProvider, order.Id, order.ExternalPaymentId),
+            cancellationToken);
+        if (cancellation.IsFailure || !cancellation.Value.IsTerminalWithoutPayment)
+        {
+            LogPaymentFailed(order, EconomyErrors.PaymentGatewayFailed, "stripe.cancel");
+            return Result.Failure<PurchaseOrderResponse>(EconomyErrors.PaymentGatewayFailed);
+        }
+
+        order.Status = PurchaseOrderStatus.Failed;
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Result.Success(ToPurchaseOrderResponse(order));
+    }
+
     public async Task<Result<OffsetPagedResponse<PurchaseHistoryItemResponse>>> GetPurchaseHistoryAsync(
         Guid userId,
         int skip,

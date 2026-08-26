@@ -159,6 +159,10 @@ public static partial class EconomyEndpoints
             .RequireAuthorization()
             .WithMetadata(new RequestSizeLimitAttribute(MaxEconomyJsonRequestBodyBytes));
 
+        group.MapPost("/purchases/{orderId:guid}/cancel", CancelPurchaseAsync)
+            .RequireAuthorization()
+            .WithMetadata(new RequestSizeLimitAttribute(MaxEconomyJsonRequestBodyBytes));
+
         group.MapPost("/purchases/{orderId:guid}/verify-store", VerifyStoreCheckoutAsync)
             .RequireAuthorization()
             .WithMetadata(new RequestSizeLimitAttribute(MaxEconomyJsonRequestBodyBytes));

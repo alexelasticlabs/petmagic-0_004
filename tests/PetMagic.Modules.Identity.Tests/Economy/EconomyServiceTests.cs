@@ -335,7 +335,13 @@ public sealed partial class EconomyServiceTests
 
         public List<PaymentRefundRequest> RefundRequests { get; } = [];
 
+        public List<PaymentCancelRequest> CancelRequests { get; } = [];
+
         public Result<PaymentRefundResponse>? RefundResult { get; set; }
+
+        public Result<PaymentCancelResponse>? CancelResult { get; set; }
+
+        public Result<PaymentStateResponse>? PaymentStateResult { get; set; }
 
         public Task<Result<PaymentCreateResponse>> CreatePaymentAsync(PaymentCreateRequest request, CancellationToken cancellationToken)
         {
@@ -408,6 +414,17 @@ public sealed partial class EconomyServiceTests
         public Task<Result<PaymentCreateResponse>> CreatePaymentWithSavedMethodAsync(PaymentSavedMethodCreateRequest request, CancellationToken cancellationToken)
         {
             return Task.FromResult(Result.Success(new PaymentCreateResponse($"pi_{request.OrderId:N}", string.Empty)));
+        }
+
+        public Task<Result<PaymentCancelResponse>> CancelPaymentAsync(PaymentCancelRequest request, CancellationToken cancellationToken)
+        {
+            CancelRequests.Add(request);
+            return Task.FromResult(CancelResult ?? Result.Success(new PaymentCancelResponse("canceled", true)));
+        }
+
+        public Task<Result<PaymentStateResponse>> GetPaymentStateAsync(PaymentStateRequest request, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(PaymentStateResult ?? Result.Success(new PaymentStateResponse("pending", false, false)));
         }
 
         public Task<Result<PaymentRefundResponse>> RefundPaymentAsync(PaymentRefundRequest request, CancellationToken cancellationToken)

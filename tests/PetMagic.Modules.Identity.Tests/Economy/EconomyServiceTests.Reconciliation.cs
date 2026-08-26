@@ -2,6 +2,7 @@ using System.Reflection;
 
 using Microsoft.EntityFrameworkCore;
 
+using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Economy.Application.Contracts;
 using PetMagic.Modules.Economy.Domain.Enums;
@@ -13,6 +14,146 @@ namespace PetMagic.Modules.Identity.Tests.Economy;
 
 public sealed partial class EconomyServiceTests
 {
+    [Fact]
+    public async Task CancelPackPurchaseAsync_ShouldCancelPendingStripePaymentAndMarkOrderFailed()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var packId = AddStarterPack(dbContext);
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        dbContext.PurchaseOrders.Add(new PurchaseOrder
+        {
+            Id = orderId,
+            UserId = userId,
+            PackId = packId,
+            PaymentProvider = "stripe",
+            Status = PurchaseOrderStatus.Pending,
+            PriceAmount = 1.49m,
+            CurrencyCode = "USD",
+            SparkToGrant = 40,
+            ExternalPaymentId = "pi_cancelled_payment",
+            CreatedAtUtc = DateTime.UtcNow.AddMinutes(-1)
+        });
+        await dbContext.SaveChangesAsync();
+
+        var gateway = new FakePaymentGateway();
+        var result = await CreateService(dbContext, gateway: gateway).CancelPackPurchaseAsync(
+            new CancelPackPurchaseCommand(userId, orderId),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(PurchaseOrderStatus.Failed, result.Value.Status);
+        Assert.Single(gateway.CancelRequests);
+        Assert.Equal(orderId, gateway.CancelRequests[0].OrderId);
+        Assert.Equal("pi_cancelled_payment", gateway.CancelRequests[0].ExternalPaymentId);
+        Assert.Equal(PurchaseOrderStatus.Failed, (await dbContext.PurchaseOrders.SingleAsync()).Status);
+    }
+
+    [Fact]
+    public async Task CancelPackPurchaseAsync_ShouldNotMarkOrderFailedUnlessProviderConfirmsTerminalUnpaidState()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var packId = AddStarterPack(dbContext);
+        var userId = Guid.NewGuid();
+        var orderId = Guid.NewGuid();
+        dbContext.PurchaseOrders.Add(new PurchaseOrder
+        {
+            Id = orderId,
+            UserId = userId,
+            PackId = packId,
+            PaymentProvider = "stripe",
+            Status = PurchaseOrderStatus.Pending,
+            PriceAmount = 1.49m,
+            CurrencyCode = "USD",
+            SparkToGrant = 40,
+            ExternalPaymentId = "pi_racing_payment",
+            CreatedAtUtc = DateTime.UtcNow.AddMinutes(-1)
+        });
+        await dbContext.SaveChangesAsync();
+
+        var gateway = new FakePaymentGateway
+        {
+            CancelResult = Result.Success(new PaymentCancelResponse("succeeded", false))
+        };
+        var result = await CreateService(dbContext, gateway: gateway).CancelPackPurchaseAsync(
+            new CancelPackPurchaseCommand(userId, orderId),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(EconomyErrors.PaymentGatewayFailed.Code, result.Error.Code);
+        Assert.Equal(PurchaseOrderStatus.Pending, (await dbContext.PurchaseOrders.SingleAsync()).Status);
+    }
+
+    [Fact]
+    public async Task RunEconomyReconciliationAsync_ShouldClosePendingStripeOrderWhenProviderConfirmsTerminalUnpaidState()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var packId = AddStarterPack(dbContext);
+        var orderId = Guid.NewGuid();
+        dbContext.PurchaseOrders.Add(new PurchaseOrder
+        {
+            Id = orderId,
+            UserId = Guid.NewGuid(),
+            PackId = packId,
+            PaymentProvider = "stripe",
+            Status = PurchaseOrderStatus.Pending,
+            PriceAmount = 1.49m,
+            CurrencyCode = "USD",
+            SparkToGrant = 40,
+            ExternalPaymentId = "cs_expired_checkout",
+            CreatedAtUtc = DateTime.UtcNow.AddHours(-2)
+        });
+        await dbContext.SaveChangesAsync();
+
+        var gateway = new FakePaymentGateway
+        {
+            PaymentStateResult = Result.Success(new PaymentStateResponse("expired", false, true))
+        };
+        var result = await CreateService(dbContext, gateway: gateway).RunEconomyReconciliationAsync(CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(1, result.Value.AutoFixesApplied);
+        Assert.Equal(PurchaseOrderStatus.Failed, (await dbContext.PurchaseOrders.SingleAsync()).Status);
+        var incident = await dbContext.EconomyIncidents.SingleAsync();
+        Assert.Equal("PurchaseSettlementFailed", incident.Type);
+        Assert.Equal("Resolved", incident.Status);
+        Assert.True(incident.AutoFixApplied);
+    }
+
+    [Fact]
+    public async Task RunEconomyReconciliationAsync_ShouldNotCreateMismatchForFailedStripeOrderWithTerminalUnpaidProviderState()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var packId = AddStarterPack(dbContext);
+        dbContext.PurchaseOrders.Add(new PurchaseOrder
+        {
+            Id = Guid.NewGuid(),
+            UserId = Guid.NewGuid(),
+            PackId = packId,
+            PaymentProvider = "stripe",
+            Status = PurchaseOrderStatus.Failed,
+            PriceAmount = 1.49m,
+            CurrencyCode = "USD",
+            SparkToGrant = 40,
+            ExternalPaymentId = "pi_cancelled_payment",
+            CreatedAtUtc = DateTime.UtcNow.AddHours(-2)
+        });
+        await dbContext.SaveChangesAsync();
+
+        var gateway = new FakePaymentGateway
+        {
+            PaymentStateResult = Result.Success(new PaymentStateResponse("canceled", false, true))
+        };
+        var result = await CreateService(dbContext, gateway: gateway).RunEconomyReconciliationAsync(CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(await dbContext.EconomyIncidents.ToListAsync());
+    }
+
     [Fact]
     public async Task RunEconomyReconciliationAsync_ShouldCreateIncidentForStalePendingPurchase()
     {

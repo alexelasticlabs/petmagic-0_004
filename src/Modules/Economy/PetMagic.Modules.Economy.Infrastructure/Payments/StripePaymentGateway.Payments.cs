@@ -8,6 +8,150 @@ namespace PetMagic.Modules.Economy.Infrastructure.Payments;
 
 public sealed partial class StripePaymentGateway
 {
+    public async Task<Result<PaymentCancelResponse>> CancelPaymentAsync(
+        PaymentCancelRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!IsStripe(request.Provider))
+        {
+            return Result.Failure<PaymentCancelResponse>(EconomyErrors.UnsupportedPaymentProvider);
+        }
+
+        var apiKey = ResolveApiKey(request.ApiSecretKey);
+        if (!EnsureConfigured(apiKey) || string.IsNullOrWhiteSpace(request.ExternalPaymentId))
+        {
+            return Result.Failure<PaymentCancelResponse>(EconomyErrors.PaymentGatewayFailed);
+        }
+
+        var stripeClient = CreateStripeClient(apiKey);
+        try
+        {
+            if (request.ExternalPaymentId.StartsWith("pi_", StringComparison.OrdinalIgnoreCase))
+            {
+                var paymentIntent = await new PaymentIntentService(stripeClient).CancelAsync(
+                    request.ExternalPaymentId,
+                    cancellationToken: cancellationToken);
+                var isTerminalWithoutPayment = string.Equals(
+                    paymentIntent.Status,
+                    "canceled",
+                    StringComparison.OrdinalIgnoreCase);
+
+                return Result.Success(new PaymentCancelResponse(
+                    paymentIntent.Status ?? string.Empty,
+                    isTerminalWithoutPayment));
+            }
+
+            if (request.ExternalPaymentId.StartsWith("cs_", StringComparison.OrdinalIgnoreCase))
+            {
+                var session = await new SessionService(stripeClient).ExpireAsync(
+                    request.ExternalPaymentId,
+                    cancellationToken: cancellationToken);
+                var isTerminalWithoutPayment = string.Equals(
+                    session.Status,
+                    "expired",
+                    StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(session.PaymentStatus, "paid", StringComparison.OrdinalIgnoreCase);
+
+                return Result.Success(new PaymentCancelResponse(
+                    session.Status ?? string.Empty,
+                    isTerminalWithoutPayment));
+            }
+
+            return Result.Failure<PaymentCancelResponse>(EconomyErrors.PaymentGatewayFailed);
+        }
+        catch (StripeException exception)
+        {
+            LogGatewayFailure(
+                exception,
+                "cancel_payment",
+                orderId: request.OrderId,
+                externalPaymentId: request.ExternalPaymentId);
+            return Result.Failure<PaymentCancelResponse>(EconomyErrors.PaymentGatewayFailed);
+        }
+        catch (Exception exception)
+        {
+            LogGatewayFailure(
+                exception,
+                "cancel_payment",
+                orderId: request.OrderId,
+                externalPaymentId: request.ExternalPaymentId);
+            return Result.Failure<PaymentCancelResponse>(EconomyErrors.PaymentGatewayFailed);
+        }
+    }
+
+    public async Task<Result<PaymentStateResponse>> GetPaymentStateAsync(
+        PaymentStateRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!IsStripe(request.Provider))
+        {
+            return Result.Failure<PaymentStateResponse>(EconomyErrors.UnsupportedPaymentProvider);
+        }
+
+        var apiKey = ResolveApiKey(request.ApiSecretKey);
+        if (!EnsureConfigured(apiKey) || string.IsNullOrWhiteSpace(request.ExternalPaymentId))
+        {
+            return Result.Failure<PaymentStateResponse>(EconomyErrors.PaymentGatewayFailed);
+        }
+
+        var stripeClient = CreateStripeClient(apiKey);
+        try
+        {
+            if (request.ExternalPaymentId.StartsWith("cs_", StringComparison.OrdinalIgnoreCase))
+            {
+                var session = await new SessionService(stripeClient).GetAsync(
+                    request.ExternalPaymentId,
+                    cancellationToken: cancellationToken);
+                var isPaid = IsSucceededCheckoutSessionStatus(session.PaymentStatus, session.Status);
+                var isTerminalWithoutPayment = string.Equals(
+                    session.Status,
+                    "expired",
+                    StringComparison.OrdinalIgnoreCase)
+                    && !isPaid;
+
+                return Result.Success(new PaymentStateResponse(
+                    session.Status ?? string.Empty,
+                    isPaid,
+                    isTerminalWithoutPayment));
+            }
+
+            if (request.ExternalPaymentId.StartsWith("pi_", StringComparison.OrdinalIgnoreCase))
+            {
+                var paymentIntent = await new PaymentIntentService(stripeClient).GetAsync(
+                    request.ExternalPaymentId,
+                    cancellationToken: cancellationToken);
+                var isPaid = IsSucceededPaymentIntentStatus(paymentIntent.Status);
+                var isTerminalWithoutPayment = string.Equals(
+                    paymentIntent.Status,
+                    "canceled",
+                    StringComparison.OrdinalIgnoreCase);
+
+                return Result.Success(new PaymentStateResponse(
+                    paymentIntent.Status ?? string.Empty,
+                    isPaid,
+                    isTerminalWithoutPayment));
+            }
+
+            return Result.Failure<PaymentStateResponse>(EconomyErrors.PaymentGatewayFailed);
+        }
+        catch (StripeException exception)
+        {
+            LogGatewayFailure(
+                exception,
+                "get_payment_state",
+                externalPaymentId: request.ExternalPaymentId);
+            return Result.Failure<PaymentStateResponse>(EconomyErrors.PaymentGatewayFailed);
+        }
+        catch (Exception exception)
+        {
+            LogGatewayFailure(
+                exception,
+                "get_payment_state",
+                externalPaymentId: request.ExternalPaymentId);
+            return Result.Failure<PaymentStateResponse>(EconomyErrors.PaymentGatewayFailed);
+        }
+    }
+
     public async Task<Result<PaymentRefundResponse>> RefundPaymentAsync(PaymentRefundRequest request, CancellationToken cancellationToken)
     {
         if (!IsStripe(request.Provider))

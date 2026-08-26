@@ -264,6 +264,8 @@ abstract class _WalletControllerBase extends Notifier<WalletState> {
 
   Future<void> verifyStripeCheckout(String? stripeReferenceId);
 
+  Future<void> cancelStripeCheckout(String orderId);
+
   Future<void> restoreStorePurchases();
 
   Future<void> _recoverPendingStorePurchase({

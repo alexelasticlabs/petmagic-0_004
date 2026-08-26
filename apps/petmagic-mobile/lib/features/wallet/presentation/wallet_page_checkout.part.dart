@@ -18,6 +18,9 @@ extension _WalletPageCheckoutStateX on _WalletPageState {
             ),
           );
       if (paymentResult == StripePaymentSheetResult.cancelled) {
+        await ref
+            .read(walletControllerProvider.notifier)
+            .cancelStripeCheckout(checkout.orderId);
         return ExternalCheckoutResult.cancelledResult;
       }
 

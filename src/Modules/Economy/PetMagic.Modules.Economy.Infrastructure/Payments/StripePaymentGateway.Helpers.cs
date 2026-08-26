@@ -40,6 +40,12 @@ public sealed partial class StripePaymentGateway
         return string.Equals(status, "succeeded", StringComparison.OrdinalIgnoreCase);
     }
 
+    private static bool IsSucceededCheckoutSessionStatus(string? paymentStatus, string? sessionStatus)
+    {
+        return string.Equals(paymentStatus, "paid", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(sessionStatus, "complete", StringComparison.OrdinalIgnoreCase);
+    }
+
     private static bool IsSucceededSetupIntentStatus(string? status)
     {
         return string.Equals(status, "succeeded", StringComparison.OrdinalIgnoreCase);

@@ -41,6 +41,14 @@ internal sealed class GenerationWorkerUnavailablePaymentGateway : IPaymentGatewa
         PaymentSavedMethodCreateRequest request,
         CancellationToken cancellationToken) => Failed<PaymentCreateResponse>();
 
+    public Task<Result<PaymentCancelResponse>> CancelPaymentAsync(
+        PaymentCancelRequest request,
+        CancellationToken cancellationToken) => Failed<PaymentCancelResponse>();
+
+    public Task<Result<PaymentStateResponse>> GetPaymentStateAsync(
+        PaymentStateRequest request,
+        CancellationToken cancellationToken) => Failed<PaymentStateResponse>();
+
     public Task<Result<PaymentRefundResponse>> RefundPaymentAsync(
         PaymentRefundRequest request,
         CancellationToken cancellationToken) => Failed<PaymentRefundResponse>();

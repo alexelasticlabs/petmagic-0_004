@@ -526,6 +526,16 @@ public sealed partial class IdentityServiceProfileTests
             return Task.FromResult(Result.Success(new PaymentCreateResponse($"pi_{request.OrderId:N}", string.Empty)));
         }
 
+        public Task<Result<PaymentCancelResponse>> CancelPaymentAsync(PaymentCancelRequest request, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Result.Success(new PaymentCancelResponse("canceled", true)));
+        }
+
+        public Task<Result<PaymentStateResponse>> GetPaymentStateAsync(PaymentStateRequest request, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Result.Success(new PaymentStateResponse("pending", false, false)));
+        }
+
         public Task<Result<PaymentRefundResponse>> RefundPaymentAsync(PaymentRefundRequest request, CancellationToken cancellationToken)
         {
             return Task.FromResult(Result.Success(new PaymentRefundResponse($"re_{request.OrderId:N}", "succeeded")));

@@ -18,6 +18,8 @@ public sealed record PurchaseCheckoutResponse(
 
 public sealed record VerifyStripeCheckoutSessionCommand(Guid UserId, Guid OrderId, string? StripeReferenceId);
 
+public sealed record CancelPackPurchaseCommand(Guid UserId, Guid OrderId);
+
 public sealed record PurchaseOrderResponse(
     Guid OrderId,
     Guid UserId,

@@ -312,6 +312,11 @@ public sealed partial class EconomyService
 
             if (order.Status == PurchaseOrderStatus.Pending && order.CreatedAtUtc <= stalePendingBeforeUtc)
             {
+                if (await ResolveTerminalStripePurchaseFailureAsync(order, stats, cancellationToken))
+                {
+                    continue;
+                }
+
                 await UpsertEconomyIncidentAsync(
                     EconomyIncidentType.PurchaseSettlementFailed,
                     "Warning",
@@ -381,6 +386,12 @@ public sealed partial class EconomyService
 
             if (order.Status == PurchaseOrderStatus.Failed && !string.IsNullOrWhiteSpace(order.ExternalPaymentId))
             {
+                var paymentState = await TryGetStripePaymentStateAsync(order, cancellationToken);
+                if (paymentState is { IsTerminalWithoutPayment: true })
+                {
+                    continue;
+                }
+
                 await UpsertEconomyIncidentAsync(
                     EconomyIncidentType.ProviderStateMismatch,
                     "Warning",
@@ -395,6 +406,63 @@ public sealed partial class EconomyService
                     cancellationToken: cancellationToken);
             }
         }
+    }
+
+    private async Task<bool> ResolveTerminalStripePurchaseFailureAsync(
+        PurchaseOrder order,
+        ReconciliationStats stats,
+        CancellationToken cancellationToken)
+    {
+        var paymentState = await TryGetStripePaymentStateAsync(order, cancellationToken);
+        if (paymentState is not { IsTerminalWithoutPayment: true })
+        {
+            return false;
+        }
+
+        order.Status = PurchaseOrderStatus.Failed;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        stats.AutoFixesApplied++;
+
+        await UpsertEconomyIncidentAsync(
+            EconomyIncidentType.PurchaseSettlementFailed,
+            "Warning",
+            $"purchase:pending:{order.Id:D}",
+            $"Purchase order {order.Id:D} was closed because the provider confirmed an unpaid terminal state.",
+            stats,
+            status: "Resolved",
+            userId: order.UserId,
+            purchaseOrderId: order.Id,
+            provider: order.PaymentProvider,
+            externalReferenceId: order.ExternalPaymentId,
+            autoFixApplied: true,
+            details: new
+            {
+                order.Status,
+                ProviderStatus = paymentState.Status,
+                order.CreatedAtUtc,
+                order.ExternalPaymentId,
+                order.PriceAmount,
+                order.CurrencyCode
+            },
+            cancellationToken: cancellationToken);
+
+        return true;
+    }
+
+    private async Task<PaymentStateResponse?> TryGetStripePaymentStateAsync(
+        PurchaseOrder order,
+        CancellationToken cancellationToken)
+    {
+        if (!string.Equals(order.PaymentProvider, "stripe", StringComparison.OrdinalIgnoreCase)
+            || string.IsNullOrWhiteSpace(order.ExternalPaymentId))
+        {
+            return null;
+        }
+
+        var result = await paymentGateway.GetPaymentStateAsync(
+            new PaymentStateRequest(order.PaymentProvider, order.ExternalPaymentId),
+            cancellationToken);
+        return result.IsSuccess ? result.Value : null;
     }
 
     private async Task ReconcileSucceededOrderLedgerAsync(

@@ -78,6 +78,10 @@ abstract interface class WalletRepositoryPort {
     String? stripeReferenceId,
     RequestCancellation? cancelToken,
   });
+  Future<PurchaseHistoryItem> cancelStripePurchase({
+    required String orderId,
+    RequestCancellation? cancelToken,
+  });
   Future<void> registerPushToken({
     required String token,
     required String platform,
