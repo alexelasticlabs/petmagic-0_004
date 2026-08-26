@@ -63,6 +63,8 @@ jobs:
             echo "BUNDLE_PATH=$cache_root/bundle"
           } >> "$GITHUB_ENV"
       - uses: ruby/setup-ruby@d45b1a4e94b71acab930e56e79c6aa188764e7f9 # v1
+        env:
+          RUNNER_TOOL_CACHE: ${{ runner.temp }}/petmagic-ruby-toolcache
         with: { ruby-version: '3.3', bundler-cache: false, working-directory: apps/petmagic-mobile }
       - run: flutter pub get
       - name: Install Ruby release tooling
@@ -194,6 +196,8 @@ jobs:
             echo "BUNDLE_PATH=$cache_root/bundle"
           } >> "$GITHUB_ENV"
       - uses: ruby/setup-ruby@d45b1a4e94b71acab930e56e79c6aa188764e7f9 # v1
+        env:
+          RUNNER_TOOL_CACHE: ${{ runner.temp }}/petmagic-ruby-toolcache
         with: { ruby-version: '3.3', bundler-cache: false, working-directory: apps/petmagic-mobile }
       - run: flutter pub get
       - name: Install Ruby release tooling
