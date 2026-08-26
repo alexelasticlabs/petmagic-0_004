@@ -154,6 +154,12 @@ adding dated audit snapshots to the repository.
   PetMagic; no account was selected and no consent or token exchange was
   performed during this recheck. This confirms current API reachability and
   native OAuth handoff, not a new end-to-end account-authentication acceptance.
+- The same `versionCode=21` device sent a deliberately invalid email/password
+  pair to `POST /api/auth/login`; Caddy recorded the mobile request reaching
+  `api.petgpt.app` and the backend returned the expected HTTP `401` problem
+  response. No user credentials were submitted. This proves the current
+  email-login transport and rejection path, not successful password-login
+  acceptance for an existing account.
 - The current source passed 550 Identity/economy/external-auth backend tests
   and 45 focused Flutter auth/session/external-auth tests on 2026-08-25. These
   are regression evidence only; they do not replace an Internal-track update
