@@ -374,8 +374,11 @@ adding dated audit snapshots to the repository.
   profile without Push Notifications or Sign in with Apple. TestFlight upload
   was disabled (`publish=false`) and was not attempted. The production Release
   target now uses manual Apple Distribution signing, while Fastlane writes the
-  current Match profile UUID into its job-local project copy; this requires a
-  fresh signed-IPA run before it can be accepted as archive evidence.
+  current Match profile UUID into its job-local project copy. A later read-only
+  sync confirmed the profile is available, but Xcode rejected the archive
+  because the target still referenced the former Apple team. The target now
+  points at the team owning the Match profile; a fresh signed-IPA run is still
+  required before it can be accepted as archive evidence.
 
 ## Automated Gates
 
