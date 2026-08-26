@@ -118,6 +118,21 @@ adding dated audit snapshots to the repository.
 
 ## Mobile release correction status
 
+- On 2026-08-27 (Minsk time), commit
+  `61bc60724176193f72dbe1dc1e9a8970a2995b5d` was deployed to the VPS. It adds
+  authenticated best-effort cancellation for a pending native Stripe
+  PaymentSheet order and provider-aware reconciliation: the backend marks an
+  order failed only after Stripe confirms a terminal unpaid state. Runtime
+  checks confirmed the public API and all application containers were healthy
+  on that exact source revision. Existing stale-record reconciliation closed
+  one expired unpaid Stripe Checkout session and resolved its corresponding
+  warning without granting currency. One `requires_source` Stripe order and
+  one Google Play order without an external purchase ID remain pending for
+  manual/provider acceptance rather than being closed speculatively. Source
+  checks passed: 230 Economy tests, three focused Flutter repository tests and
+  Flutter analysis with no issues. This is deployment and safe-reconciliation
+  evidence, not a new device-side payment cancellation or Store purchase
+  acceptance.
 - On 2026-08-27 (Minsk time), after repairing the self-hosted runner tool
   cache and provisioning its `/Users/runner` directory, manually dispatched
   [`mobile-fast-check` run `33021126125`](https://github.com/alexelasticlabs/petmagic-0_004/actions/runs/33021126125)
