@@ -118,6 +118,14 @@ adding dated audit snapshots to the repository.
 
 ## Mobile release correction status
 
+- On 2026-08-27 (Minsk time), after moving the self-hosted runner tool cache
+  under the dedicated `/Users/runner` account, manually dispatched
+  [`mobile-fast-check` run `33021126125`](https://github.com/alexelasticlabs/petmagic-0_004/actions/runs/33021126125)
+  completed successfully in 2m44s on `petmagic-mac-mini`. It passed dependency
+  resolution, localization generation/catalog checks, formatting,
+  `flutter analyze --fatal-infos`, and the Flutter test suite. The workflow
+  did not build a release artifact or contact a Store; this is runner and
+  source-regression evidence only.
 - On 2026-08-27 (Minsk time), the repository-scoped `petmagic-mac-mini`
   self-hosted runner completed
   [`mobile-fast-check` run `33014715953`](https://github.com/alexelasticlabs/petmagic-0_004/actions/runs/33014715953)
@@ -138,6 +146,14 @@ adding dated audit snapshots to the repository.
   email-confirmed production profile, wallet and Premium entry point were
   rendered without a server-unavailable state. This confirms current session
   restoration and API-backed profile data, not a new password-login attempt.
+- On 2026-08-27, a read-only check on the connected physical Android device
+  confirmed that the currently installed Play production build is
+  `versionCode=21`. It loaded current legal documents and the guest templates
+  screen from `https://api.petgpt.app` without a server-unavailable state.
+  Selecting Google opened Android's native Google account chooser for
+  PetMagic; no account was selected and no consent or token exchange was
+  performed during this recheck. This confirms current API reachability and
+  native OAuth handoff, not a new end-to-end account-authentication acceptance.
 - The current source passed 550 Identity/economy/external-auth backend tests
   and 45 focused Flutter auth/session/external-auth tests on 2026-08-25. These
   are regression evidence only; they do not replace an Internal-track update
