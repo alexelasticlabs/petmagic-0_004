@@ -607,6 +607,15 @@ do not append command transcripts to this file.
   2026-08-25. The temporary JSON credential was immediately revoked in Google
   Cloud after verification and deleted locally; no private credential was
   committed or copied to the VPS.
+- Android `1.0.0+22`, including the client-side best-effort notification of a
+  native Stripe PaymentSheet cancellation, was built and uploaded to Play
+  Internal by self-hosted [`mobile-release` run
+  `33024351860`](https://github.com/alexelasticlabs/petmagic-0_004/actions/runs/33024351860)
+  on 2026-08-27. The Mac runner completed the signed AAB build, Crashlytics
+  symbol upload, Internal-track publication and credential cleanup in about
+  five minutes. This is build and distribution evidence; install that exact
+  Internal build and exercise a Stripe test cancellation before treating the
+  client-to-VPS cancellation path as device acceptance.
 - **Release blocker — Premium allowance rollout:** the owner approved
   `40 PawSpark` at purchase and every seven days while Premium remains active.
   Local plan defaults, health checks, migration and mobile copy now match the
