@@ -60,10 +60,14 @@ adding dated audit snapshots to the repository.
   the latest scheduled dump was independently checksum-verified and restored
   into an isolated temporary database with 82 public tables, 99 EF migrations
   and one user. Zero temporary verification databases remain.
-- The connected Android test device now grants `POST_NOTIFICATIONS`; after a
-  cold restart, production holds one active FCM token in each of the economy,
-  templates and support delivery scopes. This proves permission and token
-  registration, not a delivered foreground/background notification.
+- The connected Android test device grants `POST_NOTIFICATIONS`. Production
+  registered the same FCM token in the economy, templates and support delivery
+  scopes and later disabled it in all three scopes after the authenticated
+  session ended. One economy Premium push outbox record reached `Sent`; the
+  current combined push queues have zero queued, processing, dead-letter or
+  overdue records. This proves registration lifecycle and backend-to-FCM
+  acceptance, not that iOS or Android displayed a foreground/background
+  notification.
 - Stripe live credentials authenticated with a read-only API request. Google
   Play service-account OAuth and the purchase-verification API are authorized;
   a synthetic token reached the expected validation failure path without
@@ -86,9 +90,14 @@ adding dated audit snapshots to the repository.
   verification message as `delivered`. This is current transport evidence;
   recipient data and message contents were not inspected.
 - The protected VPS backend runtime contains the Firebase project and service
-  account configuration, while `/health` reports `push_outbox=Healthy` with no
-  queued or dead-lettered delivery. This proves configuration presence and
-  queue health only; FCM and APNs delivery on real devices remain required.
+  account configuration, and a fresh production preflight confirms Templates,
+  Support (through the Templates option fallback), and Economy push delivery
+  are enabled. Firebase Console confirms FCM HTTP v1 is enabled for the
+  production project and a production APNs authentication key is attached to
+  the `com.petmagic.app` iOS registration. Apple Developer confirms both
+  `Push Notifications` and `Sign In with Apple` are enabled for that explicit
+  App ID. `/health` reports `push_outbox=Healthy`; real APNs display/tap
+  delivery on an installed iOS build remains required.
 - A 2026-08-25 recheck found one new exhausted `identity_email` test job for
   the reserved `example.com` domain. Its exact failed record was removed after
   confirming that it contained no customer recipient; `/health` now reports no
@@ -124,6 +133,14 @@ adding dated audit snapshots to the repository.
   and 45 focused Flutter auth/session/external-auth tests on 2026-08-25. These
   are regression evidence only; they do not replace an Internal-track update
   or real provider lifecycle acceptance.
+- A focused iOS authentication/push recheck passed 81 backend tests and 66
+  Flutter tests covering native Apple token exchange, Firebase error handling,
+  FCM payloads, all three push-token/outbox paths, notification routing and
+  lifecycle, iOS entitlements, protected Firebase config injection and release
+  networking. The public Apple-auth and both App Store webhook routes reject
+  empty unsigned payloads with HTTP 400 rather than failing at startup. This is
+  static/negative-path evidence, not a real Apple credential exchange or APNs
+  device delivery.
 - The protected GitHub production environment now has the existing Android
   upload keystore, matching Firebase production config and Play service-account
   JSON. Run `32666052824` built and signed `1.0.0+2`, preserved its symbols
@@ -147,7 +164,11 @@ adding dated audit snapshots to the repository.
   notifications both target the production App Store webhook. Match bootstrap
   run `32781360447` was rejected before its first step by the GitHub
   account-level billing/spending-limit gate, so no Apple signing state changed.
-  Repair GitHub Billing, then run the first Match bootstrap and TestFlight.
+  A fresh metadata-only recheck confirms the App Manager API key remains active
+  and was used on 2026-08-25, while every secret referenced by the iOS workflow
+  for Firebase config, App Store Connect and Match exists in the protected
+  GitHub `production` environment. Repair GitHub Billing or perform the first
+  signed archive on macOS, then run Match/TestFlight acceptance.
 - Android `1.0.0+3`, containing corrected mobile auth-feedback mapping and
   production API routing, was built, signed, archived and uploaded to Play
   Internal by run `32698746633`. Its Play-installed device reached the VPS API,
