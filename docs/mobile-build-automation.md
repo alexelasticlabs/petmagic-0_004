@@ -96,9 +96,9 @@ After the preflight passes, create the runner in GitHub:
 - A self-hosted runner eliminates GitHub runner minutes, not the operational
   need to update macOS/Xcode/Flutter, protect the Mac account and monitor free
   disk space.
-- If a setup action tries to write a tool cache owned by a different macOS user,
-  run the manual `runner-maintenance` workflow with its acknowledgement. It
-  changes only the runner application's `.env` to use
-  `~/.cache/petmagic-ci/toolcache`. Restart the dedicated LaunchAgent from the
-  Mac after that workflow finishes, then wait for `petmagic-mac-mini` to return
-  to `Idle` before retrying the original workflow.
+- `ruby/setup-ruby` uses non-relocatable macOS binaries. If it tries to write
+  `/Users/runner/hostedtoolcache`, run the manual `runner-maintenance` workflow
+  with its acknowledgement. It prepares only that standard tool-cache path and
+  refuses to alter an existing directory owned by another macOS user. The
+  runner account must have passwordless `sudo`; otherwise run the same script
+  from a Mac administrator session. No runner restart is required afterwards.

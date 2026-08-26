@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# Repairs the persistent tool-cache location of the dedicated PetMagic runner.
-# It changes no application, signing, provider or secret configuration.
+# Prepares the non-relocatable Ruby tool-cache location required by
+# ruby/setup-ruby on a self-hosted macOS runner. It changes no application,
+# signing, provider or secret configuration.
 
 set -euo pipefail
 
-if [[ "${1:-}" != "--configure-toolcache" ]]; then
-  echo 'Usage: repair-macos-runner-toolcache.sh --configure-toolcache' >&2
+if [[ "${1:-}" != "--prepare-ruby-toolcache" ]]; then
+  echo 'Usage: repair-macos-runner-toolcache.sh --prepare-ruby-toolcache' >&2
   exit 2
 fi
 
@@ -14,38 +15,26 @@ if [[ "$(uname -s)" != 'Darwin' ]]; then
   exit 2
 fi
 
-if [[ -z "${RUNNER_WORKSPACE:-}" ]]; then
-  echo 'RUNNER_WORKSPACE is required to locate the self-hosted runner.' >&2
-  exit 2
-fi
-
-runner_root="${RUNNER_WORKSPACE%%/_work/*}"
-if [[ "$runner_root" == "$RUNNER_WORKSPACE" || ! -d "$runner_root" ]]; then
-  echo "Unable to derive runner root from RUNNER_WORKSPACE: $RUNNER_WORKSPACE" >&2
-  exit 1
-fi
-runner_root="$(cd "$runner_root" && pwd)"
-runner_env="$runner_root/.env"
-toolcache="$HOME/.cache/petmagic-ci/toolcache"
-
-if [[ ! -x "$runner_root/svc.sh" ]]; then
-  echo "Runner service script is missing: $runner_root/svc.sh" >&2
+if ! sudo -n true 2>/dev/null; then
+  echo 'Passwordless sudo is required to create the Ruby tool-cache path. Run this script from a Mac administrator session instead.' >&2
   exit 1
 fi
 
-mkdir -p "$toolcache"
-chmod 700 "$HOME/.cache/petmagic-ci" "$toolcache"
+runner_user="$(id -un)"
+runner_group="$(id -gn)"
+runner_home='/Users/runner'
+toolcache="$runner_home/hostedtoolcache"
 
-temporary_env="$(mktemp "$runner_root/.env.petmagic.XXXXXX")"
-trap 'rm -f "$temporary_env"' EXIT
-
-if [[ -f "$runner_env" ]]; then
-  awk '!/^(AGENT_TOOLSDIRECTORY|RUNNER_TOOL_CACHE)=/' "$runner_env" > "$temporary_env"
+if sudo -n test -e "$runner_home"; then
+  existing_owner="$(sudo -n stat -f '%Su' "$runner_home")"
+  if [[ "$existing_owner" != "$runner_user" ]]; then
+    echo "$runner_home already exists but is owned by $existing_owner, not $runner_user. Refusing to change an unrelated macOS home directory." >&2
+    exit 1
+  fi
 fi
-printf 'AGENT_TOOLSDIRECTORY=%s\nRUNNER_TOOL_CACHE=%s\n' "$toolcache" "$toolcache" >> "$temporary_env"
-chmod 600 "$temporary_env"
-mv "$temporary_env" "$runner_env"
-trap - EXIT
 
-echo "Runner .env updated with writable toolcache: $toolcache"
-echo "Restart the LaunchAgent from the Mac before running Ruby-based workflows."
+sudo -n /usr/bin/install -d -o "$runner_user" -g "$runner_group" -m 0755 "$runner_home"
+sudo -n /usr/bin/install -d -o "$runner_user" -g "$runner_group" -m 0755 "$toolcache"
+test -w "$toolcache"
+
+echo "Ruby tool-cache is writable by $runner_user: $toolcache"

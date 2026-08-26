@@ -3,8 +3,8 @@ name: runner-maintenance
 on:
   workflow_dispatch:
     inputs:
-      acknowledge_runner_env_update:
-        description: Update the dedicated runner Ruby tool-cache path without restarting the Mac service
+      acknowledge_ruby_toolcache_setup:
+        description: Prepare the default macOS Ruby tool-cache path required by ruby/setup-ruby
         required: true
         default: false
         type: boolean
@@ -18,10 +18,10 @@ concurrency:
 
 jobs:
   repair-ruby-toolcache:
-    if: inputs.acknowledge_runner_env_update
+    if: inputs.acknowledge_ruby_toolcache_setup
     runs-on: [self-hosted, macOS, petmagic-mobile]
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      - name: Repair runner Ruby tool cache configuration
+      - name: Prepare default Ruby tool cache
         shell: bash
-        run: bash scripts/ci/repair-macos-runner-toolcache.sh --configure-toolcache
+        run: bash scripts/ci/repair-macos-runner-toolcache.sh --prepare-ruby-toolcache
