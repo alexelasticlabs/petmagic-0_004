@@ -63,6 +63,7 @@ void main() {
             ),
           );
         },
+        tags: const ['platform-golden'],
       );
     }
   }

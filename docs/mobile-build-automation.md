@@ -16,7 +16,7 @@ facts in `docs/release-readiness.md` only after live verification.
 
 | Profile | Purpose | Store upload |
 | --- | --- | --- |
-| `mobile-fast-check` | Formatting, localization validation, static analysis and Flutter tests. No APK, AAB, IPA, emulator or simulator. | Never |
+| `mobile-fast-check` | Formatting, localization validation, static analysis and stable Flutter tests. No APK, AAB, IPA, emulator or simulator. | Never |
 | `mobile-ci-full` | Explicit regression suite: release-smoke and optional device scenarios. | Never |
 | `mobile-release` with `publish=false` | One signed release-candidate build for the selected platform. | Never |
 | `mobile-release` with `publish=true` | Deliberate Play Internal or TestFlight release. The protected environment remains required. | Yes |
@@ -25,6 +25,24 @@ facts in `docs/release-readiness.md` only after live verification.
 Normal code work uses `mobile-fast-check`. Device suites and release-candidate
 builds are opt-in. A Store upload must be an explicit human decision, not a
 side effect of a smoke build.
+
+## Visual golden baselines
+
+`mobile-fast-check` excludes only tests tagged `platform-golden`. These are
+pixel baselines whose checked-in reference images were produced on a different
+host rendering stack and currently differ by up to 17% on macOS ARM despite
+the deterministic font harness. They are not removed: the remaining widget
+and golden tests still run in every fast check, while these exact visual
+baselines must be reviewed on their canonical rendering host before accepting
+an image update. Run them deliberately with:
+
+```bash
+cd apps/petmagic-mobile
+flutter test --concurrency=1 --tags=platform-golden
+```
+
+Never use `--update-goldens` merely to make the Mac runner green. A changed
+reference image must be reviewed as a UI change.
 
 ## Mac mini runner boundary
 
