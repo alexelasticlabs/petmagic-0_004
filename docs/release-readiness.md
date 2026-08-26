@@ -382,8 +382,9 @@ adding dated audit snapshots to the repository.
 - The first successful signed-IPA archive run (`33019223332`) did not publish
   to TestFlight (`publish=false`). It later failed only because the workflow
   sent an iOS Flutter symbol map to the Android Firebase CLI command. The iOS
-  release path now uploads the archive dSYMs through the Apple `upload-symbols`
-  tool; a fresh run is required to confirm the complete workflow result.
+  release path now resolves Firebase's Swift Package Manager `upload-symbols`
+  tool from the active Xcode build directory before uploading archive dSYMs; a
+  fresh run is required to confirm the complete workflow result.
 
 ## Automated Gates
 

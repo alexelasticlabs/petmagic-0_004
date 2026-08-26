@@ -257,7 +257,11 @@ jobs:
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
         run: |
-          ios/Pods/FirebaseCrashlytics/upload-symbols -gsp ios/Runner/GoogleService-Info.plist -p ios build/ios/archive/Runner.xcarchive/dSYMs
+          build_dir="$(xcodebuild -workspace ios/Runner.xcworkspace -scheme "$RELEASE_ENVIRONMENT" -configuration "Release-$RELEASE_ENVIRONMENT" -showBuildSettings | sed -n 's/^[[:space:]]*BUILD_DIR = //p' | head -n 1)"
+          test -n "$build_dir"
+          upload_symbols="${build_dir%/Build/*}/SourcePackages/checkouts/firebase-ios-sdk/Crashlytics/upload-symbols"
+          test -x "$upload_symbols"
+          "$upload_symbols" -gsp ios/Runner/GoogleService-Info.plist -p ios build/ios/archive/Runner.xcarchive/dSYMs
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: inputs.retain_artifacts
         with:
