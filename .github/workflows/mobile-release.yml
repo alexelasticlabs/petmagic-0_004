@@ -252,12 +252,11 @@ jobs:
             echo 'upload=false' >> "$GITHUB_OUTPUT"
             echo 'Crashlytics symbol upload skipped: FIREBASE_TOKEN is not configured.'
           fi
-      - name: Upload iOS symbols to Crashlytics
+      - name: Upload iOS dSYMs to Crashlytics
         if: steps.ios_crashlytics_symbols.outputs.upload == 'true'
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
         run: |
-          npx --yes firebase-tools@15.22.4 crashlytics:symbols:upload --app=${{ secrets.FIREBASE_IOS_APP_ID }} "build/symbols/ios-$RELEASE_ENVIRONMENT"
           ios/Pods/FirebaseCrashlytics/upload-symbols -gsp ios/Runner/GoogleService-Info.plist -p ios build/ios/archive/Runner.xcarchive/dSYMs
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: inputs.retain_artifacts

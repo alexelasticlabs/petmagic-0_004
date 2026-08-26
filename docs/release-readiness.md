@@ -379,6 +379,11 @@ adding dated audit snapshots to the repository.
   because the target still referenced the former Apple team. The target now
   points at the team owning the Match profile; a fresh signed-IPA run is still
   required before it can be accepted as archive evidence.
+- The first successful signed-IPA archive run (`33019223332`) did not publish
+  to TestFlight (`publish=false`). It later failed only because the workflow
+  sent an iOS Flutter symbol map to the Android Firebase CLI command. The iOS
+  release path now uploads the archive dSYMs through the Apple `upload-symbols`
+  tool; a fresh run is required to confirm the complete workflow result.
 
 ## Automated Gates
 
