@@ -373,7 +373,8 @@ adding dated audit snapshots to the repository.
   configuration still used automatic signing and selected a wildcard development
   profile without Push Notifications or Sign in with Apple. TestFlight upload
   was disabled (`publish=false`) and was not attempted. The production Release
-  target now explicitly selects the Match App Store profile; this requires a
+  target now uses manual Apple Distribution signing, while Fastlane writes the
+  current Match profile UUID into its job-local project copy; this requires a
   fresh signed-IPA run before it can be accepted as archive evidence.
 
 ## Automated Gates
