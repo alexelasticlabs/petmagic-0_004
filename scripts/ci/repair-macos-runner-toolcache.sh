@@ -4,8 +4,8 @@
 
 set -euo pipefail
 
-if [[ "${1:-}" != "--restart-runner" ]]; then
-  echo 'Usage: repair-macos-runner-toolcache.sh --restart-runner' >&2
+if [[ "${1:-}" != "--configure-toolcache" ]]; then
+  echo 'Usage: repair-macos-runner-toolcache.sh --configure-toolcache' >&2
   exit 2
 fi
 
@@ -47,20 +47,5 @@ chmod 600 "$temporary_env"
 mv "$temporary_env" "$runner_env"
 trap - EXIT
 
-launch_agent_dir="$HOME/Library/LaunchAgents"
-shopt -s nullglob
-service_plists=("$launch_agent_dir"/actions.runner*.plist)
-if [[ "${#service_plists[@]}" -ne 1 ]]; then
-  echo "Expected exactly one Actions runner LaunchAgent, found ${#service_plists[@]}." >&2
-  exit 1
-fi
-
-service_label="$(/usr/libexec/PlistBuddy -c 'Print :Label' "${service_plists[0]}")"
-if [[ -z "$service_label" ]]; then
-  echo 'Unable to read the runner LaunchAgent label.' >&2
-  exit 1
-fi
-
 echo "Runner .env updated with writable toolcache: $toolcache"
-echo "Restarting LaunchAgent $service_label; this maintenance job is expected to stop immediately."
-launchctl kickstart -k "gui/$(id -u)/$service_label"
+echo "Restart the LaunchAgent from the Mac before running Ruby-based workflows."

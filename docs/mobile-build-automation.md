@@ -97,9 +97,8 @@ After the preflight passes, create the runner in GitHub:
   need to update macOS/Xcode/Flutter, protect the Mac account and monitor free
   disk space.
 - If a setup action tries to write a tool cache owned by a different macOS user,
-  run the manual `runner-maintenance` workflow with its restart acknowledgement.
-  It changes only the runner application's `.env` to use
-  `~/.cache/petmagic-ci/toolcache`, then restarts that dedicated LaunchAgent.
-  The maintenance run can show as interrupted because it intentionally restarts
-  its own runner; wait for `petmagic-mac-mini` to return to `Idle` before
-  retrying the original workflow.
+  run the manual `runner-maintenance` workflow with its acknowledgement. It
+  changes only the runner application's `.env` to use
+  `~/.cache/petmagic-ci/toolcache`. Restart the dedicated LaunchAgent from the
+  Mac after that workflow finishes, then wait for `petmagic-mac-mini` to return
+  to `Idle` before retrying the original workflow.

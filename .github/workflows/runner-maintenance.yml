@@ -3,8 +3,8 @@ name: runner-maintenance
 on:
   workflow_dispatch:
     inputs:
-      acknowledge_runner_restart:
-        description: Restart the dedicated runner after repairing its Ruby tool-cache path
+      acknowledge_runner_env_update:
+        description: Update the dedicated runner Ruby tool-cache path without restarting the Mac service
         required: true
         default: false
         type: boolean
@@ -18,10 +18,10 @@ concurrency:
 
 jobs:
   repair-ruby-toolcache:
-    if: inputs.acknowledge_runner_restart
+    if: inputs.acknowledge_runner_env_update
     runs-on: [self-hosted, macOS, petmagic-mobile]
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      - name: Repair runner Ruby tool cache and restart the LaunchAgent
+      - name: Repair runner Ruby tool cache configuration
         shell: bash
-        run: bash scripts/ci/repair-macos-runner-toolcache.sh --restart-runner
+        run: bash scripts/ci/repair-macos-runner-toolcache.sh --configure-toolcache
