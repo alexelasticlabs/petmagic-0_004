@@ -126,6 +126,11 @@ adding dated audit snapshots to the repository.
   `flutter analyze --fatal-infos`, and the Flutter test suite. The workflow
   did not build a release artifact or contact a Store; this is runner and
   source-regression evidence only.
+- The self-hosted mobile workflows now pin `actions/checkout` v5, whose
+  Node 24 runtime is supported by the installed runner. The follow-up
+  [`mobile-fast-check` run `33021592084`](https://github.com/alexelasticlabs/petmagic-0_004/actions/runs/33021592084)
+  completed successfully in 2m39s with the updated action and without the
+  prior Node 20 deprecation annotation. This changes CI tooling only.
 - On 2026-08-27 (Minsk time), the repository-scoped `petmagic-mac-mini`
   self-hosted runner completed
   [`mobile-fast-check` run `33014715953`](https://github.com/alexelasticlabs/petmagic-0_004/actions/runs/33014715953)
