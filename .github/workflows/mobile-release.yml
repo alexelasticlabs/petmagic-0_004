@@ -274,11 +274,17 @@ jobs:
       - name: Upload exact artifact to TestFlight
         if: inputs.publish
         env:
-          IPA_PATH: ${{ github.workspace }}/apps/petmagic-mobile/build/ios/ipa/petmagic_mobile.ipa
           APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
           APP_STORE_CONNECT_KEY_P8: ${{ secrets.APP_STORE_CONNECT_KEY_P8 }}
-        run: APP_STORE_BUNDLE_ID="$APP_PACKAGE_NAME" bundle exec fastlane ios upload_testflight
+        shell: bash
+        run: |
+          shopt -s nullglob
+          ipa_candidates=("$GITHUB_WORKSPACE/apps/petmagic-mobile/build/ios/ipa/"*.ipa)
+          test "${#ipa_candidates[@]}" -eq 1
+          IPA_PATH="${ipa_candidates[0]}"
+          IPA_PATH="$IPA_PATH" APP_STORE_BUNDLE_ID="$APP_PACKAGE_NAME" \
+            bundle exec fastlane ios upload_testflight
       - name: Store publication skipped
         if: ${{ !inputs.publish }}
         run: echo 'Build completed without TestFlight upload because publish=false.'
