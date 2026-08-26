@@ -50,9 +50,6 @@ jobs:
           mkdir -p "$cache_root/bundle"
           echo "BUNDLE_PATH=$cache_root/bundle" >> "$GITHUB_ENV"
       - uses: ruby/setup-ruby@d45b1a4e94b71acab930e56e79c6aa188764e7f9 # v1
-        env:
-          AGENT_TOOLSDIRECTORY: ${{ runner.temp }}/petmagic-ruby-toolcache
-          RUNNER_TOOL_CACHE: ${{ runner.temp }}/petmagic-ruby-toolcache
         with: { ruby-version: '3.3', bundler-cache: false, working-directory: apps/petmagic-mobile }
       - name: Install Ruby release tooling
         run: bundle install --jobs 4 --retry 3
