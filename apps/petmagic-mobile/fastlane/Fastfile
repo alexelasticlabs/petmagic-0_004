@@ -43,10 +43,15 @@ platform :ios do
 
   desc "Synchronize App Store signing assets using Match"
   lane :sync_signing do
+    match_readonly = ENV.fetch("MATCH_READONLY", "true") == "true"
     setup_ci
+    # setup_ci correctly prepares an ephemeral keychain, but also switches
+    # Match to readonly mode. Preserve the workflow's explicit bootstrap
+    # decision after the CI setup has completed.
+    ENV["MATCH_READONLY"] = match_readonly.to_s
     match(
       type: "appstore",
-      readonly: ENV.fetch("MATCH_READONLY", "true") == "true",
+      readonly: match_readonly,
       app_identifier: [ENV.fetch("APP_STORE_BUNDLE_ID")],
       api_key: app_store_api_key_from_env
     )

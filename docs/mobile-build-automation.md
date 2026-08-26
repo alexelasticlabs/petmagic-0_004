@@ -90,6 +90,10 @@ After the preflight passes, create the runner in GitHub:
 - Use `publish=false` for QA or a locally installed release candidate.
 - Use `publish=true` only after the target Store, version and environment have
   been explicitly reviewed.
+- `signing_mode=bootstrap` is the narrowly scoped first-run exception to the
+  normal read-only Match policy: it may create the required App Store
+  distribution certificate and provisioning profile in the dedicated Match
+  repository. All routine release runs must use `signing_mode=readonly`.
 - Keep release artifacts in GitHub only when a reviewer actually needs them;
   their retention is seven days. Store uploads and crash-symbol processing do
   not require an Actions artifact backup.
