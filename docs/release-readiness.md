@@ -377,14 +377,17 @@ adding dated audit snapshots to the repository.
   current Match profile UUID into its job-local project copy. A later read-only
   sync confirmed the profile is available, but Xcode rejected the archive
   because the target still referenced the former Apple team. The target now
-  points at the team owning the Match profile; a fresh signed-IPA run is still
-  required before it can be accepted as archive evidence.
+  points at the team owning the Match profile.
 - The first successful signed-IPA archive run (`33019223332`) did not publish
   to TestFlight (`publish=false`). It later failed only because the workflow
   sent an iOS Flutter symbol map to the Android Firebase CLI command. The iOS
   release path now resolves Firebase's Swift Package Manager `upload-symbols`
-  tool from the active Xcode build directory before uploading archive dSYMs; a
-  fresh run is required to confirm the complete workflow result.
+  tool from the active Xcode build directory before uploading archive dSYMs.
+- Self-hosted iOS release run `33019993742` passed end-to-end in
+  `signing_mode=readonly`: it synchronized Match assets, produced the signed
+  production IPA, and uploaded its iOS dSYMs to Crashlytics. TestFlight was
+  explicitly skipped (`publish=false`), so this is signed-archive and symbol
+  upload evidence only, not Store or physical-device acceptance.
 
 ## Automated Gates
 
