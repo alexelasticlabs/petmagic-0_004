@@ -11,6 +11,7 @@ const _sharedProductAndTechnicalKeys = <String>{
   'imagesFilter',
   'premiumCheckoutSummaryPlanLabel',
   'premiumCheckoutTotalLabel',
+  'premiumBenefitAiGenerationsTitle',
   'premiumLabel',
   'premiumPaymentApple',
   'premiumPaymentGooglePlay',
