@@ -1,7 +1,18 @@
-name: mobile-ci
+name: mobile-ci-full
 
 on:
   workflow_dispatch:
+    inputs:
+      acknowledge_full_suite:
+        description: Run the complete slow regression suite (release smokes and optional device tests)
+        required: true
+        default: false
+        type: boolean
+      run_device_suite:
+        description: Also run all Android emulator and iOS simulator scenarios
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -11,8 +22,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  full-suite-consent:
+    runs-on: [self-hosted, macOS, petmagic-mobile]
+    steps:
+      - name: Require explicit full-suite consent
+        shell: bash
+        run: |
+          if [[ '${{ inputs.acknowledge_full_suite }}' != 'true' ]]; then
+            echo 'The full suite is opt-in. Use mobile-fast-check for normal work.' >&2
+            exit 1
+          fi
+
   quality-and-android:
-    runs-on: ubuntu-latest
+    needs: full-suite-consent
+    runs-on: [self-hosted, macOS, petmagic-mobile]
     defaults:
       run:
         working-directory: apps/petmagic-mobile
@@ -21,20 +44,16 @@ jobs:
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           flutter-version: '3.44.5'
-          cache: true
-      - name: Restore Gradle build cache
-        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
-        with:
-          cache-provider: basic
-      - name: Fit Gradle to the hosted runner
+          cache: false
+      - name: Configure persistent local dependency caches
         shell: bash
         run: |
-          printf '%s\n' \
-            'org.gradle.jvmargs=-Xmx4G -XX:MaxMetaspaceSize=1G -XX:ReservedCodeCacheSize=256m' \
-            'org.gradle.parallel=false' \
-            'org.gradle.workers.max=2' \
-            'org.gradle.vfs.watch=false' \
-            >> android/gradle.properties
+          cache_root="$HOME/.cache/petmagic-ci"
+          mkdir -p "$cache_root/pub" "$cache_root/gradle"
+          {
+            echo "PUB_CACHE=$cache_root/pub"
+            echo "GRADLE_USER_HOME=$cache_root/gradle"
+          } >> "$GITHUB_ENV"
       - name: Resolve dependencies
         run: flutter pub get
       - name: Generate localization
@@ -71,7 +90,8 @@ jobs:
           echo "$output" | grep -q "Release signing is not configured"
 
   android-staging-build:
-    runs-on: ubuntu-latest
+    needs: full-suite-consent
+    runs-on: [self-hosted, macOS, petmagic-mobile]
     defaults:
       run:
         working-directory: apps/petmagic-mobile
@@ -80,20 +100,16 @@ jobs:
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           flutter-version: '3.44.5'
-          cache: true
-      - name: Restore Gradle build cache
-        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
-        with:
-          cache-provider: basic
-      - name: Fit Gradle to the hosted runner
+          cache: false
+      - name: Configure persistent local dependency caches
         shell: bash
         run: |
-          printf '%s\n' \
-            'org.gradle.jvmargs=-Xmx4G -XX:MaxMetaspaceSize=1G -XX:ReservedCodeCacheSize=256m' \
-            'org.gradle.parallel=false' \
-            'org.gradle.workers.max=2' \
-            'org.gradle.vfs.watch=false' \
-            >> android/gradle.properties
+          cache_root="$HOME/.cache/petmagic-ci"
+          mkdir -p "$cache_root/pub" "$cache_root/gradle"
+          {
+            echo "PUB_CACHE=$cache_root/pub"
+            echo "GRADLE_USER_HOME=$cache_root/gradle"
+          } >> "$GITHUB_ENV"
       - name: Resolve dependencies
         run: flutter pub get
       - name: Build Android staging release smoke
@@ -118,7 +134,8 @@ jobs:
           --max-growth-percent 5
 
   android-production-build:
-    runs-on: ubuntu-latest
+    needs: full-suite-consent
+    runs-on: [self-hosted, macOS, petmagic-mobile]
     defaults:
       run:
         working-directory: apps/petmagic-mobile
@@ -127,20 +144,16 @@ jobs:
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           flutter-version: '3.44.5'
-          cache: true
-      - name: Restore Gradle build cache
-        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
-        with:
-          cache-provider: basic
-      - name: Fit Gradle to the hosted runner
+          cache: false
+      - name: Configure persistent local dependency caches
         shell: bash
         run: |
-          printf '%s\n' \
-            'org.gradle.jvmargs=-Xmx4G -XX:MaxMetaspaceSize=1G -XX:ReservedCodeCacheSize=256m' \
-            'org.gradle.parallel=false' \
-            'org.gradle.workers.max=2' \
-            'org.gradle.vfs.watch=false' \
-            >> android/gradle.properties
+          cache_root="$HOME/.cache/petmagic-ci"
+          mkdir -p "$cache_root/pub" "$cache_root/gradle"
+          {
+            echo "PUB_CACHE=$cache_root/pub"
+            echo "GRADLE_USER_HOME=$cache_root/gradle"
+          } >> "$GITHUB_ENV"
       - name: Resolve dependencies
         run: flutter pub get
       - name: Build Android production release smoke
@@ -159,7 +172,9 @@ jobs:
             --obfuscate --split-debug-info=build/symbols/production
 
   android-device-ui-smoke:
-    runs-on: ubuntu-latest
+    if: inputs.run_device_suite
+    needs: full-suite-consent
+    runs-on: [self-hosted, macOS, petmagic-mobile]
     strategy:
       fail-fast: false
       matrix:
@@ -176,29 +191,29 @@ jobs:
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           flutter-version: '3.44.5'
-          cache: true
-      - name: Restore Gradle build cache
-        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
-        with:
-          cache-provider: basic
-      - name: Fit Gradle to the hosted runner
+          cache: false
+      - name: Configure persistent local dependency caches
         shell: bash
         run: |
-          printf '%s\n' \
-            'org.gradle.jvmargs=-Xmx4G -XX:MaxMetaspaceSize=1G -XX:ReservedCodeCacheSize=256m' \
-            'org.gradle.parallel=false' \
-            'org.gradle.workers.max=2' \
-            'org.gradle.vfs.watch=false' \
-            >> android/gradle.properties
-      - name: Enable KVM
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
+          cache_root="$HOME/.cache/petmagic-ci"
+          mkdir -p "$cache_root/pub" "$cache_root/gradle"
+          {
+            echo "PUB_CACHE=$cache_root/pub"
+            echo "GRADLE_USER_HOME=$cache_root/gradle"
+          } >> "$GITHUB_ENV"
       - name: Resolve dependencies
         run: flutter pub get
       - name: Generate staging Firebase smoke configuration
         run: dart run tool/configure_firebase_smoke.dart --environment=staging
+      - name: Resolve Android emulator ABI for this Mac
+        id: android_emulator_abi
+        shell: bash
+        run: |
+          if [[ "$(uname -m)" == 'arm64' ]]; then
+            echo 'value=arm64-v8a' >> "$GITHUB_OUTPUT"
+          else
+            echo 'value=x86_64' >> "$GITHUB_OUTPUT"
+          fi
       - name: Prebuild Android integration scenario
         run: >-
           flutter build apk --debug --flavor staging
@@ -211,7 +226,7 @@ jobs:
         with:
           api-level: 35
           target: google_apis
-          arch: x86_64
+          arch: ${{ steps.android_emulator_abi.outputs.value }}
           profile: pixel_7
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot-save
@@ -219,7 +234,8 @@ jobs:
             cd apps/petmagic-mobile && flutter test integration_test/${{ matrix.scenario }}.dart -d emulator-5554 --flavor staging --dart-define=APP_ENVIRONMENT=staging --dart-define=APP_PACKAGE_NAME=com.petmagic.app.staging --dart-define=API_BASE_URL=https://api.staging.petgpt.app
 
   ios-build:
-    runs-on: macos-latest
+    needs: full-suite-consent
+    runs-on: [self-hosted, macOS, petmagic-mobile]
     defaults:
       run:
         working-directory: apps/petmagic-mobile
@@ -228,7 +244,13 @@ jobs:
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           flutter-version: '3.44.5'
-          cache: true
+          cache: false
+      - name: Configure persistent local dependency cache
+        shell: bash
+        run: |
+          cache_root="$HOME/.cache/petmagic-ci"
+          mkdir -p "$cache_root/pub"
+          echo "PUB_CACHE=$cache_root/pub" >> "$GITHUB_ENV"
       - run: flutter pub get
       - name: Build iOS staging release smoke
         env:
@@ -254,7 +276,9 @@ jobs:
             --obfuscate --split-debug-info=build/symbols/ios-production
 
   ios-device-ui-smoke:
-    runs-on: macos-latest
+    if: inputs.run_device_suite
+    needs: full-suite-consent
+    runs-on: [self-hosted, macOS, petmagic-mobile]
     strategy:
       fail-fast: false
       matrix:
@@ -271,7 +295,13 @@ jobs:
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           flutter-version: '3.44.5'
-          cache: true
+          cache: false
+      - name: Configure persistent local dependency cache
+        shell: bash
+        run: |
+          cache_root="$HOME/.cache/petmagic-ci"
+          mkdir -p "$cache_root/pub"
+          echo "PUB_CACHE=$cache_root/pub" >> "$GITHUB_ENV"
       - run: flutter pub get
       - name: Run deterministic iOS core flows
         env:

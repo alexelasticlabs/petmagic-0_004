@@ -1,0 +1,47 @@
+name: mobile-fast-check
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'apps/petmagic-mobile/**'
+      - '.github/workflows/mobile-fast-check.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-fast-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fast-check:
+    runs-on: [self-hosted, macOS, petmagic-mobile]
+    defaults:
+      run:
+        working-directory: apps/petmagic-mobile
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with: { flutter-version: '3.44.5', cache: false }
+      - name: Configure persistent local dependency cache
+        shell: bash
+        run: |
+          cache_root="$HOME/.cache/petmagic-ci"
+          mkdir -p "$cache_root/pub"
+          echo "PUB_CACHE=$cache_root/pub" >> "$GITHUB_ENV"
+      - name: Resolve dependencies
+        run: flutter pub get
+      - name: Generate localization
+        run: flutter gen-l10n
+      - name: Format
+        run: dart format --output=none --set-exit-if-changed lib test integration_test tool
+      - name: Verify localization catalogs
+        run: |
+          dart tool/check_generation_status_l10n.dart
+          dart tool/check_l10n_completeness.dart
+      - name: Analyze
+        run: flutter analyze --fatal-infos
+      - name: Test
+        run: flutter test --concurrency=1

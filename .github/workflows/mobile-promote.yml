@@ -30,17 +30,29 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: mobile-promote
+  cancel-in-progress: false
+
 jobs:
   promote:
-    runs-on: macos-latest
+    runs-on: [self-hosted, macOS, petmagic-mobile]
     environment: production
     defaults:
       run:
         working-directory: apps/petmagic-mobile
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Configure persistent local dependency cache
+        shell: bash
+        run: |
+          cache_root="$HOME/.cache/petmagic-ci"
+          mkdir -p "$cache_root/bundle"
+          echo "BUNDLE_PATH=$cache_root/bundle" >> "$GITHUB_ENV"
       - uses: ruby/setup-ruby@d45b1a4e94b71acab930e56e79c6aa188764e7f9 # v1
-        with: { ruby-version: '3.3', bundler-cache: true, working-directory: apps/petmagic-mobile }
+        with: { ruby-version: '3.3', bundler-cache: false, working-directory: apps/petmagic-mobile }
+      - name: Install Ruby release tooling
+        run: bundle install --jobs 4 --retry 3
       - name: Prepare Play key
         if: inputs.platform == 'android'
         env:
@@ -66,3 +78,7 @@ jobs:
           BUILD_NUMBER: ${{ inputs.build_number }}
           SUBMIT_FOR_REVIEW: ${{ inputs.submit_for_review }}
         run: bundle exec fastlane ios promote
+      - name: Remove temporary Play credential
+        if: always()
+        shell: bash
+        run: rm -f build-google-play-key.json

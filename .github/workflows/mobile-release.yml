@@ -20,14 +20,28 @@ on:
         default: readonly
         type: choice
         options: [readonly, bootstrap]
+      publish:
+        description: Upload the completed artifact to Play Internal or TestFlight
+        required: true
+        default: false
+        type: boolean
+      retain_artifacts:
+        description: Keep a seven-day GitHub artifact copy of the build and symbols
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
 
+concurrency:
+  group: mobile-release
+  cancel-in-progress: false
+
 jobs:
   android:
     if: inputs.platform != 'ios'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, macOS, petmagic-mobile]
     environment: ${{ inputs.environment || 'production' }}
     defaults:
       run:
@@ -37,23 +51,22 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
-        with: { flutter-version: '3.44.5', cache: true }
-      - name: Restore Gradle build cache
-        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
-        with:
-          cache-provider: basic
-      - name: Fit Gradle to the hosted runner
+        with: { flutter-version: '3.44.5', cache: false }
+      - name: Configure persistent local dependency caches
         shell: bash
         run: |
-          printf '%s\n' \
-            'org.gradle.jvmargs=-Xmx4G -XX:MaxMetaspaceSize=1G -XX:ReservedCodeCacheSize=256m' \
-            'org.gradle.parallel=false' \
-            'org.gradle.workers.max=2' \
-            'org.gradle.vfs.watch=false' \
-            >> android/gradle.properties
+          cache_root="$HOME/.cache/petmagic-ci"
+          mkdir -p "$cache_root/pub" "$cache_root/gradle" "$cache_root/bundle"
+          {
+            echo "PUB_CACHE=$cache_root/pub"
+            echo "GRADLE_USER_HOME=$cache_root/gradle"
+            echo "BUNDLE_PATH=$cache_root/bundle"
+          } >> "$GITHUB_ENV"
       - uses: ruby/setup-ruby@d45b1a4e94b71acab930e56e79c6aa188764e7f9 # v1
-        with: { ruby-version: '3.3', bundler-cache: true, working-directory: apps/petmagic-mobile }
+        with: { ruby-version: '3.3', bundler-cache: false, working-directory: apps/petmagic-mobile }
       - run: flutter pub get
+      - name: Install Ruby release tooling
+        run: bundle install --jobs 4 --retry 3
       - name: Resolve release identity
         shell: bash
         run: |
@@ -93,7 +106,11 @@ jobs:
           heartbeat() {
             while sleep 60; do
               echo "Android release build is still running at $(date -u +%FT%TZ)."
-              free -h
+              if command -v memory_pressure >/dev/null 2>&1; then
+                memory_pressure | head -n 5
+              elif command -v free >/dev/null 2>&1; then
+                free -h
+              fi
             done
           }
           heartbeat &
@@ -126,22 +143,36 @@ jobs:
           test -n "$firebase_app_id" && test "$firebase_app_id" != "null"
           npx --yes firebase-tools@15.22.4 crashlytics:symbols:upload --app="$firebase_app_id" "build/symbols/$RELEASE_ENVIRONMENT"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: inputs.retain_artifacts
         with:
           name: android-${{ inputs.environment || 'production' }}-release-${{ github.run_id }}
           path: |
             apps/petmagic-mobile/build/app/outputs/bundle/${{ inputs.environment || 'production' }}Release/app-${{ inputs.environment || 'production' }}-release.aab
             apps/petmagic-mobile/build/symbols/${{ inputs.environment || 'production' }}
-          retention-days: 30
+          retention-days: 7
           if-no-files-found: error
       - name: Upload exact artifact to Play Internal
+        if: inputs.publish
         env:
           AAB_PATH: ${{ github.workspace }}/apps/petmagic-mobile/build/app/outputs/bundle/${{ inputs.environment || 'production' }}Release/app-${{ inputs.environment || 'production' }}-release.aab
           GOOGLE_PLAY_JSON_KEY_PATH: ${{ github.workspace }}/apps/petmagic-mobile/build-google-play-key.json
         run: GOOGLE_PLAY_PACKAGE_NAME="$APP_PACKAGE_NAME" bundle exec fastlane android upload_internal
+      - name: Store publication skipped
+        if: ${{ !inputs.publish }}
+        run: echo 'Build completed without Play Internal upload because publish=false.'
+      - name: Remove temporary Android credentials
+        if: always()
+        shell: bash
+        run: |
+          rm -f \
+            android/app/google-services.json \
+            android/app/release.keystore \
+            android/key.properties \
+            build-google-play-key.json
 
   ios:
     if: inputs.platform != 'android'
-    runs-on: macos-latest
+    runs-on: [self-hosted, macOS, petmagic-mobile]
     environment: ${{ inputs.environment || 'production' }}
     defaults:
       run:
@@ -151,10 +182,22 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
-        with: { flutter-version: '3.44.5', cache: true }
+        with: { flutter-version: '3.44.5', cache: false }
+      - name: Configure persistent local dependency caches
+        shell: bash
+        run: |
+          cache_root="$HOME/.cache/petmagic-ci"
+          mkdir -p "$cache_root/pub" "$cache_root/gradle" "$cache_root/bundle"
+          {
+            echo "PUB_CACHE=$cache_root/pub"
+            echo "GRADLE_USER_HOME=$cache_root/gradle"
+            echo "BUNDLE_PATH=$cache_root/bundle"
+          } >> "$GITHUB_ENV"
       - uses: ruby/setup-ruby@d45b1a4e94b71acab930e56e79c6aa188764e7f9 # v1
-        with: { ruby-version: '3.3', bundler-cache: true, working-directory: apps/petmagic-mobile }
+        with: { ruby-version: '3.3', bundler-cache: false, working-directory: apps/petmagic-mobile }
       - run: flutter pub get
+      - name: Install Ruby release tooling
+        run: bundle install --jobs 4 --retry 3
       - name: Resolve release identity
         shell: bash
         run: |
@@ -217,17 +260,26 @@ jobs:
           npx --yes firebase-tools@15.22.4 crashlytics:symbols:upload --app=${{ secrets.FIREBASE_IOS_APP_ID }} "build/symbols/ios-$RELEASE_ENVIRONMENT"
           ios/Pods/FirebaseCrashlytics/upload-symbols -gsp ios/Runner/GoogleService-Info.plist -p ios build/ios/archive/Runner.xcarchive/dSYMs
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: inputs.retain_artifacts
         with:
           name: ios-${{ inputs.environment || 'production' }}-symbols-${{ github.run_id }}
           path: |
             apps/petmagic-mobile/build/symbols/ios-${{ inputs.environment || 'production' }}
             apps/petmagic-mobile/build/ios/archive/Runner.xcarchive/dSYMs
-          retention-days: 30
+          retention-days: 7
           if-no-files-found: error
       - name: Upload exact artifact to TestFlight
+        if: inputs.publish
         env:
           IPA_PATH: ${{ github.workspace }}/apps/petmagic-mobile/build/ios/ipa/petmagic_mobile.ipa
           APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
           APP_STORE_CONNECT_KEY_P8: ${{ secrets.APP_STORE_CONNECT_KEY_P8 }}
         run: APP_STORE_BUNDLE_ID="$APP_PACKAGE_NAME" bundle exec fastlane ios upload_testflight
+      - name: Store publication skipped
+        if: ${{ !inputs.publish }}
+        run: echo 'Build completed without TestFlight upload because publish=false.'
+      - name: Remove temporary iOS Firebase configuration
+        if: always()
+        shell: bash
+        run: rm -f ios/Runner/GoogleService-Info.plist
