@@ -367,6 +367,14 @@ adding dated audit snapshots to the repository.
   the same GitHub Billing gate. The App Store Connect App Manager key and its
   protected production secrets were present, but the runner never started;
   this is not an Apple credential, Match, archive, or TestFlight result.
+- Self-hosted iOS bootstrap run `33017368346` completed Ruby setup, protected
+  Firebase injection, Match repository authentication and Match bootstrap for
+  `com.petmagic.app`. The signed IPA was not produced: the production Xcode
+  configuration still used automatic signing and selected a wildcard development
+  profile without Push Notifications or Sign in with Apple. TestFlight upload
+  was disabled (`publish=false`) and was not attempted. The production Release
+  target now explicitly selects the Match App Store profile; this requires a
+  fresh signed-IPA run before it can be accepted as archive evidence.
 
 ## Automated Gates
 
