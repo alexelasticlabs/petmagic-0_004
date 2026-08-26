@@ -21,7 +21,7 @@ jobs:
     if: inputs.acknowledge_ruby_toolcache_setup
     runs-on: [self-hosted, macOS, petmagic-mobile]
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - name: Prepare default Ruby tool cache
         shell: bash
         run: bash scripts/ci/repair-macos-runner-toolcache.sh --prepare-ruby-toolcache
