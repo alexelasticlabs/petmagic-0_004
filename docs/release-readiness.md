@@ -118,6 +118,15 @@ adding dated audit snapshots to the repository.
 
 ## Mobile release correction status
 
+- On 2026-08-27 (Minsk time), the repository-scoped `petmagic-mac-mini`
+  self-hosted runner completed
+  [`mobile-fast-check` run `33014715953`](https://github.com/alexelasticlabs/petmagic-0_004/actions/runs/33014715953)
+  successfully in 2m50s. Formatting, localization generation/catalog checks,
+  `flutter analyze --fatal-infos`, and the stable Flutter suite all passed on
+  macOS ARM. The job creates no APK/AAB/IPA and performs no Store upload.
+  Platform-specific pixel baselines remain deliberately excluded from this
+  gate and require canonical-host visual review; this is CI infrastructure
+  acceptance, not mobile device or Store-release acceptance.
 - The production mobile-release workflow was corrected to build with
   `API_BASE_URL=https://api.petgpt.app`. The prior `api.petmagic.app` host does
   not resolve in DNS and explains the earliest unreachable Android artifacts.
