@@ -430,6 +430,15 @@ adding dated audit snapshots to the repository.
   production IPA, and uploaded its iOS dSYMs to Crashlytics. TestFlight was
   explicitly skipped (`publish=false`), so this is signed-archive and symbol
   upload evidence only, not Store or physical-device acceptance.
+- The first TestFlight attempt (`33024670661`) completed Match bootstrap,
+  signed IPA creation and dSYM upload, but stopped before contacting Apple
+  because the workflow assumed a fixed Flutter IPA filename. Commit
+  `09c46dc1` now discovers the single IPA emitted by Flutter instead. The
+  follow-up readonly release
+  [`33024924912`](https://github.com/alexelasticlabs/petmagic-0_004/actions/runs/33024924912)
+  completed iOS signing, archive, dSYM upload and TestFlight upload for
+  `1.0.0 (22)` on 2026-08-27. Apple processing, TestFlight installation and
+  physical-device/Sandbox acceptance remain separate evidence requirements.
 
 ## Automated Gates
 
@@ -716,10 +725,10 @@ do not append command transcripts to this file.
   one Data Protection key, then left zero temporary databases, directories or
   scripts. Production was not overwritten and remained healthy during the
   audit; retain the source archives until final launch sign-off.
-- An iOS archive and store validation from a supported macOS/Xcode environment.
-- App Store Connect currently contains no TestFlight builds for `Pet Video Magic`.
-  Upload the first signed archive before attempting Sandbox authentication,
-  StoreKit purchase, restore, notification-delivery, or TestFlight acceptance.
+- The first signed archive was accepted for TestFlight upload from the supported
+  self-hosted macOS/Xcode runner. Wait for Apple processing to finish, then
+  install the build through TestFlight before attempting Sandbox authentication,
+  StoreKit purchase, restore, notification delivery or device acceptance.
 - A protected-VPS inspection confirms the Sign in with Apple client ID and
   audience are `com.petmagic.app`, with a configured client-secret JWT valid
   through `2027-01-27T05:15:02Z`. This proves configuration presence and expiry,
