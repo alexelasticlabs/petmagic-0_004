@@ -19,7 +19,12 @@ if [[ -z "${RUNNER_WORKSPACE:-}" ]]; then
   exit 2
 fi
 
-runner_root="$(cd "${RUNNER_WORKSPACE%/_work}" && pwd)"
+runner_root="${RUNNER_WORKSPACE%%/_work/*}"
+if [[ "$runner_root" == "$RUNNER_WORKSPACE" || ! -d "$runner_root" ]]; then
+  echo "Unable to derive runner root from RUNNER_WORKSPACE: $RUNNER_WORKSPACE" >&2
+  exit 1
+fi
+runner_root="$(cd "$runner_root" && pwd)"
 runner_env="$runner_root/.env"
 toolcache="$HOME/.cache/petmagic-ci/toolcache"
 
