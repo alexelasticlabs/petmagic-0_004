@@ -118,8 +118,8 @@ adding dated audit snapshots to the repository.
 
 ## Mobile release correction status
 
-- On 2026-08-27 (Minsk time), after moving the self-hosted runner tool cache
-  under the dedicated `/Users/runner` account, manually dispatched
+- On 2026-08-27 (Minsk time), after repairing the self-hosted runner tool
+  cache and provisioning its `/Users/runner` directory, manually dispatched
   [`mobile-fast-check` run `33021126125`](https://github.com/alexelasticlabs/petmagic-0_004/actions/runs/33021126125)
   completed successfully in 2m44s on `petmagic-mac-mini`. It passed dependency
   resolution, localization generation/catalog checks, formatting,
