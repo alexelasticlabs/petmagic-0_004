@@ -141,6 +141,13 @@ adding dated audit snapshots to the repository.
   `flutter analyze --fatal-infos`, and the Flutter test suite. The workflow
   did not build a release artifact or contact a Store; this is runner and
   source-regression evidence only.
+- On 2026-08-27 (Minsk time), one exhausted `identity_email` dispatch to the
+  reserved `example.com` test domain was found during the public health audit
+  (`email.dispatch_failed`, three attempts). The isolated test job was removed
+  without re-sending mail or changing users, SMTP, or application code. A
+  fresh public health check reports every notification queue healthy; the only
+  remaining overall `Degraded` state is the intentional
+  `store_account_binding=compatibility` acceptance gate.
 - The self-hosted mobile workflows now pin `actions/checkout` v5, whose
   Node 24 runtime is supported by the installed runner. The follow-up
   [`mobile-fast-check` run `33021592084`](https://github.com/alexelasticlabs/petmagic-0_004/actions/runs/33021592084)
