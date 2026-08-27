@@ -632,6 +632,16 @@ do not append command transcripts to this file.
   five minutes. This is build and distribution evidence; install that exact
   Internal build and exercise a Stripe test cancellation before treating the
   client-to-VPS cancellation path as device acceptance.
+- The connected physical Android device then received that exact Internal-track
+  update through Google Play (not by sideload) and reports `versionCode=22`.
+  A cold start opened the guest entry screen without a server-unavailable
+  state. Native Google sign-in opened the system account chooser and returned
+  to PetMagic's current legal-acceptance gate with no client error or relevant
+  crash log. The test did not accept Terms or Privacy Policy on the owner's
+  behalf, and therefore proves Google authentication transport and session
+  creation, not the post-consent authenticated workspace. A successful
+  email/password login still requires the account holder's password and is not
+  inferred from this OAuth result.
 - **Release blocker — Premium allowance rollout:** the owner approved
   `40 PawSpark` at purchase and every seven days while Premium remains active.
   Local plan defaults, health checks, migration and mobile copy now match the
