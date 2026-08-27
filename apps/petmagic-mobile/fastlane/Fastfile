@@ -85,6 +85,14 @@ platform :ios do
     UI.message("TESTFLIGHT_LATEST_BUILD=#{latest_build}")
   end
 
+  desc "Prepare private TestFlight groups for an existing processed build"
+  lane :prepare_testflight_groups do
+    sh(
+      "ruby",
+      "fastlane/testflight_distribution.rb"
+    )
+  end
+
   desc "Submit an existing TestFlight build without uploading a new binary"
   lane :promote do
     deliver(

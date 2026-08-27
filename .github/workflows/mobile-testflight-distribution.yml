@@ -1,0 +1,55 @@
+name: mobile-testflight-distribution
+
+on:
+  workflow_dispatch:
+    inputs:
+      ios_version:
+        description: Existing iOS marketing version to prepare for TestFlight distribution
+        required: true
+        default: "1.0.0"
+        type: string
+      build_number:
+        description: Existing processed TestFlight build number
+        required: true
+        default: "22"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-testflight-distribution
+  cancel-in-progress: false
+
+jobs:
+  prepare-testflight-groups:
+    runs-on: [self-hosted, macOS, petmagic-mobile]
+    environment: production
+    defaults:
+      run:
+        working-directory: apps/petmagic-mobile
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Configure persistent local dependency cache
+        shell: bash
+        run: |
+          cache_root="$HOME/.cache/petmagic-ci"
+          mkdir -p "$cache_root/bundle"
+          echo "BUNDLE_PATH=$cache_root/bundle" >> "$GITHUB_ENV"
+      - uses: ruby/setup-ruby@d45b1a4e94b71acab930e56e79c6aa188764e7f9 # v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: false
+          working-directory: apps/petmagic-mobile
+      - name: Install Ruby release tooling
+        run: bundle install --jobs 4 --retry 3
+      - name: Prepare private TestFlight groups
+        env:
+          APP_STORE_CONNECT_APP_ID: "6796478761"
+          APP_STORE_BUNDLE_ID: com.petmagic.app
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_KEY_P8: ${{ secrets.APP_STORE_CONNECT_KEY_P8 }}
+          APP_VERSION: ${{ inputs.ios_version }}
+          BUILD_NUMBER: ${{ inputs.build_number }}
+        run: bundle exec fastlane ios prepare_testflight_groups
