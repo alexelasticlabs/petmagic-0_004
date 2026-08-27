@@ -89,7 +89,7 @@ platform :ios do
   lane :prepare_testflight_groups do
     sh(
       "ruby",
-      "fastlane/testflight_distribution.rb"
+      File.expand_path("testflight_distribution.rb", __dir__)
     )
   end
 
