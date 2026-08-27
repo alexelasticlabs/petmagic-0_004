@@ -137,7 +137,10 @@ export function TemplateSecureMedia({
     let createdObjectUrl: string | null = null;
     let isActive = true;
 
-    void fetchWithTimeout(url, { credentials: "include", signal: controller.signal })
+    // Template previews are public CDN assets. Sending admin cookies cross-origin
+    // makes a valid CORS response require Access-Control-Allow-Credentials and
+    // prevents Cloudflare R2 from serving the preview to this isolated renderer.
+    void fetchWithTimeout(url, { credentials: "omit", signal: controller.signal })
       .then(async (response) => {
         if (!isActive) {
           return;

@@ -60,6 +60,8 @@ describe("template preview media URL exposure", () => {
     );
     expect(secureMediaSource).toContain("onError={markRemoteMediaFailed}");
     expect(secureMediaSource).toContain("fetchWithTimeout(url");
+    expect(secureMediaSource).toContain('credentials: "omit"');
+    expect(secureMediaSource).not.toContain('credentials: "include"');
     expect(secureMediaSource).toContain("templates.secure_media_fetch_failed");
     expect(secureMediaSource).toContain("templates.secure_media_unsafe_host_blocked");
     expect(secureMediaSource).toContain("export function isUnsafeTemplateMediaUrl(");
