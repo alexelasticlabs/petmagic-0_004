@@ -1838,6 +1838,11 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String profileStorageDownloadedItems(Object count) {
+    return '$count Downloads offline verfügbar';
+  }
+
+  @override
   String get profileStorageCleanupSection => 'Speicher bereinigen';
 
   @override

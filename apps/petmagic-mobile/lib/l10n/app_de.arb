@@ -389,6 +389,8 @@
   "profileStorageDownloadedTitle": "Heruntergeladene Kreationen",
   "profileStorageDownloadedSubtitle": "{size} auf diesem Gerät gespeichert",
   "@profileStorageDownloadedSubtitle": {"placeholders": {"size": {}}},
+  "profileStorageDownloadedItems": "{count} Downloads offline verfügbar",
+  "@profileStorageDownloadedItems": {"placeholders": {"count": {}}},
   "profileStorageCleanupSection": "Speicher bereinigen",
   "profileStorageMediaCacheTitle": "Temporärer Mediencache",
   "profileStorageMediaCacheSubtitle": "Bilder und Vorschauen werden bei Bedarf erneut geladen.",

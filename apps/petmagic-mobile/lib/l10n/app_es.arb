@@ -393,6 +393,8 @@
   "profileStorageDownloadedTitle": "Creaciones descargadas",
   "profileStorageDownloadedSubtitle": "{size} almacenados en este dispositivo",
   "@profileStorageDownloadedSubtitle": {"placeholders": {"size": {}}},
+  "profileStorageDownloadedItems": "{count} descargas disponibles sin conexión",
+  "@profileStorageDownloadedItems": {"placeholders": {"count": {}}},
   "profileStorageCleanupSection": "Limpiar almacenamiento",
   "profileStorageMediaCacheTitle": "Caché multimedia temporal",
   "profileStorageMediaCacheSubtitle": "Las imágenes y vistas previas se descargarán de nuevo cuando sea necesario.",

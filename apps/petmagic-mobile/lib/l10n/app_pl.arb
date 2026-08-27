@@ -393,6 +393,8 @@
   "profileStorageDownloadedTitle": "Pobrane kreacje",
   "profileStorageDownloadedSubtitle": "{size} zapisane na tym urządzeniu",
   "@profileStorageDownloadedSubtitle": {"placeholders": {"size": {}}},
+  "profileStorageDownloadedItems": "{count} pobranych plików dostępnych offline",
+  "@profileStorageDownloadedItems": {"placeholders": {"count": {}}},
   "profileStorageCleanupSection": "Czyszczenie pamięci",
   "profileStorageMediaCacheTitle": "Tymczasowa pamięć multimediów",
   "profileStorageMediaCacheSubtitle": "Obrazy i podglądy zostaną pobrane ponownie, gdy będą potrzebne.",

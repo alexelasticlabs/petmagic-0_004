@@ -582,6 +582,8 @@
   "profileStorageDownloadedTitle": "Downloaded creations",
   "profileStorageDownloadedSubtitle": "{size} stored on this device",
   "@profileStorageDownloadedSubtitle": {"placeholders": {"size": {}}},
+  "profileStorageDownloadedItems": "{count} downloads available offline",
+  "@profileStorageDownloadedItems": {"placeholders": {"count": {}}},
   "profileStorageCleanupSection": "Clear storage",
   "profileStorageMediaCacheTitle": "Temporary media cache",
   "profileStorageMediaCacheSubtitle": "Images and previews will download again when needed.",

@@ -1842,6 +1842,11 @@ class AppLocalizationsIt extends AppLocalizations {
   }
 
   @override
+  String profileStorageDownloadedItems(Object count) {
+    return '$count download disponibili offline';
+  }
+
+  @override
   String get profileStorageCleanupSection => 'Pulisci memoria';
 
   @override

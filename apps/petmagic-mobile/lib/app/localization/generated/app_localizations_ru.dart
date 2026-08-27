@@ -1821,6 +1821,11 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
+  String profileStorageDownloadedItems(Object count) {
+    return 'Доступно офлайн: $count';
+  }
+
+  @override
   String get profileStorageCleanupSection => 'Очистка памяти';
 
   @override

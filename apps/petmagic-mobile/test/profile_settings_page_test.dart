@@ -113,6 +113,27 @@ void main() {
     expect(find.text(text.profileStorageMediaCacheTitle), findsOneWidget);
   });
 
+  testWidgets('storage management exposes refreshable local usage', (
+    tester,
+  ) async {
+    await _pumpSettingsPage(tester);
+
+    final text = AppLocalizations.of(
+      tester.element(find.byType(ProfileSettingsPage)),
+    );
+
+    await tester.tap(find.text(text.profileSettingsStorageTitle));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(RefreshIndicator), findsOneWidget);
+    expect(
+      find.byTooltip(text.profileNotificationsRefreshStatus),
+      findsOneWidget,
+    );
+    expect(find.text(text.profileStorageDownloadedItems(0)), findsOneWidget);
+    expect(find.text(text.profileStorageClearAction), findsNWidgets(2));
+  });
+
   testWidgets('delete confirmation sheet triggers account deletion action', (
     tester,
   ) async {

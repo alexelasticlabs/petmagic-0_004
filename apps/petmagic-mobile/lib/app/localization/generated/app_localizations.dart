@@ -3348,6 +3348,12 @@ abstract class AppLocalizations {
   /// **'{size} stored on this device'**
   String profileStorageDownloadedSubtitle(Object size);
 
+  /// No description provided for @profileStorageDownloadedItems.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} downloads available offline'**
+  String profileStorageDownloadedItems(Object count);
+
   /// No description provided for @profileStorageCleanupSection.
   ///
   /// In en, this message translates to:

@@ -22,32 +22,62 @@ class StorageManagementPage extends ConsumerStatefulWidget {
 }
 
 class _StorageManagementPageState extends ConsumerState<StorageManagementPage> {
-  late Future<int> _downloadedBytes = _loadDownloadedBytes();
-  bool _isClearing = false;
+  late Future<_StorageUsage> _storageUsage = _loadStorageUsage();
+  _StorageCleanupTarget? _clearingTarget;
 
-  Future<int> _loadDownloadedBytes() async {
+  Future<_StorageUsage> _loadStorageUsage() async {
     final entries = await ref
         .read(generationGalleryStoreProvider)
         .loadLocalReadyItems();
-    return entries.fold<int>(
-      0,
-      (total, entry) => total + (entry.localBytes < 0 ? 0 : entry.localBytes),
+    final downloadedEntries = entries
+        .where((entry) => entry.localBytes > 0)
+        .toList(growable: false);
+    return _StorageUsage(
+      downloadedBytes: downloadedEntries.fold<int>(
+        0,
+        (total, entry) => total + entry.localBytes,
+      ),
+      downloadedItems: downloadedEntries.length,
     );
   }
 
-  void _refreshStorageUsage() {
+  Future<void> _refreshStorageUsage({bool showFailure = false}) async {
+    final storageUsage = _loadStorageUsage();
     setState(() {
-      _downloadedBytes = _loadDownloadedBytes();
+      _storageUsage = storageUsage;
     });
+
+    try {
+      await storageUsage;
+    } catch (error, stackTrace) {
+      AppLogger.warn(
+        feature: 'Profile.StorageManagement',
+        operation: 'refresh_storage_usage',
+        message: 'Unable to refresh local storage usage',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      if (showFailure && mounted) {
+        PetMagicToast.show(
+          context,
+          message: AppLocalizations.of(
+            context,
+          ).profileSettingsUnavailableSubtitle,
+          tone: PetMagicToastTone.warning,
+        );
+      }
+    }
   }
 
   Future<void> _clearMediaCache() => _clear(
+    target: _StorageCleanupTarget.mediaCache,
     confirmationTitle: (text) => text.profileStorageClearMediaConfirmTitle,
     confirmationBody: (text) => text.profileStorageClearMediaConfirmBody,
     action: AppMediaCacheManager.clearAll,
   );
 
   Future<void> _clearDownloadedGenerations() => _clear(
+    target: _StorageCleanupTarget.downloadedWorks,
     confirmationTitle: (text) => text.profileStorageClearDownloadsConfirmTitle,
     confirmationBody: (text) => text.profileStorageClearDownloadsConfirmBody,
     action: () =>
@@ -55,11 +85,12 @@ class _StorageManagementPageState extends ConsumerState<StorageManagementPage> {
   );
 
   Future<void> _clear({
+    required _StorageCleanupTarget target,
     required String Function(AppLocalizations text) confirmationTitle,
     required String Function(AppLocalizations text) confirmationBody,
     required Future<void> Function() action,
   }) async {
-    if (_isClearing) {
+    if (_clearingTarget != null) {
       return;
     }
 
@@ -85,13 +116,16 @@ class _StorageManagementPageState extends ConsumerState<StorageManagementPage> {
       return;
     }
 
-    setState(() => _isClearing = true);
+    setState(() => _clearingTarget = target);
     try {
       await action();
       if (!mounted) {
         return;
       }
-      _refreshStorageUsage();
+      await _refreshStorageUsage();
+      if (!mounted) {
+        return;
+      }
       PetMagicToast.show(
         context,
         message: text.profileStorageClearSuccess,
@@ -114,7 +148,7 @@ class _StorageManagementPageState extends ConsumerState<StorageManagementPage> {
       }
     } finally {
       if (mounted) {
-        setState(() => _isClearing = false);
+        setState(() => _clearingTarget = null);
       }
     }
   }
@@ -130,101 +164,169 @@ class _StorageManagementPageState extends ConsumerState<StorageManagementPage> {
 
     return ProfileScreenBackground(
       child: SafeArea(
-        child: ListView(
-          padding: EdgeInsets.fromLTRB(20, 18, 20, bottomInset),
-          children: [
-            ProfileSettingsDetailHeader(
-              title: text.profileSettingsStorageTitle,
-              subtitle: text.profileSettingsStorageSubtitle,
-            ),
-            const SizedBox(height: 22),
-            ProfileSectionLabel(label: text.profileStorageUsageSection),
-            ProfileGlassCard(
-              child: FutureBuilder<int>(
-                future: _downloadedBytes,
+        child: RefreshIndicator(
+          color: colors.accent,
+          onRefresh: _refreshStorageUsage,
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.fromLTRB(20, 18, 20, bottomInset),
+            children: [
+              ProfileSettingsDetailHeader(
+                title: text.profileSettingsStorageTitle,
+                subtitle: text.profileSettingsStorageSubtitle,
+              ),
+              const SizedBox(height: 22),
+              ProfileSectionLabel(label: text.profileStorageUsageSection),
+              FutureBuilder<_StorageUsage>(
+                future: _storageUsage,
                 builder: (context, snapshot) {
-                  final bytes = snapshot.data ?? 0;
-                  return Row(
-                    children: [
-                      Icon(
-                        Icons.download_for_offline_outlined,
-                        color: colors.accent,
-                        size: 26,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                  final usage = snapshot.data;
+                  final isLoading =
+                      snapshot.connectionState == ConnectionState.waiting;
+                  final hasError = snapshot.hasError;
+
+                  return PetMagicAccentCard(
+                    accentColor: colors.accent,
+                    glowAlignment: Alignment.topRight,
+                    glowRadius: 1.1,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
                           children: [
-                            Text(
-                              text.profileStorageDownloadedTitle,
-                              style: TextStyle(
-                                color: colors.textStrong,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w800,
+                            Container(
+                              width: 42,
+                              height: 42,
+                              decoration: BoxDecoration(
+                                color: colors.accentSoft.withValues(
+                                  alpha: 0.35,
+                                ),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: Icon(
+                                Icons.download_for_offline_rounded,
+                                color: colors.accent,
+                                size: 22,
                               ),
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              text.profileStorageDownloadedSubtitle(
-                                _formatBytes(bytes),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                text.profileStorageDownloadedTitle,
+                                style: TextStyle(
+                                  color: colors.textStrong,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                ),
                               ),
-                              style: TextStyle(
-                                color: colors.textSoft,
-                                fontSize: 13,
-                                height: 1.35,
-                                fontWeight: FontWeight.w600,
-                              ),
+                            ),
+                            IconButton(
+                              tooltip: text.profileNotificationsRefreshStatus,
+                              onPressed: isLoading
+                                  ? null
+                                  : () =>
+                                        _refreshStorageUsage(showFailure: true),
+                              icon: isLoading
+                                  ? SizedBox.square(
+                                      dimension: 20,
+                                      child: CircularProgressIndicator(
+                                        color: colors.accent,
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : Icon(
+                                      Icons.refresh_rounded,
+                                      color: colors.accent,
+                                    ),
                             ),
                           ],
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 16),
+                        AnimatedSwitcher(
+                          duration: AppTheme.motionFast,
+                          child: Text(
+                            hasError
+                                ? '—'
+                                : usage == null
+                                ? '…'
+                                : _formatBytes(usage.downloadedBytes),
+                            key: ValueKey<String>(
+                              '$hasError:${usage?.downloadedBytes}',
+                            ),
+                            style: TextStyle(
+                              color: colors.textStrong,
+                              fontSize: 32,
+                              fontWeight: FontWeight.w900,
+                              height: 1,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          hasError
+                              ? text.profileSettingsUnavailableSubtitle
+                              : text.profileStorageDownloadedItems(
+                                  usage?.downloadedItems ?? 0,
+                                ),
+                          style: TextStyle(
+                            color: colors.textSoft,
+                            fontSize: 13,
+                            height: 1.35,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
                   );
                 },
               ),
-            ),
-            const SizedBox(height: 18),
-            ProfileSectionLabel(label: text.profileStorageCleanupSection),
-            ProfileGlassCard(
-              padding: EdgeInsets.zero,
-              child: Column(
-                children: [
-                  ProfileSettingsRow(
-                    icon: Icons.cached_rounded,
-                    title: text.profileStorageMediaCacheTitle,
-                    subtitle: text.profileStorageMediaCacheSubtitle,
-                    trailing: _ClearButton(
-                      label: text.profileStorageClearAction,
-                      isLoading: _isClearing,
-                      onPressed: _clearMediaCache,
+              const SizedBox(height: 18),
+              ProfileSectionLabel(label: text.profileStorageCleanupSection),
+              ProfileGlassCard(
+                padding: EdgeInsets.zero,
+                child: Column(
+                  children: [
+                    ProfileSettingsRow(
+                      icon: Icons.cached_rounded,
+                      title: text.profileStorageMediaCacheTitle,
+                      subtitle: text.profileStorageMediaCacheSubtitle,
+                      trailing: _ClearButton(
+                        label: text.profileStorageClearAction,
+                        isLoading:
+                            _clearingTarget == _StorageCleanupTarget.mediaCache,
+                        isDisabled: _clearingTarget != null,
+                        onPressed: _clearMediaCache,
+                      ),
                     ),
-                  ),
-                  ProfileSettingsRow(
-                    icon: Icons.folder_delete_outlined,
-                    title: text.profileStorageDownloadedTitle,
-                    subtitle: text.profileStorageDownloadedClearSubtitle,
-                    showDivider: false,
-                    trailing: _ClearButton(
-                      label: text.profileStorageClearAction,
-                      isLoading: _isClearing,
-                      onPressed: _clearDownloadedGenerations,
+                    ProfileSettingsRow(
+                      icon: Icons.folder_delete_outlined,
+                      title: text.profileStorageDownloadedTitle,
+                      subtitle: text.profileStorageDownloadedClearSubtitle,
+                      showDivider: false,
+                      trailing: _ClearButton(
+                        label: text.profileStorageClearAction,
+                        isLoading:
+                            _clearingTarget ==
+                            _StorageCleanupTarget.downloadedWorks,
+                        isDisabled: _clearingTarget != null,
+                        onPressed: _clearDownloadedGenerations,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 18),
-            Text(
-              text.profileStorageSafetyNote,
-              style: TextStyle(
-                color: colors.textMuted,
-                fontSize: 13,
-                height: 1.4,
-                fontWeight: FontWeight.w600,
+              const SizedBox(height: 18),
+              Text(
+                text.profileStorageSafetyNote,
+                style: TextStyle(
+                  color: colors.textMuted,
+                  fontSize: 13,
+                  height: 1.4,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -235,25 +337,46 @@ class _ClearButton extends StatelessWidget {
   const _ClearButton({
     required this.label,
     required this.isLoading,
+    required this.isDisabled,
     required this.onPressed,
   });
 
   final String label;
   final bool isLoading;
+  final bool isDisabled;
   final Future<void> Function() onPressed;
 
   @override
   Widget build(BuildContext context) {
-    return TextButton(
-      onPressed: isLoading ? null : onPressed,
-      child: isLoading
+    final colors = context.petMagicColors;
+
+    return TextButton.icon(
+      onPressed: isDisabled ? null : onPressed,
+      icon: isLoading
           ? const SizedBox.square(
               dimension: 16,
               child: CircularProgressIndicator(strokeWidth: 2),
             )
-          : Text(label),
+          : const Icon(Icons.delete_sweep_outlined, size: 18),
+      label: Text(label),
+      style: TextButton.styleFrom(
+        foregroundColor: colors.accent,
+        visualDensity: VisualDensity.compact,
+      ),
     );
   }
+}
+
+enum _StorageCleanupTarget { mediaCache, downloadedWorks }
+
+class _StorageUsage {
+  const _StorageUsage({
+    required this.downloadedBytes,
+    required this.downloadedItems,
+  });
+
+  final int downloadedBytes;
+  final int downloadedItems;
 }
 
 String _formatBytes(int bytes) {

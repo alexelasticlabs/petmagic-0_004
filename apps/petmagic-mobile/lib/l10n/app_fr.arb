@@ -393,6 +393,8 @@
   "profileStorageDownloadedTitle": "Créations téléchargées",
   "profileStorageDownloadedSubtitle": "{size} stockés sur cet appareil",
   "@profileStorageDownloadedSubtitle": {"placeholders": {"size": {}}},
+  "profileStorageDownloadedItems": "{count} téléchargements disponibles hors ligne",
+  "@profileStorageDownloadedItems": {"placeholders": {"count": {}}},
   "profileStorageCleanupSection": "Nettoyer le stockage",
   "profileStorageMediaCacheTitle": "Cache multimédia temporaire",
   "profileStorageMediaCacheSubtitle": "Les images et aperçus seront téléchargés à nouveau si nécessaire.",

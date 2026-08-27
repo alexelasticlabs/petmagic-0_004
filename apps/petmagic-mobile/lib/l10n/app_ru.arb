@@ -578,6 +578,8 @@
   "profileStorageDownloadedTitle": "Скачанные работы",
   "profileStorageDownloadedSubtitle": "Занято на устройстве: {size}",
   "@profileStorageDownloadedSubtitle": {"placeholders": {"size": {}}},
+  "profileStorageDownloadedItems": "Доступно офлайн: {count}",
+  "@profileStorageDownloadedItems": {"placeholders": {"count": {}}},
   "profileStorageCleanupSection": "Очистка памяти",
   "profileStorageMediaCacheTitle": "Временный медиакэш",
   "profileStorageMediaCacheSubtitle": "Изображения и превью будут загружены заново при необходимости.",

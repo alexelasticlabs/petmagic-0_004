@@ -1842,6 +1842,11 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
+  String profileStorageDownloadedItems(Object count) {
+    return '$count descargas disponibles sin conexión';
+  }
+
+  @override
   String get profileStorageCleanupSection => 'Limpiar almacenamiento';
 
   @override

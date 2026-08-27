@@ -393,6 +393,8 @@
   "profileStorageDownloadedTitle": "Creazioni scaricate",
   "profileStorageDownloadedSubtitle": "{size} memorizzati su questo dispositivo",
   "@profileStorageDownloadedSubtitle": {"placeholders": {"size": {}}},
+  "profileStorageDownloadedItems": "{count} download disponibili offline",
+  "@profileStorageDownloadedItems": {"placeholders": {"count": {}}},
   "profileStorageCleanupSection": "Pulisci memoria",
   "profileStorageMediaCacheTitle": "Cache multimediale temporanea",
   "profileStorageMediaCacheSubtitle": "Immagini e anteprime verranno scaricate di nuovo quando necessario.",
