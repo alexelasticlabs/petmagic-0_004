@@ -62,4 +62,14 @@ describe("template phone preview visual contract", () => {
     expect(cssSource).toContain(".phoneAccessTag");
     expect(cssSource).toContain("padding-inline: 0.36rem;");
   });
+
+  it("keeps the Free access badge legible on the dark phone preview in every admin theme", () => {
+    const cssSource = readFileSync(phonePreviewCssPath, "utf8");
+    const freeBadgeRule = cssSource.match(/\.phoneAccessTagFree \{([\s\S]*?)\n\}/)?.[1] ?? "";
+    const freeIconRule = cssSource.match(/\.phoneAccessIconFree \{([\s\S]*?)\n\}/)?.[1] ?? "";
+
+    expect(freeBadgeRule).toContain("color: var(--text-inverse);");
+    expect(freeBadgeRule).not.toContain("--toast-success-fg");
+    expect(freeIconRule).toContain("color: var(--text-inverse);");
+  });
 });
