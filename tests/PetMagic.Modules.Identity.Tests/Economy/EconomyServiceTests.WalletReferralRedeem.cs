@@ -1951,6 +1951,48 @@ public sealed partial class EconomyServiceTests
     }
 
     [Fact]
+    public async Task CreatePackPurchaseAsync_ShouldUseStripePaymentSheetOnIos()
+    {
+        await using var dbContext = CreateDbContext();
+
+        dbContext.PaymentProviderConfigurations.Add(new PaymentProviderConfiguration
+        {
+            Id = Guid.NewGuid(),
+            Provider = "stripe",
+            Platform = "ios",
+            Region = "US",
+            IsEnabled = true,
+            IsRecommended = false,
+            IsSelectedByDefault = false,
+            RequiresExternalWarning = true,
+            RequiresStoreDisclosure = true,
+            AllowedFromAppVersion = "1.0.0",
+            ExternalCheckoutAllowed = true,
+            BonusTokensPercent = 0,
+            Mode = "test",
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+
+        var packId = AddStarterPack(dbContext);
+        var gateway = new FakePaymentGateway();
+        var service = CreateService(dbContext, gateway: gateway);
+
+        var result = await service.CreatePackPurchaseAsync(
+            new CreatePackPurchaseCommand(Guid.NewGuid(), packId, "USD", "stripe", "ios", "1.0.0", "US", "en-US"),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(result.Value.CheckoutUrl);
+        Assert.False(string.IsNullOrWhiteSpace(result.Value.PaymentIntentClientSecret));
+        Assert.False(string.IsNullOrWhiteSpace(result.Value.CustomerId));
+        Assert.False(string.IsNullOrWhiteSpace(result.Value.CustomerEphemeralKeySecret));
+        Assert.StartsWith("pk_test_", result.Value.PublishableKey, StringComparison.Ordinal);
+        Assert.NotNull(gateway.LastPaymentCreateRequest);
+        Assert.True(gateway.LastPaymentCreateRequest!.UsePaymentSheet);
+    }
+
+    [Fact]
     public async Task ListPremiumPlansAsync_ShouldReturnConfiguredPlans()
     {
         await using var dbContext = CreateDbContext();
@@ -2019,6 +2061,48 @@ public sealed partial class EconomyServiceTests
 
         var result = await service.CreatePremiumCheckoutAsync(
             new CreatePremiumCheckoutCommand(Guid.NewGuid(), "yearly", "stripe", "android", "1.0.0", "US", "en-US"),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : string.Empty);
+        Assert.Empty(result.Value.CheckoutUrl);
+        Assert.False(string.IsNullOrWhiteSpace(result.Value.PaymentIntentClientSecret));
+        Assert.False(string.IsNullOrWhiteSpace(result.Value.CustomerId));
+        Assert.False(string.IsNullOrWhiteSpace(result.Value.CustomerEphemeralKeySecret));
+        Assert.StartsWith("pk_test_", result.Value.PublishableKey, StringComparison.Ordinal);
+        Assert.NotNull(gateway.LastSubscriptionCheckoutRequest);
+        Assert.True(gateway.LastSubscriptionCheckoutRequest!.UsePaymentSheet);
+    }
+
+    [Fact]
+    public async Task CreatePremiumCheckoutAsync_ShouldUseStripePaymentSheetOnIos()
+    {
+        await using var dbContext = CreateDbContext();
+
+        dbContext.PaymentProviderConfigurations.Add(new PaymentProviderConfiguration
+        {
+            Id = Guid.NewGuid(),
+            Provider = "stripe",
+            Platform = "ios",
+            Region = "US",
+            IsEnabled = true,
+            IsRecommended = false,
+            IsSelectedByDefault = false,
+            RequiresExternalWarning = true,
+            RequiresStoreDisclosure = true,
+            AllowedFromAppVersion = "1.0.0",
+            ExternalCheckoutAllowed = true,
+            BonusTokensPercent = 0,
+            Mode = "test",
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        await dbContext.SaveChangesAsync();
+
+        var gateway = new FakePaymentGateway();
+        var service = CreateService(dbContext, gateway: gateway);
+
+        var result = await service.CreatePremiumCheckoutAsync(
+            new CreatePremiumCheckoutCommand(Guid.NewGuid(), "yearly", "stripe", "ios", "1.0.0", "US", "en-US"),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : string.Empty);

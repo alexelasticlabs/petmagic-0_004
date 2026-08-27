@@ -9,7 +9,7 @@ on:
         default: "1.0.0"
         type: string
       repair_subscription_group_localization:
-        description: Create the missing en-US customer-facing subscription group name only
+        description: Create missing customer-facing subscription group localizations for supported US and EU app locales
         required: true
         default: false
         type: boolean

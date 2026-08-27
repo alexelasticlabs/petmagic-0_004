@@ -431,6 +431,14 @@ public sealed partial class EconomyService
             return Result.Failure<PurchaseCheckoutResponse>(EconomyErrors.PaymentProviderUnavailable);
         }
 
+        if (!EconomyPaymentProviderPolicy.IsProviderAllowedForCheckout(
+                provider,
+                EconomyPaymentProviderPolicy.NormalizePlatform(command.Platform),
+                providerConfig))
+        {
+            return Result.Failure<PurchaseCheckoutResponse>(EconomyErrors.PaymentProviderUnavailable);
+        }
+
         string? stripeApiKey = null;
         if (isStripe)
         {
@@ -546,7 +554,7 @@ public sealed partial class EconomyService
         }
 
         var normalizedPlatform = EconomyPaymentProviderPolicy.NormalizePlatform(command.Platform);
-        var usePaymentSheet = normalizedPlatform == "android";
+        var usePaymentSheet = normalizedPlatform is "android" or "ios";
         string? stripePublishableKey = null;
         string? orderCustomerId = null;
 

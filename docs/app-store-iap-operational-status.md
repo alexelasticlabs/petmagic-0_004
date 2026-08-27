@@ -13,7 +13,7 @@ Last verified: 2026-08-27.
   - `com.petmagic.app.tokens.apple.viral`
 - Each product has a configured price and one `en-US` product localization.
 - The customer-facing `en-US` subscription group localization `Pet Video Magic Premium` was created through the protected production workflow.
-- The iOS backend configuration exposes only the App Store purchase route. Stripe is intentionally disabled on iOS; it remains an Android/web route.
+- The protected catalog workflow can create the same customer-facing group name for the supported application locales: `de-DE`, `es-ES`, `fr-FR`, `it-IT`, and `pl-PL`. Their live App Store Connect creation is pending the next protected workflow run.
 
 ## Blocking App Store configuration
 
@@ -29,7 +29,21 @@ Do not use a generated placeholder or an unrelated marketing asset. Capture real
 
 Upload each screenshot to its matching App Store Connect product. Then wait for App Store sandbox propagation and test a StoreKit Sandbox purchase, cancellation, restore, and backend reconciliation on a physical iPhone.
 
-## Stripe policy boundary
+## iOS Stripe storefront policy
 
-Premium access and PawSpark token packs are digital goods. The current iOS application must use Apple In-App Purchase for those flows. Enabling the existing Stripe option in all iOS storefronts is not a safe fix and can create App Review risk. Any future external-purchase path needs a separate storefront-by-storefront policy and entitlement review before implementation.
+Product-owner decision recorded on 2026-08-27: users in the United States and
+the 27 European Union storefronts may choose either App Store Billing or Stripe
+for Premium and PawSpark purchases. Stripe is a separate option, not the
+default; the application must keep both choices visible and require any
+provider-specific disclosures supplied by the API.
 
+The backend policy uses precise `US` and `EU` routes. `EU` matches `AT`, `BE`,
+`BG`, `HR`, `CY`, `CZ`, `DK`, `EE`, `FI`, `FR`, `DE`, `GR`, `HU`, `IE`, `IT`,
+`LV`, `LT`, `LU`, `MT`, `NL`, `PL`, `PT`, `RO`, `SK`, `SI`, `ES`, and `SE`.
+The global iOS Stripe route remains disabled, so Stripe is not exposed in other
+storefronts by fallback. iOS Stripe uses the native Stripe `PaymentSheet`, not
+a browser checkout.
+
+This is a product policy and source configuration change. It becomes live only
+after the corresponding VPS release and API checks for `US` plus an EU country
+confirm both `app_store` and `stripe` payment methods.

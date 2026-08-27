@@ -87,6 +87,73 @@ public sealed partial class EconomyServiceTests
     }
 
     [Fact]
+    public async Task GetPaywallConfigAsync_ShouldDescribeNativeStripePaymentSheetOnIos()
+    {
+        await using var dbContext = CreateDbContext();
+        dbContext.PaymentProviderConfigurations.Add(new PaymentProviderConfiguration
+        {
+            Id = Guid.NewGuid(),
+            Provider = "app_store",
+            Platform = "ios",
+            Region = "*",
+            IsEnabled = true,
+            IsRecommended = false,
+            IsSelectedByDefault = false,
+            RequiresExternalWarning = false,
+            RequiresStoreDisclosure = true,
+            AllowedFromAppVersion = "0.0.0",
+            ExternalCheckoutAllowed = false,
+            BonusTokensPercent = 0,
+            DisplayLabel = "App Store",
+            DisplaySubtitle = "Store-native checkout for iPhone and iPad.",
+            Mode = "test",
+            Notes = "Default App Store in-app flow.",
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        dbContext.PaymentProviderConfigurations.Add(new PaymentProviderConfiguration
+        {
+            Id = Guid.NewGuid(),
+            Provider = "stripe",
+            Platform = "ios",
+            Region = "US",
+            IsEnabled = true,
+            IsRecommended = false,
+            IsSelectedByDefault = false,
+            RequiresExternalWarning = true,
+            RequiresStoreDisclosure = true,
+            AllowedFromAppVersion = "1.0.0",
+            ExternalCheckoutAllowed = true,
+            BonusTokensPercent = 0,
+            DisplayLabel = "Stripe",
+            DisplaySubtitle = "Secure payment form inside PetMagic.",
+            WarningTitle = "Pay with Stripe",
+            WarningMessage = "Stripe payment opens in a secure payment form inside PetMagic.",
+            Mode = "test",
+            Notes = "iOS US Stripe route.",
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        await dbContext.SaveChangesAsync();
+
+        var result = await CreateService(dbContext).GetPaywallConfigAsync(
+            new GetPaywallConfigQuery("ios", "1.0.0", "US", "en-US"),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Collection(
+            result.Value.AvailablePaymentMethods,
+            method => Assert.Equal("app_store", method.Provider),
+            method => Assert.Equal("stripe", method.Provider));
+        var stripe = result.Value.AvailablePaymentMethods.Single(method => method.Provider == "stripe");
+        Assert.Equal("stripe", stripe.Provider);
+        Assert.Contains("inside PetMagic", stripe.WarningMessage, StringComparison.Ordinal);
+        Assert.DoesNotContain("Stripe-hosted", stripe.WarningMessage, StringComparison.Ordinal);
+        Assert.False(stripe.IsSelectedByDefault);
+        Assert.False(stripe.IsRecommended);
+    }
+
+    [Fact]
     public void VerifyStripeSignatureFallback_ShouldAcceptFreshTimestamp()
     {
         const string payload = "{\"id\":\"evt_test\",\"object\":\"event\"}";

@@ -31,14 +31,19 @@ public sealed partial class EconomyService
             return Result.Failure<PremiumCheckoutResponse>(EconomyErrors.PaymentProviderUnavailable);
         }
 
+        var normalizedPlatform = EconomyPaymentProviderPolicy.NormalizePlatform(command.Platform);
+        if (!EconomyPaymentProviderPolicy.IsProviderAllowedForCheckout(provider, normalizedPlatform, providerConfig))
+        {
+            return Result.Failure<PremiumCheckoutResponse>(EconomyErrors.PaymentProviderUnavailable);
+        }
+
         var stripeApiKey = ResolveStripeApiKey(providerConfig.Mode);
         if (string.IsNullOrWhiteSpace(stripeApiKey))
         {
             return Result.Failure<PremiumCheckoutResponse>(EconomyErrors.PaymentProviderUnavailable);
         }
 
-        var normalizedPlatform = EconomyPaymentProviderPolicy.NormalizePlatform(command.Platform);
-        var usePaymentSheet = normalizedPlatform == "android";
+        var usePaymentSheet = normalizedPlatform is "android" or "ios";
         string? stripePublishableKey = null;
         if (usePaymentSheet)
         {

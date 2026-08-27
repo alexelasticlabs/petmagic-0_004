@@ -155,7 +155,8 @@ public sealed partial class EconomyService
         var title = config.WarningTitle;
         var message = config.WarningMessage;
         var note = config.Notes;
-        var usesNativeAndroidPaymentSheet = string.Equals(platform, "android", StringComparison.OrdinalIgnoreCase);
+        var usesNativePaymentSheet = string.Equals(platform, "android", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(platform, "ios", StringComparison.OrdinalIgnoreCase);
         var isEuRegion = string.Equals(region, "EU", StringComparison.OrdinalIgnoreCase)
             || EconomyPaymentProviderPolicy.IsEuRegion(region);
         if (string.IsNullOrWhiteSpace(title))
@@ -163,7 +164,7 @@ public sealed partial class EconomyService
             title = "Pay with Stripe";
         }
 
-        if (usesNativeAndroidPaymentSheet)
+        if (usesNativePaymentSheet)
         {
             message = isEuRegion
                 ? "Stripe payment opens in a secure payment form inside PetMagic. Provider terms and support may differ from Google Play."
@@ -203,21 +204,8 @@ public sealed partial class EconomyService
 
     private static List<PaywallPaymentMethodResponse> SortPaymentMethods(IEnumerable<PaywallPaymentMethodResponse> methods)
     {
-        var source = methods.ToList();
-        var hasStripe = source.Any(x => IsStripeProvider(x.Provider));
-
-        if (hasStripe)
-        {
-            source = [.. source.Select(x => x with
-            {
-                IsSelectedByDefault = IsStripeProvider(x.Provider),
-                IsRecommended = IsStripeProvider(x.Provider)
-            })];
-        }
-
-        return [.. source
-            .OrderByDescending(x => IsStripeProvider(x.Provider))
-            .ThenByDescending(x => x.IsSelectedByDefault)
+        return [.. methods
+            .OrderByDescending(x => x.IsSelectedByDefault)
             .ThenByDescending(x => x.IsRecommended)
             .ThenBy(x => x.Provider, StringComparer.Ordinal)];
     }
@@ -230,7 +218,7 @@ public sealed partial class EconomyService
     private static PaywallLegalTextsResponse BuildPaywallLegalTexts(string? locale, string? platform)
     {
         if (string.Equals(
-            EconomyPaymentProviderPolicy.NormalizePlatform(platform),
+            EconomyPaymentProviderPolicy.NormalizePlatform(platform ?? "web"),
             "android",
             StringComparison.Ordinal))
         {

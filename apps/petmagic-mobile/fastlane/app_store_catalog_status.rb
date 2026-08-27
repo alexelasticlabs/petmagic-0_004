@@ -6,10 +6,11 @@ require "openssl"
 require "uri"
 require "jwt"
 
-# Read-only verification of the exact StoreKit catalog used by the iOS app.
-# The script deliberately never creates, edits, or submits App Store Connect
-# resources. It is run from the protected production GitHub environment so the
-# API key remains unavailable to a developer workstation or workflow log.
+# Verification of the exact StoreKit catalog used by the iOS app. The optional
+# repair mode creates only missing customer-facing subscription group
+# localizations for the supported US and EU app locales. It is run from the
+# protected production GitHub environment so the API key remains unavailable to
+# a developer workstation or workflow log.
 class AppStoreCatalogStatus
   API_BASE = "https://api.appstoreconnect.apple.com/v1"
 
@@ -23,6 +24,15 @@ class AppStoreCatalogStatus
     com.petmagic.app.tokens.apple.creator
     com.petmagic.app.tokens.apple.viral
   ].freeze
+
+  SUBSCRIPTION_GROUP_LOCALIZATIONS = {
+    "en-US" => "Pet Video Magic Premium",
+    "de-DE" => "Pet Video Magic Premium",
+    "es-ES" => "Pet Video Magic Premium",
+    "fr-FR" => "Pet Video Magic Premium",
+    "it-IT" => "Pet Video Magic Premium",
+    "pl-PL" => "Pet Video Magic Premium"
+  }.freeze
 
   def initialize
     @app_id = ENV.fetch("APP_STORE_CONNECT_APP_ID")
@@ -47,7 +57,7 @@ class AppStoreCatalogStatus
       )
     end
 
-    ensure_subscription_group_localization if repair_subscription_group_localization?
+    ensure_subscription_group_localizations if repair_subscription_group_localization?
 
     print_catalog("consumable", consumables)
     print_catalog("subscription", subscriptions)
@@ -156,7 +166,7 @@ class AppStoreCatalogStatus
     ENV.fetch("APP_STORE_CATALOG_REPAIR", "false") == "true"
   end
 
-  def ensure_subscription_group_localization
+  def ensure_subscription_group_localizations
     groups = subscription_groups
     raise "Expected exactly one App Store subscription group, found #{groups.length}" unless groups.length == 1
 
@@ -166,29 +176,35 @@ class AppStoreCatalogStatus
         "limit" => "200"
       )}"
     )
-    return if existing_localizations.any? { |localization| localization.dig("attributes", "locale") == "en-US" }
+    existing_locales = existing_localizations
+      .map { |localization| localization.dig("attributes", "locale") }
+      .compact
 
-    post(
-      "/subscriptionGroupLocalizations",
-      {
-        "data" => {
-          "type" => "subscriptionGroupLocalizations",
-          "attributes" => {
-            "locale" => "en-US",
-            "name" => "Pet Video Magic Premium"
-          },
-          "relationships" => {
-            "subscriptionGroup" => {
-              "data" => {
-                "type" => "subscriptionGroups",
-                "id" => group.fetch("id")
+    SUBSCRIPTION_GROUP_LOCALIZATIONS.each do |locale, name|
+      next if existing_locales.include?(locale)
+
+      post(
+        "/subscriptionGroupLocalizations",
+        {
+          "data" => {
+            "type" => "subscriptionGroupLocalizations",
+            "attributes" => {
+              "locale" => locale,
+              "name" => name
+            },
+            "relationships" => {
+              "subscriptionGroup" => {
+                "data" => {
+                  "type" => "subscriptionGroups",
+                  "id" => group.fetch("id")
+                }
               }
             }
           }
         }
-      }
-    )
-    puts "app_store_catalog_repair subscription_group_localization=en-US created"
+      )
+      puts "app_store_catalog_repair subscription_group_localization=#{locale} created"
+    end
   end
 
   def print_review_screenshot_status(kind, resources, resource_path)
