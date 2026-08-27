@@ -44,6 +44,8 @@ The global iOS Stripe route remains disabled, so Stripe is not exposed in other
 storefronts by fallback. iOS Stripe uses the native Stripe `PaymentSheet`, not
 a browser checkout.
 
-This is a product policy and source configuration change. It becomes live only
-after the corresponding VPS release and API checks for `US` plus an EU country
-confirm both `app_store` and `stripe` payment methods.
+The policy is live in the VPS revision `fa9a5be1`: public checkout-config API
+checks confirm `app_store` and `stripe` for `US` and `DE`, neither selected by
+default, and only `app_store` for `CA`. This is API-level evidence; a real
+iPhone still has to accept a Stripe PaymentSheet and complete a sandbox StoreKit
+purchase before either provider can be called payment-accepted.
