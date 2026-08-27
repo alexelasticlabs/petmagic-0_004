@@ -8,6 +8,11 @@ on:
         required: true
         default: "1.0.0"
         type: string
+      repair_subscription_group_localization:
+        description: Create the missing en-US customer-facing subscription group name only
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -52,4 +57,5 @@ jobs:
           APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
           APP_STORE_CONNECT_KEY_P8: ${{ secrets.APP_STORE_CONNECT_KEY_P8 }}
+          APP_STORE_CATALOG_REPAIR: ${{ inputs.repair_subscription_group_localization }}
         run: bundle exec fastlane ios catalog_status

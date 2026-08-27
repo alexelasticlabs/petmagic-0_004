@@ -47,6 +47,8 @@ class AppStoreCatalogStatus
       )
     end
 
+    ensure_subscription_group_localization if repair_subscription_group_localization?
+
     print_catalog("consumable", consumables)
     print_catalog("subscription", subscriptions)
     print_localization_status("consumable", consumables, "/v2/inAppPurchases", "inAppPurchaseLocalizations")
@@ -150,6 +152,46 @@ class AppStoreCatalogStatus
     end
   end
 
+  def repair_subscription_group_localization?
+    ENV.fetch("APP_STORE_CATALOG_REPAIR", "false") == "true"
+  end
+
+  def ensure_subscription_group_localization
+    groups = subscription_groups
+    raise "Expected exactly one App Store subscription group, found #{groups.length}" unless groups.length == 1
+
+    group = groups.first
+    existing_localizations = list_all(
+      "/subscriptionGroups/#{group.fetch("id")}/subscriptionGroupLocalizations?#{URI.encode_www_form(
+        "filter[locale]" => "en-US",
+        "limit" => "1"
+      )}"
+    )
+    return unless existing_localizations.empty?
+
+    post(
+      "/subscriptionGroupLocalizations",
+      {
+        "data" => {
+          "type" => "subscriptionGroupLocalizations",
+          "attributes" => {
+            "locale" => "en-US",
+            "name" => "Pet Video Magic Premium"
+          },
+          "relationships" => {
+            "subscriptionGroup" => {
+              "data" => {
+                "type" => "subscriptionGroups",
+                "id" => group.fetch("id")
+              }
+            }
+          }
+        }
+      }
+    )
+    puts "app_store_catalog_repair subscription_group_localization=en-US created"
+  end
+
   def print_review_screenshot_status(kind, resources, resource_path)
     resources.each do |resource|
       response = get_optional("#{resource_path}/#{resource.fetch("id")}/relationships/appStoreReviewScreenshot")
@@ -202,6 +244,23 @@ class AppStoreCatalogStatus
     raise "App Store Connect API GET #{uri.request_uri} returned HTTP #{response.code}: #{error_message}"
   rescue JSON::ParserError
     raise "App Store Connect API GET #{uri.request_uri} returned HTTP #{response.code}"
+  end
+
+  def post(path, payload)
+    uri = URI("#{API_BASE}#{path}")
+    request = Net::HTTP::Post.new(uri)
+    request["Authorization"] = "Bearer #{jwt}"
+    request["Accept"] = "application/json"
+    request["Content-Type"] = "application/json"
+    request.body = JSON.generate(payload)
+
+    response = Net::HTTP.start(uri.host, uri.port, use_ssl: true) { |http| http.request(request) }
+    return JSON.parse(response.body) if response.code.to_i == 201
+
+    error_message = JSON.parse(response.body).fetch("errors", []).map { |error| error["detail"] || error["title"] }.join("; ")
+    raise "App Store Connect API POST #{uri.request_uri} returned HTTP #{response.code}: #{error_message}"
+  rescue JSON::ParserError
+    raise "App Store Connect API POST #{uri.request_uri} returned HTTP #{response.code}"
   end
 
   def jwt
