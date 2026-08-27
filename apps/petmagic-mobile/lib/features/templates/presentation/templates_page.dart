@@ -35,7 +35,6 @@ import 'package:petmagic_mobile/features/templates/presentation/widgets/template
 import 'package:petmagic_mobile/features/templates/presentation/widgets/templates_top_bar.dart';
 import 'package:petmagic_mobile/features/wallet/application/wallet_controller.dart';
 import 'package:petmagic_mobile/shared/loading/magic_loading_screen.dart';
-import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
 import 'package:petmagic_mobile/shared/navigation/app_navigation_context.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_navigation_layout.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_action_sheet.dart';

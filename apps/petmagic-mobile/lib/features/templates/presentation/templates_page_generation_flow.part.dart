@@ -312,7 +312,7 @@ extension _TemplatesPageGenerationFlow on _TemplatesPageState {
 
       final selectedPet = pets.length == 1
           ? pets.first
-          : await _showPetPickerSheet(context, pets);
+          : await showTemplatePetPickerSheet(context, pets);
       if (!mounted || selectedPet == null) {
         return;
       }

@@ -764,9 +764,14 @@ void main() {
     await tester.tap(find.text('Bella').first);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
-    expect(find.byType(ListTile), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey<String>('pet-picker-option:pet-42')),
+      findsOneWidget,
+    );
 
-    await tester.tap(find.text('Bella').last);
+    await tester.tap(
+      find.byKey(const ValueKey<String>('pet-picker-option:pet-42')),
+    );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
