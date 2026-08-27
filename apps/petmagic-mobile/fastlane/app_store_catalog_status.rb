@@ -163,11 +163,10 @@ class AppStoreCatalogStatus
     group = groups.first
     existing_localizations = list_all(
       "/subscriptionGroups/#{group.fetch("id")}/subscriptionGroupLocalizations?#{URI.encode_www_form(
-        "filter[locale]" => "en-US",
-        "limit" => "1"
+        "limit" => "200"
       )}"
     )
-    return unless existing_localizations.empty?
+    return if existing_localizations.any? { |localization| localization.dig("attributes", "locale") == "en-US" }
 
     post(
       "/subscriptionGroupLocalizations",
