@@ -18,6 +18,7 @@ import 'package:petmagic_mobile/features/profile/presentation/profile_settings_d
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/storage_management_page.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
+import 'package:petmagic_mobile/shared/settings/app_settings_bottom_sheets.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
@@ -69,6 +70,15 @@ void main() {
     );
     expect(bottomSheetSource, contains('profileLanguageSheetOptions ='));
     expect(bottomSheetSource, contains('text.profileSettingsLanguageGerman'));
+  });
+
+  test('language options are sorted by their native labels', () {
+    expect(
+      profileLanguageSheetOptions
+          .map((option) => option.locale.languageCode)
+          .toList(growable: false),
+      const ['de', 'en', 'es', 'fr', 'it', 'pl', 'ru'],
+    );
   });
 
   testWidgets('theme sheet applies selected theme mode', (tester) async {

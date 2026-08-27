@@ -21,13 +21,13 @@ class ProfileLanguageSheetOption {
 }
 
 const profileLanguageSheetOptions = <ProfileLanguageSheetOption>[
-  ProfileLanguageSheetOption(locale: Locale('ru'), nativeLabel: 'Русский'),
-  ProfileLanguageSheetOption(locale: Locale('en'), nativeLabel: 'English'),
   ProfileLanguageSheetOption(locale: Locale('de'), nativeLabel: 'Deutsch'),
+  ProfileLanguageSheetOption(locale: Locale('en'), nativeLabel: 'English'),
   ProfileLanguageSheetOption(locale: Locale('es'), nativeLabel: 'Español'),
   ProfileLanguageSheetOption(locale: Locale('fr'), nativeLabel: 'Français'),
   ProfileLanguageSheetOption(locale: Locale('it'), nativeLabel: 'Italiano'),
   ProfileLanguageSheetOption(locale: Locale('pl'), nativeLabel: 'Polski'),
+  ProfileLanguageSheetOption(locale: Locale('ru'), nativeLabel: 'Русский'),
 ];
 
 String profileLanguageLabel(AppLocalizations text, Locale locale) {
@@ -59,34 +59,63 @@ Future<void> showProfileLanguageSheet({
     builder: (sheetContext, bottomInset) {
       return _ProfileSettingsSheetShell(
         bottomInset: bottomInset,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const _SheetHandle(),
-            const SizedBox(height: 18),
-            Text(
-              text.profileSettingsLanguageTitle,
-              style: TextStyle(
-                color: colors.textStrong,
-                fontSize: 36,
-                fontWeight: FontWeight.w900,
-                height: 1.05,
+        child: SizedBox(
+          height: MediaQuery.sizeOf(sheetContext).height * 0.72,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const _SheetHandle(),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(14),
+                      color: colors.accentSoft.withValues(alpha: 0.34),
+                    ),
+                    child: SizedBox(
+                      width: 42,
+                      height: 42,
+                      child: Icon(
+                        Icons.translate_rounded,
+                        color: colors.accent,
+                        size: 22,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      text.profileSettingsLanguageTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: colors.textStrong,
+                        fontSize: 28,
+                        fontWeight: FontWeight.w900,
+                        height: 1.1,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(height: 14),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: colors.border.withValues(alpha: 0.8)),
-                color: colors.surfaceStrong.withValues(alpha: 0.48),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(8),
-                child: Column(
-                  children: [
-                    for (final option in options)
-                      _LanguageTile(
+              const SizedBox(height: 14),
+              Expanded(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: colors.border.withValues(alpha: 0.74),
+                    ),
+                    color: colors.surfaceStrong.withValues(alpha: 0.28),
+                  ),
+                  child: ListView.separated(
+                    padding: const EdgeInsets.all(8),
+                    itemCount: options.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 6),
+                    itemBuilder: (context, index) {
+                      final option = options[index];
+                      return _LanguageTile(
                         locale: option.locale,
                         nativeLabel: option.nativeLabel,
                         isSelected: _isSameLocale(
@@ -99,19 +128,21 @@ Future<void> showProfileLanguageSheet({
                             Navigator.of(sheetContext).pop();
                           }
                         },
-                      ),
-                  ],
+                      );
+                    },
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Center(
-              child: TextButton(
-                onPressed: () => Navigator.of(sheetContext).pop(),
-                child: Text(text.walletRedeemCancelAction),
+              const SizedBox(height: 6),
+              Center(
+                child: TextButton.icon(
+                  onPressed: () => Navigator.of(sheetContext).pop(),
+                  icon: const Icon(Icons.close_rounded, size: 18),
+                  label: Text(text.walletRedeemCancelAction),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       );
     },
