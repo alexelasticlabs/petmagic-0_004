@@ -236,7 +236,11 @@ class NotificationCoordinator extends _NotificationCoordinatorBase
       return true;
     }
 
-    if (settings.authorizationStatus == AuthorizationStatus.denied) {
+    // On Android 13+, Firebase reports `denied` before the first runtime
+    // prompt as well as after a denial. Let Android decide whether it can
+    // display the prompt; iOS must not be prompted again after a denial.
+    if (settings.authorizationStatus == AuthorizationStatus.denied &&
+        !Platform.isAndroid) {
       return false;
     }
 

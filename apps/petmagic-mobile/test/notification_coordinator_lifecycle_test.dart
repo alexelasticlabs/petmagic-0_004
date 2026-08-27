@@ -149,6 +149,10 @@ void main() {
       expect(coordinatorSource, contains('requestPermission('));
       expect(coordinatorSource, contains('getNotificationSettings()'));
       expect(coordinatorSource, contains('_notificationsAllowed()'));
+      expect(
+        coordinatorSource,
+        contains('AuthorizationStatus.denied &&\n        !Platform.isAndroid'),
+      );
       expect(settingsSource, contains('requestPermission('));
     },
   );
