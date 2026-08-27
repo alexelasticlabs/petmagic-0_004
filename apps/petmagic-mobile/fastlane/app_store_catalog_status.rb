@@ -1,0 +1,129 @@
+# frozen_string_literal: true
+
+require "json"
+require "net/http"
+require "openssl"
+require "uri"
+require "jwt"
+
+# Read-only verification of the exact StoreKit catalog used by the iOS app.
+# The script deliberately never creates, edits, or submits App Store Connect
+# resources. It is run from the protected production GitHub environment so the
+# API key remains unavailable to a developer workstation or workflow log.
+class AppStoreCatalogStatus
+  API_BASE = "https://api.appstoreconnect.apple.com/v1"
+
+  EXPECTED_SUBSCRIPTION_IDS = %w[
+    com.petmagic.app.premium.monthly
+    com.petmagic.app.premium.yearly
+  ].freeze
+
+  EXPECTED_CONSUMABLE_IDS = %w[
+    com.petmagic.app.tokens.apple.starter
+    com.petmagic.app.tokens.apple.creator
+    com.petmagic.app.tokens.apple.viral
+  ].freeze
+
+  def initialize
+    @app_id = ENV.fetch("APP_STORE_CONNECT_APP_ID")
+    @key_id = ENV.fetch("APP_STORE_CONNECT_KEY_ID")
+    @issuer_id = ENV.fetch("APP_STORE_CONNECT_ISSUER_ID")
+    @private_key = OpenSSL::PKey::EC.new(ENV.fetch("APP_STORE_CONNECT_KEY_P8").gsub("\\n", "\n"))
+  end
+
+  def run
+    consumables = list_all(
+      "/apps/#{@app_id}/inAppPurchasesV2?#{URI.encode_www_form(
+        "fields[inAppPurchases]" => "name,productId,state,inAppPurchaseType",
+        "limit" => "200"
+      )}"
+    )
+    subscriptions = subscription_groups.flat_map do |group|
+      list_all(
+        "/subscriptionGroups/#{group.fetch("id")}/subscriptions?#{URI.encode_www_form(
+          "fields[subscriptions]" => "name,productId,state",
+          "limit" => "200"
+        )}"
+      )
+    end
+
+    print_catalog("consumable", consumables)
+    print_catalog("subscription", subscriptions)
+
+    verify_expected!("consumable", consumables, EXPECTED_CONSUMABLE_IDS)
+    verify_expected!("subscription", subscriptions, EXPECTED_SUBSCRIPTION_IDS)
+    puts "app_store_catalog_status=verified"
+  end
+
+  private
+
+  def subscription_groups
+    list_all(
+      "/apps/#{@app_id}/subscriptionGroups?#{URI.encode_www_form(
+        "fields[subscriptionGroups]" => "referenceName",
+        "limit" => "200"
+      )}"
+    )
+  end
+
+  def list_all(initial_path)
+    resources = []
+    path = initial_path
+
+    while path
+      response = get(path)
+      resources.concat(response.fetch("data"))
+      path = response.dig("links", "next")
+      path = URI(path).request_uri if path
+    end
+
+    resources
+  end
+
+  def print_catalog(kind, resources)
+    resources
+      .sort_by { |resource| resource.dig("attributes", "productId").to_s }
+      .each do |resource|
+        attributes = resource.fetch("attributes")
+        product_id = attributes.fetch("productId")
+        state = attributes.fetch("state", "UNKNOWN")
+        type = attributes.fetch("inAppPurchaseType", "AUTO_RENEWABLE_SUBSCRIPTION")
+        puts "app_store_catalog_item kind=#{kind} product_id=#{product_id} state=#{state} type=#{type}"
+      end
+  end
+
+  def verify_expected!(kind, resources, expected_ids)
+    actual_ids = resources.map { |resource| resource.dig("attributes", "productId") }.compact
+    missing_ids = expected_ids - actual_ids
+    return if missing_ids.empty?
+
+    raise "App Store #{kind} products are missing: #{missing_ids.join(", ")}"
+  end
+
+  def get(path)
+    uri = URI(path.start_with?("http") ? path : "#{API_BASE}#{path}")
+    request = Net::HTTP::Get.new(uri)
+    request["Authorization"] = "Bearer #{jwt}"
+    request["Accept"] = "application/json"
+
+    response = Net::HTTP.start(uri.host, uri.port, use_ssl: true) { |http| http.request(request) }
+    return JSON.parse(response.body) if response.code.to_i == 200
+
+    error_message = JSON.parse(response.body).fetch("errors", []).map { |error| error["detail"] || error["title"] }.join("; ")
+    raise "App Store Connect API GET #{uri.request_uri} returned HTTP #{response.code}: #{error_message}"
+  rescue JSON::ParserError
+    raise "App Store Connect API GET #{uri.request_uri} returned HTTP #{response.code}"
+  end
+
+  def jwt
+    now = Time.now.to_i
+    JWT.encode(
+      { "iss" => @issuer_id, "iat" => now - 30, "exp" => now + 600, "aud" => "appstoreconnect-v1" },
+      @private_key,
+      "ES256",
+      { "kid" => @key_id, "typ" => "JWT" }
+    )
+  end
+end
+
+AppStoreCatalogStatus.new.run

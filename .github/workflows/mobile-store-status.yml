@@ -46,3 +46,10 @@ jobs:
           APP_STORE_CONNECT_KEY_P8: ${{ secrets.APP_STORE_CONNECT_KEY_P8 }}
           APP_VERSION: ${{ inputs.ios_version }}
         run: bundle exec fastlane ios testflight_status
+      - name: Read App Store purchase catalog
+        env:
+          APP_STORE_CONNECT_APP_ID: "6796478761"
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_KEY_P8: ${{ secrets.APP_STORE_CONNECT_KEY_P8 }}
+        run: bundle exec fastlane ios catalog_status

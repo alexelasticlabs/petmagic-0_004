@@ -85,6 +85,14 @@ platform :ios do
     UI.message("TESTFLIGHT_LATEST_BUILD=#{latest_build}")
   end
 
+  desc "Read the App Store product catalog required by the iOS checkout flows"
+  lane :catalog_status do
+    sh(
+      "ruby",
+      File.expand_path("app_store_catalog_status.rb", __dir__)
+    )
+  end
+
   desc "Prepare private TestFlight groups for an existing processed build"
   lane :prepare_testflight_groups do
     sh(
