@@ -30,8 +30,10 @@ class AppStoreCatalogStatus
     "de-DE" => "Pet Video Magic Premium",
     "es-ES" => "Pet Video Magic Premium",
     "fr-FR" => "Pet Video Magic Premium",
-    "it-IT" => "Pet Video Magic Premium",
-    "pl-PL" => "Pet Video Magic Premium"
+    # App Store Connect uses language-only shortcodes for Italian and Polish
+    # subscription-group localizations (unlike de-DE, es-ES, and fr-FR).
+    "it" => "Pet Video Magic Premium",
+    "pl" => "Pet Video Magic Premium"
   }.freeze
 
   def initialize

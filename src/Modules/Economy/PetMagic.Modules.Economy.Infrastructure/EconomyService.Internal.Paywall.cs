@@ -166,8 +166,11 @@ public sealed partial class EconomyService
 
         if (usesNativePaymentSheet)
         {
+            var storeName = string.Equals(platform, "ios", StringComparison.OrdinalIgnoreCase)
+                ? "App Store"
+                : "Google Play";
             message = isEuRegion
-                ? "Stripe payment opens in a secure payment form inside PetMagic. Provider terms and support may differ from Google Play."
+                ? $"Stripe payment opens in a secure payment form inside PetMagic. Provider terms and support may differ from {storeName}."
                 : "Stripe payment opens in a secure payment form inside PetMagic. Your payment details are processed securely by Stripe.";
         }
         else if (string.IsNullOrWhiteSpace(message))

@@ -13,7 +13,7 @@ Last verified: 2026-08-27.
   - `com.petmagic.app.tokens.apple.viral`
 - Each product has a configured price and one `en-US` product localization.
 - The customer-facing `en-US` subscription group localization `Pet Video Magic Premium` was created through the protected production workflow.
-- The protected catalog workflow can create the same customer-facing group name for the supported application locales: `de-DE`, `es-ES`, `fr-FR`, `it-IT`, and `pl-PL`. Their live App Store Connect creation is pending the next protected workflow run.
+- The protected catalog workflow creates the same customer-facing group name for the supported application locales. App Store Connect accepts `de-DE`, `es-ES`, and `fr-FR`; its required shortcodes for the remaining locales are `it` and `pl` (not `it-IT`/`pl-PL`). The next protected workflow run will verify all six configured locales: `en-US`, `de-DE`, `es-ES`, `fr-FR`, `it`, `pl`.
 
 ## Blocking App Store configuration
 

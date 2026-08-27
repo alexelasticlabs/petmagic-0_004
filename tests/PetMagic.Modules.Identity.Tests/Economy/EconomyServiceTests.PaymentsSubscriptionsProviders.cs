@@ -116,7 +116,7 @@ public sealed partial class EconomyServiceTests
             Id = Guid.NewGuid(),
             Provider = "stripe",
             Platform = "ios",
-            Region = "US",
+            Region = "EU",
             IsEnabled = true,
             IsRecommended = false,
             IsSelectedByDefault = false,
@@ -130,14 +130,14 @@ public sealed partial class EconomyServiceTests
             WarningTitle = "Pay with Stripe",
             WarningMessage = "Stripe payment opens in a secure payment form inside PetMagic.",
             Mode = "test",
-            Notes = "iOS US Stripe route.",
+            Notes = "iOS EU Stripe route.",
             CreatedAtUtc = DateTime.UtcNow,
             UpdatedAtUtc = DateTime.UtcNow
         });
         await dbContext.SaveChangesAsync();
 
         var result = await CreateService(dbContext).GetPaywallConfigAsync(
-            new GetPaywallConfigQuery("ios", "1.0.0", "US", "en-US"),
+            new GetPaywallConfigQuery("ios", "1.0.0", "DE", "de-DE"),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -148,6 +148,8 @@ public sealed partial class EconomyServiceTests
         var stripe = result.Value.AvailablePaymentMethods.Single(method => method.Provider == "stripe");
         Assert.Equal("stripe", stripe.Provider);
         Assert.Contains("inside PetMagic", stripe.WarningMessage, StringComparison.Ordinal);
+        Assert.Contains("App Store", stripe.WarningMessage, StringComparison.Ordinal);
+        Assert.DoesNotContain("Google Play", stripe.WarningMessage, StringComparison.Ordinal);
         Assert.DoesNotContain("Stripe-hosted", stripe.WarningMessage, StringComparison.Ordinal);
         Assert.False(stripe.IsSelectedByDefault);
         Assert.False(stripe.IsRecommended);
