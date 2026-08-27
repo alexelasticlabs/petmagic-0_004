@@ -446,6 +446,14 @@ adding dated audit snapshots to the repository.
   completed iOS signing, archive, dSYM upload and TestFlight upload for
   `1.0.0 (22)` on 2026-08-27. Apple processing, TestFlight installation and
   physical-device/Sandbox acceptance remain separate evidence requirements.
+- The read-only
+  [`mobile-store-status` run `33026177629`](https://github.com/alexelasticlabs/petmagic-0_004/actions/runs/33026177629)
+  authenticated with the protected App Store Connect API key and read
+  `TESTFLIGHT_LATEST_BUILD=22` for iOS marketing version `1.0.0`. No binary,
+  TestFlight group, App Store metadata or review state was changed. This
+  confirms that Apple exposes build 22 through the TestFlight API, while
+  installation, Apple Sign In, StoreKit Sandbox and notification acceptance on
+  a physical iOS device remain pending.
 
 ## Automated Gates
 
