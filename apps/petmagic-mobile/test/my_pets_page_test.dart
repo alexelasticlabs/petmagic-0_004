@@ -271,6 +271,10 @@ void main() {
         expect(find.text('Bella'), findsOneWidget);
         expect(find.textContaining('3 photos'), findsOneWidget);
         expect(find.textContaining('7 generations'), findsOneWidget);
+        expect(
+          find.widgetWithText(FloatingActionButton, 'Add pet'),
+          findsOneWidget,
+        );
         final avatar = tester.widget<CachedNetworkImage>(
           find.byType(CachedNetworkImage).first,
         );
@@ -293,6 +297,7 @@ void main() {
 
     expect(find.text('Add your first pet'), findsOneWidget);
     expect(find.widgetWithText(FilledButton, 'Add pet'), findsOneWidget);
+    expect(find.widgetWithText(FloatingActionButton, 'Add pet'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

@@ -118,6 +118,7 @@ class _MyPetsPageState extends ConsumerState<MyPetsPage>
     }
 
     final pets = ref.watch(petsProvider);
+    final hasPets = pets.asData?.value.isNotEmpty ?? false;
     final petsLoadRequiresSignIn = _isUnauthorizedError(pets.asError?.error);
     final unavailableKind = petsLoadRequiresSignIn
         ? null
@@ -208,7 +209,8 @@ class _MyPetsPageState extends ConsumerState<MyPetsPage>
           },
         ),
       ),
-      floatingActionButton: petsLoadRequiresSignIn || unavailableKind != null
+      floatingActionButton:
+          petsLoadRequiresSignIn || unavailableKind != null || !hasPets
           ? null
           : FloatingActionButton.extended(
               onPressed: () => _showPetForm(context, ref),
