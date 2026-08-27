@@ -25,7 +25,7 @@ import 'wallet_page_test_support.dart';
 void main() {
   configureWidgetTestHarness();
 
-  test('wallet pack pricing copy uses backend template pricing source', () {
+  test('wallet pack copy uses user-facing value while keeping live pricing', () {
     final source = File(
       'lib/features/wallet/presentation/widgets/wallet_page_activity_widgets.dart',
     ).readAsStringSync();
@@ -37,6 +37,8 @@ void main() {
     ).readAsStringSync();
 
     expect(source, contains('templatePricing.usageLabel'));
+    expect(source, contains('_packBenefitLabel'));
+    expect(source, isNot(contains('_valuePerCurrencyLabel')));
     expect(pageSource, contains('templatesControllerProvider'));
     expect(pageSource, isNot(contains('_kWalletApproxPhotoCostSpark')));
     expect(pageSource, isNot(contains('_kWalletApproxVideoCostSpark')));
@@ -132,9 +134,14 @@ void main() {
         findsOneWidget,
       );
 
-      expect(find.text(text.walletPackDetailsAction), findsWidgets);
+      expect(
+        find.byKey(const ValueKey<String>('wallet-pack-option:starter')),
+        findsOneWidget,
+      );
 
-      await tester.tap(find.text(text.walletPackDetailsAction).first);
+      await tester.tap(
+        find.byKey(const ValueKey<String>('wallet-pack-option:starter')),
+      );
       await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.text(text.premiumPaymentStripe), findsAtLeastNWidgets(1));
@@ -619,9 +626,10 @@ void main() {
       expect(helpersSource, contains('text.premiumPaymentOther'));
       expect(helpersSource, isNot(contains('_ => method.provider')));
       expect(helpersSource, contains('text.walletSourceOther'));
-      expect(helpersSource, contains('NumberFormat.decimalPatternDigits('));
-      expect(helpersSource, contains('locale: text.localeName'));
-      expect(helpersSource, contains('decimalDigits: 1'));
+      expect(helpersSource, contains('String _packBenefitLabel('));
+      expect(helpersSource, contains('text.walletPackStarterDescription'));
+      expect(helpersSource, contains('text.walletPackCreatorDescription'));
+      expect(helpersSource, isNot(contains('_valuePerCurrencyLabel')));
       expect(helpersSource, isNot(contains("NumberFormat('0.0')")));
       expect(helpersSource, contains('String _formatPrice('));
       expect(helpersSource, contains('locale: localeTag'));

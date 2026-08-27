@@ -88,7 +88,7 @@ class _FeaturedPackTile extends StatelessWidget {
     final localeTag = Localizations.localeOf(context).toLanguageTag();
     final colors = context.petMagicColors;
     final price = displayPrice ?? _formatPrice(pack, localeTag);
-    final valueLabel = _valuePerCurrencyLabel(text, pack);
+    final benefitLabel = _packBenefitLabel(text, pack);
     final usageLabel = templatePricing.usageLabel(text, pack.totalSpark);
     final badgeLabel = isBestOffer
         ? '🔥 ${text.walletBestValueBadge}'
@@ -98,201 +98,217 @@ class _FeaturedPackTile extends StatelessWidget {
         : badgeLabel;
     final badgeColor = isBestOffer ? colors.gold : colors.accent;
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isBestOffer
-              ? badgeColor.withValues(alpha: 0.55)
-              : isPopular
-              ? colors.accent.withValues(alpha: 0.46)
-              : colors.border.withValues(alpha: 0.98),
-          width: isBestOffer ? 1.5 : 1.1,
-        ),
-        boxShadow: isBestOffer
-            ? [
-                BoxShadow(
-                  color: badgeColor.withValues(alpha: 0.12),
-                  blurRadius: 20,
-                  spreadRadius: 2,
-                  offset: const Offset(0, 4),
-                ),
-              ]
-            : null,
-        gradient: isBestOffer
-            ? LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                stops: const [0.0, 0.5, 1.0],
-                colors: [
-                  badgeColor.withValues(alpha: 0.10),
-                  colors.surfaceGlass,
-                  badgeColor.withValues(alpha: 0.05),
-                ],
-              )
-            : null,
-        color: isBestOffer ? null : colors.surfaceGlass,
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                SizedBox(
-                  width: 54,
-                  height: 54,
-                  child: Image.asset(
-                    _packImageAsset(pack.code),
-                    fit: BoxFit.contain,
-                    filterQuality: FilterQuality.medium,
+    return Semantics(
+      key: ValueKey<String>('wallet-pack-option:${pack.packId}'),
+      button: true,
+      label:
+          '${pack.displayName}. ${text.walletPackTotalSpark(pack.totalSpark)}. $price. $benefitLabel. $usageLabel',
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isBestOffer
+                ? badgeColor.withValues(alpha: 0.55)
+                : isPopular
+                ? colors.accent.withValues(alpha: 0.46)
+                : colors.border.withValues(alpha: 0.98),
+            width: isBestOffer ? 1.5 : 1.1,
+          ),
+          boxShadow: isBestOffer
+              ? [
+                  BoxShadow(
+                    color: badgeColor.withValues(alpha: 0.12),
+                    blurRadius: 20,
+                    spreadRadius: 2,
+                    offset: const Offset(0, 4),
                   ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                ]
+              : null,
+          gradient: isBestOffer
+              ? LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  stops: const [0.0, 0.5, 1.0],
+                  colors: [
+                    badgeColor.withValues(alpha: 0.10),
+                    colors.surfaceGlass,
+                    badgeColor.withValues(alpha: 0.05),
+                  ],
+                )
+              : null,
+          color: isBestOffer ? null : colors.surfaceGlass,
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(20),
+            onTap: isBuying ? null : onTap,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
-                      Text(
-                        pack.displayName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: colors.textStrong,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w900,
+                      SizedBox(
+                        width: 54,
+                        height: 54,
+                        child: Image.asset(
+                          _packImageAsset(pack.code),
+                          fit: BoxFit.contain,
+                          filterQuality: FilterQuality.medium,
                         ),
                       ),
-                      if (badgeLabel != null) ...[
-                        const SizedBox(height: 4),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(999),
-                            color: badgeColor.withValues(alpha: 0.22),
-                            border: Border.all(
-                              color: badgeColor.withValues(alpha: 0.42),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              pack.displayName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: colors.textStrong,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                              ),
                             ),
-                          ),
-                          child: Text(
-                            badgeLabelWithIcon!,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: badgeColor,
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
+                            if (badgeLabel != null) ...[
+                              const SizedBox(height: 4),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 3,
+                                ),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(999),
+                                  color: badgeColor.withValues(alpha: 0.22),
+                                  border: Border.all(
+                                    color: badgeColor.withValues(alpha: 0.42),
+                                  ),
+                                ),
+                                child: Text(
+                                  badgeLabelWithIcon!,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: badgeColor,
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
-                      ],
+                      ),
                     ],
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Expanded(
-                  child: FittedBox(
-                    alignment: Alignment.centerLeft,
-                    fit: BoxFit.scaleDown,
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          '${pack.totalSpark}',
-                          style: TextStyle(
-                            color: colors.textStrong,
-                            fontSize: 34,
-                            fontWeight: FontWeight.w900,
-                            height: 0.96,
+                  const SizedBox(height: 8),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        child: FittedBox(
+                          alignment: Alignment.centerLeft,
+                          fit: BoxFit.scaleDown,
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                '${pack.totalSpark}',
+                                style: TextStyle(
+                                  color: colors.textStrong,
+                                  fontSize: 34,
+                                  fontWeight: FontWeight.w900,
+                                  height: 0.96,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              const PawSparkIcon(size: 16),
+                              const SizedBox(width: 6),
+                              Text(
+                                text.walletBalanceUnit,
+                                style: TextStyle(
+                                  color: colors.accent,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(width: 4),
-                        const PawSparkIcon(size: 16),
-                        const SizedBox(width: 6),
-                        Text(
-                          text.walletBalanceUnit,
+                      ),
+                      const SizedBox(width: 10),
+                      FilledButton(
+                        onPressed: isBuying ? null : onTap,
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size(104, 36),
+                          backgroundColor: colors.accent,
+                          disabledBackgroundColor: colors.surfaceStrong
+                              .withValues(alpha: 0.95),
+                          foregroundColor: Theme.of(
+                            context,
+                          ).colorScheme.onPrimary,
+                          disabledForegroundColor: colors.textMuted,
+                          textStyle: Theme.of(context).textTheme.labelLarge
+                              ?.copyWith(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w900,
+                              ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: Text(price),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(
+                        pack.bonusSpark > 0
+                            ? Icons.card_giftcard_rounded
+                            : Icons.auto_awesome_rounded,
+                        color: pack.bonusSpark > 0
+                            ? colors.gold
+                            : colors.accent,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          benefitLabel,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: colors.accent,
-                            fontSize: 14,
+                            color: pack.bonusSpark > 0
+                                ? colors.gold
+                                : colors.textSoft,
+                            fontSize: 12,
                             fontWeight: FontWeight.w800,
                           ),
                         ),
-                      ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    usageLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: colors.textMuted,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                ),
-                const SizedBox(width: 10),
-                FilledButton(
-                  onPressed: isBuying ? null : onTap,
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size(104, 36),
-                    backgroundColor: colors.accent,
-                    disabledBackgroundColor: colors.surfaceStrong.withValues(
-                      alpha: 0.95,
-                    ),
-                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                    disabledForegroundColor: colors.textMuted,
-                    textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w900,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: Text(price),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text(
-              valueLabel,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: colors.textSoft,
-                fontSize: 11.5,
-                fontWeight: FontWeight.w700,
+                ],
               ),
             ),
-            const SizedBox(height: 4),
-            Text(
-              usageLabel,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: colors.textSoft,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton(
-                onPressed: isBuying ? null : onTap,
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 0),
-                  minimumSize: const Size(0, 30),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  foregroundColor: colors.textSoft,
-                  textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                child: Text(text.walletPackDetailsAction),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );

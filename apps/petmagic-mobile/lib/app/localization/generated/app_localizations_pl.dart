@@ -904,21 +904,21 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String walletApproxGenerations(Object count) {
-    return '≈ $count generacji według aktualnych cen szablonów';
+    return 'Wystarczy na około $count kreacji';
   }
 
   @override
   String walletApproxGenerationRange(Object fromCount, Object toCount) {
-    return '≈ $fromCount-$toCount generacji według aktualnych cen szablonów';
+    return 'Wystarczy na około $fromCount–$toCount kreacji';
   }
 
   @override
   String get walletApproxGenerationBelowOne =>
-      'Mniej niż jedna generacja według aktualnych cen szablonów';
+      'Mały zastrzyk na kolejną kreację';
 
   @override
   String get walletGenerationPricingUnavailable =>
-      'Ceny szablonów są ładowane z PetMagic.';
+      'Gotowe do tworzenia zdjęć i filmów';
 
   @override
   String get walletContactSupportAction => 'Skontaktuj się z pomocą techniczną';
@@ -1132,6 +1132,18 @@ class AppLocalizationsPl extends AppLocalizations {
   String walletPackBaseSpark(Object count) {
     return '$count baza';
   }
+
+  @override
+  String get walletPackStarterDescription =>
+      'Łagodny start dla pierwszych kreacji';
+
+  @override
+  String get walletPackCreatorDescription =>
+      'Więcej swobody dla ulubionych pomysłów';
+
+  @override
+  String get walletPackViralDescription =>
+      'Największy zastrzyk dla dużych pomysłów';
 
   @override
   String walletBuyForPrice(Object price) {

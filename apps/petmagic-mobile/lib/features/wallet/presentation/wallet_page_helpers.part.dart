@@ -83,17 +83,17 @@ String? _walletStoreUnavailableSubtitle(
   };
 }
 
-String _valuePerCurrencyLabel(AppLocalizations text, CurrencyPackModel pack) {
-  if (pack.priceAmount <= 0) {
-    return '-';
+String _packBenefitLabel(AppLocalizations text, CurrencyPackModel pack) {
+  if (pack.bonusSpark > 0) {
+    return text.walletPackBonusPill(pack.bonusSpark);
   }
 
-  final sparkPerUnit = pack.totalSpark / pack.priceAmount;
-  final formatted = NumberFormat.decimalPatternDigits(
-    locale: text.localeName,
-    decimalDigits: 1,
-  ).format(sparkPerUnit);
-  return '$formatted ${text.walletBalanceUnit} / ${pack.currencyCode}1';
+  return switch (pack.code) {
+    'starter' => text.walletPackStarterDescription,
+    'creator' => text.walletPackCreatorDescription,
+    'viral' => text.walletPackViralDescription,
+    _ => text.walletPackUsageNote,
+  };
 }
 
 String _formatPrice(CurrencyPackModel pack, String localeTag) {

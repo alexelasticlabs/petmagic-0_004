@@ -1761,25 +1761,25 @@ abstract class AppLocalizations {
   /// No description provided for @walletApproxGenerations.
   ///
   /// In en, this message translates to:
-  /// **'≈ {count} generations at current template prices'**
+  /// **'Enough for about {count} creations'**
   String walletApproxGenerations(Object count);
 
   /// No description provided for @walletApproxGenerationRange.
   ///
   /// In en, this message translates to:
-  /// **'≈ {fromCount}-{toCount} generations at current template prices'**
+  /// **'Enough for about {fromCount}–{toCount} creations'**
   String walletApproxGenerationRange(Object fromCount, Object toCount);
 
   /// No description provided for @walletApproxGenerationBelowOne.
   ///
   /// In en, this message translates to:
-  /// **'Less than one generation at current template prices'**
+  /// **'A little boost for your next creation'**
   String get walletApproxGenerationBelowOne;
 
   /// No description provided for @walletGenerationPricingUnavailable.
   ///
   /// In en, this message translates to:
-  /// **'Template prices are loading from PetMagic.'**
+  /// **'Ready for photo and video creations'**
   String get walletGenerationPricingUnavailable;
 
   /// No description provided for @walletContactSupportAction.
@@ -2141,6 +2141,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count} base'**
   String walletPackBaseSpark(Object count);
+
+  /// No description provided for @walletPackStarterDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'A gentle start for your first creations'**
+  String get walletPackStarterDescription;
+
+  /// No description provided for @walletPackCreatorDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'More room for your favourite ideas'**
+  String get walletPackCreatorDescription;
+
+  /// No description provided for @walletPackViralDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'The biggest boost for ambitious ideas'**
+  String get walletPackViralDescription;
 
   /// No description provided for @walletBuyForPrice.
   ///

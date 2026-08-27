@@ -896,21 +896,21 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String walletApproxGenerations(Object count) {
-    return '≈ $count генераций по текущим ценам шаблонов';
+    return 'Хватит примерно на $count творений';
   }
 
   @override
   String walletApproxGenerationRange(Object fromCount, Object toCount) {
-    return '≈ $fromCount-$toCount генераций по текущим ценам шаблонов';
+    return 'Хватит примерно на $fromCount–$toCount творений';
   }
 
   @override
   String get walletApproxGenerationBelowOne =>
-      'Меньше одной генерации по текущим ценам шаблонов';
+      'Немного PawSpark для следующей идеи';
 
   @override
   String get walletGenerationPricingUnavailable =>
-      'Цены шаблонов загружаются из PetMagic.';
+      'Создавайте фото и видео для питомца';
 
   @override
   String get walletContactSupportAction => 'Связаться с поддержкой';
@@ -1123,6 +1123,15 @@ class AppLocalizationsRu extends AppLocalizations {
   String walletPackBaseSpark(Object count) {
     return '$count база';
   }
+
+  @override
+  String get walletPackStarterDescription => 'Для первых волшебных идей';
+
+  @override
+  String get walletPackCreatorDescription => 'Больше свободы для любимых идей';
+
+  @override
+  String get walletPackViralDescription => 'Максимум PawSpark для больших идей';
 
   @override
   String walletBuyForPrice(Object price) {
