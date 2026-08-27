@@ -51,6 +51,8 @@ class AppStoreCatalogStatus
     print_catalog("subscription", subscriptions)
     print_localization_status("consumable", consumables, "/v2/inAppPurchases", "inAppPurchaseLocalizations")
     print_localization_status("subscription", subscriptions, "subscriptions", "subscriptionLocalizations")
+    print_consumable_price_status(consumables)
+    print_subscription_price_status(subscriptions)
 
     verify_expected!("consumable", consumables, EXPECTED_CONSUMABLE_IDS)
     verify_expected!("subscription", subscriptions, EXPECTED_SUBSCRIPTION_IDS)
@@ -113,6 +115,34 @@ class AppStoreCatalogStatus
       )
       locales = localizations.map { |localization| localization.dig("attributes", "locale") }.compact.sort
       puts "app_store_catalog_localizations kind=#{kind} product_id=#{product_id} count=#{localizations.length} locales=#{locales.join(",")}"
+    end
+  end
+
+  def print_consumable_price_status(resources)
+    resources.each do |resource|
+      schedule = get(
+        "/v2/inAppPurchases/#{resource.fetch("id")}/iapPriceSchedule?#{URI.encode_www_form(
+          "include" => "manualPrices,automaticPrices",
+          "limit[manualPrices]" => "50",
+          "limit[automaticPrices]" => "50"
+        )}"
+      ).fetch("data")
+      relationships = schedule.fetch("relationships", {})
+      manual_count = relationships.dig("manualPrices", "data")&.length || 0
+      automatic_count = relationships.dig("automaticPrices", "data")&.length || 0
+      puts "app_store_catalog_prices kind=consumable product_id=#{resource.dig("attributes", "productId")} manual=#{manual_count} automatic=#{automatic_count}"
+    end
+  end
+
+  def print_subscription_price_status(resources)
+    resources.each do |resource|
+      prices = list_all(
+        "/subscriptions/#{resource.fetch("id")}/prices?#{URI.encode_www_form(
+          "filter[territory]" => "USA",
+          "limit" => "200"
+        )}"
+      )
+      puts "app_store_catalog_prices kind=subscription product_id=#{resource.dig("attributes", "productId")} usa=#{prices.length}"
     end
   end
 
