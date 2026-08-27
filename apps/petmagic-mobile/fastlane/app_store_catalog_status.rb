@@ -49,6 +49,8 @@ class AppStoreCatalogStatus
 
     print_catalog("consumable", consumables)
     print_catalog("subscription", subscriptions)
+    print_localization_status("consumable", consumables, "inAppPurchases", "inAppPurchaseLocalizations")
+    print_localization_status("subscription", subscriptions, "subscriptions", "subscriptionLocalizations")
 
     verify_expected!("consumable", consumables, EXPECTED_CONSUMABLE_IDS)
     verify_expected!("subscription", subscriptions, EXPECTED_SUBSCRIPTION_IDS)
@@ -98,6 +100,20 @@ class AppStoreCatalogStatus
     return if missing_ids.empty?
 
     raise "App Store #{kind} products are missing: #{missing_ids.join(", ")}"
+  end
+
+  def print_localization_status(kind, resources, resource_path, localization_path)
+    resources.each do |resource|
+      product_id = resource.dig("attributes", "productId")
+      localizations = list_all(
+        "/#{resource_path}/#{resource.fetch("id")}/#{localization_path}?#{URI.encode_www_form(
+          "fields[#{localization_path}]" => "locale,name,description,state",
+          "limit" => "200"
+        )}"
+      )
+      locales = localizations.map { |localization| localization.dig("attributes", "locale") }.compact.sort
+      puts "app_store_catalog_localizations kind=#{kind} product_id=#{product_id} count=#{localizations.length} locales=#{locales.join(",")}"
+    end
   end
 
   def get(path)
