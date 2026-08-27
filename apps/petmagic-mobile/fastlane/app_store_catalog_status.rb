@@ -49,7 +49,7 @@ class AppStoreCatalogStatus
 
     print_catalog("consumable", consumables)
     print_catalog("subscription", subscriptions)
-    print_localization_status("consumable", consumables, "inAppPurchases", "inAppPurchaseLocalizations")
+    print_localization_status("consumable", consumables, "/v2/inAppPurchases", "inAppPurchaseLocalizations")
     print_localization_status("subscription", subscriptions, "subscriptions", "subscriptionLocalizations")
 
     verify_expected!("consumable", consumables, EXPECTED_CONSUMABLE_IDS)
@@ -117,7 +117,8 @@ class AppStoreCatalogStatus
   end
 
   def get(path)
-    uri = URI(path.start_with?("http") ? path : "#{API_BASE}#{path}")
+    api_base = path.start_with?("/v2/") ? API_BASE.delete_suffix("/v1") : API_BASE
+    uri = URI(path.start_with?("http") ? path : "#{api_base}#{path}")
     request = Net::HTTP::Get.new(uri)
     request["Authorization"] = "Bearer #{jwt}"
     request["Accept"] = "application/json"
