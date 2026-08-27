@@ -70,6 +70,21 @@ class TestflightDistribution
     attributes = build.fetch("attributes")
     raise "TestFlight build is expired" if attributes.fetch("expired")
     raise "TestFlight build is not processed: #{attributes.fetch("processingState")}" unless attributes.fetch("processingState") == "VALID"
+
+    beta_attributes = get(
+      "/builds/#{build.fetch("id")}/buildBetaDetail?#{URI.encode_www_form(
+        "fields[buildBetaDetails]" => "internalBuildState,externalBuildState,autoNotifyEnabled"
+      )}"
+    ).fetch("data").fetch("attributes")
+    internal_state = beta_attributes.fetch("internalBuildState")
+    external_state = beta_attributes.fetch("externalBuildState")
+
+    puts "testflight_internal_build_state=#{internal_state}"
+    puts "testflight_external_build_state=#{external_state}"
+
+    return if %w[READY_FOR_BETA_TESTING IN_BETA_TESTING].include?(internal_state)
+
+    raise "TestFlight build is not internally testable: #{internal_state}"
   end
 
   def find_or_create_group(name, internal)
