@@ -933,6 +933,37 @@ void main() {
   );
 
   testWidgets(
+    'TemplateCard keeps the PawSpark price visible for featured templates',
+    (tester) async {
+      await tester.pumpWidget(
+        buildTemplateCardHost(
+          const TemplateItem(
+            templateId: 'featured-price',
+            templateType: TemplateType.image,
+            title: 'Featured price',
+            shortDescription: 'A compact featured template.',
+            petPhotoRequirements: ['Clear face'],
+            category: 'Funny',
+            tags: ['funny'],
+            isPremium: false,
+            tokenCost: 5,
+          ),
+          theme: AppTheme.dark(),
+          size: const Size(188, 260),
+          featuredData: const TemplateCardFeaturedData(
+            badgeLabel: 'Template of the day',
+            actionLabel: 'Try template',
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('5'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'TemplateCard constrains Russian featured badge on phone-width cards',
     (tester) async {
       await tester.pumpWidget(

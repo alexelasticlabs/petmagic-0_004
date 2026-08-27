@@ -117,26 +117,16 @@ class _FeaturedPackTile extends StatelessWidget {
           boxShadow: isBestOffer
               ? [
                   BoxShadow(
-                    color: badgeColor.withValues(alpha: 0.12),
-                    blurRadius: 20,
-                    spreadRadius: 2,
+                    color: colors.shadow.withValues(alpha: 0.16),
+                    blurRadius: 14,
                     offset: const Offset(0, 4),
                   ),
                 ]
               : null,
-          gradient: isBestOffer
-              ? LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  stops: const [0.0, 0.5, 1.0],
-                  colors: [
-                    badgeColor.withValues(alpha: 0.10),
-                    colors.surfaceGlass,
-                    badgeColor.withValues(alpha: 0.05),
-                  ],
-                )
-              : null,
-          color: isBestOffer ? null : colors.surfaceGlass,
+          // The best-value state is conveyed by the gold badge and border.
+          // A flat surface keeps the pack readable instead of tinting its whole
+          // card with a muddy gold gradient.
+          color: isBestOffer ? colors.surfaceStrong : colors.surfaceGlass,
         ),
         child: Material(
           color: Colors.transparent,

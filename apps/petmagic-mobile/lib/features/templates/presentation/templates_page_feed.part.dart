@@ -57,7 +57,9 @@ TemplateItem _mergeFeaturedTemplateWithVisibleItem({
         : featured.category,
     tags: featured.tags.isNotEmpty ? featured.tags : template.tags,
     isPremium: featured.isPremium || template.isPremium,
-    tokenCost: template.tokenCost,
+    // The daily-featured endpoint is the source of truth for the offer shown
+    // in this slot. It can differ from a cached catalogue card.
+    tokenCost: featured.tokenCost,
     effectivePromoBadge: template.effectivePromoBadge,
     thumbnailUrl: template.thumbnailUrl ?? fallbackTemplate.thumbnailUrl,
     previewAsset: template.previewAsset ?? fallbackTemplate.previewAsset,

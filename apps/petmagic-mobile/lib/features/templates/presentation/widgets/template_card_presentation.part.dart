@@ -110,6 +110,10 @@ class _TemplateDetails extends StatelessWidget {
             spacing: 6,
             runSpacing: 6,
             children: [
+              // Keep the purchase decision visible on the featured card too:
+              // featured metadata supplements the normal card information,
+              // rather than replacing it.
+              _TokenChip(cost: template.tokenCost),
               if (featuredCountdownLabel != null)
                 _TemplateFeaturedMetaChip(
                   icon: Icons.timer_outlined,

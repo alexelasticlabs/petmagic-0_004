@@ -128,25 +128,33 @@ class _HighlightBadge extends StatelessWidget {
           ),
         ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.auto_awesome_rounded, size: 11, color: foreground),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: foreground,
-                fontSize: 9.5,
-                fontWeight: FontWeight.w900,
-                height: 1,
+      child: ConstrainedBox(
+        // A featured badge shares the narrow card header with the media type.
+        // Without a finite width, Row lays out long localized labels at their
+        // intrinsic width and can overflow the 188 px catalogue card.
+        constraints: const BoxConstraints(maxWidth: 146),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.auto_awesome_rounded, size: 11, color: foreground),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: foreground,
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w900,
+                    height: 1,
+                  ),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

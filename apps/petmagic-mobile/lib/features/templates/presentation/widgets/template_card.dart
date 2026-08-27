@@ -33,7 +33,7 @@ class TemplateCardFeaturedData {
     this.countdownTarget,
     this.popularityCount,
     this.isNew = false,
-    this.showPopularityTodayFallback = true,
+    this.showPopularityTodayFallback = false,
   });
 
   final String badgeLabel;

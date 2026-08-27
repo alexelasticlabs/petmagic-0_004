@@ -287,13 +287,7 @@ class _BalancePanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
-    final panelGradient = [
-      colors.accentSoft.withValues(alpha: 0.95),
-      colors.surfaceStrong.withValues(alpha: 0.98),
-      colors.surface.withValues(alpha: 0.98),
-    ];
-    final panelBorder = colors.accent.withValues(alpha: 0.26);
-    final panelGlow = colors.accent.withValues(alpha: 0.12);
+    final panelBorder = colors.accent.withValues(alpha: 0.38);
     final eyebrowColor = colors.accent;
 
     return Container(
@@ -301,64 +295,75 @@ class _BalancePanel extends StatelessWidget {
       padding: EdgeInsets.fromLTRB(16, 12, rightInset, 12),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
-        gradient: LinearGradient(
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-          colors: panelGradient,
-        ),
+        color: colors.surfaceStrong,
         border: Border.all(color: panelBorder),
         boxShadow: [
           BoxShadow(
-            color: panelGlow,
-            blurRadius: 34,
-            offset: const Offset(0, 18),
+            color: colors.shadow.withValues(alpha: 0.22),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
+      child: Row(
         children: [
-          Text(
-            text.walletBalanceEyebrow,
-            maxLines: 1,
-            style: TextStyle(
-              color: eyebrowColor,
-              fontSize: 14,
-              fontWeight: FontWeight.w900,
+          Container(
+            width: 4,
+            height: 54,
+            decoration: BoxDecoration(
+              color: colors.accent,
+              borderRadius: BorderRadius.circular(999),
             ),
           ),
-          const SizedBox(height: 5),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: Row(
-                children: [
-                  Text(
-                    balanceValue,
-                    style: TextStyle(
-                      color: colors.textStrong,
-                      fontSize: 39,
-                      height: 1,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: -0.8,
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  text.walletBalanceEyebrow,
+                  maxLines: 1,
+                  style: TextStyle(
+                    color: eyebrowColor,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Row(
+                      children: [
+                        Text(
+                          balanceValue,
+                          style: TextStyle(
+                            color: colors.textStrong,
+                            fontSize: 39,
+                            height: 1,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.8,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        const PawSparkIcon(size: 22),
+                        const SizedBox(width: 6),
+                        Text(
+                          unit,
+                          style: TextStyle(
+                            color: colors.textStrong,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 6),
-                  const PawSparkIcon(size: 22),
-                  const SizedBox(width: 6),
-                  Text(
-                    unit,
-                    style: TextStyle(
-                      color: colors.textStrong,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ],

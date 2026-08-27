@@ -1116,6 +1116,7 @@ void main() {
 
     expect(visibleCards, isNotEmpty);
     expect(visibleCards.first.template.templateId, 'template-2');
+    expect(visibleCards.first.template.tokenCost, 5);
     expect(visibleCards.first.featuredData, isNotNull);
     expect(find.text(text.templateOfTheDayTitle), findsNothing);
     expect(find.text('Daily portrait'), findsOneWidget);
