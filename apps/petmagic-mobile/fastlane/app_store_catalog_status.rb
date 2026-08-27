@@ -51,8 +51,11 @@ class AppStoreCatalogStatus
     print_catalog("subscription", subscriptions)
     print_localization_status("consumable", consumables, "/v2/inAppPurchases", "inAppPurchaseLocalizations")
     print_localization_status("subscription", subscriptions, "subscriptions", "subscriptionLocalizations")
+    print_subscription_group_localization_status
     print_consumable_price_status(consumables)
     print_subscription_price_status(subscriptions)
+    print_review_screenshot_status("consumable", consumables, "/v2/inAppPurchases")
+    print_review_screenshot_status("subscription", subscriptions, "/subscriptions")
 
     verify_expected!("consumable", consumables, EXPECTED_CONSUMABLE_IDS)
     verify_expected!("subscription", subscriptions, EXPECTED_SUBSCRIPTION_IDS)
@@ -134,6 +137,28 @@ class AppStoreCatalogStatus
     end
   end
 
+  def print_subscription_group_localization_status
+    subscription_groups.each do |group|
+      localizations = list_all(
+        "/subscriptionGroups/#{group.fetch("id")}/subscriptionGroupLocalizations?#{URI.encode_www_form(
+          "fields[subscriptionGroupLocalizations]" => "locale,name,state",
+          "limit" => "200"
+        )}"
+      )
+      locales = localizations.map { |localization| localization.dig("attributes", "locale") }.compact.sort
+      puts "app_store_catalog_group_localizations group=#{group.dig("attributes", "referenceName")} count=#{localizations.length} locales=#{locales.join(",")}"
+    end
+  end
+
+  def print_review_screenshot_status(kind, resources, resource_path)
+    resources.each do |resource|
+      response = get_optional("#{resource_path}/#{resource.fetch("id")}/relationships/appStoreReviewScreenshot")
+      review_screenshot_id = response&.dig("data", "id")
+      status = review_screenshot_id ? "present" : "missing"
+      puts "app_store_catalog_review_screenshot kind=#{kind} product_id=#{resource.dig("attributes", "productId")} status=#{status}"
+    end
+  end
+
   def print_subscription_price_status(resources)
     resources.each do |resource|
       prices = list_all(
@@ -155,6 +180,23 @@ class AppStoreCatalogStatus
 
     response = Net::HTTP.start(uri.host, uri.port, use_ssl: true) { |http| http.request(request) }
     return JSON.parse(response.body) if response.code.to_i == 200
+
+    error_message = JSON.parse(response.body).fetch("errors", []).map { |error| error["detail"] || error["title"] }.join("; ")
+    raise "App Store Connect API GET #{uri.request_uri} returned HTTP #{response.code}: #{error_message}"
+  rescue JSON::ParserError
+    raise "App Store Connect API GET #{uri.request_uri} returned HTTP #{response.code}"
+  end
+
+  def get_optional(path)
+    api_base = path.start_with?("/v2/") ? API_BASE.delete_suffix("/v1") : API_BASE
+    uri = URI(path.start_with?("http") ? path : "#{api_base}#{path}")
+    request = Net::HTTP::Get.new(uri)
+    request["Authorization"] = "Bearer #{jwt}"
+    request["Accept"] = "application/json"
+
+    response = Net::HTTP.start(uri.host, uri.port, use_ssl: true) { |http| http.request(request) }
+    return JSON.parse(response.body) if response.code.to_i == 200
+    return nil if response.code.to_i == 404
 
     error_message = JSON.parse(response.body).fetch("errors", []).map { |error| error["detail"] || error["title"] }.join("; ")
     raise "App Store Connect API GET #{uri.request_uri} returned HTTP #{response.code}: #{error_message}"
