@@ -528,14 +528,16 @@
 .accessOptions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.55rem;
+  gap: 0.7rem;
 }
 
 .accessOption {
-  border: 1px solid var(--border-soft);
-  border-radius: 0.59rem;
-  padding: 0.7rem 0.78rem;
-  background: var(--surface-2);
+  position: relative;
+  min-height: 5.8rem;
+  border: 1.5px solid var(--border-soft);
+  border-radius: 0.72rem;
+  padding: 0.86rem 3.2rem 0.86rem 0.96rem;
+  background: var(--surface-1);
   color: var(--text-soft);
   text-align: left;
   cursor: pointer;
@@ -548,49 +550,107 @@
     box-shadow 140ms ease;
 }
 
+.accessOption::after {
+  position: absolute;
+  top: 0.88rem;
+  right: 0.88rem;
+  width: 1.22rem;
+  height: 1.22rem;
+  border: 2px solid var(--text-subtle);
+  border-radius: 999px;
+  content: "";
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
 .accessOptionFree {
-  background: var(--surface-2);
+  background: var(--surface-1);
 }
 
 .accessOptionPremium {
-  background: color-mix(in srgb, var(--warning) 12%, var(--surface-2));
-  border-color: color-mix(in srgb, var(--warning) 44%, var(--border-soft));
+  background: color-mix(in srgb, var(--warning) 5%, var(--surface-1));
+  border-color: color-mix(in srgb, var(--warning) 28%, var(--border-soft));
 }
 
-.accessOption:hover {
+.accessOption:hover:not(.accessOptionActive) {
   border-color: var(--border-accent);
   background: var(--surface-hover);
   transform: translateY(-1px);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent);
+  box-shadow: 0 5px 14px color-mix(in srgb, var(--text-strong) 7%, transparent);
+}
+
+.accessOption:focus-visible {
+  outline: 2px solid var(--accent-strong);
+  outline-offset: 3px;
 }
 
 .accessOptionActive {
-  border-color: color-mix(in srgb, var(--accent) 40%, var(--border-soft));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent);
+  border-color: var(--accent-strong);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent),
+    0 8px 20px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.accessOptionActive::after {
+  border-color: var(--accent-strong);
+  background: var(--surface-1);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.accessOptionActive::before {
+  position: absolute;
+  z-index: 1;
+  top: 1.17rem;
+  right: 1.17rem;
+  width: 0.42rem;
+  height: 0.23rem;
+  border-right: 2px solid var(--accent-strong);
+  border-bottom: 2px solid var(--accent-strong);
+  content: "";
+  transform: rotate(45deg);
 }
 
 .accessOptionActiveFree {
-  border-color: color-mix(in srgb, var(--accent) 46%, var(--border-soft));
-  background: var(--accent-soft-bg);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent);
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface-1));
 }
 
 .accessOptionActivePremium {
-  border-color: color-mix(in srgb, var(--warning) 48%, var(--border-soft));
-  background: color-mix(in srgb, var(--warning) 16%, var(--surface-1));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warning) 24%, transparent);
+  border-color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 18%, var(--surface-1));
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--warning) 22%, transparent),
+    0 8px 20px color-mix(in srgb, var(--warning) 14%, transparent);
+}
+
+.accessOptionActivePremium::after {
+  border-color: var(--warning);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--warning) 16%, transparent);
+}
+
+.accessOptionActivePremium::before {
+  border-color: var(--warning);
 }
 
 .accessOptionTitle {
   color: var(--text-strong);
-  font-size: 0.84rem;
-  font-weight: 600;
+  font-size: 0.88rem;
+  font-weight: 750;
   line-height: 1.2;
+}
+
+.accessOptionActiveFree .accessOptionTitle {
+  color: var(--accent-strong);
+}
+
+.accessOptionActivePremium .accessOptionTitle {
+  color: var(--warning-soft-fg);
 }
 
 .accessOptionHint {
   color: var(--text-muted);
-  font-size: 0.69rem;
+  font-size: 0.74rem;
   line-height: 1.32;
 }
 

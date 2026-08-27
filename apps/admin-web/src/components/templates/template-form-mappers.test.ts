@@ -31,6 +31,7 @@ const editorControllerPath = fileURLToPath(
   new URL("./use-template-editor-controller.ts", import.meta.url)
 );
 const formMappersPath = fileURLToPath(new URL("./template-form-mappers.ts", import.meta.url));
+const editorStylesPath = fileURLToPath(new URL("./template-editor.module.css", import.meta.url));
 
 describe("template form numeric hardening", () => {
   it("normalizes token cost to bounded digits only", () => {
@@ -192,6 +193,18 @@ describe("template form numeric hardening", () => {
     expect(basicFieldsSource).not.toContain(
       'description: "Reserved for future video-result input"'
     );
+  });
+
+  it("makes the selected template access tier visually and keyboard-accessibly distinct", () => {
+    const basicFieldsSource = readFileSync(basicFieldsPath, "utf8");
+    const stylesSource = readFileSync(editorStylesPath, "utf8");
+
+    expect(basicFieldsSource).toContain("aria-pressed={!form.isPremium}");
+    expect(basicFieldsSource).toContain("aria-pressed={form.isPremium}");
+    expect(stylesSource).toContain(".accessOption::after");
+    expect(stylesSource).toContain(".accessOptionActive::before");
+    expect(stylesSource).toContain(".accessOption:focus-visible");
+    expect(stylesSource).toContain(".accessOptionActivePremium::after");
   });
 
   it("keeps template editor promo badge options localized", () => {
