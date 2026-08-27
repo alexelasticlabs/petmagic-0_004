@@ -74,6 +74,17 @@ platform :ios do
     )
   end
 
+  desc "Read the latest processed TestFlight build for one marketing version"
+  lane :testflight_status do
+    version = ENV.fetch("APP_VERSION")
+    latest_build = latest_testflight_build_number(
+      version: version,
+      api_key: app_store_api_key_from_env,
+      initial_build_number: 0
+    )
+    UI.message("TESTFLIGHT_LATEST_BUILD=#{latest_build}")
+  end
+
   desc "Submit an existing TestFlight build without uploading a new binary"
   lane :promote do
     deliver(
