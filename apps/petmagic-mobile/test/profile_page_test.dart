@@ -212,7 +212,7 @@ void main() {
     expect(find.text(text.authSignInRequired), findsOneWidget);
     expect(find.text(text.authRequiredMessage), findsOneWidget);
     expect(find.text('Auth route'), findsNothing);
-    expect(walletController.loadCalls, 0);
+    expect(walletController.syncSnapshotCalls, 0);
     expect(premiumSummaryReads, 0);
   });
 
@@ -447,7 +447,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 250));
 
-      expect(walletController.loadCalls, 0);
+      expect(walletController.syncSnapshotCalls, 0);
     },
   );
 
@@ -525,11 +525,12 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 250));
 
-      expect(walletController.loadCalls, 1);
+      expect(walletController.syncSnapshotCalls, 1);
+      expect(walletController.loadCalls, 0);
     },
   );
 
-  testWidgets('profile page preloads wallet for partial wallet snapshot', (
+  testWidgets('profile page does not reload a partial wallet snapshot', (
     tester,
   ) async {
     final walletController = _CountingWalletController(
@@ -614,7 +615,8 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 250));
 
-    expect(walletController.loadCalls, 1);
+    expect(walletController.syncSnapshotCalls, 0);
+    expect(walletController.loadCalls, 0);
   });
 
   testWidgets(
@@ -698,13 +700,13 @@ void main() {
       await tester.pump(const Duration(milliseconds: 250));
 
       expect(find.text('Pet User'), findsOneWidget);
-      expect(walletController.loadCalls, 0);
+      expect(walletController.syncSnapshotCalls, 0);
 
       networkController.setHasInternet(true);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 250));
 
-      expect(walletController.loadCalls, 1);
+      expect(walletController.syncSnapshotCalls, 1);
     },
   );
 
@@ -776,14 +778,14 @@ void main() {
       final text = AppLocalizations.of(profileContext);
 
       expect(find.text(text.retryAction), findsOneWidget);
-      expect(walletController.loadCalls, 0);
+      expect(walletController.syncSnapshotCalls, 0);
 
       await tester.tap(find.text(text.retryAction));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 250));
 
       expect(find.text('Pet User'), findsOneWidget);
-      expect(walletController.loadCalls, 1);
+      expect(walletController.syncSnapshotCalls, 1);
     },
   );
 
@@ -875,7 +877,7 @@ void main() {
         greaterThan(initialInitializeCalls),
       );
       expect(find.text('Pet User'), findsOneWidget);
-      expect(walletController.loadCalls, 1);
+      expect(walletController.syncSnapshotCalls, 1);
       expect(tester.takeException(), isNull);
     },
   );
@@ -1736,6 +1738,7 @@ class _CountingWalletController extends WalletController {
 
   final WalletState initialState;
   int loadCalls = 0;
+  int syncSnapshotCalls = 0;
 
   @override
   WalletState build() => initialState;
@@ -1743,6 +1746,11 @@ class _CountingWalletController extends WalletController {
   @override
   Future<void> load({bool refresh = false}) async {
     loadCalls++;
+  }
+
+  @override
+  Future<void> syncSnapshot({bool forceRefresh = false}) async {
+    syncSnapshotCalls++;
   }
 }
 

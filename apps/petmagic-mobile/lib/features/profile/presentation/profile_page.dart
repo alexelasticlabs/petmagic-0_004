@@ -72,7 +72,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
     );
   }
 
-  void _preloadWalletIfNeeded() {
+  void _preloadWalletIfNeeded({bool forceRefresh = false}) {
     final profileState = ref.read(profileControllerProvider);
     final walletState = ref.read(walletControllerProvider);
     if (!profileState.isAuthenticated ||
@@ -82,19 +82,29 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
       return;
     }
 
-    if (!_shouldPreloadWalletSnapshot(walletState)) {
+    if (!_shouldPreloadWalletSnapshot(
+      walletState,
+      forceRefresh: forceRefresh,
+    )) {
       return;
     }
 
-    unawaited(ref.read(walletControllerProvider.notifier).load());
+    unawaited(
+      ref
+          .read(walletControllerProvider.notifier)
+          .syncSnapshot(forceRefresh: forceRefresh),
+    );
   }
 
-  bool _shouldPreloadWalletSnapshot(WalletState walletState) {
+  bool _shouldPreloadWalletSnapshot(
+    WalletState walletState, {
+    required bool forceRefresh,
+  }) {
     if (walletState.isLoading || walletState.isRefreshing) {
       return false;
     }
 
-    return !walletState.hasCompletedFullLoad;
+    return forceRefresh || walletState.wallet == null;
   }
 
   bool _shouldSkipDeferredProfileReload() {
@@ -198,8 +208,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
 
     if (profileState.isAuthenticated &&
         profileState.profile != null &&
-        _shouldPreloadWalletSnapshot(walletState)) {
-      _preloadWalletIfNeeded();
+        _shouldPreloadWalletSnapshot(walletState, forceRefresh: true)) {
+      _preloadWalletIfNeeded(forceRefresh: true);
     }
 
     final unavailableKind =

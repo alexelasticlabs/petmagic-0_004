@@ -53,8 +53,8 @@ extension _ProfilePageView on _ProfilePageState {
       final walletState = ref.read(walletControllerProvider);
       if (profileState.isAuthenticated &&
           profileState.profile != null &&
-          _shouldPreloadWalletSnapshot(walletState)) {
-        _preloadWalletIfNeeded();
+          _shouldPreloadWalletSnapshot(walletState, forceRefresh: true)) {
+        _preloadWalletIfNeeded(forceRefresh: true);
       }
 
       final currentUnavailableKind =
