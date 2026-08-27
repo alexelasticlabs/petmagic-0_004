@@ -454,6 +454,16 @@ adding dated audit snapshots to the repository.
   confirms that Apple exposes build 22 through the TestFlight API, while
   installation, Apple Sign In, StoreKit Sandbox and notification acceptance on
   a physical iOS device remain pending.
+- The protected `mobile-testflight-distribution` workflow now prepares
+  private TestFlight groups idempotently without creating testers, sending
+  invitations, enabling a public link, or submitting Beta App Review. Its
+  first run created `PetMagic Internal QA`, but Apple rejected assigning build
+  `1.0.0 (22)`. The diagnostic run
+  [`33052081097`](https://github.com/alexelasticlabs/petmagic-0_004/actions/runs/33052081097)
+  read `MISSING_EXPORT_COMPLIANCE` for both internal and external TestFlight
+  state. The account owner must complete the build's export-compliance
+  declaration before the workflow can attach the build, create the external
+  group, or invite testers. No invitation or external-review action was sent.
 
 ## Automated Gates
 
