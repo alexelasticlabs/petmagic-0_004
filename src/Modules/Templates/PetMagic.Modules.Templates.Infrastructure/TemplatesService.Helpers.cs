@@ -43,6 +43,15 @@ internal sealed partial class TemplatesService
 
     private Result ValidateActivation(TemplateItem template)
     {
+        if (string.IsNullOrWhiteSpace(template.Title)
+            || string.IsNullOrWhiteSpace(template.ShortDescription)
+            || string.IsNullOrWhiteSpace(template.Category)
+            || template.TokenCost <= 0
+            || DeserializeRequirements(template.PetPhotoRequirements).Length == 0)
+        {
+            return Result.Failure(TemplatesErrors.MissingActivationMetadata);
+        }
+
         if (GetAsset(template, TemplateAssetKind.Preview) is null)
         {
             return Result.Failure(TemplatesErrors.MissingPreview);
@@ -62,6 +71,12 @@ internal sealed partial class TemplatesService
 
         if (template.TemplateType == TemplateType.Video)
         {
+            var modelCheck = ValidateVideoModels(template.PreprocessingModel, template.KlingModel);
+            if (modelCheck.IsFailure)
+            {
+                return modelCheck;
+            }
+
             if (GetAsset(template, TemplateAssetKind.ReferenceMotion) is null)
             {
                 return Result.Failure(TemplatesErrors.MissingReferenceMotion);
@@ -229,6 +244,22 @@ internal sealed partial class TemplatesService
         }
 
         return Result.Success(category);
+    }
+
+    private async Task<Result<string>> ResolveTemplateCategoryNameAsync(
+        string rawCategoryName,
+        string? currentCategoryName,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(rawCategoryName))
+        {
+            return Result.Success(string.Empty);
+        }
+
+        var categoryResult = await EnsureTemplateCategoryAsync(rawCategoryName, currentCategoryName, cancellationToken);
+        return categoryResult.IsFailure
+            ? Result.Failure<string>(categoryResult.Error)
+            : Result.Success(categoryResult.Value.Name);
     }
 
     private Task<TemplateItem?> FindTemplateAsync(Guid templateId, CancellationToken cancellationToken)

@@ -7,6 +7,60 @@ namespace PetMagic.Modules.Identity.Tests.Templates;
 public sealed class TemplatesValidatorsTests
 {
     [Fact]
+    public void TemplateValidators_ShouldAllowTitleOnlyDrafts_ButRequireActivationMetadata()
+    {
+        var draft = new CreateImageTemplateCommand(
+            "Portrait draft",
+            string.Empty,
+            string.Empty,
+            [],
+            false,
+            0,
+            TemplatePromoBadgeMode.Auto.ToString(),
+            null,
+            string.Empty,
+            string.Empty,
+            TemplateStatus.Draft.ToString(),
+            []);
+        var active = draft with { Status = TemplateStatus.Active.ToString() };
+
+        Assert.True(new CreateImageTemplateCommandValidator().Validate(draft).IsValid);
+
+        var activeResult = new CreateImageTemplateCommandValidator().Validate(active);
+        Assert.False(activeResult.IsValid);
+        Assert.Contains(activeResult.Errors, error => error.PropertyName == "ShortDescription");
+        Assert.Contains(activeResult.Errors, error => error.PropertyName == "Category");
+        Assert.Contains(activeResult.Errors, error => error.PropertyName == "TokenCost");
+        Assert.Contains(activeResult.Errors, error => error.PropertyName == "ImageModel");
+    }
+
+    [Fact]
+    public void VideoTemplateValidator_ShouldAllowTitleOnlyDraft()
+    {
+        var result = new CreateVideoTemplateCommandValidator().Validate(
+            new CreateVideoTemplateCommand(
+                "Video draft",
+                string.Empty,
+                string.Empty,
+                [],
+                false,
+                0,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                string.Empty,
+                null,
+                null,
+                string.Empty,
+                string.Empty,
+                string.Empty,
+                string.Empty,
+                false,
+                TemplateStatus.Draft.ToString(),
+                []));
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
     public void UpdateImageTemplateValidator_ShouldRejectOversizedFields_AndZeroPreviewFileSize()
     {
         var validator = new UpdateImageTemplateCommandValidator();

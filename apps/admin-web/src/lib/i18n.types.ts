@@ -445,6 +445,7 @@ export type Dictionary = {
   editorSaveDraft: string;
   editorSaveAndActivate: string;
   templateSavedAsDraft: string;
+  templateDraftTitleRequired: string;
   templateActivated: string;
   editorAccessFreeHint: string;
   editorAccessPremiumHint: string;

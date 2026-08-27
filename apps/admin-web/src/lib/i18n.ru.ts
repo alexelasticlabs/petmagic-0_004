@@ -481,6 +481,7 @@ export const ruDictionary: Dictionary = {
   editorSaveDraft: "Сохранить как черновик",
   editorSaveAndActivate: "Сохранить и активировать",
   templateSavedAsDraft: "Шаблон сохранен как черновик.",
+  templateDraftTitleRequired: "Укажите название, чтобы сохранить черновик.",
   templateActivated: "Шаблон сохранен и активирован.",
   editorAccessFreeHint: "Доступно всем пользователям.",
   editorAccessPremiumHint: "Только для Premium пользователей.",

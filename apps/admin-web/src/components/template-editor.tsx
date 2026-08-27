@@ -52,6 +52,7 @@ export function TemplateEditor({ locale, templateType, initialTemplateId }: Temp
     initializationError,
     isEditMode,
     isLoading,
+    isSaveReady,
     isSaving,
     isVideo,
     mergedCategorySuggestions,
@@ -61,6 +62,7 @@ export function TemplateEditor({ locale, templateType, initialTemplateId }: Temp
     resetForm,
     retryInitialization,
     router,
+    saveReadinessHint,
     setEditorStatus,
     setForm,
     setPreviewFile,
@@ -128,6 +130,7 @@ export function TemplateEditor({ locale, templateType, initialTemplateId }: Temp
                 form={form}
                 setForm={setForm}
                 categorySuggestions={mergedCategorySuggestions}
+                requireCompleteDetails={editorStatus === "Active"}
                 showMusicDescription={isVideo}
               />
             </section>
@@ -235,10 +238,12 @@ export function TemplateEditor({ locale, templateType, initialTemplateId }: Temp
         <TemplateEditorFooter
           catalogPath={catalogPath}
           editorStatus={editorStatus}
+          isSaveReady={isSaveReady}
           isSaving={isSaving}
           onCancel={(path) => router.push(path)}
           onReset={resetForm}
           onSetEditorStatus={setEditorStatus}
+          saveReadinessHint={saveReadinessHint}
           text={text}
         />
       </form>

@@ -21,6 +21,7 @@ type TemplateBasicFieldsProps = {
   form: TemplateFormState;
   setForm: SetTemplateFormState;
   categorySuggestions?: string[];
+  requireCompleteDetails?: boolean;
   showMusicDescription?: boolean;
 };
 
@@ -33,6 +34,7 @@ export function TemplateBasicFields({
   form,
   setForm,
   categorySuggestions = [],
+  requireCompleteDetails = false,
   showMusicDescription = false,
 }: TemplateBasicFieldsProps) {
   const categoryValues = Array.from(
@@ -146,7 +148,7 @@ export function TemplateBasicFields({
             }))
           }
           rows={3}
-          required
+          required={requireCompleteDetails}
         />
       </label>
 
@@ -295,7 +297,7 @@ export function TemplateBasicFields({
             maxLength={TEMPLATE_TOKEN_COST_MAX_LENGTH}
             min="1"
             step="1"
-            required
+            required={requireCompleteDetails}
           />
         </label>
 

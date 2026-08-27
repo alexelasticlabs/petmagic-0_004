@@ -18,6 +18,7 @@ internal static class TemplatesErrors
     public static readonly Error InvalidGalleryCursor = new("templates.gallery_cursor_invalid", "Gallery cursor is invalid.");
     public static readonly Error PremiumRequired = new("templates.premium_required", "templates.premium_required");
     public static readonly Error MissingPreview = new("templates.preview_required", "Preview asset is required before activation.");
+    public static readonly Error MissingActivationMetadata = new("templates.activation_metadata_required", "Template title, description, category, PawSpark cost, and pet photo requirements are required before activation.");
     public static readonly Error MissingImageModel = new("templates.image_model_required", "Image model is required before activation.");
     public static readonly Error MissingReferenceMotion = new("templates.reference_motion_required", "Reference motion video is required before activation.");
     public static readonly Error MissingReferenceDuration = new("templates.reference_duration_required", "Reference video duration must be determined before activation.");

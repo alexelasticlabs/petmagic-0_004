@@ -475,6 +475,7 @@ export const enDictionary: Dictionary = {
   editorSaveDraft: "Save as draft",
   editorSaveAndActivate: "Save and activate",
   templateSavedAsDraft: "Template saved as draft.",
+  templateDraftTitleRequired: "Enter a template name to save the draft.",
   templateActivated: "Template saved and activated.",
   editorAccessFreeHint: "Available to all users.",
   editorAccessPremiumHint: "Only for Premium users.",

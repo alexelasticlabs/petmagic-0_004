@@ -17,6 +17,40 @@ public sealed partial class TemplatesServiceTests
 {
 
     [Fact]
+    public async Task CreateImageAsync_ShouldSaveTitleOnlyDraft_AndRejectActivationUntilCompleted()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+
+        var draft = await service.CreateImageAsync(
+            new CreateImageTemplateCommand(
+                "Portrait draft",
+                string.Empty,
+                string.Empty,
+                [],
+                false,
+                0,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                null,
+                string.Empty,
+                string.Empty,
+                TemplateStatus.Draft.ToString(),
+                []),
+            CancellationToken.None);
+
+        Assert.True(draft.IsSuccess);
+        Assert.Equal(TemplateStatus.Draft.ToString(), draft.Value.Status);
+        Assert.Empty(await dbContext.TemplateCategories.ToListAsync());
+
+        var activation = await service.ChangeStatusAsync(
+            new ChangeTemplateStatusCommand(draft.Value.TemplateId, TemplateStatus.Active.ToString()),
+            CancellationToken.None);
+
+        Assert.True(activation.IsFailure);
+        Assert.Equal("templates.activation_metadata_required", activation.Error.Code);
+    }
+
+    [Fact]
     public async Task CreateVideoAsync_ShouldCalculateImageOrientation_WhenReferenceDurationIsTenSecondsOrLess()
     {
         await using var dbContext = CreateDbContext();

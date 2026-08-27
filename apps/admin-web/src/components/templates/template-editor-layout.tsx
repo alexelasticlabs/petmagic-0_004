@@ -166,18 +166,22 @@ export function TemplateEditorRail({
 export function TemplateEditorFooter({
   catalogPath,
   editorStatus,
+  isSaveReady,
   isSaving,
   onCancel,
   onReset,
   onSetEditorStatus,
+  saveReadinessHint,
   text,
 }: {
   catalogPath: string;
   editorStatus: EditorVisibilityStatus;
+  isSaveReady: boolean;
   isSaving: boolean;
   onCancel: (path: string) => void;
   onReset: () => void;
   onSetEditorStatus: (status: EditorVisibilityStatus) => void;
+  saveReadinessHint: string | null;
   text: Dictionary;
 }) {
   return (
@@ -186,9 +190,10 @@ export function TemplateEditorFooter({
         <div className={styles.footerStatusCopy}>
           <span className={styles.footerStatusLabel}>{text.editorVisibilityTitle}</span>
           <p className={styles.footerStatusHint}>
-            {editorStatus === "Active"
-              ? text.editorVisibleToUsersHint
-              : text.editorHiddenFromUsersHint}
+            {saveReadinessHint ??
+              (editorStatus === "Active"
+                ? text.editorVisibleToUsersHint
+                : text.editorHiddenFromUsersHint)}
           </p>
         </div>
 
@@ -248,9 +253,9 @@ export function TemplateEditorFooter({
           type="submit"
           variant="primary"
           className={styles.primaryButton}
-          disabled={isSaving}
+          disabled={isSaving || !isSaveReady}
         >
-          {text.saveTemplate}
+          {editorStatus === "Active" ? text.editorSaveAndActivate : text.editorSaveDraft}
         </Button>
       </div>
     </div>

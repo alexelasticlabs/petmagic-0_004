@@ -17,6 +17,20 @@ Production-visible templates are templates where:
 is the environment/content hygiene flag for local smoke, failing provider, staging overload, and QA
 templates that must never appear in normal production-visible public surfaces.
 
+## Draft Authoring Contract
+
+Use `Draft` for unfinished templates that an administrator intends to return to. A draft requires
+only a non-empty title and remains available in the regular admin catalog; it is never shown to
+users. Empty optional fields must not create empty template categories.
+
+`Archived` is a separate lifecycle state for removing a template from routine work. Do not use it
+as a substitute for an unfinished draft.
+
+Before a template can move to `Active`, the API requires a title, short description, category,
+positive PawSpark cost, pet photo requirements, valid model configuration, and the public media
+required for its template type. This check is enforced server-side, including status-only API
+requests, rather than relying only on the admin form.
+
 Public endpoints exclude `IsQaOnly=true` by default:
 
 - `GET /api/templates`

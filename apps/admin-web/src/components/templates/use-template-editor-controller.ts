@@ -312,6 +312,11 @@ export function useTemplateEditorController({
     }
 
     const catalogPath = getTemplateCatalogPath(locale, templateType);
+    const draftReadinessError = getDraftReadinessError(form, text);
+    if (draftReadinessError) {
+      setToast({ type: "error", message: draftReadinessError });
+      return;
+    }
 
     try {
       let formToSave = form;
@@ -439,6 +444,11 @@ export function useTemplateEditorController({
     .filter(Boolean);
   const isLoading = isInitializing || isTemplateOptionsLoading;
   const isSaving = saveTemplateMutation.isPending;
+  const draftReadinessError = getDraftReadinessError(form, text);
+  const activationReadinessError = getActivationReadinessError(templateType, form, text, "Active");
+  const saveReadinessHint =
+    editorStatus === "Active" ? activationReadinessError : draftReadinessError;
+  const isSaveReady = saveReadinessHint === null;
   const activeToast =
     toast ??
     (hasTemplateOptionsError
@@ -458,6 +468,7 @@ export function useTemplateEditorController({
     handleUpload,
     initializationError,
     isEditMode,
+    isSaveReady,
     isLoading,
     isSaving,
     isVideo,
@@ -468,6 +479,7 @@ export function useTemplateEditorController({
     resetForm,
     retryInitialization,
     router,
+    saveReadinessHint,
     selectedTemplate,
     setEditorStatus,
     setForm,
@@ -579,6 +591,10 @@ function getTemplateSaveErrorMessage(
   );
 }
 
+function getDraftReadinessError(form: TemplateFormState, text: Dictionary): string | null {
+  return form.title.trim() ? null : text.templateDraftTitleRequired;
+}
+
 function getActivationReadinessError(
   templateType: TemplateType,
   form: TemplateFormState,
@@ -590,6 +606,22 @@ function getActivationReadinessError(
   }
 
   const missingLabels: string[] = [];
+
+  if (!form.title.trim()) {
+    missingLabels.push(text.titleLabel);
+  }
+
+  if (!form.shortDescription.trim()) {
+    missingLabels.push(text.shortDescriptionLabel);
+  }
+
+  if (!form.category.trim()) {
+    missingLabels.push(text.categoryLabel);
+  }
+
+  if ((parseOptionalDecimal(form.tokenCost) ?? 0) <= 0) {
+    missingLabels.push(text.tokenCostLabel);
+  }
 
   if (!form.previewUrl.trim()) {
     missingLabels.push(text.previewAssetTitle);
@@ -606,6 +638,22 @@ function getActivationReadinessError(
 
     if (parseOptionalDecimal(form.referenceDurationSeconds) === undefined) {
       missingLabels.push(text.referenceDurationLabel);
+    }
+
+    if (!form.preprocessingModel.trim()) {
+      missingLabels.push(text.preprocessingModelLabel);
+    }
+
+    if (!form.preprocessingPrompt.trim()) {
+      missingLabels.push(text.preprocessingPromptLabel);
+    }
+
+    if (!form.klingModel.trim()) {
+      missingLabels.push(text.klingModelLabel);
+    }
+
+    if (!form.klingPrompt.trim()) {
+      missingLabels.push(text.klingPromptLabel);
     }
   } else {
     if (!form.imageModel.trim()) {

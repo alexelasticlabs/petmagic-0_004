@@ -12,22 +12,25 @@ internal sealed partial class TemplatesService
 {
     public async Task<Result<AdminTemplateResponse>> CreateImageAsync(CreateImageTemplateCommand command, CancellationToken cancellationToken)
     {
-        var categoryResult = await EnsureTemplateCategoryAsync(command.Category, null, cancellationToken);
-        if (categoryResult.IsFailure)
-        {
-            return Result.Failure<AdminTemplateResponse>(categoryResult.Error);
-        }
-
-        var modelCheck = ValidateImageModel(command.ImageModel);
-        if (modelCheck.IsFailure)
-        {
-            return Result.Failure<AdminTemplateResponse>(modelCheck.Error);
-        }
-
         var statusResult = ResolveRequestedStatus(command.Status, TemplateStatus.Draft);
         if (statusResult.IsFailure)
         {
             return Result.Failure<AdminTemplateResponse>(statusResult.Error);
+        }
+
+        var categoryNameResult = await ResolveTemplateCategoryNameAsync(command.Category, null, cancellationToken);
+        if (categoryNameResult.IsFailure)
+        {
+            return Result.Failure<AdminTemplateResponse>(categoryNameResult.Error);
+        }
+
+        if (statusResult.Value == TemplateStatus.Active)
+        {
+            var modelCheck = ValidateImageModel(command.ImageModel);
+            if (modelCheck.IsFailure)
+            {
+                return Result.Failure<AdminTemplateResponse>(modelCheck.Error);
+            }
         }
 
         var now = DateTime.UtcNow;
@@ -38,7 +41,7 @@ internal sealed partial class TemplatesService
             Title = command.Title.Trim(),
             ShortDescription = command.ShortDescription.Trim(),
             PetPhotoRequirements = SerializeRequirements(command.PetPhotoRequirements),
-            Category = categoryResult.Value.Name,
+            Category = categoryNameResult.Value,
             Tags = SerializeTags(command.Tags),
             IsPremium = command.IsPremium,
             IsQaOnly = command.IsQaOnly,
@@ -120,28 +123,31 @@ internal sealed partial class TemplatesService
             return Result.Failure<AdminTemplateResponse>(TemplatesErrors.TypeMismatch);
         }
 
-        var categoryResult = await EnsureTemplateCategoryAsync(command.Category, template.Category, cancellationToken);
-        if (categoryResult.IsFailure)
-        {
-            return Result.Failure<AdminTemplateResponse>(categoryResult.Error);
-        }
-
-        var modelCheck = ValidateImageModel(command.ImageModel);
-        if (modelCheck.IsFailure)
-        {
-            return Result.Failure<AdminTemplateResponse>(modelCheck.Error);
-        }
-
         var statusResult = ResolveRequestedStatus(command.Status, template.Status);
         if (statusResult.IsFailure)
         {
             return Result.Failure<AdminTemplateResponse>(statusResult.Error);
         }
 
+        var categoryNameResult = await ResolveTemplateCategoryNameAsync(command.Category, template.Category, cancellationToken);
+        if (categoryNameResult.IsFailure)
+        {
+            return Result.Failure<AdminTemplateResponse>(categoryNameResult.Error);
+        }
+
+        if (statusResult.Value == TemplateStatus.Active)
+        {
+            var modelCheck = ValidateImageModel(command.ImageModel);
+            if (modelCheck.IsFailure)
+            {
+                return Result.Failure<AdminTemplateResponse>(modelCheck.Error);
+            }
+        }
+
         template.Title = command.Title.Trim();
         template.ShortDescription = command.ShortDescription.Trim();
         template.PetPhotoRequirements = SerializeRequirements(command.PetPhotoRequirements);
-        template.Category = categoryResult.Value.Name;
+        template.Category = categoryNameResult.Value;
         template.Tags = SerializeTags(command.Tags);
         template.IsPremium = command.IsPremium;
         if (command.IsQaOnly.HasValue)
@@ -253,22 +259,25 @@ internal sealed partial class TemplatesService
 
     public async Task<Result<AdminTemplateResponse>> CreateVideoAsync(CreateVideoTemplateCommand command, CancellationToken cancellationToken)
     {
-        var categoryResult = await EnsureTemplateCategoryAsync(command.Category, null, cancellationToken);
-        if (categoryResult.IsFailure)
-        {
-            return Result.Failure<AdminTemplateResponse>(categoryResult.Error);
-        }
-
-        var modelCheck = ValidateVideoModels(command.PreprocessingModel, command.KlingModel);
-        if (modelCheck.IsFailure)
-        {
-            return Result.Failure<AdminTemplateResponse>(modelCheck.Error);
-        }
-
         var statusResult = ResolveRequestedStatus(command.Status, TemplateStatus.Draft);
         if (statusResult.IsFailure)
         {
             return Result.Failure<AdminTemplateResponse>(statusResult.Error);
+        }
+
+        var categoryNameResult = await ResolveTemplateCategoryNameAsync(command.Category, null, cancellationToken);
+        if (categoryNameResult.IsFailure)
+        {
+            return Result.Failure<AdminTemplateResponse>(categoryNameResult.Error);
+        }
+
+        if (statusResult.Value == TemplateStatus.Active)
+        {
+            var modelCheck = ValidateVideoModels(command.PreprocessingModel, command.KlingModel);
+            if (modelCheck.IsFailure)
+            {
+                return Result.Failure<AdminTemplateResponse>(modelCheck.Error);
+            }
         }
 
         var (duration, orientation) = await ResolveReferenceMetadataAsync(command.ReferenceMotionAsset, cancellationToken);
@@ -280,7 +289,7 @@ internal sealed partial class TemplatesService
             Title = command.Title.Trim(),
             ShortDescription = command.ShortDescription.Trim(),
             PetPhotoRequirements = SerializeRequirements(command.PetPhotoRequirements),
-            Category = categoryResult.Value.Name,
+            Category = categoryNameResult.Value,
             Tags = SerializeTags(command.Tags),
             IsPremium = command.IsPremium,
             IsQaOnly = command.IsQaOnly,
@@ -370,22 +379,25 @@ internal sealed partial class TemplatesService
             return Result.Failure<AdminTemplateResponse>(TemplatesErrors.TypeMismatch);
         }
 
-        var categoryResult = await EnsureTemplateCategoryAsync(command.Category, template.Category, cancellationToken);
-        if (categoryResult.IsFailure)
-        {
-            return Result.Failure<AdminTemplateResponse>(categoryResult.Error);
-        }
-
-        var modelCheck = ValidateVideoModels(command.PreprocessingModel, command.KlingModel);
-        if (modelCheck.IsFailure)
-        {
-            return Result.Failure<AdminTemplateResponse>(modelCheck.Error);
-        }
-
         var statusResult = ResolveRequestedStatus(command.Status, template.Status);
         if (statusResult.IsFailure)
         {
             return Result.Failure<AdminTemplateResponse>(statusResult.Error);
+        }
+
+        var categoryNameResult = await ResolveTemplateCategoryNameAsync(command.Category, template.Category, cancellationToken);
+        if (categoryNameResult.IsFailure)
+        {
+            return Result.Failure<AdminTemplateResponse>(categoryNameResult.Error);
+        }
+
+        if (statusResult.Value == TemplateStatus.Active)
+        {
+            var modelCheck = ValidateVideoModels(command.PreprocessingModel, command.KlingModel);
+            if (modelCheck.IsFailure)
+            {
+                return Result.Failure<AdminTemplateResponse>(modelCheck.Error);
+            }
         }
 
         var effectivePreviewAsset = ResolveEffectiveTemplateAsset(
@@ -428,7 +440,7 @@ internal sealed partial class TemplatesService
         template.Title = command.Title.Trim();
         template.ShortDescription = command.ShortDescription.Trim();
         template.PetPhotoRequirements = SerializeRequirements(command.PetPhotoRequirements);
-        template.Category = categoryResult.Value.Name;
+        template.Category = categoryNameResult.Value;
         template.Tags = SerializeTags(command.Tags);
         template.IsPremium = command.IsPremium;
         if (command.IsQaOnly.HasValue)

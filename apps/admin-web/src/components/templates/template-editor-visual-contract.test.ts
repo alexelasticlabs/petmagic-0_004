@@ -46,7 +46,8 @@ describe("template editor visual contract", () => {
     const layoutSource = readFileSync(editorLayoutPath, "utf8");
     const styles = readFileSync(editorStylesPath, "utf8");
 
-    expect(layoutSource.match(/disabled=\{isSaving\}/g)).toHaveLength(5);
+    expect(layoutSource.match(/disabled=\{isSaving\}/g)).toHaveLength(4);
+    expect(layoutSource).toContain("disabled={isSaving || !isSaveReady}");
     expect(styles).toContain(".footerStatusButton:disabled");
     expect(styles).toContain("cursor: not-allowed;");
   });

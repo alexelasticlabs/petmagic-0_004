@@ -11,6 +11,12 @@ internal static class TemplateValidationRules
     public const int TagMaxLength = 32;
     public const int RequirementMaxLength = 160;
     public const int RequirementMaxCount = 6;
+
+    public static bool IsActiveTemplateStatus(string? rawStatus)
+    {
+        return Enum.TryParse<TemplateStatus>(rawStatus, true, out var status)
+               && status == TemplateStatus.Active;
+    }
 }
 
 public sealed class TemplateAssetCommandValidator : AbstractValidator<TemplateAssetCommand>
@@ -30,11 +36,15 @@ public sealed class CreateImageTemplateCommandValidator : AbstractValidator<Crea
     public CreateImageTemplateCommandValidator()
     {
         RuleFor(x => x.Title).NotEmpty().MaximumLength(120);
-        RuleFor(x => x.ShortDescription).NotEmpty().MaximumLength(240);
-        RuleFor(x => x.Category).NotEmpty().MaximumLength(64);
+        RuleFor(x => x.ShortDescription).MaximumLength(240);
+        RuleFor(x => x.ShortDescription).NotEmpty().When(x => TemplateValidationRules.IsActiveTemplateStatus(x.Status));
+        RuleFor(x => x.Category).MaximumLength(64);
+        RuleFor(x => x.Category).NotEmpty().When(x => TemplateValidationRules.IsActiveTemplateStatus(x.Status));
         RuleFor(x => x.TokenCost).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.TokenCost).GreaterThan(0).When(x => TemplateValidationRules.IsActiveTemplateStatus(x.Status));
         RuleFor(x => x.PromoBadgeMode).Must(raw => Enum.TryParse<TemplatePromoBadgeMode>(raw, true, out _)).WithMessage("templates.promo_badge_mode_invalid");
-        RuleFor(x => x.ImageModel).NotEmpty().MaximumLength(128);
+        RuleFor(x => x.ImageModel).MaximumLength(128);
+        RuleFor(x => x.ImageModel).NotEmpty().When(x => TemplateValidationRules.IsActiveTemplateStatus(x.Status));
         RuleFor(x => x.ImagePrompt).NotNull().MaximumLength(TemplateValidationRules.PromptMaxLength);
         RuleFor(x => x.Status).MaximumLength(32);
         RuleFor(x => x.Status).Must(raw => string.IsNullOrWhiteSpace(raw) || Enum.TryParse<TemplateStatus>(raw, true, out _)).WithMessage("templates.status_invalid");
@@ -58,11 +68,15 @@ public sealed class UpdateImageTemplateCommandValidator : AbstractValidator<Upda
     {
         RuleFor(x => x.TemplateId).NotEmpty();
         RuleFor(x => x.Title).NotEmpty().MaximumLength(120);
-        RuleFor(x => x.ShortDescription).NotEmpty().MaximumLength(240);
-        RuleFor(x => x.Category).NotEmpty().MaximumLength(64);
+        RuleFor(x => x.ShortDescription).MaximumLength(240);
+        RuleFor(x => x.ShortDescription).NotEmpty().When(x => TemplateValidationRules.IsActiveTemplateStatus(x.Status));
+        RuleFor(x => x.Category).MaximumLength(64);
+        RuleFor(x => x.Category).NotEmpty().When(x => TemplateValidationRules.IsActiveTemplateStatus(x.Status));
         RuleFor(x => x.TokenCost).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.TokenCost).GreaterThan(0).When(x => TemplateValidationRules.IsActiveTemplateStatus(x.Status));
         RuleFor(x => x.PromoBadgeMode).Must(raw => Enum.TryParse<TemplatePromoBadgeMode>(raw, true, out _)).WithMessage("templates.promo_badge_mode_invalid");
-        RuleFor(x => x.ImageModel).NotEmpty().MaximumLength(128);
+        RuleFor(x => x.ImageModel).MaximumLength(128);
+        RuleFor(x => x.ImageModel).NotEmpty().When(x => TemplateValidationRules.IsActiveTemplateStatus(x.Status));
         RuleFor(x => x.ImagePrompt).NotNull().MaximumLength(TemplateValidationRules.PromptMaxLength);
         RuleFor(x => x.Status).MaximumLength(32);
         RuleFor(x => x.Status).Must(raw => string.IsNullOrWhiteSpace(raw) || Enum.TryParse<TemplateStatus>(raw, true, out _)).WithMessage("templates.status_invalid");
@@ -85,14 +99,19 @@ public sealed class CreateVideoTemplateCommandValidator : AbstractValidator<Crea
     public CreateVideoTemplateCommandValidator()
     {
         RuleFor(x => x.Title).NotEmpty().MaximumLength(120);
-        RuleFor(x => x.ShortDescription).NotEmpty().MaximumLength(240);
-        RuleFor(x => x.Category).NotEmpty().MaximumLength(64);
+        RuleFor(x => x.ShortDescription).MaximumLength(240);
+        RuleFor(x => x.ShortDescription).NotEmpty().When(x => TemplateValidationRules.IsActiveTemplateStatus(x.Status));
+        RuleFor(x => x.Category).MaximumLength(64);
+        RuleFor(x => x.Category).NotEmpty().When(x => TemplateValidationRules.IsActiveTemplateStatus(x.Status));
         RuleFor(x => x.TokenCost).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.TokenCost).GreaterThan(0).When(x => TemplateValidationRules.IsActiveTemplateStatus(x.Status));
         RuleFor(x => x.PromoBadgeMode).Must(raw => Enum.TryParse<TemplatePromoBadgeMode>(raw, true, out _)).WithMessage("templates.promo_badge_mode_invalid");
         RuleFor(x => x.MusicDescription).MaximumLength(240);
-        RuleFor(x => x.PreprocessingModel).NotEmpty().MaximumLength(128);
+        RuleFor(x => x.PreprocessingModel).MaximumLength(128);
+        RuleFor(x => x.PreprocessingModel).NotEmpty().When(x => TemplateValidationRules.IsActiveTemplateStatus(x.Status));
         RuleFor(x => x.PreprocessingPrompt).NotNull().MaximumLength(TemplateValidationRules.PromptMaxLength);
-        RuleFor(x => x.KlingModel).NotEmpty().MaximumLength(128);
+        RuleFor(x => x.KlingModel).MaximumLength(128);
+        RuleFor(x => x.KlingModel).NotEmpty().When(x => TemplateValidationRules.IsActiveTemplateStatus(x.Status));
         RuleFor(x => x.KlingPrompt).NotNull().MaximumLength(TemplateValidationRules.PromptMaxLength);
         RuleFor(x => x.Status).MaximumLength(32);
         RuleFor(x => x.Status).Must(raw => string.IsNullOrWhiteSpace(raw) || Enum.TryParse<TemplateStatus>(raw, true, out _)).WithMessage("templates.status_invalid");
@@ -117,14 +136,19 @@ public sealed class UpdateVideoTemplateCommandValidator : AbstractValidator<Upda
     {
         RuleFor(x => x.TemplateId).NotEmpty();
         RuleFor(x => x.Title).NotEmpty().MaximumLength(120);
-        RuleFor(x => x.ShortDescription).NotEmpty().MaximumLength(240);
-        RuleFor(x => x.Category).NotEmpty().MaximumLength(64);
+        RuleFor(x => x.ShortDescription).MaximumLength(240);
+        RuleFor(x => x.ShortDescription).NotEmpty().When(x => TemplateValidationRules.IsActiveTemplateStatus(x.Status));
+        RuleFor(x => x.Category).MaximumLength(64);
+        RuleFor(x => x.Category).NotEmpty().When(x => TemplateValidationRules.IsActiveTemplateStatus(x.Status));
         RuleFor(x => x.TokenCost).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.TokenCost).GreaterThan(0).When(x => TemplateValidationRules.IsActiveTemplateStatus(x.Status));
         RuleFor(x => x.PromoBadgeMode).Must(raw => Enum.TryParse<TemplatePromoBadgeMode>(raw, true, out _)).WithMessage("templates.promo_badge_mode_invalid");
         RuleFor(x => x.MusicDescription).MaximumLength(240);
-        RuleFor(x => x.PreprocessingModel).NotEmpty().MaximumLength(128);
+        RuleFor(x => x.PreprocessingModel).MaximumLength(128);
+        RuleFor(x => x.PreprocessingModel).NotEmpty().When(x => TemplateValidationRules.IsActiveTemplateStatus(x.Status));
         RuleFor(x => x.PreprocessingPrompt).NotNull().MaximumLength(TemplateValidationRules.PromptMaxLength);
-        RuleFor(x => x.KlingModel).NotEmpty().MaximumLength(128);
+        RuleFor(x => x.KlingModel).MaximumLength(128);
+        RuleFor(x => x.KlingModel).NotEmpty().When(x => TemplateValidationRules.IsActiveTemplateStatus(x.Status));
         RuleFor(x => x.KlingPrompt).NotNull().MaximumLength(TemplateValidationRules.PromptMaxLength);
         RuleFor(x => x.Status).MaximumLength(32);
         RuleFor(x => x.Status).Must(raw => string.IsNullOrWhiteSpace(raw) || Enum.TryParse<TemplateStatus>(raw, true, out _)).WithMessage("templates.status_invalid");
