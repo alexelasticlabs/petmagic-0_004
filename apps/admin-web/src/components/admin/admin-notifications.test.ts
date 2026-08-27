@@ -124,7 +124,12 @@ describe("server-backed admin notifications", () => {
     expect(topbarSource).toContain('event.key === "Tab"');
     expect(topbarSource).toContain("notificationTriggerRef.current?.focus()");
     expect(topbarSource).toContain("href={`/${locale}/notifications`}");
+    expect(topbarSource).toContain("summary, [tabindex]");
+    expect(topbarSource).toContain("notificationToolbar");
+    expect(topbarSource).toContain("notificationMoreActions");
     expect(shellStyles).toContain("height: 100dvh;");
+    expect(shellStyles).toContain("overflow-x: auto;");
+    expect(shellStyles).toContain(".notificationCard::before");
     expect(shellStyles).toContain("overflow-wrap: anywhere;");
   });
 

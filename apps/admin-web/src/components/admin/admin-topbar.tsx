@@ -11,7 +11,13 @@ import {
   type AdminNotificationCategory,
 } from "@/components/admin/admin-chrome.content";
 import commandPaletteStyles from "@/components/admin/admin-command-palette.module.css";
-import { BellIcon, MenuIcon, SearchIcon } from "@/components/admin/admin-icons";
+import {
+  BellIcon,
+  CancelCircleIcon,
+  MenuIcon,
+  MoreHorizontalIcon,
+  SearchIcon,
+} from "@/components/admin/admin-icons";
 import { AdminLangDropdown } from "@/components/admin/admin-lang-dropdown";
 import {
   sanitizeAdminNotificationText,
@@ -212,7 +218,7 @@ export function AdminTopbar({
       if (event.key === "Tab" && notificationPanelRef.current) {
         const focusable = Array.from(
           notificationPanelRef.current.querySelectorAll<HTMLElement>(
-            'a[href], button:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex="-1"])'
+            'a[href], button:not(:disabled), select:not(:disabled), summary, [tabindex]:not([tabindex="-1"])'
           )
         );
         if (focusable.length === 0) return;
@@ -332,48 +338,60 @@ export function AdminTopbar({
                   tabIndex={-1}
                 >
                   <div className={styles.notificationPanelHeader}>
-                    <div className={styles.notificationPanelCopy}>
-                      <span className={styles.notificationEyebrow}>
-                        {copy.topbar.centerEyebrow}
+                    <div className={styles.notificationPanelIdentity}>
+                      <span className={styles.notificationPanelIcon} aria-hidden="true">
+                        <BellIcon />
                       </span>
-                      <strong id={notificationPanelTitleId} className={styles.notificationTitle}>
-                        {copy.topbar.centerTitle}
-                      </strong>
-                      <p className={styles.notificationSummary}>
-                        {copy.topbar.summary(unreadCount, supportUnreadCount)}
-                      </p>
+                      <div className={styles.notificationPanelCopy}>
+                        <strong id={notificationPanelTitleId} className={styles.notificationTitle}>
+                          {copy.topbar.centerTitle}
+                        </strong>
+                        <p className={styles.notificationSummary}>
+                          {copy.topbar.summary(unreadCount, supportUnreadCount)}
+                        </p>
+                      </div>
                     </div>
-                    <div className={styles.notificationHeaderActions}>
-                      <button
-                        type="button"
-                        className={styles.notificationTextButton}
-                        onClick={() => closeNotificationPanel({ restoreFocus: true })}
-                      >
-                        {locale === "ru" ? "Закрыть" : "Close"}
-                      </button>
-                      <Link
-                        href={`/${locale}/notifications`}
-                        className={styles.notificationTextButton}
-                      >
-                        {locale === "ru" ? "Вся история" : "Full history"}
-                      </Link>
-                      <button
-                        type="button"
-                        className={styles.notificationTextButton}
-                        onClick={markAllAsRead}
-                        disabled={unreadCount === 0}
-                      >
-                        {copy.topbar.markAllRead}
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.notificationTextButton}
-                        onClick={clearRead}
-                        disabled={items.every((item) => !item.read)}
-                      >
-                        {copy.topbar.clearRead}
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      className={styles.notificationCloseButton}
+                      onClick={() => closeNotificationPanel({ restoreFocus: true })}
+                      aria-label={copy.topbar.close}
+                      title={copy.topbar.close}
+                    >
+                      <CancelCircleIcon />
+                    </button>
+                  </div>
+
+                  <div className={styles.notificationToolbar}>
+                    <button
+                      type="button"
+                      className={styles.notificationMarkAllButton}
+                      onClick={markAllAsRead}
+                      disabled={unreadCount === 0}
+                    >
+                      {copy.topbar.markAllRead}
+                    </button>
+                    <Link
+                      href={`/${locale}/notifications`}
+                      className={styles.notificationHistoryLink}
+                    >
+                      {copy.topbar.fullHistory}
+                    </Link>
+                    <details className={styles.notificationMoreActions}>
+                      <summary aria-label={copy.topbar.moreActions} title={copy.topbar.moreActions}>
+                        <MoreHorizontalIcon />
+                      </summary>
+                      <div className={styles.notificationMoreActionMenu}>
+                        <button
+                          type="button"
+                          className={styles.notificationMenuAction}
+                          onClick={clearRead}
+                          disabled={items.every((item) => !item.read)}
+                        >
+                          {copy.topbar.clearRead}
+                        </button>
+                      </div>
+                    </details>
                   </div>
 
                   <div

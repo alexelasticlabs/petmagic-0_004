@@ -185,9 +185,15 @@ test("notification inbox, collapsed rail and mobile sheet stay compact", async (
   await expect.poll(() => page.evaluate(() => document.documentElement.dataset.theme)).toBe("dark");
 
   await page.getByRole("button", { name: "Open notifications", exact: true }).click();
-  const popover = page.getByRole("dialog", { name: "Important admin events", exact: true });
+  const popover = page.getByRole("dialog", { name: "Notifications", exact: true });
   await expect(popover).toBeVisible();
   await expect(popover.getByText("Economy incident detected", { exact: true })).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath("notifications-popover-desktop-dark.png"),
+    fullPage: false,
+  });
+  await popover.locator('summary[aria-label="More actions"]').click();
+  await expect(popover.getByRole("button", { name: "Clear read", exact: true })).toBeDisabled();
   await popover.getByRole("link", { name: "Full history", exact: true }).click();
   await expect(page).toHaveURL(/\/en\/notifications$/);
   await expect(
@@ -217,7 +223,9 @@ test("notification inbox, collapsed rail and mobile sheet stay compact", async (
   await page.getByRole("button", { name: "Open notifications", exact: true }).click();
   await expect(popover).toBeVisible();
   await expect(popover).toBeFocused();
-  await expect(popover.getByRole("button", { name: "Close", exact: true })).toBeVisible();
+  await expect(
+    popover.getByRole("button", { name: "Close notifications", exact: true })
+  ).toBeVisible();
   const mobile = await page.evaluate(() => ({
     clientWidth: document.documentElement.clientWidth,
     scrollWidth: document.documentElement.scrollWidth,

@@ -38,9 +38,11 @@ type AdminChromeCopy = {
     notificationFiltersLabel: string;
     notificationTriggerLabel: (open: boolean) => string;
     filterLabels: Record<AdminNotificationFilter, string>;
-    centerEyebrow: string;
     centerTitle: string;
     summary: (unreadCount: number, supportUnreadCount: number) => string;
+    close: string;
+    fullHistory: string;
+    moreActions: string;
     markAllRead: string;
     clearRead: string;
     critical: string;
@@ -155,12 +157,14 @@ const adminChromeCopy: Record<Locale, AdminChromeCopy> = {
         promo: "Промокоды",
         system: "Система",
       },
-      centerEyebrow: "Центр уведомлений",
-      centerTitle: "Важные события админки",
+      centerTitle: "Уведомления",
       summary: (unreadCount, supportUnreadCount) =>
         `${unreadCount} новых в ленте${
           supportUnreadCount > 0 ? `, ${supportUnreadCount} новых сообщений в поддержке` : ""
         }`,
+      close: "Закрыть уведомления",
+      fullHistory: "Вся история",
+      moreActions: "Другие действия",
       markAllRead: "Прочитать всё",
       clearRead: "Очистить прочитанное",
       critical: "Критично",
@@ -281,12 +285,14 @@ const adminChromeCopy: Record<Locale, AdminChromeCopy> = {
         promo: "Promo",
         system: "System",
       },
-      centerEyebrow: "Notification center",
-      centerTitle: "Important admin events",
+      centerTitle: "Notifications",
       summary: (unreadCount, supportUnreadCount) =>
         `${unreadCount} unread in feed${
           supportUnreadCount > 0 ? `, ${supportUnreadCount} new support messages` : ""
         }`,
+      close: "Close notifications",
+      fullHistory: "Full history",
+      moreActions: "More actions",
       markAllRead: "Mark all read",
       clearRead: "Clear read",
       critical: "Critical",
