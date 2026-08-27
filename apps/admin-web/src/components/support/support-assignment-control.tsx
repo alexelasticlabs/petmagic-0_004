@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   canOpenSupportAssignmentEditor,
@@ -27,6 +27,7 @@ type SupportAssignmentControlProps = {
   sessionUserId: string | null;
   sessionUserRoles: string[];
   locale: Locale;
+  claimRequestId?: number;
 };
 
 export function SupportAssignmentControl({
@@ -35,6 +36,7 @@ export function SupportAssignmentControl({
   sessionUserId,
   sessionUserRoles,
   locale,
+  claimRequestId = 0,
 }: SupportAssignmentControlProps) {
   const queryClient = useQueryClient();
   const [editorOpen, setEditorOpen] = useState(false);
@@ -43,6 +45,8 @@ export function SupportAssignmentControl({
   );
   const [reason, setReason] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const reasonInputRef = useRef<HTMLTextAreaElement>(null);
+  const handledClaimRequestIdRef = useRef(claimRequestId);
   const isAdmin = sessionUserRoles.includes("Admin");
   const isModerator = sessionUserRoles.includes("Moderator");
   const copy =
@@ -55,9 +59,11 @@ export function SupportAssignmentControl({
           self: "Вы",
           currentOperator: "Текущий оператор",
           reason: "Причина изменения",
-          reasonPlaceholder: "Кратко объясните передачу или снятие назначения",
-          reasonHint: "Причина попадёт в audit trail. Минимум 3 символа.",
-          confirm: "Подтвердить назначение",
+          reasonPlaceholder: "Например: взял в работу",
+          reasonHint: "Эта заметка сохранится в истории тикета.",
+          claimReason: "Взял в работу",
+          confirm: "Подтвердить",
+          claimConfirm: "Взять в работу",
           cancel: "Отмена",
           loading: "Загрузка операторов…",
           failed: "Не удалось изменить назначение. Обновите тикет и повторите.",
@@ -70,9 +76,11 @@ export function SupportAssignmentControl({
           self: "You",
           currentOperator: "Current operator",
           reason: "Change reason",
-          reasonPlaceholder: "Briefly explain the handoff or unassignment",
-          reasonHint: "The reason is stored in the audit trail. Minimum 3 characters.",
-          confirm: "Confirm assignment",
+          reasonPlaceholder: "For example: claimed for follow-up",
+          reasonHint: "This note is saved in the ticket history.",
+          claimReason: "Claimed for follow-up",
+          confirm: "Confirm",
+          claimConfirm: "Claim ticket",
           cancel: "Cancel",
           loading: "Loading operators…",
           failed: "Could not change assignment. Refresh the ticket and retry.",
@@ -190,6 +198,42 @@ export function SupportAssignmentControl({
 
   const canSubmit = assignmentPayloadValid && !assignmentMutation.isPending;
 
+  const openSelfAssignmentEditor = () => {
+    if (!canOpenEditor || !sessionUserId) {
+      return;
+    }
+
+    setSelectedOperatorId(sessionUserId);
+    setEditorOpen(true);
+    setReason(copy.claimReason);
+    setErrorMessage(null);
+  };
+
+  useEffect(() => {
+    if (claimRequestId === handledClaimRequestIdRef.current) {
+      return;
+    }
+
+    handledClaimRequestIdRef.current = claimRequestId;
+    if (!canOpenEditor || !sessionUserId) {
+      return;
+    }
+
+    setSelectedOperatorId(sessionUserId);
+    setEditorOpen(true);
+    setReason(copy.claimReason);
+    setErrorMessage(null);
+  }, [claimRequestId, canOpenEditor, copy.claimReason, sessionUserId]);
+
+  useEffect(() => {
+    if (!editorOpen || !reasonInputRef.current) {
+      return;
+    }
+
+    reasonInputRef.current.focus();
+    reasonInputRef.current.select();
+  }, [editorOpen]);
+
   return (
     <div className={styles.root}>
       <div className={styles.actions}>
@@ -198,13 +242,7 @@ export function SupportAssignmentControl({
             type="button"
             size="sm"
             variant="primary"
-            onClick={() => {
-              if (!canOpenEditor || !sessionUserId) return;
-              setSelectedOperatorId(sessionUserId);
-              setEditorOpen(true);
-              setReason("");
-              setErrorMessage(null);
-            }}
+            onClick={openSelfAssignmentEditor}
             disabled={!canOpenEditor || assignmentMutation.isPending}
           >
             {copy.claim}
@@ -252,6 +290,8 @@ export function SupportAssignmentControl({
           <label className={styles.field}>
             <span>{copy.reason}</span>
             <textarea
+              ref={reasonInputRef}
+              id="support-assignment-reason"
               className={styles.reason}
               value={reason}
               maxLength={500}
@@ -274,7 +314,9 @@ export function SupportAssignmentControl({
               onClick={() => assignmentMutation.mutate()}
               disabled={!canSubmit}
             >
-              {copy.confirm}
+              {!conversation.assignedAdminId && selectedOperatorId === sessionUserId
+                ? copy.claimConfirm
+                : copy.confirm}
             </Button>
             <Button
               type="button"

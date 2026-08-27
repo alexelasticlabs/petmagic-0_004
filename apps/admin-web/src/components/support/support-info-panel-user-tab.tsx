@@ -37,6 +37,7 @@ type SupportInfoPanelUserTabProps = {
   canViewSubjectUserContext: boolean;
   confirmPendingStatusChange: () => Promise<void>;
   conversation: NonNullable<SupportConversationController["conversation"]>;
+  claimRequestId: number;
   isAssignedToCurrentAdmin: boolean;
   sessionUserId: string | null;
   sessionUserRoles: string[];
@@ -126,6 +127,7 @@ export function SupportInfoPanelUserTab({
   canViewSubjectUserContext,
   confirmPendingStatusChange,
   conversation,
+  claimRequestId,
   isAssignedToCurrentAdmin,
   sessionUserId,
   sessionUserRoles,
@@ -178,6 +180,7 @@ export function SupportInfoPanelUserTab({
             sessionUserId={sessionUserId}
             sessionUserRoles={sessionUserRoles}
             locale={locale}
+            claimRequestId={claimRequestId}
           />
           {conversation.assignedAdminId &&
           !isAssignedToCurrentAdmin &&

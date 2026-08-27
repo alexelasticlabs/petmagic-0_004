@@ -1180,3 +1180,38 @@
 :global(:root[data-theme="dark"]) .messageAdmin .messageReplyBlockPreview {
   color: color-mix(in srgb, var(--success) 74%, var(--text-strong));
 }
+
+/* Keep support evidence readable without letting a single phone screenshot consume the chat. */
+.messageItem.messageWithMedia {
+  max-width: min(56%, 24rem);
+}
+
+.messageItem.messageWithMedia .messageMediaGrid,
+.messageItem.messageWithMedia .messageMediaTileSingle {
+  width: min(100%, 19rem);
+  max-width: 19rem;
+}
+
+.messageItem.messageWithMedia .messageMediaTileSingle {
+  max-height: 15rem;
+}
+
+.messageItem.messageWithMedia .messageImage,
+.messageItem.messageWithMedia .messageVideo {
+  max-height: 15rem;
+  object-fit: contain;
+}
+
+@media (max-width: 1180px) {
+  .messageItem.messageWithMedia {
+    max-width: min(82%, 24rem);
+  }
+}
+
+@media (max-width: 640px) {
+  .messageItem.messageWithMedia,
+  .messageItem.messageWithMedia .messageMediaGrid,
+  .messageItem.messageWithMedia .messageMediaTileSingle {
+    max-width: 100%;
+  }
+}

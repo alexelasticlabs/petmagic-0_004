@@ -7,4 +7,5 @@ export type SupportConversationText = SupportConversationController["text"];
 export type SupportInfoPanelProps = {
   locale: Locale;
   controller: SupportConversationController;
+  claimRequestId?: number;
 };

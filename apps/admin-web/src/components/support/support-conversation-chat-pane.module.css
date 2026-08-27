@@ -592,3 +592,41 @@
     height: auto;
   }
 }
+
+.ownershipComposerNotice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--warning) 42%, var(--border-soft));
+  border-radius: 0.9rem;
+  background: color-mix(in srgb, var(--warning) 8%, var(--surface-2));
+}
+
+.ownershipComposerCopy {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.ownershipComposerCopy strong {
+  color: var(--text-strong);
+}
+
+.ownershipComposerCopy span {
+  color: var(--text-muted);
+  font-size: 0.83rem;
+  line-height: 1.35;
+}
+
+@media (max-width: 640px) {
+  .ownershipComposerNotice {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .ownershipComposerNotice :global(.ui-button) {
+    width: 100%;
+  }
+}

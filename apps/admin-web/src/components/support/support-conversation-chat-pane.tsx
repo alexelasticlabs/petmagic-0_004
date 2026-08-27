@@ -42,6 +42,7 @@ type SupportConversationChatPaneProps = {
   attachmentInputRef: RefObject<HTMLInputElement | null>;
   attachmentPreviewUrl: string | null;
   canManageSupportWorkspace: boolean;
+  canClaimConversation: boolean;
   canManageReplyTemplates: boolean;
   canRetryAttachment: boolean;
   composerPlaceholder: string;
@@ -69,6 +70,7 @@ type SupportConversationChatPaneProps = {
   messagesById: Map<string, SupportMessage>;
   messagesEndRef: RefObject<HTMLDivElement | null>;
   jumpToMessage: (messageId: string) => void;
+  onClaimConversation: () => void;
   readOnlyComposerTitle: string;
   reply: string;
   replyComposerAttachment: SupportMessageAttachment | null | undefined;
@@ -105,6 +107,7 @@ export function SupportConversationChatPane({
   attachmentInputRef,
   attachmentPreviewUrl,
   canManageSupportWorkspace,
+  canClaimConversation,
   canManageReplyTemplates,
   canRetryAttachment,
   composerPlaceholder,
@@ -125,6 +128,7 @@ export function SupportConversationChatPane({
   isConversationReadOnly,
   isDragging,
   jumpToMessage,
+  onClaimConversation,
   locale,
   messageLabels,
   messagesById,
@@ -263,6 +267,25 @@ export function SupportConversationChatPane({
                       {text.supportReopenConversationAction}
                     </Button>
                   </div>
+                ) : null}
+              </div>
+            ) : isComposerDisabled ? (
+              <div
+                className={styles.ownershipComposerNotice}
+                data-testid="support-composer-ownership-gate"
+              >
+                <div className={styles.ownershipComposerCopy}>
+                  <strong>{copy.controller.ownershipRequired}</strong>
+                  <span>
+                    {locale === "ru"
+                      ? "Возьмите тикет в работу — после этого можно будет написать ответ или прикрепить файл."
+                      : "Claim the ticket to reply to the customer or attach a file."}
+                  </span>
+                </div>
+                {canClaimConversation ? (
+                  <Button variant="primary" size="sm" onClick={onClaimConversation}>
+                    {locale === "ru" ? "Взять в работу" : "Claim ticket"}
+                  </Button>
                 ) : null}
               </div>
             ) : (

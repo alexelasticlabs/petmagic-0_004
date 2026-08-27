@@ -1,5 +1,5 @@
 .page {
-  --support-page-max: 112rem;
+  --support-page-max: 128rem;
   display: grid;
   gap: 18px;
   width: min(100%, var(--support-page-max));
@@ -7,7 +7,7 @@
 }
 
 .workspace {
-  --support-workspace-height: clamp(38rem, calc(100dvh - 10rem), 66rem);
+  --support-workspace-height: clamp(40rem, calc(100dvh - 8rem), 70rem);
   display: grid;
   gap: 16px;
   align-items: stretch;
@@ -15,7 +15,7 @@
 }
 
 .workspaceFullView {
-  grid-template-columns: minmax(15rem, 17.4rem) minmax(0, 1fr) minmax(19rem, 22rem);
+  grid-template-columns: minmax(14rem, 16rem) minmax(0, 1fr) minmax(17rem, 19rem);
   gap: 14px;
   align-items: stretch;
 }
@@ -104,7 +104,7 @@
 
 @media (max-width: 1480px) {
   .workspaceFullView {
-    grid-template-columns: minmax(14.5rem, 16.6rem) minmax(0, 1fr) minmax(17.5rem, 20rem);
+    grid-template-columns: minmax(13.5rem, 15rem) minmax(0, 1fr) minmax(16rem, 18rem);
   }
 }
 

@@ -17,7 +17,11 @@ import styles from "@/components/support/support-info-panel.module.css";
 import { type SupportInfoPanelProps } from "@/components/support/support-info-panel.types";
 import { type SupportConversationStatus } from "@/lib/api-client";
 
-export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) {
+export function SupportInfoPanel({
+  locale,
+  controller,
+  claimRequestId = 0,
+}: SupportInfoPanelProps) {
   const [pendingStatusConfirm, setPendingStatusConfirm] =
     useState<SupportConversationStatus | null>(null);
   const [tagInput, setTagInput] = useState("");
@@ -161,6 +165,7 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
               canViewSubjectUserContext={canViewSubjectUserContext}
               confirmPendingStatusChange={confirmPendingStatusChange}
               conversation={conversation}
+              claimRequestId={claimRequestId}
               isAssignedToCurrentAdmin={isAssignedToCurrentAdmin}
               sessionUserId={sessionUserId}
               sessionUserRoles={sessionUserRoles}

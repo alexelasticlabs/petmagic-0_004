@@ -928,14 +928,16 @@ test("moderator RBAC and support claim/unassign ownership", async ({ page }) => 
   };
 
   const supportInfoPanel = page.getByTestId("support-info-panel");
-  const claimTicket = async (reason: string, expectedVersion: number) => {
+  const claimTicket = async (expectedVersion: number, editorAlreadyOpen = false) => {
     const requestCount = assignmentRequests.length;
-    const claimButton = supportInfoPanel.getByRole("button", {
-      name: "Claim ticket",
-      exact: true,
-    });
-    await expect(claimButton).toBeEnabled();
-    await claimButton.click();
+    if (!editorAlreadyOpen) {
+      const claimButton = supportInfoPanel.getByRole("button", {
+        name: "Claim ticket",
+        exact: true,
+      });
+      await expect(claimButton).toBeEnabled();
+      await claimButton.click();
+    }
 
     await expect(
       supportInfoPanel.getByRole("button", {
@@ -943,19 +945,19 @@ test("moderator RBAC and support claim/unassign ownership", async ({ page }) => 
         exact: true,
       })
     ).toContainText("You");
-    const confirmButton = supportInfoPanel.getByRole("button", {
-      name: "Confirm assignment",
-      exact: true,
-    });
-    await expect(confirmButton).toBeDisabled();
-    await supportInfoPanel.getByLabel("Change reason", { exact: true }).fill(reason);
+    const confirmButton = supportInfoPanel
+      .getByRole("button", {
+        name: "Claim ticket",
+        exact: true,
+      })
+      .last();
     await expect(confirmButton).toBeEnabled();
     await confirmButton.click();
 
     await expect.poll(() => assignmentRequests.length).toBe(requestCount + 1);
     expect(assignmentRequests.at(-1)).toEqual({
       assignedAdminId: moderatorUserId,
-      reason,
+      reason: "Claimed for follow-up",
       expectedVersion,
     });
   };
@@ -975,11 +977,11 @@ test("moderator RBAC and support claim/unassign ownership", async ({ page }) => 
       .click();
 
     const confirmButton = supportInfoPanel.getByRole("button", {
-      name: "Confirm assignment",
+      name: "Confirm",
       exact: true,
     });
     await expect(confirmButton).toBeDisabled();
-    await supportInfoPanel.getByLabel("Change reason", { exact: true }).fill(reason);
+    await page.locator("#support-assignment-reason").fill(reason);
     await expect(confirmButton).toBeEnabled();
     await confirmButton.click();
 
@@ -995,9 +997,17 @@ test("moderator RBAC and support claim/unassign ownership", async ({ page }) => 
   await expect(
     supportInfoPanel.getByRole("button", { name: "Claim ticket", exact: true })
   ).toBeVisible();
-  await expect(page.getByPlaceholder("Write a reply to the user...")).toBeDisabled();
+  await expect(page.getByTestId("support-composer-ownership-gate")).toBeVisible();
+  await page
+    .getByTestId("support-composer-ownership-gate")
+    .getByRole("button", {
+      name: "Claim ticket",
+      exact: true,
+    })
+    .click();
+  await expect(page.locator("#support-assignment-reason")).toHaveValue("Claimed for follow-up");
 
-  await claimTicket("Taking ownership for the first response.", 1);
+  await claimTicket(1, true);
   await expect(
     supportInfoPanel.getByRole("button", { name: "Change assignment", exact: true })
   ).toBeVisible();
@@ -1034,7 +1044,7 @@ test("moderator RBAC and support claim/unassign ownership", async ({ page }) => 
   expect(await page.evaluate(() => document.body.style.overflow)).toBe("");
 
   await detailsTrigger.click();
-  await claimTicket("Taking ownership from the compact workspace.", 3);
+  await claimTicket(3);
   await expect(page.getByPlaceholder("Write a reply to the user...")).toBeEnabled();
   await page.getByTestId("support-details-backdrop").click({ position: { x: 8, y: 8 } });
   await expect(page.getByTestId("support-details-drawer")).toBeHidden();
@@ -1052,7 +1062,7 @@ test("moderator RBAC and support claim/unassign ownership", async ({ page }) => 
     supportInfoPanel.getByRole("button", { name: "Change assignment", exact: true })
   ).toBeVisible();
   await unassignOwnTicket("Releasing ownership after compact-layout review.", 4);
-  await expect(page.getByPlaceholder("Write a reply to the user...")).toBeDisabled();
+  await expect(page.getByTestId("support-composer-ownership-gate")).toBeVisible();
   await page.keyboard.press("Escape");
 
   await page.setViewportSize({ width: 390, height: 844 });
@@ -1069,9 +1079,11 @@ test("moderator RBAC and support claim/unassign ownership", async ({ page }) => 
       return { left, right, top };
     });
 
-    const composer = document.querySelector<HTMLElement>('[data-testid="support-composer"]');
+    const composer = document.querySelector<HTMLElement>(
+      '[data-testid="support-composer"], [data-testid="support-composer-ownership-gate"]'
+    );
     if (!composer) {
-      throw new Error("Missing support composer");
+      throw new Error("Missing support composer state");
     }
 
     return {
@@ -1096,7 +1108,7 @@ test("moderator RBAC and support claim/unassign ownership", async ({ page }) => 
   await expect(
     supportInfoPanel.getByRole("button", { name: "Claim ticket", exact: true })
   ).toBeVisible();
-  await claimTicket("Taking ownership from the mobile workspace.", 5);
+  await claimTicket(5);
   await expect(page.getByPlaceholder("Write a reply to the user...")).toBeEnabled();
   await page.keyboard.press("Escape");
 

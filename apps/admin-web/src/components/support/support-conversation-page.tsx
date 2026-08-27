@@ -66,6 +66,7 @@ export function SupportConversationPage({
   >(null);
   const [isSupportDetailsDrawerMode, setIsSupportDetailsDrawerMode] = useState(false);
   const [isSupportDetailsDrawerOpen, setIsSupportDetailsDrawerOpen] = useState(false);
+  const [claimRequestId, setClaimRequestId] = useState(0);
   const supportDetailsDrawerId = useId();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -121,6 +122,7 @@ export function SupportConversationPage({
     setQueuePriorityFilter,
     setQueueSort,
     setSearchQuery,
+    setActiveSidePanelTab,
     setSelectedAttachment,
     statusMutation,
     text,
@@ -209,6 +211,22 @@ export function SupportConversationPage({
   const isComposerBusy = isSendReplySubmitting;
   const isComposerDisabled = isConversationReadOnly || !canMutateConversation || isComposerBusy;
   const isConversationClosed = conversation?.status === "Closed";
+  const canClaimConversation =
+    Boolean(conversation) &&
+    !conversation?.assignedAdminId &&
+    canManageSupportWorkspace &&
+    !isConversationReadOnly;
+  const requestClaimConversation = () => {
+    if (!canClaimConversation) {
+      return;
+    }
+
+    setActiveSidePanelTab("user");
+    if (isSupportDetailsDrawerMode) {
+      setIsSupportDetailsDrawerOpen(true);
+    }
+    setClaimRequestId((current) => current + 1);
+  };
   const isQueueControlsLocked = !canManageSupportWorkspace || inboxQuery.isFetching;
   const setQueueSubFilter = (value: SupportQueueSubFilter) => {
     if (isQueueControlsLocked) {
@@ -604,6 +622,7 @@ export function SupportConversationPage({
               attachmentInputRef={attachmentInputRef}
               attachmentPreviewUrl={attachmentPreviewUrl}
               canManageSupportWorkspace={canManageSupportWorkspace}
+              canClaimConversation={canClaimConversation}
               canManageReplyTemplates={sessionUserRoles.includes("Admin")}
               canRetryAttachment={canMutateConversation}
               composerPlaceholder={composerPlaceholder}
@@ -636,6 +655,7 @@ export function SupportConversationPage({
               isConversationReadOnly={isConversationReadOnly}
               isDragging={isDragging}
               jumpToMessage={jumpToMessage}
+              onClaimConversation={requestClaimConversation}
               locale={locale}
               messageLabels={messageLabels}
               messagesById={messagesById}
@@ -675,7 +695,11 @@ export function SupportConversationPage({
               closeLabel={text.supportClosePanelAction}
               onClose={() => setIsSupportDetailsDrawerOpen(false)}
             >
-              <SupportInfoPanel locale={locale} controller={controller} />
+              <SupportInfoPanel
+                locale={locale}
+                controller={controller}
+                claimRequestId={claimRequestId}
+              />
             </SupportConversationDetailsDrawer>
           </div>
           {fullscreenImage ? (
