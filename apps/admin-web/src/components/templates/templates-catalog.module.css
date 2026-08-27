@@ -566,7 +566,9 @@
 .cardGrid {
   min-width: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
+  /* auto-fit collapses unused tracks, so a small catalogue does not leave
+     every real card at a narrow 1/5 width. The max keeps one card readable. */
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 24rem));
   gap: clamp(0.75rem, 0.48rem + 0.45vw, 0.95rem);
   align-items: stretch;
 }
@@ -574,7 +576,9 @@
 .templateCard {
   min-width: 0;
   min-height: 100%;
-  overflow: hidden;
+  /* The action menu is an overlay. Clipping it here turns it into hidden
+     content inside the card and makes the control appear broken. */
+  overflow: visible;
   display: flex;
   flex-direction: column;
   border: 1px solid var(--border-soft);
@@ -598,6 +602,7 @@
   min-width: 0;
   aspect-ratio: 16 / 9;
   overflow: hidden;
+  border-radius: calc(var(--radius) - 1px) calc(var(--radius) - 1px) 0 0;
   border-bottom: 1px solid var(--border-soft);
   background: var(--surface-2);
 }
@@ -869,6 +874,33 @@
   margin-left: 0;
   justify-content: stretch;
   gap: 0.28rem;
+}
+
+.cardActionMenu {
+  position: relative;
+  z-index: 2;
+  flex: 1 1 calc(50% - 0.14rem);
+  min-width: 6.6rem;
+}
+
+.cardActionMenu > button {
+  width: 100%;
+  min-width: 0;
+  min-height: 2.1rem;
+  justify-content: space-between;
+  border: 1px solid var(--border-soft);
+  background: var(--surface-2);
+  color: var(--text-soft);
+}
+
+.cardActionMenu > button:hover:not(:disabled) {
+  border-color: var(--border-accent);
+  background: var(--surface-hover);
+  color: var(--text-strong);
+}
+
+.cardActionMenu [role="menu"] {
+  min-width: 12rem;
 }
 
 .cardActions .cardActionIconButton {
@@ -1395,7 +1427,7 @@
   }
 
   .cardGrid {
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
   }
 }
 
@@ -1472,6 +1504,11 @@
   }
 
   .cardActions .cardActionIconButton {
+    min-height: 2.75rem;
+  }
+
+  .cardActionMenu,
+  .cardActionMenu > button {
     min-height: 2.75rem;
   }
 

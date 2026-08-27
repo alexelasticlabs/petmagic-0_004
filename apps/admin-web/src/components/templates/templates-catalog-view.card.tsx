@@ -243,6 +243,7 @@ export function TemplateCatalogCard({
               items={actionItems}
               disabled={isBusy}
               align="end"
+              className={styles.cardActionMenu}
             />
           ) : null}
         </div>

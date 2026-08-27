@@ -711,6 +711,46 @@ test("unified templates catalog supports publishing filters and responsive cards
     scrollWidth: document.documentElement.scrollWidth,
   }));
   expect(desktopDimensions.scrollWidth).toBeLessThanOrEqual(desktopDimensions.clientWidth);
+
+  const featuredCard = main.locator("article").filter({ hasText: "Golden Studio Portrait" });
+  await expect(featuredCard).toBeVisible();
+  const featuredCardWidth = await featuredCard.evaluate(
+    (element) => element.getBoundingClientRect().width
+  );
+  expect(featuredCardWidth).toBeGreaterThanOrEqual(288);
+
+  const actionsButton = featuredCard.getByRole("button", { name: "Действия", exact: true });
+  await actionsButton.click();
+  const actionsMenu = featuredCard.getByRole("menu", { name: "Действия", exact: true });
+  await expect(actionsMenu).toBeVisible();
+  const desktopActionsGeometry = await page.evaluate(() => {
+    const card = Array.from(document.querySelectorAll("article")).find((element) =>
+      element.textContent?.includes("Golden Studio Portrait")
+    );
+    const menu = document.querySelector<HTMLElement>('[role="menu"][aria-label="Действия"]');
+    if (!card || !menu) {
+      throw new Error("Template card actions are missing.");
+    }
+
+    const cardRect = card.getBoundingClientRect();
+    const menuRect = menu.getBoundingClientRect();
+    return {
+      cardBottom: cardRect.bottom,
+      cardWidth: cardRect.width,
+      menuBottom: menuRect.bottom,
+      menuLeft: menuRect.left,
+      menuRight: menuRect.right,
+      viewportWidth: document.documentElement.clientWidth,
+    };
+  });
+  expect(desktopActionsGeometry.menuBottom).toBeGreaterThan(desktopActionsGeometry.cardBottom);
+  expect(desktopActionsGeometry.menuLeft).toBeGreaterThanOrEqual(0);
+  expect(desktopActionsGeometry.menuRight).toBeLessThanOrEqual(
+    desktopActionsGeometry.viewportWidth
+  );
+  await actionsButton.press("Escape");
+  await expect(actionsMenu).toHaveCount(0);
+
   await page.screenshot({
     path: testInfo.outputPath("templates-catalog-desktop.png"),
     fullPage: true,
@@ -810,6 +850,31 @@ test("unified templates catalog supports publishing filters and responsive cards
   expect(mobileDimensions.filtersLeft).toBeGreaterThanOrEqual(0);
   expect(mobileDimensions.filtersRight).toBeLessThanOrEqual(390);
   expect(mobileDimensions.sidebarRight).toBeLessThanOrEqual(0);
+
+  const mobileFeaturedCard = main.locator("article").filter({ hasText: "Golden Studio Portrait" });
+  const mobileActionsButton = mobileFeaturedCard.getByRole("button", {
+    name: "Действия",
+    exact: true,
+  });
+  await mobileActionsButton.click();
+  const mobileActionsMenu = mobileFeaturedCard.getByRole("menu", {
+    name: "Действия",
+    exact: true,
+  });
+  await expect(mobileActionsMenu).toBeVisible();
+  const mobileActionsGeometry = await mobileActionsMenu.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    return {
+      left: rect.left,
+      right: rect.right,
+      viewportWidth: document.documentElement.clientWidth,
+    };
+  });
+  expect(mobileActionsGeometry.left).toBeGreaterThanOrEqual(0);
+  expect(mobileActionsGeometry.right).toBeLessThanOrEqual(mobileActionsGeometry.viewportWidth);
+  await mobileActionsButton.press("Escape");
+  await expect(mobileActionsMenu).toHaveCount(0);
+
   await page.screenshot({
     path: testInfo.outputPath("templates-catalog-mobile.png"),
     fullPage: true,

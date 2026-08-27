@@ -180,6 +180,12 @@ describe("templates catalog actions", () => {
       "`${templateBasePath}/test/${encodeURIComponent(template.templateId)}`"
     );
     expect(source).toContain("<AdminActionMenu");
+    expect(source).toContain("className={styles.cardActionMenu}");
+    expect(styles).toContain(
+      "grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 24rem))"
+    );
+    expect(styles).toContain("overflow: visible;");
+    expect(styles).toContain('.cardActionMenu [role="menu"]');
     expect(source).toContain("className={`${styles.tablePrimaryAction}");
     expect(source).toContain('isBusy ? ` ${styles.cardActionIconButtonDisabled}` : ""');
     expect(source).toContain("aria-disabled={isBusy}");
