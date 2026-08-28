@@ -79,7 +79,10 @@ void main() {
     );
 
     expect(find.text('Server is unavailable'), findsOneWidget);
-    expect(find.textContaining('could not reach the backend'), findsOneWidget);
+    expect(
+      find.textContaining('PetMagic is temporarily unavailable'),
+      findsOneWidget,
+    );
     expect(find.text('Retry'), findsOneWidget);
   });
 
