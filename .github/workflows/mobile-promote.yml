@@ -75,6 +75,7 @@ jobs:
           APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
           APP_STORE_CONNECT_KEY_P8: ${{ secrets.APP_STORE_CONNECT_KEY_P8 }}
+          APP_VERSION: 1.0.0
           BUILD_NUMBER: ${{ inputs.build_number }}
           SUBMIT_FOR_REVIEW: ${{ inputs.submit_for_review }}
         run: bundle exec fastlane ios promote
