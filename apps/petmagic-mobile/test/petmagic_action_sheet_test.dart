@@ -13,10 +13,13 @@ void main() {
     await tester.tap(find.text('Open'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Add a photo or video'), findsOneWidget);
+    expect(find.text('Add a photo'), findsOneWidget);
+    expect(find.text('Upload from device'), findsOneWidget);
     expect(find.text('Use a pet from your profile'), findsOneWidget);
 
-    await tester.tap(find.text('Upload'));
+    expect(tester.getTopLeft(find.byType(BottomSheet).last).dy, 0);
+
+    await tester.tap(find.text('Upload from device'));
     await tester.pumpAndSettle();
 
     expect(find.text('Content source'), findsOneWidget);
@@ -38,7 +41,7 @@ void main() {
 
     await tester.tap(find.text('Open'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Upload'));
+    await tester.tap(find.text('Upload from device'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Gallery'));
     await tester.pumpAndSettle();
@@ -47,7 +50,7 @@ void main() {
   });
 
   testWidgets(
-    'PetMagicActionSheet surface follows light and dark theme tokens',
+    'PetMagicActionSheet uses a plain themed surface without backdrop blur',
     (tester) async {
       for (final themeMode in [ThemeMode.light, ThemeMode.dark]) {
         await tester.pumpWidget(_ActionSheetHost(themeMode: themeMode));
@@ -55,17 +58,52 @@ void main() {
         await tester.tap(find.text('Open'));
         await tester.pumpAndSettle();
 
-        final sheetContext = tester.element(find.text('Add a photo or video'));
+        final sheetContext = tester.element(find.text('Add a photo'));
         final colors = sheetContext.petMagicColors;
-        final gradient =
-            (_sheetSurfaceDecoration(tester).gradient! as LinearGradient);
+        final decoration = _sheetSurfaceDecoration(tester, colors);
 
-        expect(gradient.colors, [colors.surfaceGlass, colors.surface]);
+        expect(decoration.color, colors.surface);
+        expect(decoration.gradient, isNull);
+        expect(find.byType(BackdropFilter), findsNothing);
 
         await tester.pumpWidget(const SizedBox.shrink());
       }
     },
   );
+
+  testWidgets('PetMagicActionSheet closes from its header action', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const _ActionSheetHost());
+
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.close_rounded));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Add a photo'), findsNothing);
+    expect(find.text('result:none'), findsOneWidget);
+  });
+
+  testWidgets('PetMagicActionSheet stays overflow-free on a compact screen', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      tester.platformDispatcher.clearTextScaleFactorTestValue();
+    });
+
+    await tester.pumpWidget(const _ActionSheetHost());
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+
+    expect(tester.getTopLeft(find.byType(BottomSheet).last).dy, 0);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 class _ActionSheetHost extends StatefulWidget {
@@ -120,7 +158,10 @@ class _ActionSheetHostState extends State<_ActionSheetHost> {
   }
 }
 
-BoxDecoration _sheetSurfaceDecoration(WidgetTester tester) {
+BoxDecoration _sheetSurfaceDecoration(
+  WidgetTester tester,
+  PetMagicColors colors,
+) {
   final decoratedBox = tester.widget<DecoratedBox>(
     find.byWidgetPredicate((widget) {
       if (widget is! DecoratedBox) {
@@ -129,8 +170,8 @@ BoxDecoration _sheetSurfaceDecoration(WidgetTester tester) {
 
       final decoration = widget.decoration;
       return decoration is BoxDecoration &&
-          decoration.borderRadius == BorderRadius.circular(32) &&
-          decoration.gradient is LinearGradient;
+          decoration.color == colors.surface &&
+          decoration.gradient == null;
     }),
   );
 

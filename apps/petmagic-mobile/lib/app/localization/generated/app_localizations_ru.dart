@@ -595,6 +595,15 @@ class AppLocalizationsRu extends AppLocalizations {
   String get petsActionSheetSourceTitle => 'Источник контента';
 
   @override
+  String get petsActionSheetAddPhotoTitle => 'Добавить фото';
+
+  @override
+  String get petsActionSheetUploadDeviceTitle => 'Загрузить с устройства';
+
+  @override
+  String get petsActionSheetChoosePetTitle => 'Выбрать питомца';
+
+  @override
   String get petsActionSheetUploadSemantic => 'Загрузить фото или видео';
 
   @override

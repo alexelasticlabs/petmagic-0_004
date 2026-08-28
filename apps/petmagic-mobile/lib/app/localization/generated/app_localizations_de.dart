@@ -600,6 +600,15 @@ class AppLocalizationsDe extends AppLocalizations {
   String get petsActionSheetSourceTitle => 'Inhaltsquelle';
 
   @override
+  String get petsActionSheetAddPhotoTitle => 'Foto hinzufügen';
+
+  @override
+  String get petsActionSheetUploadDeviceTitle => 'Vom Gerät hochladen';
+
+  @override
+  String get petsActionSheetChoosePetTitle => 'Haustier auswählen';
+
+  @override
   String get petsActionSheetUploadSemantic => 'Foto oder Video hochladen';
 
   @override

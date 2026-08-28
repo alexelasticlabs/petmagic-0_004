@@ -601,6 +601,15 @@ class AppLocalizationsPl extends AppLocalizations {
   String get petsActionSheetSourceTitle => 'Źródło treści';
 
   @override
+  String get petsActionSheetAddPhotoTitle => 'Dodaj zdjęcie';
+
+  @override
+  String get petsActionSheetUploadDeviceTitle => 'Prześlij z urządzenia';
+
+  @override
+  String get petsActionSheetChoosePetTitle => 'Wybierz pupila';
+
+  @override
   String get petsActionSheetUploadSemantic => 'Prześlij zdjęcie lub wideo';
 
   @override

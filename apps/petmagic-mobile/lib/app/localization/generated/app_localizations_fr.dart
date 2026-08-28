@@ -603,6 +603,15 @@ class AppLocalizationsFr extends AppLocalizations {
   String get petsActionSheetSourceTitle => 'Source du contenu';
 
   @override
+  String get petsActionSheetAddPhotoTitle => 'Ajouter une photo';
+
+  @override
+  String get petsActionSheetUploadDeviceTitle => 'Importer depuis l’appareil';
+
+  @override
+  String get petsActionSheetChoosePetTitle => 'Choisir un animal';
+
+  @override
   String get petsActionSheetUploadSemantic =>
       'Téléverser une photo ou une vidéo';
 

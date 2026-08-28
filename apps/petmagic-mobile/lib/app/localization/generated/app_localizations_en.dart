@@ -597,6 +597,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get petsActionSheetSourceTitle => 'Content source';
 
   @override
+  String get petsActionSheetAddPhotoTitle => 'Add a photo';
+
+  @override
+  String get petsActionSheetUploadDeviceTitle => 'Upload from device';
+
+  @override
+  String get petsActionSheetChoosePetTitle => 'Choose a pet';
+
+  @override
   String get petsActionSheetUploadSemantic => 'Upload a photo or video';
 
   @override

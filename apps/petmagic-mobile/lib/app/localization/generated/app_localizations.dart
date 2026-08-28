@@ -1218,6 +1218,24 @@ abstract class AppLocalizations {
   /// **'Content source'**
   String get petsActionSheetSourceTitle;
 
+  /// No description provided for @petsActionSheetAddPhotoTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a photo'**
+  String get petsActionSheetAddPhotoTitle;
+
+  /// No description provided for @petsActionSheetUploadDeviceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload from device'**
+  String get petsActionSheetUploadDeviceTitle;
+
+  /// No description provided for @petsActionSheetChoosePetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a pet'**
+  String get petsActionSheetChoosePetTitle;
+
   /// No description provided for @petsActionSheetUploadSemantic.
   ///
   /// In en, this message translates to:

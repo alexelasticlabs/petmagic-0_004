@@ -1,14 +1,7 @@
-import 'dart:math' as math;
-import 'dart:ui';
-
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
-import 'package:petmagic_mobile/core/performance/performance_guard.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
-import 'package:petmagic_mobile/shared/widgets/motion.dart';
-import 'package:petmagic_mobile/shared/widgets/petmagic_haptics.dart';
 
 part 'petmagic_action_sheet_items.part.dart';
 
@@ -19,14 +12,21 @@ enum PetMagicActionSheetStep { main, uploadSource }
 Future<PetMagicActionSheetResult?> showPetMagicActionSheet(
   BuildContext context,
 ) {
+  final screenHeight = Overlay.of(
+    context,
+    rootOverlay: true,
+  ).context.size!.height;
+
   return showPetMagicModalBottomSheet<PetMagicActionSheetResult>(
     context: context,
     isScrollControlled: true,
-    useSafeArea: true,
+    useSafeArea: false,
     backgroundColor: Colors.transparent,
     barrierColor: Theme.of(context).colorScheme.scrim.withValues(alpha: 0.55),
+    constraints: BoxConstraints.tightFor(height: screenHeight),
     builder: (sheetContext, bottomInset) => PetMagicActionSheet(
       bottomInset: bottomInset,
+      screenHeight: screenHeight,
       onPickFromGallery: () =>
           Navigator.of(sheetContext).pop(PetMagicActionSheetResult.gallery),
       onOpenCamera: () =>
@@ -44,12 +44,14 @@ class PetMagicActionSheet extends StatefulWidget {
     required this.onOpenCamera,
     required this.onSelectExistingPet,
     this.bottomInset = 0,
+    this.screenHeight,
   });
 
   final VoidCallback onPickFromGallery;
   final VoidCallback onOpenCamera;
   final VoidCallback onSelectExistingPet;
   final double bottomInset;
+  final double? screenHeight;
 
   @override
   State<PetMagicActionSheet> createState() => _PetMagicActionSheetState();
@@ -60,13 +62,12 @@ class _PetMagicActionSheetState extends State<PetMagicActionSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final reduceMotion = PetMotion.reduceMotion(context);
-    final disableGlass =
-        defaultTargetPlatform == TargetPlatform.android ||
-        PerformanceGuard.shouldDisableGlassEffects(context);
     final colors = context.petMagicColors;
-    final bottomPadding = math.max(widget.bottomInset, 12.0);
-    final surfaceBorderColor = colors.border.withValues(alpha: 0.72);
+    final screenHeight =
+        widget.screenHeight ?? MediaQuery.sizeOf(context).height;
+    final contentHeight = (screenHeight - widget.bottomInset)
+        .clamp(0.0, screenHeight)
+        .toDouble();
 
     return PopScope<void>(
       canPop: _step == PetMagicActionSheetStep.main,
@@ -81,31 +82,17 @@ class _PetMagicActionSheetState extends State<PetMagicActionSheet> {
       },
       child: SafeArea(
         top: false,
+        bottom: false,
         child: Padding(
-          padding: EdgeInsets.fromLTRB(12, 0, 12, bottomPadding),
-          child: Align(
-            alignment: Alignment.bottomCenter,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 520),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(32),
-                child: disableGlass
-                    ? _buildSheetSurface(
-                        context,
-                        colors: colors,
-                        reduceMotion: reduceMotion,
-                        surfaceBorderColor: surfaceBorderColor,
-                      )
-                    : BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-                        child: _buildSheetSurface(
-                          context,
-                          colors: colors,
-                          reduceMotion: reduceMotion,
-                          surfaceBorderColor: surfaceBorderColor,
-                        ),
-                      ),
+          padding: EdgeInsets.only(bottom: widget.bottomInset),
+          child: SizedBox(
+            height: contentHeight,
+            width: double.infinity,
+            child: ClipRRect(
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(30),
               ),
+              child: _buildSheetSurface(context, colors: colors),
             ),
           ),
         ),
@@ -116,78 +103,35 @@ class _PetMagicActionSheetState extends State<PetMagicActionSheet> {
   Widget _buildSheetSurface(
     BuildContext context, {
     required PetMagicColors colors,
-    required bool reduceMotion,
-    required Color surfaceBorderColor,
   }) {
     return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [colors.surfaceGlass, colors.surface],
-        ),
-        borderRadius: BorderRadius.circular(32),
-        border: Border.all(color: surfaceBorderColor),
-        boxShadow: [
-          BoxShadow(
-            color: colors.accent.withValues(alpha: 0.12),
-            blurRadius: 36,
-            spreadRadius: 2,
-            offset: const Offset(0, 18),
-          ),
-          BoxShadow(
-            color: colors.shadow.withValues(alpha: 0.34),
-            blurRadius: 32,
-            offset: const Offset(0, 18),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
-        child: AnimatedSize(
-          duration: PetMotion.effectiveDuration(context, PetMotion.medium),
-          curve: PetMotion.emphasized,
-          alignment: Alignment.topCenter,
+      decoration: BoxDecoration(color: colors.surface),
+      child: SafeArea(
+        top: true,
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const _PetMagicActionSheetHandle(),
-              const SizedBox(height: 18),
+              const SizedBox(height: 14),
+              _PetMagicActionSheetHeader(
+                title: _step == PetMagicActionSheetStep.main
+                    ? AppLocalizations.of(context).petsActionSheetAddPhotoTitle
+                    : AppLocalizations.of(context).petsActionSheetSourceTitle,
+                onBack: _step == PetMagicActionSheetStep.uploadSource
+                    ? () => setState(() {
+                        _step = PetMagicActionSheetStep.main;
+                      })
+                    : null,
+                onClose: () => Navigator.of(context).pop(),
+              ),
+              const SizedBox(height: 12),
+              Divider(height: 1, color: colors.border.withValues(alpha: 0.62)),
+              const SizedBox(height: 4),
               AnimatedSwitcher(
-                duration: PetMotion.effectiveDuration(
-                  context,
-                  const Duration(milliseconds: 220),
-                ),
-                switchInCurve: PetMotion.emphasized,
-                switchOutCurve: Curves.easeInOutCubic,
-                layoutBuilder: (currentChild, previousChildren) {
-                  return Stack(
-                    alignment: Alignment.topCenter,
-                    children: [
-                      ...previousChildren,
-                      ...switch (currentChild) {
-                        final Widget child => [child],
-                        null => const <Widget>[],
-                      },
-                    ],
-                  );
-                },
-                transitionBuilder: (child, animation) {
-                  final slideTween = Tween<Offset>(
-                    begin: reduceMotion
-                        ? Offset.zero
-                        : const Offset(0.05, 0.04),
-                    end: Offset.zero,
-                  );
-                  return FadeTransition(
-                    opacity: animation,
-                    child: SlideTransition(
-                      position: slideTween.animate(animation),
-                      child: child,
-                    ),
-                  );
-                },
+                duration: const Duration(milliseconds: 180),
                 child: KeyedSubtree(
                   key: ValueKey<PetMagicActionSheetStep>(_step),
                   child: _buildStep(context),
@@ -205,8 +149,8 @@ class _PetMagicActionSheetState extends State<PetMagicActionSheet> {
     final items = switch (_step) {
       PetMagicActionSheetStep.main => [
         PetMagicActionSheetItem(
-          icon: Icons.upload_rounded,
-          title: text.petsUploadAction,
+          icon: Icons.file_upload_outlined,
+          title: text.petsActionSheetUploadDeviceTitle,
           subtitle: text.petsActionSheetUploadSubtitle,
           semanticLabel: text.petsActionSheetUploadSemantic,
           onTap: () {
@@ -217,7 +161,7 @@ class _PetMagicActionSheetState extends State<PetMagicActionSheet> {
         ),
         PetMagicActionSheetItem(
           icon: Icons.pets_rounded,
-          title: text.petsChooseFromMyPetsAction,
+          title: text.petsActionSheetChoosePetTitle,
           subtitle: text.petsActionSheetMyPetsSubtitle,
           semanticLabel: text.petsActionSheetMyPetsSemantic,
           onTap: widget.onSelectExistingPet,
@@ -245,17 +189,12 @@ class _PetMagicActionSheetState extends State<PetMagicActionSheet> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (_step == PetMagicActionSheetStep.uploadSource)
-          _PetMagicActionSheetStepHeader(
-            title: text.petsActionSheetSourceTitle,
-            onBack: () {
-              setState(() {
-                _step = PetMagicActionSheetStep.main;
-              });
-            },
-          ),
         for (var i = 0; i < items.length; i++) ...[
-          if (i > 0) const SizedBox(height: 14),
+          if (i > 0)
+            Divider(
+              height: 1,
+              color: context.petMagicColors.border.withValues(alpha: 0.62),
+            ),
           items[i],
         ],
       ],
@@ -271,10 +210,10 @@ class _PetMagicActionSheetHandle extends StatelessWidget {
     final colors = context.petMagicColors;
     return Center(
       child: Container(
-        width: 46,
-        height: 5,
+        width: 36,
+        height: 4,
         decoration: BoxDecoration(
-          color: colors.border.withValues(alpha: 0.72),
+          color: colors.border.withValues(alpha: 0.56),
           borderRadius: BorderRadius.circular(999),
         ),
       ),
@@ -282,61 +221,52 @@ class _PetMagicActionSheetHandle extends StatelessWidget {
   }
 }
 
-class _PetMagicActionSheetStepHeader extends StatelessWidget {
-  const _PetMagicActionSheetStepHeader({
+class _PetMagicActionSheetHeader extends StatelessWidget {
+  const _PetMagicActionSheetHeader({
     required this.title,
-    required this.onBack,
+    required this.onClose,
+    this.onBack,
   });
 
   final String title;
-  final VoidCallback onBack;
+  final VoidCallback onClose;
+  final VoidCallback? onBack;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
-      child: SizedBox(
-        height: 32,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Material(
-                color: Colors.transparent,
-                child: InkResponse(
-                  onTap: onBack,
-                  radius: 22,
-                  containedInkWell: true,
-                  highlightShape: BoxShape.circle,
-                  child: Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: colors.surfaceStrong.withValues(alpha: 0.58),
-                      border: Border.all(color: colors.border),
-                    ),
-                    child: Icon(
-                      Icons.arrow_back_ios_new_rounded,
-                      size: 16,
-                      color: colors.textStrong,
-                    ),
-                  ),
-                ),
-              ),
+    return SizedBox(
+      height: 44,
+      child: Row(
+        children: [
+          if (onBack != null) ...[
+            IconButton(
+              onPressed: onBack,
+              icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
+              color: colors.textSoft,
+              tooltip: MaterialLocalizations.of(context).backButtonTooltip,
             ),
-            Text(
-              title,
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                color: colors.textStrong,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.1,
-              ),
-            ),
+            const SizedBox(width: 4),
           ],
-        ),
+          Expanded(
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                color: colors.textStrong,
+                fontSize: 23,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          IconButton(
+            onPressed: onClose,
+            icon: const Icon(Icons.close_rounded, size: 24),
+            color: colors.textSoft,
+            tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+          ),
+        ],
       ),
     );
   }
