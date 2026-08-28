@@ -110,6 +110,7 @@ platform :ios do
       skip_binary_upload: true,
       skip_screenshots: true,
       skip_metadata: true,
+      precheck_include_in_app_purchases: false,
       submit_for_review: ENV.fetch("SUBMIT_FOR_REVIEW", "false") == "true",
       automatic_release: false,
       phased_release: true,
