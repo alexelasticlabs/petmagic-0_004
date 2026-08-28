@@ -2,18 +2,25 @@ import 'dart:io';
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:petmagic_mobile/app/preferences/app_preferences_controller.dart';
 import 'package:petmagic_mobile/core/platform/app_runtime_info.dart';
 
 final flutterAppRuntimeInfoProvider = Provider<AppRuntimeInfo>((ref) {
-  return const FlutterAppRuntimeInfo();
+  final selectedLocale = ref.watch(
+    appPreferencesControllerProvider.select((state) => state.locale),
+  );
+  return FlutterAppRuntimeInfo(localeOverride: selectedLocale);
 });
 
 final class FlutterAppRuntimeInfo implements AppRuntimeInfo {
-  const FlutterAppRuntimeInfo();
+  const FlutterAppRuntimeInfo({this.localeOverride});
+
+  final Locale? localeOverride;
 
   @override
   AppLocale get locale {
-    final locale = WidgetsBinding.instance.platformDispatcher.locale;
+    final locale =
+        localeOverride ?? WidgetsBinding.instance.platformDispatcher.locale;
     return AppLocale(
       languageTag: locale.toLanguageTag(),
       countryCode: locale.countryCode,
