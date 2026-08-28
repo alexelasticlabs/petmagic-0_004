@@ -424,6 +424,21 @@
   gap: 0.16rem;
 }
 
+.dateValue,
+.registrationCell {
+  color: var(--text-soft);
+  font-size: 0.76rem;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+.registrationCell {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--control-height-sm);
+  color: var(--text-muted);
+}
+
 .noActivity {
   color: var(--text-soft);
 }
@@ -450,21 +465,26 @@
 }
 
 .actionsCell {
-  min-width: 13.25rem;
+  min-width: 19rem;
   text-align: right;
 }
 
 .quickActions {
-  display: inline-flex;
+  display: inline-grid;
+  grid-template-columns: repeat(3, minmax(0, max-content));
   justify-content: flex-end;
-  flex-wrap: wrap;
   gap: 0.36rem;
 }
 
 .quickActionLink {
   min-width: 0;
   gap: 0.3rem;
+  justify-content: center;
   text-decoration: none;
+}
+
+.quickActionPrimary {
+  min-width: 5.6rem;
 }
 
 .quickActionIcon {
@@ -648,7 +668,8 @@
     grid-column: 1 / -1;
   }
 
-  .tableWrap :global(td:nth-child(4)) {
+  .tableWrap :global(td:nth-child(4)),
+  .tableWrap :global(td:nth-child(5)) {
     grid-column: 1 / -1;
   }
 
@@ -662,13 +683,13 @@
   }
 
   .quickActions {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     width: 100%;
-    justify-content: stretch;
   }
 
   .quickActionLink {
-    flex: 1 1 min(10rem, 100%);
+    width: 100%;
   }
 }
 
@@ -723,7 +744,8 @@
   }
 
   .tableWrap :global(td),
-  .tableWrap :global(td:nth-child(4)) {
+  .tableWrap :global(td:nth-child(4)),
+  .tableWrap :global(td:nth-child(5)) {
     grid-column: 1;
   }
 }

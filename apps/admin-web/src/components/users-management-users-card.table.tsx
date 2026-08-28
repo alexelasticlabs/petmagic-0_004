@@ -3,7 +3,12 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef } from "react";
 
-import { CaretDownIcon, DollarIcon, SupportIcon } from "@/components/admin/admin-icons";
+import {
+  CaretDownIcon,
+  DollarIcon,
+  SupportIcon,
+  UserRegisterIcon,
+} from "@/components/admin/admin-icons";
 import {
   AdminBadge,
   AdminStatusBadge,
@@ -103,6 +108,7 @@ export function UsersManagementUsersTable({
               <th>{ui.accountAndAccess}</th>
               <th>{ui.plan}</th>
               <th>{ui.lastActivity}</th>
+              <th>{ui.registeredAt}</th>
               <th>{ui.quickActions}</th>
             </tr>
           </thead>
@@ -187,15 +193,19 @@ export function UsersManagementUsersTable({
                   </td>
                   <td data-label={ui.lastActivity}>
                     {user.lastActivityAtUtc ? (
-                      formatDateTime(user.lastActivityAtUtc, locale)
+                      <time dateTime={user.lastActivityAtUtc} className={styles.dateValue}>
+                        {formatDateTime(user.lastActivityAtUtc, locale)}
+                      </time>
                     ) : (
                       <div className={styles.activityCell}>
                         <span className={styles.noActivity}>{ui.noActivity}</span>
-                        <span className={styles.activityMeta}>
-                          {ui.registeredAt} {formatDateTime(user.createdAtUtc, locale)}
-                        </span>
                       </div>
                     )}
+                  </td>
+                  <td data-label={ui.registeredAt}>
+                    <time dateTime={user.createdAtUtc} className={styles.registrationCell}>
+                      {formatDateTime(user.createdAtUtc, locale)}
+                    </time>
                   </td>
                   <td data-label={ui.quickActions} className={styles.actionsCell}>
                     <div
@@ -203,6 +213,15 @@ export function UsersManagementUsersTable({
                       role="group"
                       aria-label={`${ui.quickActions}: ${userName || maskEmail(user.email)}`}
                     >
+                      <Link
+                        href={`/${locale}/users/${encodeURIComponent(user.userId)}`}
+                        className={`ui-button ui-button--primary ui-button--sm ${styles.quickActionLink} ${styles.quickActionPrimary}`}
+                        aria-label={`${ui.quickProfile}: ${userName || maskEmail(user.email)}`}
+                        title={`${ui.quickProfile}: ${userName || maskEmail(user.email)}`}
+                      >
+                        <UserRegisterIcon className={styles.quickActionIcon} />
+                        <span className={styles.quickActionText}>{ui.quickProfile}</span>
+                      </Link>
                       <Link
                         href={`/${locale}/users/${encodeURIComponent(user.userId)}?tab=wallet`}
                         className={`ui-button ui-button--secondary ui-button--sm ${styles.quickActionLink}`}

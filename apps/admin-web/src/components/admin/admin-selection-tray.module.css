@@ -2,11 +2,12 @@
   position: sticky;
   z-index: 18;
   inset-block-end: max(0.75rem, env(safe-area-inset-bottom));
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(13rem, 0.72fr) minmax(0, 1.28fr);
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
-  width: min(100%, 64rem);
+  width: min(100%, 72rem);
   margin-inline: auto;
   padding: 0.7rem;
   border: 1px solid var(--border-accent);
@@ -18,13 +19,15 @@
 
 .details {
   display: grid;
-  min-width: min(36rem, 62vw);
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-width: 0;
+  align-items: center;
   gap: 0.55rem;
 }
 
 .items {
   display: flex;
-  max-height: 7.5rem;
+  max-height: 6.2rem;
   margin: 0;
   padding: 0;
   flex-wrap: wrap;
@@ -129,6 +132,12 @@
   gap: 0.45rem;
 }
 
+@media (max-width: 900px) {
+  .tray {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 @media (max-width: 640px) {
   .tray {
     align-items: stretch;
@@ -137,6 +146,7 @@
 
   .details {
     min-width: 0;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .actions {

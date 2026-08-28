@@ -97,8 +97,10 @@ describe("users management visual contract", () => {
     expect(tableSource).toContain("<span>{ui.userColumn}</span>");
     expect(tableSource).toContain("<th>{ui.accountAndAccess}</th>");
     expect(tableSource).toContain("<th>{ui.plan}</th>");
+    expect(tableSource).toContain("<th>{ui.registeredAt}</th>");
     expect(tableSource).toContain("<th>{ui.quickActions}</th>");
     expect(tableSource).toContain("data-label={ui.quickActions}");
+    expect(tableSource).toContain("data-label={ui.registeredAt}");
     expect(tableSource).toContain("href={`/${locale}/users/${encodeURIComponent(user.userId)}`}");
     expect(tableSource).toContain("?tab=wallet");
     expect(tableSource).toContain("?tab=support");
@@ -171,6 +173,7 @@ describe("users management visual contract", () => {
     expect(usersContentSource).toContain('openProfile: "Открыть досье"');
     expect(usersContentSource).toContain('openProfile: "Open dossier"');
     expect(usersContentSource).toContain('quickActions: "Быстрые действия"');
+    expect(usersContentSource).toContain('quickProfile: "Досье"');
     expect(usersContentSource).toContain('quickWallet: "Баланс"');
     expect(usersContentSource).toContain('quickWallet: "Balance"');
     expect(usersContentSource).toContain('filterStatus: "Состояние аккаунта"');
@@ -219,10 +222,8 @@ describe("users management visual contract", () => {
     expect(stylesSource).toContain(".selectField :global(button[class*=");
     expect(stylesSource).toContain(".searchInput:focus-visible {");
     expect(stylesSource).toContain("box-shadow: var(--focus-ring);");
-    expect(stylesSource).toContain(
-      ".quickActions {\n    display: flex;\n    width: 100%;\n    justify-content: stretch;"
-    );
-    expect(stylesSource).toContain(".quickActionLink {\n    flex: 1 1 min(10rem, 100%);");
+    expect(stylesSource).toContain("grid-template-columns: repeat(3, minmax(0, 1fr));");
+    expect(stylesSource).toContain(".quickActionLink {\n    width: 100%;");
     expect(stylesSource).toContain(".paginationControls {\n    width: 100%;");
     expect(stylesSource).toContain("justify-content: space-between;");
     expect(stylesSource).not.toContain(".walletDialog");

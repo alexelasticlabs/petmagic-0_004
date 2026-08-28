@@ -49,6 +49,7 @@ export type UsersManagementPageText = {
   registeredAt: string;
   openProfile: string;
   quickActions: string;
+  quickProfile: string;
   quickWallet: string;
   quickSupport: string;
   identifierPrefix: string;
@@ -150,6 +151,7 @@ const usersManagementPageText: Record<Locale, UsersManagementPageText> = {
     registeredAt: "Зарегистрирован",
     openProfile: "Открыть досье",
     quickActions: "Быстрые действия",
+    quickProfile: "Досье",
     quickWallet: "Баланс",
     quickSupport: "Обращения",
     identifierPrefix: "ID",
@@ -255,6 +257,7 @@ const usersManagementPageText: Record<Locale, UsersManagementPageText> = {
     registeredAt: "Registered",
     openProfile: "Open dossier",
     quickActions: "Quick actions",
+    quickProfile: "Dossier",
     quickWallet: "Balance",
     quickSupport: "Support",
     identifierPrefix: "ID",

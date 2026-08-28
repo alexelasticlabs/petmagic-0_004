@@ -348,6 +348,21 @@ test("admin command palette searches users and safely queues a selected-user ema
   await expect(commandDialog).toBeHidden();
   await page.goto("/en/users");
   await expect(page).toHaveURL(/\/en\/users$/);
+  await expect(page.getByRole("columnheader", { name: "Registered", exact: true })).toBeVisible();
+
+  const userQuickActions = page.getByRole("group", {
+    name: "Quick actions: Alice Eligible",
+    exact: true,
+  });
+  await expect(
+    userQuickActions.getByRole("link", { name: "Dossier: Alice Eligible" })
+  ).toBeVisible();
+  await expect(
+    userQuickActions.getByRole("link", { name: "Balance: Alice Eligible" })
+  ).toBeVisible();
+  await expect(
+    userQuickActions.getByRole("link", { name: "Support: Alice Eligible" })
+  ).toBeVisible();
 
   const eligibleCheckbox = page.getByRole("checkbox", {
     name: "Select recipient: Alice Eligible",
