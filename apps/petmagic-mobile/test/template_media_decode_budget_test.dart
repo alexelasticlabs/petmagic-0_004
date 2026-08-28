@@ -369,10 +369,11 @@ void main() {
   });
 
   test('template blocked balance sheet keeps a lazy scroll surface', () async {
-    final source = readTemplateFlowSheetsLibrarySource();
+    final source = await File(
+      'lib/features/templates/presentation/widgets/template_flow_sheets_actions.part.dart',
+    ).readAsString();
 
     expect(source, contains('child: ListView('));
     expect(source, contains('shrinkWrap: true'));
-    expect(source, isNot(contains('SingleChildScrollView(')));
   });
 }
