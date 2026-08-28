@@ -798,6 +798,11 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
 
+    expect(
+      tester.getTopLeft(find.byType(BottomSheet).last).dy,
+      0,
+      reason: 'Rewards history must begin at the top edge of the screen.',
+    );
     expect(find.text('Reward history row 0'), findsOneWidget);
     expect(find.text('Reward history row 119'), findsNothing);
   });
