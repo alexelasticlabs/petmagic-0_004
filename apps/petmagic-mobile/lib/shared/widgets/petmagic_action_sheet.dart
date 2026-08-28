@@ -120,11 +120,13 @@ class _PetMagicActionSheetState extends State<PetMagicActionSheet> {
                 title: _step == PetMagicActionSheetStep.main
                     ? AppLocalizations.of(context).petsActionSheetAddPhotoTitle
                     : AppLocalizations.of(context).petsActionSheetSourceTitle,
+                centerTitle: _step == PetMagicActionSheetStep.uploadSource,
                 onBack: _step == PetMagicActionSheetStep.uploadSource
                     ? () => setState(() {
                         _step = PetMagicActionSheetStep.main;
                       })
                     : null,
+                showClose: _step == PetMagicActionSheetStep.main,
                 onClose: () => Navigator.of(context).pop(),
               ),
               const SizedBox(height: 12),
@@ -226,48 +228,71 @@ class _PetMagicActionSheetHeader extends StatelessWidget {
     required this.title,
     required this.onClose,
     this.onBack,
+    this.centerTitle = false,
+    this.showClose = true,
   });
 
   final String title;
   final VoidCallback onClose;
   final VoidCallback? onBack;
+  final bool centerTitle;
+  final bool showClose;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
+    final titleText = Text(
+      title,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+        color: colors.textStrong,
+        fontSize: 23,
+        fontWeight: FontWeight.w800,
+      ),
+    );
+
     return SizedBox(
       height: 44,
-      child: Row(
-        children: [
-          if (onBack != null) ...[
-            IconButton(
-              onPressed: onBack,
-              icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-              color: colors.textSoft,
-              tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+      child: centerTitle
+          ? Stack(
+              alignment: Alignment.center,
+              children: [
+                if (onBack != null)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: IconButton(
+                      onPressed: onBack,
+                      icon: const Icon(
+                        Icons.arrow_back_ios_new_rounded,
+                        size: 20,
+                      ),
+                      color: colors.textSoft,
+                      tooltip: MaterialLocalizations.of(
+                        context,
+                      ).backButtonTooltip,
+                    ),
+                  ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 48),
+                  child: titleText,
+                ),
+              ],
+            )
+          : Row(
+              children: [
+                Expanded(child: titleText),
+                if (showClose)
+                  IconButton(
+                    onPressed: onClose,
+                    icon: const Icon(Icons.close_rounded, size: 24),
+                    color: colors.textSoft,
+                    tooltip: MaterialLocalizations.of(
+                      context,
+                    ).closeButtonTooltip,
+                  ),
+              ],
             ),
-            const SizedBox(width: 4),
-          ],
-          Expanded(
-            child: Text(
-              title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: colors.textStrong,
-                fontSize: 23,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-          IconButton(
-            onPressed: onClose,
-            icon: const Icon(Icons.close_rounded, size: 24),
-            color: colors.textSoft,
-            tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
-          ),
-        ],
-      ),
     );
   }
 }

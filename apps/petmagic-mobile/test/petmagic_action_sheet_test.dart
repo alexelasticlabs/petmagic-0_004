@@ -27,6 +27,8 @@ void main() {
       find.text('Choose a photo or video from your gallery'),
       findsOneWidget,
     );
+    expect(tester.getTopLeft(find.byType(BottomSheet).last).dy, 0);
+    expect(find.byIcon(Icons.close_rounded), findsNothing);
 
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
@@ -102,6 +104,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(tester.getTopLeft(find.byType(BottomSheet).last).dy, 0);
+    await tester.tap(find.text('Upload from device'));
+    await tester.pumpAndSettle();
+    expect(find.text('Content source'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

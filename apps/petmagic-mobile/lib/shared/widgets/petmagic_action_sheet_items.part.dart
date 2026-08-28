@@ -19,7 +19,6 @@ class PetMagicActionSheetItem extends StatelessWidget {
   final bool enabled;
 
   @override
-  @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
     final enabled = this.enabled;
