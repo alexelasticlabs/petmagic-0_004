@@ -5751,7 +5751,7 @@ abstract class AppLocalizations {
   /// No description provided for @templateFlowReadyTitle.
   ///
   /// In en, this message translates to:
-  /// **'Ready to create!'**
+  /// **'Ready to create'**
   String get templateFlowReadyTitle;
 
   /// No description provided for @templateFlowCheckDetailsSubtitle.
@@ -5781,7 +5781,7 @@ abstract class AppLocalizations {
   /// No description provided for @templateFlowDurationHint.
   ///
   /// In en, this message translates to:
-  /// **'Creation can take from 10 seconds to 1 minute.'**
+  /// **'Usually takes 10–60 seconds'**
   String get templateFlowDurationHint;
 
   /// No description provided for @templateFlowCreateMagicAction.

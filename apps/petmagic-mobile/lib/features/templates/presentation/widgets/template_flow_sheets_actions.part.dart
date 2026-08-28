@@ -44,216 +44,295 @@ Future<bool?> showTemplateGenerationConfirmSheet({
 }) {
   final text = AppLocalizations.of(context);
   final colors = context.petMagicColors;
+  final screenHeight = Overlay.of(
+    context,
+    rootOverlay: true,
+  ).context.size!.height;
   return showPetMagicModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
-    useSafeArea: true,
+    useSafeArea: false,
     backgroundColor: Colors.transparent,
-    builder: (sheetContext, bottomInset) => Padding(
-      padding: EdgeInsets.only(bottom: bottomInset),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: colors.backgroundBottom,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-          border: Border.all(color: colors.border.withValues(alpha: 0.7)),
-        ),
+    constraints: BoxConstraints.tightFor(height: screenHeight),
+    builder: (sheetContext, bottomInset) {
+      final contentHeight = (screenHeight - bottomInset)
+          .clamp(0.0, screenHeight)
+          .toDouble();
+      return SafeArea(
+        top: false,
+        bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+          padding: EdgeInsets.only(bottom: bottomInset),
+          child: SizedBox(
+            height: contentHeight,
+            width: double.infinity,
+            child: ClipRRect(
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(30),
+              ),
+              child: DecoratedBox(
+                decoration: BoxDecoration(color: colors.backgroundBottom),
+                child: SafeArea(
+                  top: true,
+                  bottom: false,
+                  child: _TemplateGenerationConfirmContent(
+                    template: template,
+                    photo: photo,
+                    title: text.templateFlowReadyTitle,
+                    subtitle: text.templateFlowCheckDetailsSubtitle,
+                    durationHint: text.templateFlowDurationHint,
+                    createLabel: text.templateFlowCreateMagicAction,
+                    changePhotoLabel: text.templateFlowChangePhotoAction,
+                    onCreate: () => Navigator.of(sheetContext).pop(true),
+                    onChangePhoto: () => Navigator.of(sheetContext).pop(false),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    },
+  );
+}
+
+class _TemplateGenerationConfirmContent extends StatelessWidget {
+  const _TemplateGenerationConfirmContent({
+    required this.template,
+    required this.photo,
+    required this.title,
+    required this.subtitle,
+    required this.durationHint,
+    required this.createLabel,
+    required this.changePhotoLabel,
+    required this.onCreate,
+    required this.onChangePhoto,
+  });
+
+  final TemplateItem template;
+  final XFile photo;
+  final String title;
+  final String subtitle;
+  final String durationHint;
+  final String createLabel;
+  final String changePhotoLabel;
+  final VoidCallback onCreate;
+  final VoidCallback onChangePhoto;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Center(child: _SheetHandle(color: colors.border)),
+          const SizedBox(height: 14),
+          SizedBox(
+            height: 44,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: IconButton(
+                    onPressed: onChangePhoto,
+                    icon: const Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      size: 20,
+                    ),
+                    color: colors.textSoft,
+                    tooltip: MaterialLocalizations.of(
+                      context,
+                    ).backButtonTooltip,
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 48),
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: colors.textStrong,
+                      fontSize: 23,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: colors.textMuted,
+              fontSize: 14.5,
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 26),
+          _TemplateGenerationConfirmSummary(template: template, photo: photo),
+          const SizedBox(height: 14),
+          Divider(height: 1, color: colors.border.withValues(alpha: 0.62)),
+          const SizedBox(height: 14),
+          Row(
             children: [
-              Center(child: _SheetHandle(color: colors.border)),
-              const SizedBox(height: 20),
-              Text(
-                text.templateFlowReadyTitle,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: colors.textStrong,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 5),
-              Text(
-                text.templateFlowCheckDetailsSubtitle,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: colors.textMuted,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: 20),
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  color: colors.surfaceGlass,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: colors.border.withValues(alpha: 0.6),
+              Icon(Icons.schedule_rounded, size: 20, color: colors.textMuted),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  durationHint,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: colors.textMuted,
+                    fontSize: 15,
                   ),
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: 96,
-                        height: 118,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color: colors.border.withValues(alpha: 0.5),
-                            width: 1.5,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.14),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        child: Image.file(
-                          File(photo.path),
-                          fit: BoxFit.cover,
-                          cacheWidth: _selectedPetPhotoPreviewCacheWidth,
-                          cacheHeight: _selectedPetPhotoPreviewCacheHeight,
-                          filterQuality: FilterQuality.medium,
-                          errorBuilder: (context, error, stackTrace) {
-                            return DecoratedBox(
-                              decoration: BoxDecoration(
-                                color: colors.surfaceGlass,
-                              ),
-                              child: Icon(
-                                Icons.photo_camera_back_rounded,
-                                color: colors.textMuted,
-                                size: 32,
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _templateDisplayTitle(text, template.title),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.titleMedium
-                                  ?.copyWith(
-                                    color: colors.textStrong,
-                                    fontWeight: FontWeight.w800,
-                                    height: 1.15,
-                                  ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              _templateDisplayDescription(
-                                text,
-                                template.shortDescription,
-                                isVideo: template.isVideo,
-                              ),
-                              maxLines: 3,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.bodySmall
-                                  ?.copyWith(
-                                    color: colors.textMuted,
-                                    height: 1.35,
-                                  ),
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.auto_awesome_rounded,
-                                  color: colors.accent,
-                                  size: 18,
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    '${text.templateFlowCostLabel}: '
-                                    '${template.tokenCost} ${text.walletBalanceUnit}',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .labelLarge
-                                        ?.copyWith(
-                                          color: colors.textSoft,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  color: colors.gold.withValues(alpha: 0.09),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: colors.gold.withValues(alpha: 0.22),
-                  ),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 11,
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.schedule_rounded,
-                        color: colors.gold,
-                        size: 18,
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          text.templateFlowDurationHint,
-                          style: Theme.of(context).textTheme.labelMedium
-                              ?.copyWith(color: colors.textSoft, height: 1.35),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 18),
-              FilledButton.icon(
-                onPressed: () => Navigator.of(sheetContext).pop(true),
-                icon: const Icon(Icons.auto_awesome_rounded, size: 19),
-                label: Text(text.templateFlowCreateMagicAction),
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size.fromHeight(52),
-                  textStyle: Theme.of(sheetContext).textTheme.labelLarge
-                      ?.copyWith(fontSize: 16, fontWeight: FontWeight.w700),
-                ),
-              ),
-              const SizedBox(height: 10),
-              OutlinedButton(
-                onPressed: () => Navigator.of(sheetContext).pop(false),
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(48),
-                ),
-                child: Text(text.templateFlowChangePhotoAction),
               ),
             ],
           ),
-        ),
+          const SizedBox(height: 22),
+          FilledButton.icon(
+            onPressed: onCreate,
+            icon: const Icon(Icons.auto_awesome_rounded, size: 19),
+            label: Text(createLabel),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(58),
+              backgroundColor: colors.accent,
+              foregroundColor: colors.on(colors.accent),
+              elevation: 0,
+              shadowColor: Colors.transparent,
+              textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
+                fontSize: 16.5,
+                fontWeight: FontWeight.w800,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          TextButton(onPressed: onChangePhoto, child: Text(changePhotoLabel)),
+        ],
       ),
-    ),
-  );
+    );
+  }
+}
+
+class _TemplateGenerationConfirmSummary extends StatelessWidget {
+  const _TemplateGenerationConfirmSummary({
+    required this.template,
+    required this.photo,
+  });
+
+  final TemplateItem template;
+  final XFile photo;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final previewSize = (constraints.maxWidth * 0.44)
+            .clamp(140.0, 160.0)
+            .toDouble();
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: SizedBox(
+                width: previewSize,
+                height: previewSize,
+                child: Image.file(
+                  File(photo.path),
+                  fit: BoxFit.cover,
+                  cacheWidth: _selectedPetPhotoPreviewCacheWidth,
+                  cacheHeight: _selectedPetPhotoPreviewCacheHeight,
+                  filterQuality: FilterQuality.medium,
+                  errorBuilder: (_, _, _) => ColoredBox(
+                    color: colors.surfaceStrong,
+                    child: Icon(
+                      Icons.photo_camera_back_rounded,
+                      color: colors.textMuted,
+                      size: 32,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _templateDisplayTitle(text, template.title),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: colors.textStrong,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      height: 1.1,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    _templateDisplayDescription(
+                      text,
+                      template.shortDescription,
+                      isVideo: template.isVideo,
+                    ),
+                    maxLines: 4,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: colors.textMuted,
+                      fontSize: 14.5,
+                      height: 1.34,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.auto_awesome_rounded,
+                        color: colors.accent,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          '${template.tokenCost} ${text.walletBalanceUnit}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.labelLarge
+                              ?.copyWith(
+                                color: colors.textSoft,
+                                fontWeight: FontWeight.w700,
+                              ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
 }
 
 Future<TemplateBlockedAction?> showTemplateBlockedSheet({

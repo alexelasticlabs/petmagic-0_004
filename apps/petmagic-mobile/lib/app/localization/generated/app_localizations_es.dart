@@ -3221,7 +3221,7 @@ class AppLocalizationsEs extends AppLocalizations {
       'Tomar una foto o un video con la cámara';
 
   @override
-  String get templateFlowReadyTitle => '¡Listo para crear!';
+  String get templateFlowReadyTitle => 'Listo para crear';
 
   @override
   String get templateFlowCheckDetailsSubtitle =>
@@ -3237,8 +3237,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get templateFlowBalanceLabel => 'Tu saldo';
 
   @override
-  String get templateFlowDurationHint =>
-      'La creación puede tardar entre 10 segundos y 1 minuto.';
+  String get templateFlowDurationHint => 'Suele tardar entre 10 y 60 segundos';
 
   @override
   String get templateFlowCreateMagicAction => 'crear magia';

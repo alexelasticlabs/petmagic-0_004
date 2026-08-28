@@ -3203,7 +3203,7 @@ class AppLocalizationsPl extends AppLocalizations {
   String get petsActionSheetCameraSemantic => 'Zrób zdjęcie lub wideo aparatem';
 
   @override
-  String get templateFlowReadyTitle => 'Gotowy do tworzenia!';
+  String get templateFlowReadyTitle => 'Gotowy do tworzenia';
 
   @override
   String get templateFlowCheckDetailsSubtitle =>
@@ -3219,8 +3219,7 @@ class AppLocalizationsPl extends AppLocalizations {
   String get templateFlowBalanceLabel => 'Twoje saldo';
 
   @override
-  String get templateFlowDurationHint =>
-      'Tworzenie może zająć od 10 sekund do 1 minuty.';
+  String get templateFlowDurationHint => 'Zwykle zajmuje 10–60 sekund';
 
   @override
   String get templateFlowCreateMagicAction => 'Stwórz magię';

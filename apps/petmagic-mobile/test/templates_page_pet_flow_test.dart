@@ -245,7 +245,7 @@ void main() {
     await tester.tap(find.text('Upload').first);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
-    await tester.tap(find.text('Upload').last);
+    await tester.tap(find.text('Upload from device'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
     await tester.tap(find.text('Gallery'));

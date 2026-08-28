@@ -3181,7 +3181,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get petsActionSheetCameraSemantic => 'Сделать фото или видео с камеры';
 
   @override
-  String get templateFlowReadyTitle => 'Готово к созданию!';
+  String get templateFlowReadyTitle => 'Готово к созданию';
 
   @override
   String get templateFlowCheckDetailsSubtitle =>
@@ -3197,8 +3197,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get templateFlowBalanceLabel => 'Ваш баланс';
 
   @override
-  String get templateFlowDurationHint =>
-      'Создание может занять от 10 секунд до 1 минуты.';
+  String get templateFlowDurationHint => 'Обычно занимает 10–60 секунд';
 
   @override
   String get templateFlowCreateMagicAction => 'Создать магию';
