@@ -39,6 +39,10 @@ abstract class _NotificationCoordinatorBase {
       const NotificationRouteResolver();
   static final RegExp _routeControlCharacters = RegExp(r'[\x00-\x1F\x7F]');
   static const Duration _handledInteractionWindow = Duration(minutes: 5);
+  static const Duration _firebaseReadinessTimeout = Duration(seconds: 3);
+  static const Duration _firebaseReadinessPollInterval = Duration(
+    milliseconds: 100,
+  );
   static const int _maxHandledInteractions = 128;
   static const int _maxExternalDedupeKeyLength = 160;
 
@@ -67,16 +71,17 @@ class NotificationCoordinator extends _NotificationCoordinatorBase
   });
 
   Future<void> initializeForAuthenticatedUser() async {
-    if (_isDisposed ||
-        _authenticatedReady ||
-        _initializing ||
-        !_firebaseReady) {
+    if (_isDisposed || _authenticatedReady || _initializing) {
       return;
     }
 
     _authSessionActive = true;
     _initializing = true;
     try {
+      if (!await _waitForFirebaseReady()) {
+        return;
+      }
+
       await _ensureInitialized();
       final permissionAllowed = await _ensureNotificationPermissionAllowed();
       if (!permissionAllowed) {
@@ -189,6 +194,31 @@ class NotificationCoordinator extends _NotificationCoordinatorBase
   }
 
   bool get _firebaseReady => Firebase.apps.isNotEmpty;
+
+  Future<bool> _waitForFirebaseReady() async {
+    if (_firebaseReady) {
+      return true;
+    }
+
+    final deadline = DateTime.now().add(
+      _NotificationCoordinatorBase._firebaseReadinessTimeout,
+    );
+    while (!_firebaseReady && _canContinueInitialization()) {
+      final remaining = deadline.difference(DateTime.now());
+      if (remaining <= Duration.zero) {
+        return false;
+      }
+      await Future<void>.delayed(
+        remaining < _NotificationCoordinatorBase._firebaseReadinessPollInterval
+            ? remaining
+            : _NotificationCoordinatorBase._firebaseReadinessPollInterval,
+      );
+    }
+
+    return _firebaseReady && _canContinueInitialization();
+  }
+
+  bool _canContinueInitialization() => !_isDisposed && _authSessionActive;
 
   Future<void> _ensureInitialized() async {
     if (_initialized) {

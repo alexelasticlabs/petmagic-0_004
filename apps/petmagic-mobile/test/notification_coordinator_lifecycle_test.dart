@@ -149,6 +149,15 @@ void main() {
       expect(coordinatorSource, contains('requestPermission('));
       expect(coordinatorSource, contains('getNotificationSettings()'));
       expect(coordinatorSource, contains('_notificationsAllowed()'));
+      expect(coordinatorSource, contains('_waitForFirebaseReady()'));
+      expect(
+        coordinatorSource,
+        contains('static const Duration _firebaseReadinessTimeout'),
+      );
+      expect(
+        coordinatorSource,
+        contains('return _firebaseReady && _canContinueInitialization();'),
+      );
       expect(
         coordinatorSource,
         contains('AuthorizationStatus.denied &&\n        !Platform.isAndroid'),
