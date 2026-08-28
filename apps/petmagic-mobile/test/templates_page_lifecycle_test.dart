@@ -1093,7 +1093,7 @@ void main() {
         ],
         child: MaterialApp(
           theme: AppTheme.light(),
-          locale: const Locale('en'),
+          locale: const Locale('ru'),
           localizationsDelegates: const [
             AppLocalizations.delegate,
             GlobalMaterialLocalizations.delegate,
@@ -1127,8 +1127,28 @@ void main() {
     expect(visibleCards.single.template.templateId, 'template-1');
     expect(find.text('Daily portrait'), findsOneWidget);
     expect(find.textContaining('#daily'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(TemplateOfTheDayCard),
+        matching: find.text(text.templateOfTheDayTitle),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byType(TemplateOfTheDayCard),
+        matching: find.text('Template of the Day'),
+      ),
+      findsNothing,
+    );
     expect(find.text('5 ${text.walletBalanceUnit}'), findsOneWidget);
-    expect(find.text(text.templateOfTheDayTryAction), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(TemplateOfTheDayCard),
+        matching: find.text(text.templateOfTheDayTryAction),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets(

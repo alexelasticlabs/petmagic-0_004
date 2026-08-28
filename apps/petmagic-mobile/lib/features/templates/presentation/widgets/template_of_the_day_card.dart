@@ -128,9 +128,10 @@ class TemplateOfTheDayCard extends StatelessWidget {
                             children: [
                               _TemplateOfTheDayBadge(
                                 icon: Icons.auto_awesome_rounded,
-                                label: template.badgeText.trim().isEmpty
-                                    ? text.templateOfTheDayTitle
-                                    : template.badgeText,
+                                label: _templateOfTheDayBadgeLabel(
+                                  rawLabel: template.badgeText,
+                                  text: text,
+                                ),
                               ),
                               _TemplateOfTheDayBadge(
                                 icon: template.isVideo
@@ -225,6 +226,18 @@ class TemplateOfTheDayCard extends StatelessWidget {
 
 String templateOfTheDayLoadErrorLabel(BuildContext context) {
   return AppLocalizations.of(context).templateOfTheDayLoadFailed;
+}
+
+String _templateOfTheDayBadgeLabel({
+  required String rawLabel,
+  required AppLocalizations text,
+}) {
+  final trimmed = rawLabel.trim();
+  if (trimmed.isEmpty || trimmed.toLowerCase() == 'template of the day') {
+    return text.templateOfTheDayTitle;
+  }
+
+  return trimmed;
 }
 
 String? _normalizeTemplateOfTheDayMediaUrl(String? rawUrl) {
