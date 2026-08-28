@@ -1210,15 +1210,28 @@ void main() {
 
       final context = tester.element(find.byType(TemplatesPage));
       final text = AppLocalizations.of(context);
-      final visibleCardIds = tester
+      final initialRegularCardIds = tester
           .widgetList<TemplateCard>(find.byType(TemplateCard))
           .map((card) => card.template.templateId)
           .toList();
 
-      expect(visibleCardIds, containsAllInOrder(['template-1', 'template-3']));
-      expect(visibleCardIds, isNot(contains('template-2')));
-      expect(find.byType(TemplateOfTheDayCard), findsOneWidget);
+      expect(initialRegularCardIds, contains('template-1'));
+      expect(initialRegularCardIds, isNot(contains('template-2')));
+      final featuredCard = tester.widget<TemplateOfTheDayCard>(
+        find.byType(TemplateOfTheDayCard),
+      );
+      expect(featuredCard.template.templateId, 'template-2');
       expect(find.text(text.templateOfTheDayTryAction), findsOneWidget);
+
+      await tester.drag(find.byType(CustomScrollView), const Offset(0, -500));
+      await tester.pump();
+
+      final scrolledRegularCardIds = tester
+          .widgetList<TemplateCard>(find.byType(TemplateCard))
+          .map((card) => card.template.templateId)
+          .toList();
+      expect(scrolledRegularCardIds, contains('template-3'));
+      expect(scrolledRegularCardIds, isNot(contains('template-2')));
     },
   );
 
