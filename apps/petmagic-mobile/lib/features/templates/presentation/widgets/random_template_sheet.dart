@@ -19,19 +19,23 @@ Future<TemplateItem?> showRandomTemplateSettingsSheet(
   required List<String> categories,
   required RandomTemplateFinder onFind,
 }) {
+  final screenHeight = Overlay.of(
+    context,
+    rootOverlay: true,
+  ).context.size!.height;
+
   return showPetMagicModalBottomSheet<TemplateItem>(
     context: context,
     isScrollControlled: true,
-    useSafeArea: true,
+    useSafeArea: false,
     backgroundColor: Colors.transparent,
-    constraints: BoxConstraints(
-      maxHeight: MediaQuery.sizeOf(context).height * 0.78,
-    ),
+    constraints: BoxConstraints.tightFor(height: screenHeight),
     builder: (sheetContext, bottomInset) => _RandomTemplateSettingsSheet(
       initialType: initialType,
       initialCategory: initialCategory,
       categories: categories,
       bottomInset: bottomInset,
+      screenHeight: screenHeight,
       onFind: onFind,
     ),
   );
@@ -57,6 +61,7 @@ class _RandomTemplateSettingsSheet extends StatefulWidget {
     required this.initialCategory,
     required this.categories,
     required this.bottomInset,
+    required this.screenHeight,
     required this.onFind,
   });
 
@@ -64,6 +69,7 @@ class _RandomTemplateSettingsSheet extends StatefulWidget {
   final String? initialCategory;
   final List<String> categories;
   final double bottomInset;
+  final double screenHeight;
   final RandomTemplateFinder onFind;
 
   @override
@@ -97,6 +103,7 @@ class _RandomTemplateSettingsSheetState
   Widget build(BuildContext context) {
     return _RandomTemplateSheetContent(
       bottomInset: widget.bottomInset,
+      screenHeight: widget.screenHeight,
       categories: _categories,
       type: _type,
       category: _category,
