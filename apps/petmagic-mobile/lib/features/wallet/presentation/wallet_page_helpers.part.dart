@@ -1,48 +1,5 @@
 part of 'wallet_page.dart';
 
-class _WalletTemplatePricing {
-  const _WalletTemplatePricing({required this.minCost, required this.maxCost});
-
-  final int? minCost;
-  final int? maxCost;
-
-  static _WalletTemplatePricing fromState(TemplatesState state) {
-    final costs = <int>[
-      for (final template in state.items)
-        if (template.tokenCost > 0) template.tokenCost,
-      if ((state.templateOfTheDay?.tokenCost ?? 0) > 0)
-        state.templateOfTheDay!.tokenCost,
-    ];
-
-    if (costs.isEmpty) {
-      return const _WalletTemplatePricing(minCost: null, maxCost: null);
-    }
-
-    costs.sort();
-    return _WalletTemplatePricing(minCost: costs.first, maxCost: costs.last);
-  }
-
-  String usageLabel(AppLocalizations text, int totalSpark) {
-    final min = minCost;
-    final max = maxCost;
-    if (min == null || max == null || min <= 0 || max <= 0) {
-      return text.walletGenerationPricingUnavailable;
-    }
-
-    final lowestCount = totalSpark ~/ max;
-    final highestCount = totalSpark ~/ min;
-    if (highestCount <= 0) {
-      return text.walletApproxGenerationBelowOne;
-    }
-
-    if (lowestCount == highestCount || lowestCount <= 0) {
-      return text.walletApproxGenerations(highestCount);
-    }
-
-    return text.walletApproxGenerationRange(lowestCount, highestCount);
-  }
-}
-
 String _walletProviderLabel(
   AppLocalizations text,
   WalletPaymentMethodModel method,
@@ -92,6 +49,15 @@ String _packBenefitLabel(AppLocalizations text, CurrencyPackModel pack) {
     'starter' => text.walletPackStarterDescription,
     'creator' => text.walletPackCreatorDescription,
     'viral' => text.walletPackViralDescription,
+    _ => text.walletPackUsageNote,
+  };
+}
+
+String _packMotivationLabel(AppLocalizations text, CurrencyPackModel pack) {
+  return switch (pack.code) {
+    'starter' => text.walletPackStarterMotivation,
+    'creator' => text.walletPackCreatorMotivation,
+    'viral' => text.walletPackViralMotivation,
     _ => text.walletPackUsageNote,
   };
 }

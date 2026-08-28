@@ -914,24 +914,6 @@ class AppLocalizationsFr extends AppLocalizations {
   String get walletViewPremiumAction => 'Voir la prime';
 
   @override
-  String walletApproxGenerations(Object count) {
-    return 'De quoi créer environ $count créations';
-  }
-
-  @override
-  String walletApproxGenerationRange(Object fromCount, Object toCount) {
-    return 'De quoi créer environ $fromCount–$toCount créations';
-  }
-
-  @override
-  String get walletApproxGenerationBelowOne =>
-      'Un petit boost pour votre prochaine création';
-
-  @override
-  String get walletGenerationPricingUnavailable =>
-      'Prêt pour vos créations photo et vidéo';
-
-  @override
   String get walletContactSupportAction => 'Contacter l\'assistance';
 
   @override
@@ -1158,6 +1140,18 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get walletPackViralDescription =>
       'Le plus grand boost pour les grandes idées';
+
+  @override
+  String get walletPackStarterMotivation =>
+      'Commencez à créer dès aujourd’hui.';
+
+  @override
+  String get walletPackCreatorMotivation =>
+      'Encore plus de façons de faire plaisir à votre compagnon.';
+
+  @override
+  String get walletPackViralMotivation =>
+      'Donnez vie à vos idées les plus audacieuses.';
 
   @override
   String walletBuyForPrice(Object price) {

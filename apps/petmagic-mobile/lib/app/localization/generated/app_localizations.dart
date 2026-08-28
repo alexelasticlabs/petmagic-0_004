@@ -1770,30 +1770,6 @@ abstract class AppLocalizations {
   /// **'View Premium'**
   String get walletViewPremiumAction;
 
-  /// No description provided for @walletApproxGenerations.
-  ///
-  /// In en, this message translates to:
-  /// **'Enough for about {count} creations'**
-  String walletApproxGenerations(Object count);
-
-  /// No description provided for @walletApproxGenerationRange.
-  ///
-  /// In en, this message translates to:
-  /// **'Enough for about {fromCount}–{toCount} creations'**
-  String walletApproxGenerationRange(Object fromCount, Object toCount);
-
-  /// No description provided for @walletApproxGenerationBelowOne.
-  ///
-  /// In en, this message translates to:
-  /// **'A little boost for your next creation'**
-  String get walletApproxGenerationBelowOne;
-
-  /// No description provided for @walletGenerationPricingUnavailable.
-  ///
-  /// In en, this message translates to:
-  /// **'Ready for photo and video creations'**
-  String get walletGenerationPricingUnavailable;
-
   /// No description provided for @walletContactSupportAction.
   ///
   /// In en, this message translates to:
@@ -2171,6 +2147,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The biggest boost for ambitious ideas'**
   String get walletPackViralDescription;
+
+  /// No description provided for @walletPackStarterMotivation.
+  ///
+  /// In en, this message translates to:
+  /// **'Start creating today.'**
+  String get walletPackStarterMotivation;
+
+  /// No description provided for @walletPackCreatorMotivation.
+  ///
+  /// In en, this message translates to:
+  /// **'More ways to delight your pet.'**
+  String get walletPackCreatorMotivation;
+
+  /// No description provided for @walletPackViralMotivation.
+  ///
+  /// In en, this message translates to:
+  /// **'Bring your boldest ideas to life.'**
+  String get walletPackViralMotivation;
 
   /// No description provided for @walletBuyForPrice.
   ///

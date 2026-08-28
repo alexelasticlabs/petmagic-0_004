@@ -13,7 +13,6 @@ import 'package:petmagic_mobile/core/payments/stripe_payment_sheet.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/shared/auth/auth_required_sheet.dart';
 import 'package:petmagic_mobile/shared/profile/profile_surface_widgets.dart';
-import 'package:petmagic_mobile/features/templates/application/template_catalog_contract.dart';
 import 'package:petmagic_mobile/features/wallet/domain/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/application/wallet_controller.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_stripe_checkout_page.dart';
@@ -90,7 +89,6 @@ class _WalletPageState extends ConsumerState<WalletPage>
           return;
         }
 
-        unawaited(_ensureTemplatePricingLoaded());
         final current = ref.read(walletControllerProvider);
         if (_hasHydratedWalletSnapshot(current)) {
           return;
@@ -99,17 +97,6 @@ class _WalletPageState extends ConsumerState<WalletPage>
         ref.read(walletControllerProvider.notifier).load();
       });
     });
-  }
-
-  Future<void> _ensureTemplatePricingLoaded() async {
-    final templatesState = ref.read(templatesControllerProvider);
-    if (templatesState.items.isNotEmpty ||
-        templatesState.isLoading ||
-        templatesState.isRefreshing) {
-      return;
-    }
-
-    await ref.read(templatesControllerProvider.notifier).loadInitial();
   }
 
   bool _hasHydratedWalletSnapshot(WalletState state) {

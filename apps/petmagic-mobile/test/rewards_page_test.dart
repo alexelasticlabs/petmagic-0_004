@@ -11,7 +11,6 @@ import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/rewards/presentation/rewards_page.dart';
 import 'package:petmagic_mobile/features/templates/application/generation_history_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_generation_controller.dart';
-import 'package:petmagic_mobile/features/templates/application/templates_controller.dart';
 import 'package:petmagic_mobile/features/wallet/domain/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/application/wallet_controller.dart';
 import 'package:petmagic_mobile/features/wallet/application/wallet_repository.dart';
@@ -93,9 +92,6 @@ void main() {
           walletControllerProvider.overrideWith(() => controller),
           walletRepositoryProvider.overrideWithValue(
             defaultFakeWalletRepository(),
-          ),
-          templatesControllerProvider.overrideWith(
-            StaticWalletTemplatesController.new,
           ),
         ],
         child: MaterialApp.router(

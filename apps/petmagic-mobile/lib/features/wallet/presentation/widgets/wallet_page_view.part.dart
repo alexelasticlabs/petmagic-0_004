@@ -19,9 +19,6 @@ extension _WalletPageView on _WalletPageState {
         ),
       ),
     );
-    final templatePricing = ref.watch(
-      templatesControllerProvider.select(_WalletTemplatePricing.fromState),
-    );
     final controller = ref.read(walletControllerProvider.notifier);
     final isAuthenticated = ref.watch(
       appLaunchControllerProvider.select((launch) => launch.isAuthenticated),
@@ -265,7 +262,6 @@ extension _WalletPageView on _WalletPageState {
                       _PacksSection(
                         packs: state.packs,
                         storeProductPrices: state.storeProductPrices,
-                        templatePricing: templatePricing,
                         isBuying: state.isBuying,
                         onSelect: (pack) => _showPackDetailSheet(
                           context,

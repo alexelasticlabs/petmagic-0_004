@@ -10,7 +10,6 @@ import 'package:petmagic_mobile/app/localization/generated/app_localizations.dar
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/shared/profile/profile_surface_widgets.dart';
-import 'package:petmagic_mobile/features/templates/application/templates_controller.dart';
 import 'package:petmagic_mobile/features/wallet/domain/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_repository.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/all_transactions_page.dart';
@@ -25,7 +24,7 @@ import 'wallet_page_test_support.dart';
 void main() {
   configureWidgetTestHarness();
 
-  test('wallet pack copy uses user-facing value while keeping live pricing', () {
+  test('wallet pack copy uses motivation instead of estimated generations', () {
     final source = File(
       'lib/features/wallet/presentation/widgets/wallet_page_activity_widgets.dart',
     ).readAsStringSync();
@@ -36,17 +35,20 @@ void main() {
       'lib/features/wallet/presentation/wallet_page_helpers.part.dart',
     ).readAsStringSync();
 
-    expect(source, contains('templatePricing.usageLabel'));
+    expect(source, contains('_packMotivationLabel'));
     expect(source, contains('_packBenefitLabel'));
     expect(source, isNot(contains('_valuePerCurrencyLabel')));
-    expect(pageSource, contains('templatesControllerProvider'));
+    expect(pageSource, isNot(contains('templatesControllerProvider')));
     expect(pageSource, isNot(contains('_kWalletApproxPhotoCostSpark')));
     expect(pageSource, isNot(contains('_kWalletApproxVideoCostSpark')));
     expect(source, isNot(contains('walletApproxPhotos')));
     expect(source, isNot(contains('walletApproxVideos')));
-    expect(helperSource, contains('walletApproxGenerationRange'));
-    expect(helperSource, contains('walletApproxGenerations'));
-    expect(helperSource, contains('walletGenerationPricingUnavailable'));
+    expect(helperSource, contains('walletPackStarterMotivation'));
+    expect(helperSource, contains('walletPackCreatorMotivation'));
+    expect(helperSource, contains('walletPackViralMotivation'));
+    expect(helperSource, isNot(contains('walletApproxGenerationRange')));
+    expect(helperSource, isNot(contains('walletApproxGenerations')));
+    expect(helperSource, isNot(contains('walletGenerationPricingUnavailable')));
     expect(helperSource, isNot(contains('walletApproxPhotosOnly')));
     expect(helperSource, isNot(contains('walletApproxPhotosOrVideos')));
     expect(source, isNot(contains(' или ')));
@@ -129,10 +131,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.text(text.walletBuySparkTitle), findsWidgets);
-      expect(
-        find.text(text.walletApproxGenerationRange(2, 10)),
-        findsOneWidget,
-      );
+      expect(find.text(text.walletPackStarterMotivation), findsOneWidget);
 
       expect(
         find.byKey(const ValueKey<String>('wallet-pack-option:starter')),
@@ -149,29 +148,27 @@ void main() {
     },
   );
 
-  testWidgets(
-    'wallet page shows pricing fallback when template feed is unavailable',
-    (tester) async {
-      await pumpWalletPage(
-        tester,
-        repository: FakeWalletRepository(
-          wallet: walletStateFixture,
-          ledger: ledgerItemsFixture,
-          packs: packsFixture,
-          purchases: purchasesFixture,
-        ),
-        templatesController: StaticWalletTemplatesController(items: const []),
-      );
+  testWidgets('wallet pack copy does not depend on the template feed', (
+    tester,
+  ) async {
+    await pumpWalletPage(
+      tester,
+      repository: FakeWalletRepository(
+        wallet: walletStateFixture,
+        ledger: ledgerItemsFixture,
+        packs: packsFixture,
+        purchases: purchasesFixture,
+      ),
+    );
 
-      final walletContext = tester.element(find.byType(WalletPage));
-      final text = AppLocalizations.of(walletContext);
+    final walletContext = tester.element(find.byType(WalletPage));
+    final text = AppLocalizations.of(walletContext);
 
-      await tester.drag(find.byType(ListView).first, const Offset(0, -520));
-      await tester.pump(const Duration(milliseconds: 300));
+    await tester.drag(find.byType(ListView).first, const Offset(0, -520));
+    await tester.pump(const Duration(milliseconds: 300));
 
-      expect(find.text(text.walletGenerationPricingUnavailable), findsWidgets);
-    },
-  );
+    expect(find.text(text.walletPackStarterMotivation), findsOneWidget);
+  });
 
   testWidgets('wallet soft warning uses non-danger warning tone', (
     tester,
@@ -239,9 +236,6 @@ void main() {
             walletRepositoryProvider.overrideWithValue(
               defaultFakeWalletRepository(),
             ),
-            templatesControllerProvider.overrideWith(
-              StaticWalletTemplatesController.new,
-            ),
           ],
           child: MaterialApp.router(
             theme: AppTheme.dark(),
@@ -303,9 +297,6 @@ void main() {
             walletControllerProvider.overrideWith(() => walletController),
             walletRepositoryProvider.overrideWithValue(
               defaultFakeWalletRepository(),
-            ),
-            templatesControllerProvider.overrideWith(
-              StaticWalletTemplatesController.new,
             ),
           ],
           child: MaterialApp.router(
@@ -462,9 +453,6 @@ void main() {
         overrides: [
           appLaunchControllerProvider.overrideWith(() => launchController),
           walletRepositoryProvider.overrideWithValue(repository),
-          templatesControllerProvider.overrideWith(
-            StaticWalletTemplatesController.new,
-          ),
         ],
         child: MaterialApp.router(
           theme: AppTheme.dark(),

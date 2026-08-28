@@ -4,14 +4,12 @@ class _PacksSection extends StatelessWidget {
   const _PacksSection({
     required this.packs,
     required this.storeProductPrices,
-    required this.templatePricing,
     required this.isBuying,
     required this.onSelect,
   });
 
   final List<CurrencyPackModel> packs;
   final Map<String, String> storeProductPrices;
-  final _WalletTemplatePricing templatePricing;
   final bool isBuying;
   final ValueChanged<CurrencyPackModel> onSelect;
 
@@ -48,7 +46,6 @@ class _PacksSection extends StatelessWidget {
               sortedPacks[index],
               storeProductPrices,
             ),
-            templatePricing: templatePricing,
             isBestOffer: bestOfferPack.packId == sortedPacks[index].packId,
             isPopular:
                 popularPack?.packId == sortedPacks[index].packId &&
@@ -67,7 +64,6 @@ class _FeaturedPackTile extends StatelessWidget {
   const _FeaturedPackTile({
     required this.pack,
     required this.displayPrice,
-    required this.templatePricing,
     required this.isBestOffer,
     required this.isPopular,
     required this.isBuying,
@@ -76,7 +72,6 @@ class _FeaturedPackTile extends StatelessWidget {
 
   final CurrencyPackModel pack;
   final String? displayPrice;
-  final _WalletTemplatePricing templatePricing;
   final bool isBestOffer;
   final bool isPopular;
   final bool isBuying;
@@ -89,7 +84,7 @@ class _FeaturedPackTile extends StatelessWidget {
     final colors = context.petMagicColors;
     final price = displayPrice ?? _formatPrice(pack, localeTag);
     final benefitLabel = _packBenefitLabel(text, pack);
-    final usageLabel = templatePricing.usageLabel(text, pack.totalSpark);
+    final motivationLabel = _packMotivationLabel(text, pack);
     final badgeLabel = isBestOffer
         ? '🔥 ${text.walletBestValueBadge}'
         : (isPopular ? text.walletPopularBadge : null);
@@ -102,7 +97,7 @@ class _FeaturedPackTile extends StatelessWidget {
       key: ValueKey<String>('wallet-pack-option:${pack.packId}'),
       button: true,
       label:
-          '${pack.displayName}. ${text.walletPackTotalSpark(pack.totalSpark)}. $price. $benefitLabel. $usageLabel',
+          '${pack.displayName}. ${text.walletPackTotalSpark(pack.totalSpark)}. $price. $benefitLabel. $motivationLabel',
       child: DecoratedBox(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
@@ -286,7 +281,7 @@ class _FeaturedPackTile extends StatelessWidget {
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    usageLabel,
+                    motivationLabel,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(

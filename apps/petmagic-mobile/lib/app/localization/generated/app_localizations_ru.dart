@@ -901,24 +901,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get walletViewPremiumAction => 'Посмотреть Premium';
 
   @override
-  String walletApproxGenerations(Object count) {
-    return 'Хватит примерно на $count творений';
-  }
-
-  @override
-  String walletApproxGenerationRange(Object fromCount, Object toCount) {
-    return 'Хватит примерно на $fromCount–$toCount творений';
-  }
-
-  @override
-  String get walletApproxGenerationBelowOne =>
-      'Немного PawSpark для следующей идеи';
-
-  @override
-  String get walletGenerationPricingUnavailable =>
-      'Создавайте фото и видео для питомца';
-
-  @override
   String get walletContactSupportAction => 'Связаться с поддержкой';
 
   @override
@@ -1138,6 +1120,16 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get walletPackViralDescription => 'Максимум PawSpark для больших идей';
+
+  @override
+  String get walletPackStarterMotivation => 'Начните создавать уже сегодня.';
+
+  @override
+  String get walletPackCreatorMotivation =>
+      'Больше поводов порадовать любимца.';
+
+  @override
+  String get walletPackViralMotivation => 'Воплощайте самые смелые задумки.';
 
   @override
   String walletBuyForPrice(Object price) {
