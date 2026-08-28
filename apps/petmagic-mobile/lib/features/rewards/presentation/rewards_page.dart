@@ -309,12 +309,6 @@ class _RewardsPageState extends ConsumerState<RewardsPage>
                       balance: state.wallet?.balance,
                       onHistoryTap: () => _showHistorySheet(state.ledger),
                     ),
-                    const SizedBox(height: 16),
-                    _AdRewardCard(
-                      wallet: state.wallet,
-                      isClaimingAd: state.isClaimingAd,
-                      onClaimAd: controller.claimAdReward,
-                    ),
                     if (warningMessage != null) ...[
                       const SizedBox(height: 16),
                       _WarningBanner(

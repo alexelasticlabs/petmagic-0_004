@@ -121,12 +121,8 @@ class _WalletHighlightCard extends StatelessWidget {
         ? text.profileWalletPreviewLoadingStatus
         : weeklyReady
         ? text.profileWalletPreviewWeeklyReady
-        : text.profileWalletPreviewAdCount(walletValue.adRewardsRemainingToday);
-    final rewardColor = walletValue == null
-        ? colors.textMuted
-        : weeklyReady
-        ? colors.accent
-        : colors.accent;
+        : null;
+    final rewardColor = walletValue == null ? colors.textMuted : colors.accent;
 
     return Material(
       color: Colors.transparent,
@@ -207,17 +203,17 @@ class _WalletHighlightCard extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 12),
-                ProfileStatusPill(
-                  label: rewardLabel,
-                  leading: wallet == null
-                      ? Icons.sync_rounded
-                      : weeklyReady
-                      ? Icons.card_giftcard_rounded
-                      : Icons.play_circle_outline_rounded,
-                  backgroundColor: rewardColor.withValues(alpha: 0.1),
-                  foregroundColor: rewardColor,
-                ),
+                if (rewardLabel != null) ...[
+                  const SizedBox(height: 12),
+                  ProfileStatusPill(
+                    label: rewardLabel,
+                    leading: wallet == null
+                        ? Icons.sync_rounded
+                        : Icons.card_giftcard_rounded,
+                    backgroundColor: rewardColor.withValues(alpha: 0.1),
+                    foregroundColor: rewardColor,
+                  ),
+                ],
               ],
             ),
           ),
