@@ -66,8 +66,7 @@ class _FilterBar extends ConsumerWidget {
       (GenerationHistoryFilter.failed, text.generationStatusFilterFailed),
     ];
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
+    return HorizontalFilterStrip(
       child: Row(
         children: [
           for (final filter in filters) ...[

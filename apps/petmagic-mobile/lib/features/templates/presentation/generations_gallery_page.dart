@@ -35,6 +35,7 @@ import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 import 'package:petmagic_mobile/shared/widgets/premium_banner_style.dart';
 import 'package:petmagic_mobile/shared/widgets/premium_crown_icon.dart';
 import 'package:petmagic_mobile/shared/widgets/premium_shimmer_button.dart';
+import 'package:petmagic_mobile/shared/widgets/horizontal_filter_strip.dart';
 
 part 'generations_gallery_page_cards.dart';
 part 'generations_gallery_page_failed_card.part.dart';
