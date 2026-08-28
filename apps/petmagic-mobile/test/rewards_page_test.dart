@@ -701,7 +701,7 @@ void main() {
 
     expect(find.text(text.walletBalanceEyebrow), findsOneWidget);
     expect(find.text(text.rewardsPageTitle), findsOneWidget);
-    expect(find.text(text.walletAdRewardCompactTitle), findsOneWidget);
+    expect(find.text(text.walletAdRewardCompactTitle), findsNothing);
     expect(find.text(text.rewardsPromoTitle), findsOneWidget);
     expect(find.text(text.walletPartialActivityUnavailable), findsNothing);
     expect(find.text('wallet.purchases_failed'), findsNothing);
@@ -734,7 +734,7 @@ void main() {
 
     expect(find.text(text.gamificationStreakTitle), findsNothing);
     expect(find.text(text.gamificationChallengeTitle), findsNothing);
-    expect(find.text(text.walletAdRewardCompactTitle), findsOneWidget);
+    expect(find.text(text.walletAdRewardCompactTitle), findsNothing);
     expect(find.text(text.rewardsPromoTitle), findsOneWidget);
     expect(find.text(text.rewardsReferralTitle), findsWidgets);
   });
