@@ -88,7 +88,7 @@ describe("dashboard production data handling", () => {
     expect(stylesSource).toContain("grid-template-columns: auto minmax(0, 1fr) auto auto;");
   });
 
-  it("renders a localized bounded system status without raw backend summaries", () => {
+  it("renders a localized, actionable system status without raw backend summaries", () => {
     const source = readDashboardViewLibrarySource();
     const contentSource = readFileSync(dashboardContentPath, "utf8");
     const stylesSource = readFileSync(dashboardStylesPath, "utf8");
@@ -98,11 +98,14 @@ describe("dashboard production data handling", () => {
     expect(source).toContain("isAdminSystemStatusExpired(systemStatus)");
     expect(source).toContain("viewModel.systemStatus && !systemStatusExpired");
     expect(source).toContain("copy.systemStatusSection.staleTitle");
-    expect(source).toContain("copy.systemStatusSection.statusDescriptions[check.status]");
+    expect(source).toContain("getDashboardSystemStatusGuidance(locale, check.key, check.status)");
+    expect(source).toContain("copy.systemStatusSection.nextStepLabel");
     expect(source).not.toContain("{check.summary}");
     expect(contentSource).toContain('title: "Состояние системы"');
     expect(contentSource).toContain('title: "System status"');
+    expect(contentSource).toContain('nextStepLabel: "Следующий шаг:"');
     expect(stylesSource).toContain(".systemStatusGrid");
+    expect(stylesSource).toContain(".systemStatusNextStep");
   });
 
   it("exposes retry, busy, and empty states for dashboard failures and empty live sections", () => {

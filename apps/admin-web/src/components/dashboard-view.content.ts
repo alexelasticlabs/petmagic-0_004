@@ -49,6 +49,7 @@ export type DashboardCopy = {
     staleTitle: string;
     staleDescription: string;
     unknownCheck: string;
+    nextStepLabel: string;
     checkLabels: Record<string, string>;
     statusLabels: Record<DashboardSystemStatus, string>;
     statusDescriptions: Record<DashboardSystemStatus, string>;
@@ -200,7 +201,7 @@ const dashboardCopy: Record<Locale, DashboardCopy> = {
     },
     systemStatusSection: {
       title: "Состояние системы",
-      description: "Ограниченная проверка критичных внутренних контуров без раскрытия конфигурации",
+      description: "Показываем, что именно требует проверки и какое действие нужно выполнить",
       overallLabel: "Общий статус",
       updatedAt: (time) => `Проверено: ${time}`,
       unavailableTitle: "Системный статус недоступен",
@@ -212,10 +213,11 @@ const dashboardCopy: Record<Locale, DashboardCopy> = {
       unknownCheck: "Системный контур",
       checkLabels: {
         api: "API",
-        subscriptionCatalog: "Каталог подписок",
-        storeAccountBinding: "Привязка store-аккаунтов",
+        subscriptionCatalog: "Покупки и подписки",
+        storeAccountBinding: "Проверка покупок в магазинах",
         generationScheduler: "Планировщик генераций",
       },
+      nextStepLabel: "Следующий шаг:",
       statusLabels: {
         healthy: "Работает",
         degraded: "Требует внимания",
@@ -423,7 +425,7 @@ const dashboardCopy: Record<Locale, DashboardCopy> = {
     },
     systemStatusSection: {
       title: "System status",
-      description: "A bounded check of critical internal paths without exposing configuration",
+      description: "See what needs attention, why it matters, and the next correct action",
       overallLabel: "Overall status",
       updatedAt: (time) => `Checked: ${time}`,
       unavailableTitle: "System status is unavailable",
@@ -435,10 +437,11 @@ const dashboardCopy: Record<Locale, DashboardCopy> = {
       unknownCheck: "System path",
       checkLabels: {
         api: "API",
-        subscriptionCatalog: "Subscription catalog",
-        storeAccountBinding: "Store account binding",
+        subscriptionCatalog: "Purchases and subscriptions",
+        storeAccountBinding: "Store purchase verification",
         generationScheduler: "Generation scheduler",
       },
+      nextStepLabel: "Next step:",
       statusLabels: {
         healthy: "Operational",
         degraded: "Needs attention",

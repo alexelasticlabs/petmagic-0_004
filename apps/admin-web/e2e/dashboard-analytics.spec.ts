@@ -224,6 +224,23 @@ async function installDashboardMocks(page: Page) {
       return;
     }
 
+    if (url.pathname === "/api/admin/system/operations") {
+      await fulfillJson(route, {
+        overallStatus: "unhealthy",
+        generatedAtUtc: "2099-01-01T00:00:00Z",
+        cacheDurationSeconds: 15,
+        staleAfterSeconds: 45,
+        email: { status: "healthy", backlogCount: 0, deadLetterCount: 0 },
+        auditOutbox: { status: "healthy", backlogCount: 0, deadLetterCount: 0 },
+        pushOutbox: { status: "unhealthy", backlogCount: 0, deadLetterCount: 1 },
+        generations: { status: "healthy", queueDepth: 0 },
+        economy: { status: "healthy", openIncidentCount: 0, criticalIncidentCount: 0 },
+        workers: { status: "healthy", generationWorkerHeartbeatAgeSeconds: 10 },
+        unavailableSources: [],
+      });
+      return;
+    }
+
     if (url.pathname === "/api/admin/support/tickets/metrics") {
       await fulfillJson(route, {
         totalConversations: 5,
@@ -306,8 +323,28 @@ test("dashboard switches commerce ranges and stays within the mobile viewport", 
     attentionRegion.getByRole("link", { name: "Open: System status", exact: true })
   ).toHaveAttribute("href", "/en/dashboard#system-status");
   await expect(page.getByRole("heading", { name: "System status", exact: true })).toBeVisible();
-  await expect(page.getByText("Store account binding", { exact: true })).toBeVisible();
+  await expect(page.getByText("Store purchase verification", { exact: true })).toBeVisible();
   await expect(page.getByText("Needs attention", { exact: true }).last()).toBeVisible();
+  await expect(
+    page.getByText(
+      "New purchases are not blocked, but legacy purchases without a store account binding are still accepted.",
+      { exact: true }
+    )
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      /Confirm a purchase and restore flow in Apple and Google sandbox, then enable strict binding verification\./
+    )
+  ).toBeVisible();
+  await expect(page.getByText("Push notification delivery", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText(
+      "1 delivery item(s) will not be retried automatically because all attempts were exhausted."
+    )
+  ).toBeVisible();
+  await expect(
+    page.getByText(/Review the worker journal entry, fix the cause, and trigger the event again\./)
+  ).toBeVisible();
 
   const commercePeriod = page.getByRole("group", { name: "Commerce period", exact: true });
   await expect(commercePeriod).toHaveCount(1);

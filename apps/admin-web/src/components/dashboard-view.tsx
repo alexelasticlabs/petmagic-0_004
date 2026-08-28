@@ -37,6 +37,7 @@ import {
 import { ensureAdminSession } from "@/components/admin/admin-session";
 import { DonutChart, RevenueChart } from "@/components/dashboard/dashboard-charts";
 import { DashboardOperationsHealth } from "@/components/dashboard-operations-health";
+import { getDashboardSystemStatusGuidance } from "@/components/dashboard-system-status.content";
 import {
   DASHBOARD_COMMERCE_PERIOD_DAYS,
   getDashboardCopy,
@@ -358,20 +359,29 @@ export function DashboardView({ locale }: DashboardViewProps) {
             }
           >
             <ul className={styles.systemStatusGrid}>
-              {viewModel.systemStatus.checks.map((check) => (
-                <li key={check.key} className={styles.systemStatusCheck}>
-                  <div className={styles.systemStatusCheckHeader}>
-                    <strong>
-                      {copy.systemStatusSection.checkLabels[check.key] ??
-                        copy.systemStatusSection.unknownCheck}
-                    </strong>
-                    <AdminBadge tone={systemStatusTone(check.status)}>
-                      {copy.systemStatusSection.statusLabels[check.status]}
-                    </AdminBadge>
-                  </div>
-                  <p>{copy.systemStatusSection.statusDescriptions[check.status]}</p>
-                </li>
-              ))}
+              {viewModel.systemStatus.checks.map((check) => {
+                const guidance = getDashboardSystemStatusGuidance(locale, check.key, check.status);
+                return (
+                  <li key={check.key} className={styles.systemStatusCheck}>
+                    <div className={styles.systemStatusCheckHeader}>
+                      <strong>
+                        {copy.systemStatusSection.checkLabels[check.key] ??
+                          copy.systemStatusSection.unknownCheck}
+                      </strong>
+                      <AdminBadge tone={systemStatusTone(check.status)}>
+                        {copy.systemStatusSection.statusLabels[check.status]}
+                      </AdminBadge>
+                    </div>
+                    <p>{guidance.description}</p>
+                    {guidance.nextStep ? (
+                      <p className={styles.systemStatusNextStep}>
+                        <strong>{copy.systemStatusSection.nextStepLabel}</strong>{" "}
+                        {guidance.nextStep}
+                      </p>
+                    ) : null}
+                  </li>
+                );
+              })}
             </ul>
           </AdminCard>
         ) : (
