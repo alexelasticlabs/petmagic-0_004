@@ -60,10 +60,9 @@ final class WalletStorePurchaseService {
       );
     }
 
-    final availability = await sharedStoreProductAvailabilityCache.read(
+    final availability = await _fetchAvailabilityWithWarmupRetry(
       requestedIds,
-      loader: _loadAvailabilitySnapshot,
-      scopeKey: paymentMethod.provider,
+      paymentMethod.provider,
     );
     return (
       isAvailable: availability.isAvailable,
@@ -82,11 +81,9 @@ final class WalletStorePurchaseService {
       throw const AppException('wallet.payment_unavailable');
     }
 
-    final availability = await sharedStoreProductAvailabilityCache.read(
-      {productId},
-      loader: _loadAvailabilitySnapshot,
-      scopeKey: paymentMethod.provider,
-    );
+    final availability = await _fetchAvailabilityWithWarmupRetry({
+      productId,
+    }, paymentMethod.provider);
     final productDetails = availability.productDetailsById[productId];
     if (!availability.isAvailable || productDetails == null) {
       throw const AppException('wallet.payment_unavailable');
@@ -129,6 +126,30 @@ final class WalletStorePurchaseService {
     if (result.responseCode != BillingResponse.ok) {
       throw const AppException('wallet.payment_unavailable');
     }
+  }
+
+  Future<StoreProductAvailabilitySnapshot> _fetchAvailabilityWithWarmupRetry(
+    Set<String> productIds,
+    String provider,
+  ) async {
+    final availability = await sharedStoreProductAvailabilityCache.read(
+      productIds,
+      loader: _loadAvailabilitySnapshot,
+      scopeKey: provider,
+    );
+    if (availability.isAvailable) {
+      return availability;
+    }
+
+    // A native billing client can report unavailable immediately after resume
+    // even though it becomes ready a moment later. Retry once with a fresh
+    // lookup before showing an availability error to the user.
+    await Future<void>.delayed(const Duration(milliseconds: 250));
+    return sharedStoreProductAvailabilityCache.read(
+      productIds,
+      loader: _loadAvailabilitySnapshot,
+      scopeKey: provider,
+    );
   }
 
   Future<StoreProductAvailabilitySnapshot> _loadAvailabilitySnapshot(

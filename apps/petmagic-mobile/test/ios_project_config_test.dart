@@ -154,17 +154,23 @@ void main() {
     );
   });
 
-  test('mobile release configuration allows portrait and landscape', () {
+  test('mobile release configuration is locked to portrait', () {
     final mainSource = File('lib/main.dart').readAsStringSync();
     final androidManifest = File(
       'android/app/src/main/AndroidManifest.xml',
     ).readAsStringSync();
     final infoPlist = File('ios/Runner/Info.plist').readAsStringSync();
 
-    expect(mainSource, isNot(contains('setPreferredOrientations')));
-    expect(androidManifest, isNot(contains('screenOrientation')));
-    expect(infoPlist, contains('UIInterfaceOrientationLandscapeLeft'));
-    expect(infoPlist, contains('UIInterfaceOrientationLandscapeRight'));
+    expect(mainSource, contains('SystemChrome.setPreferredOrientations'));
+    expect(mainSource, contains('DeviceOrientation.portraitUp'));
+    expect(androidManifest, contains('android:screenOrientation="portrait"'));
+    expect(infoPlist, contains('UIInterfaceOrientationPortrait'));
+    expect(
+      infoPlist,
+      isNot(contains('UIInterfaceOrientationPortraitUpsideDown')),
+    );
+    expect(infoPlist, isNot(contains('UIInterfaceOrientationLandscapeLeft')));
+    expect(infoPlist, isNot(contains('UIInterfaceOrientationLandscapeRight')));
   });
 
   test(

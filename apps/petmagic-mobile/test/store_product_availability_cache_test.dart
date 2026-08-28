@@ -45,6 +45,34 @@ void main() {
   );
 
   test(
+    'store product availability cache does not retain transient unavailable results',
+    () async {
+      var loadCalls = 0;
+      final cache = StoreProductAvailabilityCache();
+
+      Future<StoreProductAvailabilitySnapshot> loader(
+        Set<String> productIds,
+      ) async {
+        loadCalls++;
+        if (loadCalls == 1) {
+          return const StoreProductAvailabilitySnapshot(isAvailable: false);
+        }
+        return StoreProductAvailabilitySnapshot(
+          isAvailable: true,
+          productIds: productIds,
+        );
+      }
+
+      final first = await cache.read({'pack.small'}, loader: loader);
+      final second = await cache.read({'pack.small'}, loader: loader);
+
+      expect(first.isAvailable, isFalse);
+      expect(second.isAvailable, isTrue);
+      expect(loadCalls, 2);
+    },
+  );
+
+  test(
     'store product availability cache reuses fresh superset entries for subset lookups',
     () async {
       var loadCalls = 0;

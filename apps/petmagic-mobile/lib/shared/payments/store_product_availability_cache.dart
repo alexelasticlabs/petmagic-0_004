@@ -50,16 +50,13 @@ class StoreProductAvailabilitySnapshot {
 class StoreProductAvailabilityCache {
   StoreProductAvailabilityCache({
     Duration successTtl = const Duration(minutes: 10),
-    Duration unavailableTtl = const Duration(minutes: 1),
     int maxEntries = 64,
     DateTime Function()? now,
   }) : _successTtl = successTtl,
-       _unavailableTtl = unavailableTtl,
        _maxEntries = maxEntries,
        _now = now ?? DateTime.now;
 
   final Duration _successTtl;
-  final Duration _unavailableTtl;
   final int _maxEntries;
   final DateTime Function() _now;
   final Map<String, _StoreProductAvailabilityCacheEntry> _entries =
@@ -119,12 +116,17 @@ class StoreProductAvailabilityCache {
 
     final future = () async {
       final snapshot = await loader(normalizedProductIds);
-      final ttl = snapshot.isAvailable ? _successTtl : _unavailableTtl;
+      // StoreKit and Google Play can briefly report an unavailable billing
+      // service while their connection is warming up. Never turn that
+      // transient response into a cached checkout failure.
+      if (!snapshot.isAvailable) {
+        return snapshot;
+      }
       _rememberEntry(
         cacheKey,
         _StoreProductAvailabilityCacheEntry(
           snapshot: snapshot,
-          expiresAt: _now().add(ttl),
+          expiresAt: _now().add(_successTtl),
         ),
       );
       return snapshot;
