@@ -7,6 +7,7 @@ import 'package:petmagic_mobile/features/templates/data/templates_dto.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_remote_error_policy.dart';
 import 'package:petmagic_mobile/features/templates/domain/templates_query.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
+part 'templates_remote_data_source_locale.part.dart';
 
 final templatesRemoteDataSourceProvider = Provider<TemplatesRemoteDataSource>((
   ref,
@@ -26,7 +27,6 @@ final templatesRemoteDataSourceProvider = Provider<TemplatesRemoteDataSource>((
 class TemplatesRemoteDataSource {
   TemplatesRemoteDataSource(this._dio, {AppRuntimeInfo? runtimeInfo})
     : _runtimeInfo = runtimeInfo ?? const DefaultAppRuntimeInfo();
-
   final Dio _dio;
   final AppRuntimeInfo _runtimeInfo;
   CancelToken? _feedCancelToken;
@@ -42,7 +42,9 @@ class TemplatesRemoteDataSource {
     try {
       final response = await _dio.get<Map<String, Object?>>(
         '/api/templates/feed',
-        queryParameters: _localizedQueryParameters(query.toQueryParameters()),
+        queryParameters: _runtimeInfo.localizedQueryParameters(
+          query.toQueryParameters(),
+        ),
         cancelToken: cancelToken,
       );
 
@@ -76,10 +78,9 @@ class TemplatesRemoteDataSource {
     try {
       final response = await _dio.get<Map<String, Object?>>(
         '/api/templates',
-        queryParameters: _localizedQueryParameters(<String, Object?>{
-          'page': page,
-          'pageSize': pageSize,
-        }),
+        queryParameters: _runtimeInfo.localizedQueryParameters(
+          <String, Object?>{'page': page, 'pageSize': pageSize},
+        ),
       );
 
       final data = response.data;
@@ -105,7 +106,9 @@ class TemplatesRemoteDataSource {
     try {
       final response = await _dio.get<Map<String, Object?>>(
         '/api/templates/${encodeTemplatePathSegment(templateId)}',
-        queryParameters: _localizedQueryParameters(const <String, Object?>{}),
+        queryParameters: _runtimeInfo.localizedQueryParameters(
+          const <String, Object?>{},
+        ),
       );
       final data = response.data;
       if (data == null) {
@@ -139,19 +142,20 @@ class TemplatesRemoteDataSource {
     try {
       final response = await _dio.get<Map<String, Object?>>(
         '/api/templates/random',
-        queryParameters: _localizedQueryParameters(<String, Object?>{
-          if (mode != TemplateRandomMode.any)
-            'type': mode == TemplateRandomMode.video
-                ? TemplateType.video.apiValue
-                : TemplateType.image.apiValue,
-          if (category != null && category.trim().isNotEmpty)
-            'category': category.trim(),
-          'includePremium': includePremium,
-          if (access != TemplateRandomAccess.available)
-            'access': access == TemplateRandomAccess.premium
-                ? 'premium'
-                : 'free',
-        }),
+        queryParameters: _runtimeInfo
+            .localizedQueryParameters(<String, Object?>{
+              if (mode != TemplateRandomMode.any)
+                'type': mode == TemplateRandomMode.video
+                    ? TemplateType.video.apiValue
+                    : TemplateType.image.apiValue,
+              if (category != null && category.trim().isNotEmpty)
+                'category': category.trim(),
+              'includePremium': includePremium,
+              if (access != TemplateRandomAccess.available)
+                'access': access == TemplateRandomAccess.premium
+                    ? 'premium'
+                    : 'free',
+            }),
         cancelToken: cancelToken,
       );
       final data = response.data;
@@ -229,7 +233,9 @@ class TemplatesRemoteDataSource {
     try {
       final response = await _dio.get<Map<String, Object?>>(
         '/api/templates/template-of-the-day',
-        queryParameters: _localizedQueryParameters(const <String, Object?>{}),
+        queryParameters: _runtimeInfo.localizedQueryParameters(
+          const <String, Object?>{},
+        ),
         cancelToken: cancelToken,
       );
       final data = response.data;
@@ -390,16 +396,5 @@ class TemplatesRemoteDataSource {
 
     cancelToken.cancel('Superseded by hidden templates metadata lifecycle.');
     _templateOfTheDayCancelToken = null;
-  }
-
-  Map<String, Object?> _localizedQueryParameters(
-    Map<String, Object?> parameters,
-  ) {
-    final locale = _runtimeInfo.locale.languageTag.trim();
-    if (locale.isEmpty || locale.toLowerCase().startsWith('en')) {
-      return parameters;
-    }
-
-    return <String, Object?>{...parameters, 'locale': locale};
   }
 }
