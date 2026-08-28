@@ -49,6 +49,8 @@ abstract class _NotificationCoordinatorBase {
   StreamSubscription<String>? _tokenRefreshSubscription;
   StreamSubscription<RemoteMessage>? _messageOpenedSubscription;
   StreamSubscription<RemoteMessage>? _foregroundMessageSubscription;
+  Timer? _firebaseReadinessTimer;
+  Completer<void>? _firebaseReadinessWaiter;
   final Map<String, DateTime> _handledInteractions = <String, DateTime>{};
   String? _lastRegisteredToken;
   bool _isDisposed = false;
@@ -148,6 +150,7 @@ class NotificationCoordinator extends _NotificationCoordinatorBase
       _authSessionActive = false;
       _authenticatedReady = false;
       _handledInteractions.clear();
+      _cancelFirebaseReadinessWait();
     }
 
     final token =
@@ -187,6 +190,7 @@ class NotificationCoordinator extends _NotificationCoordinatorBase
     _isDisposed = true;
     _authSessionActive = false;
     _registrationEpoch++;
+    _cancelFirebaseReadinessWait();
     await _tokenRefreshSubscription?.cancel();
     await _messageOpenedSubscription?.cancel();
     await _foregroundMessageSubscription?.cancel();
@@ -208,14 +212,32 @@ class NotificationCoordinator extends _NotificationCoordinatorBase
       if (remaining <= Duration.zero) {
         return false;
       }
-      await Future<void>.delayed(
-        remaining < _NotificationCoordinatorBase._firebaseReadinessPollInterval
-            ? remaining
-            : _NotificationCoordinatorBase._firebaseReadinessPollInterval,
-      );
+      final delay =
+          remaining <
+              _NotificationCoordinatorBase._firebaseReadinessPollInterval
+          ? remaining
+          : _NotificationCoordinatorBase._firebaseReadinessPollInterval;
+      final waiter = Completer<void>();
+      _firebaseReadinessWaiter = waiter;
+      _firebaseReadinessTimer = Timer(delay, waiter.complete);
+      await waiter.future;
+      if (identical(_firebaseReadinessWaiter, waiter)) {
+        _firebaseReadinessWaiter = null;
+        _firebaseReadinessTimer = null;
+      }
     }
 
     return _firebaseReady && _canContinueInitialization();
+  }
+
+  void _cancelFirebaseReadinessWait() {
+    _firebaseReadinessTimer?.cancel();
+    _firebaseReadinessTimer = null;
+    final waiter = _firebaseReadinessWaiter;
+    _firebaseReadinessWaiter = null;
+    if (waiter != null && !waiter.isCompleted) {
+      waiter.complete();
+    }
   }
 
   bool _canContinueInitialization() => !_isDisposed && _authSessionActive;

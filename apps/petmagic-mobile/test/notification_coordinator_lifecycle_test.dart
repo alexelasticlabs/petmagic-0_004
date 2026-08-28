@@ -158,6 +158,8 @@ void main() {
         coordinatorSource,
         contains('return _firebaseReady && _canContinueInitialization();'),
       );
+      expect(coordinatorSource, contains('_cancelFirebaseReadinessWait();'));
+      expect(coordinatorSource, contains('_firebaseReadinessTimer?.cancel();'));
       expect(
         coordinatorSource,
         contains('AuthorizationStatus.denied &&\n        !Platform.isAndroid'),
