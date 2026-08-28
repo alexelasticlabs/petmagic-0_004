@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -42,7 +44,8 @@ class ProfileNotificationsSettingsSection extends ConsumerStatefulWidget {
 }
 
 class _ProfileNotificationsSettingsSectionState
-    extends ConsumerState<ProfileNotificationsSettingsSection> {
+    extends ConsumerState<ProfileNotificationsSettingsSection>
+    with WidgetsBindingObserver {
   NotificationPreferencesStoragePort get _storage =>
       ref.read(notificationPreferencesStorageProvider);
   final AppPermissionCoordinator _permissionCoordinator =
@@ -76,7 +79,24 @@ class _ProfileNotificationsSettingsSectionState
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _load();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed || _isLoading) {
+      return;
+    }
+
+    unawaited(_refreshPushPermissionStatus());
+    unawaited(_refreshDevicePermissions());
   }
 
   Future<void> _load() async {

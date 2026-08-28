@@ -127,6 +127,36 @@ void main() {
     );
   });
 
+  test(
+    'profile notification status refreshes after returning from settings',
+    () {
+      final source = _readProfileNotificationsSettingsSource();
+
+      expect(source, contains('with WidgetsBindingObserver'));
+      expect(source, contains('WidgetsBinding.instance.addObserver(this);'));
+      expect(source, contains('WidgetsBinding.instance.removeObserver(this);'));
+      expect(source, contains('void didChangeAppLifecycleState'));
+      expect(source, contains('state != AppLifecycleState.resumed'));
+      expect(source, contains('unawaited(_refreshPushPermissionStatus());'));
+      expect(source, contains('unawaited(_refreshDevicePermissions());'));
+    },
+  );
+
+  test('denied iOS permission directs the user to device settings', () {
+    final source = _readProfileNotificationsSettingsSource();
+
+    expect(
+      source,
+      contains(
+        '_pushAuthorizationStatus !=\n                            AuthorizationStatus.denied',
+      ),
+    );
+    expect(
+      source,
+      contains('FilledButton(\n                          onPressed:'),
+    );
+  });
+
   test('profile notification permission grant registers push token', () async {
     final source = _readProfileNotificationsSettingsSource();
 

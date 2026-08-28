@@ -218,17 +218,19 @@ extension _ProfileNotificationsSettingsView
                               : _refreshPushPermissionStatus,
                           child: Text(text.profileNotificationsRefreshStatus),
                         ),
-                        FilledButton(
-                          onPressed: _isRequestingPermission
-                              ? null
-                              : _requestPushPermission,
-                          child: Text(
-                            _isRequestingPermission
-                                ? text.profileLoadingAction
-                                : text.profileNotificationsRequestPermission,
+                        if (_pushAuthorizationStatus !=
+                            AuthorizationStatus.denied)
+                          FilledButton(
+                            onPressed: _isRequestingPermission
+                                ? null
+                                : _requestPushPermission,
+                            child: Text(
+                              _isRequestingPermission
+                                  ? text.profileLoadingAction
+                                  : text.profileNotificationsRequestPermission,
+                            ),
                           ),
-                        ),
-                        FilledButton.tonal(
+                        FilledButton(
                           onPressed:
                               _isRequestingPermission || _isOpeningSettings
                               ? null
