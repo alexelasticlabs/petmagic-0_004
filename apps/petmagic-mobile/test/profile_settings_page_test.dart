@@ -43,6 +43,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('EN'), findsOneWidget);
+    expect(find.text('🇬🇧'), findsOneWidget);
     expect(find.byIcon(Icons.close_rounded), findsOneWidget);
     expect(find.byType(Radio<Locale>), findsNothing);
     expect(find.text(text.walletRedeemCancelAction), findsNothing);
@@ -74,7 +75,9 @@ void main() {
     );
     expect(bottomSheetSource, contains('profileLanguageSheetOptions ='));
     expect(bottomSheetSource, contains('text.profileSettingsLanguageGerman'));
-    expect(bottomSheetSource, contains('height * 0.65'));
+    expect(bottomSheetSource, contains("flag: '🇩🇪'"));
+    expect(bottomSheetSource, contains('height * 0.60'));
+    expect(bottomSheetSource, contains('horizontalInset: 0'));
   });
 
   test('language options are sorted by their native labels', () {
@@ -83,6 +86,12 @@ void main() {
           .map((option) => option.locale.languageCode)
           .toList(growable: false),
       const ['de', 'en', 'es', 'fr', 'it', 'pl', 'ru'],
+    );
+    expect(
+      profileLanguageSheetOptions
+          .map((option) => option.flag)
+          .toList(growable: false),
+      const ['🇩🇪', '🇬🇧', '🇪🇸', '🇫🇷', '🇮🇹', '🇵🇱', '🇷🇺'],
     );
   });
 

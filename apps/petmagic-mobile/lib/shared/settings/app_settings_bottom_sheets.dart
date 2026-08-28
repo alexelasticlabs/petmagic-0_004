@@ -14,20 +14,50 @@ class ProfileLanguageSheetOption {
   const ProfileLanguageSheetOption({
     required this.locale,
     required this.nativeLabel,
+    required this.flag,
   });
 
   final Locale locale;
   final String nativeLabel;
+  final String flag;
 }
 
 const profileLanguageSheetOptions = <ProfileLanguageSheetOption>[
-  ProfileLanguageSheetOption(locale: Locale('de'), nativeLabel: 'Deutsch'),
-  ProfileLanguageSheetOption(locale: Locale('en'), nativeLabel: 'English'),
-  ProfileLanguageSheetOption(locale: Locale('es'), nativeLabel: 'Español'),
-  ProfileLanguageSheetOption(locale: Locale('fr'), nativeLabel: 'Français'),
-  ProfileLanguageSheetOption(locale: Locale('it'), nativeLabel: 'Italiano'),
-  ProfileLanguageSheetOption(locale: Locale('pl'), nativeLabel: 'Polski'),
-  ProfileLanguageSheetOption(locale: Locale('ru'), nativeLabel: 'Русский'),
+  ProfileLanguageSheetOption(
+    locale: Locale('de'),
+    nativeLabel: 'Deutsch',
+    flag: '🇩🇪',
+  ),
+  ProfileLanguageSheetOption(
+    locale: Locale('en'),
+    nativeLabel: 'English',
+    flag: '🇬🇧',
+  ),
+  ProfileLanguageSheetOption(
+    locale: Locale('es'),
+    nativeLabel: 'Español',
+    flag: '🇪🇸',
+  ),
+  ProfileLanguageSheetOption(
+    locale: Locale('fr'),
+    nativeLabel: 'Français',
+    flag: '🇫🇷',
+  ),
+  ProfileLanguageSheetOption(
+    locale: Locale('it'),
+    nativeLabel: 'Italiano',
+    flag: '🇮🇹',
+  ),
+  ProfileLanguageSheetOption(
+    locale: Locale('pl'),
+    nativeLabel: 'Polski',
+    flag: '🇵🇱',
+  ),
+  ProfileLanguageSheetOption(
+    locale: Locale('ru'),
+    nativeLabel: 'Русский',
+    flag: '🇷🇺',
+  ),
 ];
 
 String profileLanguageLabel(AppLocalizations text, Locale locale) {
@@ -51,8 +81,8 @@ Future<void> showProfileLanguageSheet({
 }) {
   final colors = context.petMagicColors;
   final text = AppLocalizations.of(context);
-  final maxSheetHeight = MediaQuery.sizeOf(context).height * 0.65;
-  final maxListHeight = (maxSheetHeight - 88)
+  final maxSheetHeight = MediaQuery.sizeOf(context).height * 0.60;
+  final maxListHeight = (maxSheetHeight - 76)
       .clamp(0, maxSheetHeight)
       .toDouble();
 
@@ -65,8 +95,8 @@ Future<void> showProfileLanguageSheet({
         bottomInset: bottomInset,
         horizontalInset: 0,
         topInset: 0,
-        borderRadius: 30,
-        contentPadding: const EdgeInsets.fromLTRB(20, 10, 20, 16),
+        borderRadius: 28,
+        contentPadding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
         child: ConstrainedBox(
           constraints: BoxConstraints(maxHeight: maxSheetHeight),
           child: Column(
@@ -74,7 +104,7 @@ Future<void> showProfileLanguageSheet({
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const _SheetHandle(width: 36, height: 4),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Row(
                 children: [
                   Expanded(
@@ -103,7 +133,7 @@ Future<void> showProfileLanguageSheet({
                   ),
                 ],
               ),
-              Divider(height: 20, color: colors.border.withValues(alpha: 0.58)),
+              Divider(height: 16, color: colors.border.withValues(alpha: 0.58)),
               ConstrainedBox(
                 constraints: BoxConstraints(maxHeight: maxListHeight),
                 child: ListView.separated(
@@ -119,6 +149,7 @@ Future<void> showProfileLanguageSheet({
                     return _LanguageTile(
                       locale: option.locale,
                       nativeLabel: option.nativeLabel,
+                      flag: option.flag,
                       isSelected: _isSameLocale(option.locale, selectedLocale),
                       onTap: () async {
                         final selection = onSelect(option.locale);

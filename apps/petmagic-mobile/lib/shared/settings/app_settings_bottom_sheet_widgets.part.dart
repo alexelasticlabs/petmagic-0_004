@@ -86,12 +86,14 @@ class _LanguageTile extends StatelessWidget {
   const _LanguageTile({
     required this.locale,
     required this.nativeLabel,
+    required this.flag,
     required this.isSelected,
     required this.onTap,
   });
 
   final Locale locale;
   final String nativeLabel;
+  final String flag;
   final bool isSelected;
   final VoidCallback onTap;
 
@@ -105,7 +107,7 @@ class _LanguageTile extends StatelessWidget {
       label: nativeLabel,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(15),
+          borderRadius: BorderRadius.circular(14),
           color: isSelected
               ? colors.accent.withValues(alpha: 0.13)
               : Colors.transparent,
@@ -113,16 +115,25 @@ class _LanguageTile extends StatelessWidget {
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            borderRadius: BorderRadius.circular(15),
+            borderRadius: BorderRadius.circular(14),
             onTap: onTap,
             child: SizedBox(
-              height: 54,
+              height: 50,
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: Row(
                   children: [
                     SizedBox(
-                      width: 34,
+                      width: 28,
+                      child: Text(
+                        flag,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 18),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      width: 28,
                       child: Text(
                         locale.languageCode.toUpperCase(),
                         style: TextStyle(
@@ -133,7 +144,7 @@ class _LanguageTile extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         nativeLabel,
