@@ -512,6 +512,7 @@ String _readNotificationCoordinatorSource() {
   return [
     'lib/app/notifications/notification_coordinator.dart',
     'lib/app/notifications/notification_interaction_coordinator.part.dart',
+    'lib/app/notifications/notification_firebase_readiness.part.dart',
   ].map((path) => File(path).readAsStringSync()).join('\n');
 }
 
