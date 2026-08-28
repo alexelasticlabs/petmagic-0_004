@@ -61,9 +61,15 @@ type PolicyDraft = {
   falLimitConfirmed: boolean;
 };
 
+type ProviderRefreshVariables = {
+  source: "automatic" | "manual";
+};
+
 const POLICY_LIMIT_MAX = 1_000;
 const POLICY_REASON_MIN_LENGTH = 3;
 const SNAPSHOT_FRESHNESS_TICK_MS = 10_000;
+const CAPACITY_REFRESH_INTERVAL_MS = 15_000;
+const PROVIDER_BALANCE_REFRESH_INTERVAL_MS = 5 * 60_000;
 const POLICY_LIMITS_ERROR_ID = "generation-capacity-policy-limits-error";
 const POLICY_REASON_ERROR_ID = "generation-capacity-policy-reason-error";
 const POLICY_CONFIRMATION_ERROR_ID = "generation-capacity-policy-confirmation-error";
@@ -158,6 +164,7 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
   const [policyConflictBlocked, setPolicyConflictBlocked] = useState(false);
   const [isPolicyConflictRefreshing, setIsPolicyConflictRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(null);
+  const [isOverviewManuallyOpen, setIsOverviewManuallyOpen] = useState(false);
   const [freshnessNowMs, setFreshnessNowMs] = useState(() => Date.now());
   const firstEditorFieldRef = useRef<HTMLInputElement>(null);
   const policyConflictRefreshSequenceRef = useRef(0);
@@ -177,9 +184,10 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
       return selectNewestGenerationCapacitySnapshot(current, incoming);
     },
     enabled,
-    staleTime: 10_000,
-    refetchInterval: 25_000,
-    refetchIntervalInBackground: false,
+    staleTime: CAPACITY_REFRESH_INTERVAL_MS,
+    refetchInterval: CAPACITY_REFRESH_INTERVAL_MS,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: "always",
   });
 
   const control = capacityQuery.data;
@@ -233,6 +241,14 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
     !falLimitConfirmationMissing &&
     (!requiresRiskAcknowledgement || draft.riskAcknowledged)
   );
+  const requiresOperationalAttention = Boolean(
+    snapshotTooOld ||
+    capacityQuery.isRefetchError ||
+    refreshError ||
+    control?.alerts.length ||
+    control?.lanes.submissionUnknownCount
+  );
+  const isOverviewOpen = requiresOperationalAttention || isOverviewManuallyOpen;
 
   useEffect(() => {
     if (!enabled) {
@@ -356,7 +372,11 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
     },
   });
 
-  const refreshMutation = useMutation({
+  const refreshMutation = useMutation<
+    Awaited<ReturnType<typeof refreshAdminTemplateGenerationProvider>>,
+    unknown,
+    ProviderRefreshVariables
+  >({
     mutationFn: refreshAdminTemplateGenerationProvider,
     onMutate: async () => {
       setRefreshError(null);
@@ -365,7 +385,7 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
         exact: true,
       });
     },
-    onSuccess: (result) => {
+    onSuccess: (result, { source }) => {
       const updated = result.control;
       const accepted = queryClient.setQueryData<AdminTemplateGenerationControl>(
         adminQueryKeys.templateGenerationControl,
@@ -378,20 +398,22 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
             ? text.refreshCoalesced
             : text.refreshFailed;
       setRefreshError(result.outcome === "failed" ? message : null);
-      addNotification({
-        title: text.title,
-        message,
-        category: "system",
-        source: text.notificationSource,
-        tone:
-          result.outcome === "failed"
-            ? "error"
-            : result.outcome === "coalesced"
-              ? "info"
-              : "success",
-        href: `/${locale}/generations`,
-        dedupeKey: `generation-provider-refresh:${result.outcome}:${result.checkedAtUtc ?? accepted?.balance.checkedAtUtc ?? updated.revision}`,
-      });
+      if (source === "manual") {
+        addNotification({
+          title: text.title,
+          message,
+          category: "system",
+          source: text.notificationSource,
+          tone:
+            result.outcome === "failed"
+              ? "error"
+              : result.outcome === "coalesced"
+                ? "info"
+                : "success",
+          href: `/${locale}/generations`,
+          dedupeKey: `generation-provider-refresh:${result.outcome}:${result.checkedAtUtc ?? accepted?.balance.checkedAtUtc ?? updated.revision}`,
+        });
+      }
       void queryClient.invalidateQueries({
         queryKey: adminQueryKeys.templateGenerationControl,
         exact: true,
@@ -399,6 +421,29 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
     },
     onError: (error) => setRefreshError(getAdminErrorMessage(error, text.refreshError)),
   });
+
+  const isProviderRefreshPendingRef = useRef(false);
+  const requestProviderRefreshRef = useRef(refreshMutation.mutate);
+  useEffect(() => {
+    isProviderRefreshPendingRef.current = refreshMutation.isPending;
+  }, [refreshMutation.isPending]);
+  useEffect(() => {
+    requestProviderRefreshRef.current = refreshMutation.mutate;
+  }, [refreshMutation.mutate]);
+
+  useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible" && !isProviderRefreshPendingRef.current) {
+        requestProviderRefreshRef.current({ source: "automatic" });
+      }
+    }, PROVIDER_BALANCE_REFRESH_INTERVAL_MS);
+
+    return () => window.clearInterval(interval);
+  }, [enabled]);
 
   const isPolicyEditorBusy = policyMutation.isPending || isPolicyConflictRefreshing;
 
@@ -555,6 +600,13 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
           Math.round((control.lanes.inFlightTotal / control.effectiveGlobalLimit) * 100)
         )
       : 0;
+  const schedulerMode =
+    control.worker.schedulerV2Enabled === null
+      ? text.balanceUnknown
+      : control.worker.schedulerV2Enabled
+        ? text.schedulerV2On
+        : text.schedulerV2Off;
+  const isSynchronizing = capacityQuery.isFetching || refreshMutation.isPending;
 
   return (
     <>
@@ -568,7 +620,7 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
                 className={styles.button}
                 type="button"
                 disabled={refreshMutation.isPending}
-                onClick={() => refreshMutation.mutate()}
+                onClick={() => refreshMutation.mutate({ source: "manual" })}
               >
                 {refreshMutation.isPending ? text.refreshingProvider : text.refreshProvider}
               </button>
@@ -590,54 +642,19 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
             <AdminBadge tone={balanceTone(control.balance.state)}>
               {text.balanceStateLabels[control.balance.state]}
             </AdminBadge>
-            <span>
-              {text.policyRevision}: {control.revision}
+            <span className={styles.liveStatus} aria-live="polite">
+              <span
+                aria-hidden="true"
+                className={`${styles.liveStatusDot} ${
+                  isSynchronizing ? styles.liveStatusDotSyncing : ""
+                }`}
+              />
+              {isSynchronizing
+                ? text.syncing
+                : text.updatedAt(formatOptionalDate(control.generatedAtUtc, locale))}
             </span>
-            <span>
-              {text.confirmedAt}: {formatOptionalDate(control.confirmedAtUtc, locale)}
-            </span>
-          </div>
-
-          <div className={styles.metricGrid}>
-            <AdminKpiCard
-              label={text.effectiveCapacity}
-              value={String(control.effectiveGlobalLimit)}
-              hint={`${text.providerLimit}: ${control.confirmedFalConcurrencyLimit} · reserve ${control.reservedHeadroom}`}
-              tone={control.admissionEnabled ? "primary" : "danger"}
-            />
-            <AdminKpiCard
-              label={text.balance}
-              value={formatUsd(control.balance.currentBalanceUsd, locale)}
-              hint={`${text.checkedAt}: ${formatOptionalDate(control.balance.checkedAtUtc, locale)}`}
-              tone={balanceTone(control.balance.state)}
-            />
-            <AdminKpiCard
-              label={text.inFlight}
-              value={`${control.lanes.inFlightTotal} / ${control.effectiveGlobalLimit}`}
-              hint={`${usagePercent}% · ${text.borrowedSlots}: ${control.lanes.borrowedSlotsInUse}`}
-              tone={usagePercent >= 90 ? "warning" : "info"}
-            />
-            <AdminKpiCard
-              label={text.queued}
-              value={String(control.queue.totalDepth)}
-              hint={`${text.imageQueue}: ${control.queue.imageDepth} · ${text.videoQueue}: ${control.queue.videoDepth}`}
-              tone={control.queue.totalDepth > 0 ? "magenta" : "success"}
-            />
-          </div>
-
-          <div className={styles.progressHeader}>
-            <span>{text.capacityUsage}</span>
-            <strong>{usagePercent}%</strong>
-          </div>
-          <div
-            className={styles.progressTrack}
-            role="progressbar"
-            aria-label={text.capacityUsage}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={usagePercent}
-          >
-            <span style={{ width: `${usagePercent}%` }} />
+            <span className={styles.refreshPolicyNote}>{text.autoRefresh}</span>
+            <span className={styles.refreshPolicyNote}>{text.providerBalanceRefresh}</span>
           </div>
 
           {capacityQuery.isRefetchError || snapshotTooOld ? (
@@ -680,116 +697,198 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
             enabled={control.lanes.submissionUnknownCount > 0}
           />
 
-          <div className={styles.detailGrid}>
-            <details className={styles.details}>
-              <summary>{text.profile}</summary>
-              <dl className={styles.definitionGrid}>
-                {profileRows(control.effectiveProfile, text).map(([label, value]) => (
-                  <div key={label}>
-                    <dt>{label}</dt>
-                    <dd>{value}</dd>
-                  </div>
-                ))}
-              </dl>
-            </details>
+          <div className={styles.metricGrid}>
+            <AdminKpiCard
+              label={text.effectiveCapacity}
+              value={String(control.effectiveGlobalLimit)}
+              hint={`${text.providerLimit}: ${control.confirmedFalConcurrencyLimit} · reserve ${control.reservedHeadroom}`}
+              tone={control.admissionEnabled ? "primary" : "danger"}
+            />
+            <AdminKpiCard
+              label={text.balance}
+              value={formatUsd(control.balance.currentBalanceUsd, locale)}
+              hint={`${text.checkedAt}: ${formatOptionalDate(control.balance.checkedAtUtc, locale)}`}
+              tone={balanceTone(control.balance.state)}
+            />
+            <AdminKpiCard
+              label={text.inFlight}
+              value={`${control.lanes.inFlightTotal} / ${control.effectiveGlobalLimit}`}
+              hint={`${usagePercent}% · ${text.borrowedSlots}: ${control.lanes.borrowedSlotsInUse}`}
+              tone={usagePercent >= 90 ? "warning" : "info"}
+            />
+            <AdminKpiCard
+              label={text.queued}
+              value={String(control.queue.totalDepth)}
+              hint={`${text.imageQueue}: ${control.queue.imageDepth} · ${text.videoQueue}: ${control.queue.videoDepth}`}
+              tone={control.queue.totalDepth > 0 ? "magenta" : "success"}
+            />
+          </div>
 
-            <details className={styles.details}>
-              <summary>{text.worker}</summary>
-              <dl className={styles.definitionGrid}>
-                <div>
-                  <dt>{text.workerInstances}</dt>
-                  <dd>{control.worker.instanceCount}</dd>
-                </div>
-                <div>
-                  <dt>{text.workerRevision}</dt>
-                  <dd>{control.worker.appliedPolicyRevision ?? "—"}</dd>
-                </div>
-                <div>
-                  <dt>{text.schedulerMode}</dt>
-                  <dd>
-                    {control.worker.schedulerV2Enabled === null
-                      ? text.balanceUnknown
-                      : control.worker.schedulerV2Enabled
-                        ? text.schedulerV2On
-                        : text.schedulerV2Off}
-                  </dd>
-                </div>
-                <div>
-                  <dt>{text.workerHeartbeat}</dt>
-                  <dd>{formatOptionalDate(control.worker.heartbeatAtUtc, locale)}</dd>
-                </div>
-                <div>
-                  <dt>{text.workerProgress}</dt>
-                  <dd>{formatOptionalDate(control.worker.lastProgressAtUtc, locale)}</dd>
-                </div>
-                <div>
-                  <dt>{text.imageInFlight}</dt>
-                  <dd>{control.lanes.imageInFlight}</dd>
-                </div>
-                <div>
-                  <dt>{text.videoInFlight}</dt>
-                  <dd>{control.lanes.videoInFlight}</dd>
-                </div>
-                <div>
-                  <dt>{text.preprocessingInFlight}</dt>
-                  <dd>{control.lanes.videoPreprocessingInFlight}</dd>
-                </div>
-                <div>
-                  <dt>{text.submissionUnknown}</dt>
-                  <dd>{control.lanes.submissionUnknownCount}</dd>
-                </div>
-                <div>
-                  <dt>{text.nativeSlots}</dt>
-                  <dd>{control.lanes.nativeSlotsInUse}</dd>
-                </div>
-                <div>
-                  <dt>{text.borrowedSlots}</dt>
-                  <dd>{control.lanes.borrowedSlotsInUse}</dd>
-                </div>
-                <div>
-                  <dt>{text.reservedSlots}</dt>
-                  <dd>{control.lanes.reservedSlotsAvailable}</dd>
-                </div>
-                <div>
-                  <dt>{text.dispatch}</dt>
-                  <dd>{control.worker.dispatchConcurrency ?? text.balanceUnknown}</dd>
-                </div>
-                <div>
-                  <dt>{text.reconciliation}</dt>
-                  <dd>{control.worker.reconciliationConcurrency ?? text.balanceUnknown}</dd>
-                </div>
-                <div>
-                  <dt>{text.mediaImport}</dt>
-                  <dd>{control.worker.mediaImportConcurrency ?? text.balanceUnknown}</dd>
-                </div>
-                <div>
-                  <dt>{text.maintenance}</dt>
-                  <dd>{control.worker.maintenanceConcurrency ?? text.balanceUnknown}</dd>
-                </div>
-              </dl>
-            </details>
+          <details
+            className={styles.overview}
+            open={isOverviewOpen}
+            onToggle={(event) => setIsOverviewManuallyOpen(event.currentTarget.open)}
+          >
+            <summary>
+              <span>{text.overview}</span>
+              <span className={styles.overviewSummary}>
+                {control.effectiveGlobalLimit} {text.effectiveCapacity} · {control.queue.totalDepth}{" "}
+                {text.queued}
+              </span>
+            </summary>
 
-            <details className={styles.details}>
-              <summary>{text.stages}</summary>
-              <p className={styles.emptyDetail}>
-                {control.queue.oldestQueuedAtUtc
-                  ? `${text.oldestQueued}: ${formatOptionalDate(control.queue.oldestQueuedAtUtc, locale)}`
-                  : text.noQueue}
-              </p>
-              {control.queue.stages.length > 0 ? (
+            <div className={styles.progressHeader}>
+              <span>{text.capacityUsage}</span>
+              <strong>{usagePercent}%</strong>
+            </div>
+            <div
+              className={styles.progressTrack}
+              role="progressbar"
+              aria-label={text.capacityUsage}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={usagePercent}
+            >
+              <span style={{ width: `${usagePercent}%` }} />
+            </div>
+
+            <div className={styles.detailGrid}>
+              <details className={styles.details}>
+                <summary>
+                  <span className={styles.detailSummaryCopy}>
+                    <strong>{text.profile}</strong>
+                    <small>
+                      {control.effectiveGlobalLimit} {text.effectiveCapacity} · {text.providerLimit}
+                      : {control.confirmedFalConcurrencyLimit}
+                    </small>
+                  </span>
+                </summary>
                 <dl className={styles.definitionGrid}>
-                  {control.queue.stages.map((stage) => (
-                    <div key={stage.stage}>
-                      <dt>{stage.stage}</dt>
-                      <dd>{stage.count}</dd>
+                  <div>
+                    <dt>{text.policyRevision}</dt>
+                    <dd>{control.revision}</dd>
+                  </div>
+                  <div>
+                    <dt>{text.confirmedAt}</dt>
+                    <dd>{formatOptionalDate(control.confirmedAtUtc, locale)}</dd>
+                  </div>
+                  {profileRows(control.effectiveProfile, text).map(([label, value]) => (
+                    <div key={label}>
+                      <dt>{label}</dt>
+                      <dd>{value}</dd>
                     </div>
                   ))}
                 </dl>
-              ) : (
-                <p className={styles.emptyDetail}>{text.noStages}</p>
-              )}
-            </details>
-          </div>
+              </details>
+
+              <details className={styles.details}>
+                <summary>
+                  <span className={styles.detailSummaryCopy}>
+                    <strong>{text.worker}</strong>
+                    <small>
+                      {control.worker.instanceCount} · {schedulerMode}
+                    </small>
+                  </span>
+                </summary>
+                <dl className={styles.definitionGrid}>
+                  <div>
+                    <dt>{text.workerInstances}</dt>
+                    <dd>{control.worker.instanceCount}</dd>
+                  </div>
+                  <div>
+                    <dt>{text.workerRevision}</dt>
+                    <dd>{control.worker.appliedPolicyRevision ?? "—"}</dd>
+                  </div>
+                  <div>
+                    <dt>{text.schedulerMode}</dt>
+                    <dd>{schedulerMode}</dd>
+                  </div>
+                  <div>
+                    <dt>{text.workerHeartbeat}</dt>
+                    <dd>{formatOptionalDate(control.worker.heartbeatAtUtc, locale)}</dd>
+                  </div>
+                  <div>
+                    <dt>{text.workerProgress}</dt>
+                    <dd>{formatOptionalDate(control.worker.lastProgressAtUtc, locale)}</dd>
+                  </div>
+                  <div>
+                    <dt>{text.imageInFlight}</dt>
+                    <dd>{control.lanes.imageInFlight}</dd>
+                  </div>
+                  <div>
+                    <dt>{text.videoInFlight}</dt>
+                    <dd>{control.lanes.videoInFlight}</dd>
+                  </div>
+                  <div>
+                    <dt>{text.preprocessingInFlight}</dt>
+                    <dd>{control.lanes.videoPreprocessingInFlight}</dd>
+                  </div>
+                  <div>
+                    <dt>{text.submissionUnknown}</dt>
+                    <dd>{control.lanes.submissionUnknownCount}</dd>
+                  </div>
+                  <div>
+                    <dt>{text.nativeSlots}</dt>
+                    <dd>{control.lanes.nativeSlotsInUse}</dd>
+                  </div>
+                  <div>
+                    <dt>{text.borrowedSlots}</dt>
+                    <dd>{control.lanes.borrowedSlotsInUse}</dd>
+                  </div>
+                  <div>
+                    <dt>{text.reservedSlots}</dt>
+                    <dd>{control.lanes.reservedSlotsAvailable}</dd>
+                  </div>
+                  <div>
+                    <dt>{text.dispatch}</dt>
+                    <dd>{control.worker.dispatchConcurrency ?? text.balanceUnknown}</dd>
+                  </div>
+                  <div>
+                    <dt>{text.reconciliation}</dt>
+                    <dd>{control.worker.reconciliationConcurrency ?? text.balanceUnknown}</dd>
+                  </div>
+                  <div>
+                    <dt>{text.mediaImport}</dt>
+                    <dd>{control.worker.mediaImportConcurrency ?? text.balanceUnknown}</dd>
+                  </div>
+                  <div>
+                    <dt>{text.maintenance}</dt>
+                    <dd>{control.worker.maintenanceConcurrency ?? text.balanceUnknown}</dd>
+                  </div>
+                </dl>
+              </details>
+
+              <details className={styles.details}>
+                <summary>
+                  <span className={styles.detailSummaryCopy}>
+                    <strong>{text.stages}</strong>
+                    <small>
+                      {control.queue.totalDepth > 0
+                        ? `${control.queue.totalDepth} ${text.queued}`
+                        : text.noQueue}
+                    </small>
+                  </span>
+                </summary>
+                <p className={styles.emptyDetail}>
+                  {control.queue.oldestQueuedAtUtc
+                    ? `${text.oldestQueued}: ${formatOptionalDate(control.queue.oldestQueuedAtUtc, locale)}`
+                    : text.noQueue}
+                </p>
+                {control.queue.stages.length > 0 ? (
+                  <dl className={styles.definitionGrid}>
+                    {control.queue.stages.map((stage) => (
+                      <div key={stage.stage}>
+                        <dt>{stage.stage}</dt>
+                        <dd>{stage.count}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                ) : (
+                  <p className={styles.emptyDetail}>{text.noStages}</p>
+                )}
+              </details>
+            </div>
+          </details>
         </AdminCard>
       </div>
 

@@ -12,6 +12,11 @@ type GenerationCapacityAlertLike = GenerationCapacityAlertText & {
 export type GenerationCapacityPanelText = {
   title: string;
   description: string;
+  overview: string;
+  autoRefresh: string;
+  providerBalanceRefresh: string;
+  syncing: string;
+  updatedAt: (value: string) => string;
   unavailable: string;
   retry: string;
   refreshProvider: string;
@@ -106,6 +111,11 @@ const capacityPanelText: Record<Locale, GenerationCapacityPanelText> = {
   ru: {
     title: "Capacity и fal.ai",
     description: "Очередь PetMagic, доступные provider slots и состояние единственного worker.",
+    overview: "Обзор capacity",
+    autoRefresh: "Статус обновляется каждые 15 секунд",
+    providerBalanceRefresh: "Баланс fal.ai сверяется каждые 5 минут",
+    syncing: "Синхронизируем состояние…",
+    updatedAt: (value) => `Данные обновлены: ${value}`,
     unavailable: "Состояние генерационной очереди временно недоступно.",
     retry: "Повторить",
     refreshProvider: "Обновить баланс",
@@ -211,6 +221,11 @@ const capacityPanelText: Record<Locale, GenerationCapacityPanelText> = {
   en: {
     title: "Capacity and fal.ai",
     description: "PetMagic queue, available provider slots, and the single worker state.",
+    overview: "Capacity overview",
+    autoRefresh: "Status refreshes every 15 seconds",
+    providerBalanceRefresh: "fal.ai balance is checked every 5 minutes",
+    syncing: "Syncing state…",
+    updatedAt: (value) => `Updated: ${value}`,
     unavailable: "Generation capacity is temporarily unavailable.",
     retry: "Retry",
     refreshProvider: "Refresh balance",

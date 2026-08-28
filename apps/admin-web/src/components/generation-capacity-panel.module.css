@@ -62,10 +62,80 @@
   font-size: 0.73rem;
 }
 
+.liveStatus,
+.refreshPolicyNote {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.34rem;
+  min-height: 1.6rem;
+  border-radius: 999px;
+  padding: 0.22rem 0.5rem;
+  background: color-mix(in srgb, var(--surface-2) 84%, transparent);
+}
+
+.liveStatus {
+  color: var(--text-soft);
+  font-weight: 650;
+}
+
+.refreshPolicyNote {
+  color: var(--text-muted);
+}
+
+.liveStatusDot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: var(--success);
+  box-shadow: 0 0 0 0.18rem color-mix(in srgb, var(--success) 14%, transparent);
+}
+
+.liveStatusDotSyncing {
+  animation: liveStatusPulse 1s ease-in-out infinite;
+}
+
+@keyframes liveStatusPulse {
+  50% {
+    opacity: 0.38;
+    transform: scale(0.72);
+  }
+}
+
 .metricGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(12.5rem, 1fr));
   gap: 0.65rem;
+}
+
+.overview {
+  margin-top: 0.8rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface-2) 82%, transparent);
+  padding: 0.68rem;
+}
+
+.overview summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  color: var(--text-strong);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.overview summary:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.overviewSummary {
+  color: var(--text-muted);
+  font-size: 0.73rem;
+  font-weight: 500;
+  text-align: right;
 }
 
 .progressHeader {
@@ -115,21 +185,50 @@
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--surface-2) 82%, transparent);
-  padding: 0.68rem;
+  overflow: hidden;
 }
 
 .details summary {
+  display: flex;
+  align-items: center;
+  min-height: 4rem;
+  padding: 0.68rem;
   color: var(--text-strong);
   font-size: 0.78rem;
-  font-weight: 700;
   cursor: pointer;
+}
+
+.details summary:hover {
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+}
+
+.details[open] summary {
+  border-bottom: 1px solid var(--border-soft);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.detailSummaryCopy {
+  display: grid;
+  gap: 0.16rem;
+  min-width: 0;
+}
+
+.detailSummaryCopy strong {
+  font-size: 0.8rem;
+}
+
+.detailSummaryCopy small {
+  color: var(--text-muted);
+  font-size: 0.71rem;
+  font-weight: 500;
+  overflow-wrap: anywhere;
 }
 
 .definitionGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.48rem;
-  margin: 0.65rem 0 0;
+  margin: 0.68rem;
 }
 
 .definitionGrid div {
@@ -154,7 +253,7 @@
 }
 
 .emptyDetail {
-  margin: 0.6rem 0 0;
+  margin: 0.68rem;
   color: var(--text-muted);
   font-size: 0.74rem;
 }
@@ -355,6 +454,15 @@
   .actions .button,
   .actions .primaryButton {
     width: 100%;
+  }
+
+  .overview summary {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .overviewSummary {
+    text-align: left;
   }
 
   .editorGrid,

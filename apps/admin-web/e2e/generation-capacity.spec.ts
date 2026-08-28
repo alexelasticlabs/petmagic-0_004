@@ -6,6 +6,43 @@ function getCapacitySurface(page: Page) {
   return page.locator('[data-admin-surface="generation-capacity"]');
 }
 
+test("keeps a healthy capacity overview compact until an operator opens it", async ({ page }) => {
+  await installMocks(
+    page,
+    createControl({
+      balance: {
+        state: "fresh",
+        currentBalanceUsd: 8.25,
+        lastSuccessfulAtUtc: "2026-07-29T10:05:00Z",
+        checkedAtUtc: "2026-07-29T10:05:00Z",
+      },
+      alerts: [],
+    })
+  );
+  await loginAsAdmin(page);
+  await page.goto("/en/generations");
+
+  const capacitySurface = getCapacitySurface(page);
+  await expect(capacitySurface.getByText("Status refreshes every 15 seconds")).toBeVisible();
+  await expect(
+    capacitySurface.getByText("fal.ai balance is checked every 5 minutes")
+  ).toBeVisible();
+  await expect(capacitySurface.getByText(/^Updated:/)).toBeVisible();
+  const overview = capacitySurface
+    .locator("details")
+    .filter({ hasText: "Capacity overview" })
+    .first();
+  await expect(overview).not.toHaveAttribute("open", "");
+  await expect(
+    overview.getByRole("progressbar", { name: "Capacity usage", exact: true })
+  ).toBeHidden();
+
+  await overview.getByText("Capacity overview", { exact: true }).click();
+  await expect(
+    overview.getByRole("progressbar", { name: "Capacity usage", exact: true })
+  ).toBeVisible();
+});
+
 function createSession() {
   return {
     accessToken: "capacity-admin-token",
