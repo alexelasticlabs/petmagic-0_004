@@ -180,6 +180,12 @@ class AppLocalizationsPl extends AppLocalizations {
   String get allFilter => 'Wszystkie';
 
   @override
+  String get templateFormatFilterLabel => 'Format';
+
+  @override
+  String get templateCategoryFilterLabel => 'Kategoria';
+
+  @override
   String get videosFilter => 'Wideo';
 
   @override

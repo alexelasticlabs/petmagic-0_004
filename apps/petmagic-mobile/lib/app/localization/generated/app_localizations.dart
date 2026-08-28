@@ -420,6 +420,18 @@ abstract class AppLocalizations {
   /// **'All'**
   String get allFilter;
 
+  /// No description provided for @templateFormatFilterLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Format'**
+  String get templateFormatFilterLabel;
+
+  /// No description provided for @templateCategoryFilterLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Category'**
+  String get templateCategoryFilterLabel;
+
   /// No description provided for @videosFilter.
   ///
   /// In en, this message translates to:

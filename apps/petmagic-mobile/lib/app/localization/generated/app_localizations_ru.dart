@@ -176,6 +176,12 @@ class AppLocalizationsRu extends AppLocalizations {
   String get allFilter => 'Все';
 
   @override
+  String get templateFormatFilterLabel => 'Формат';
+
+  @override
+  String get templateCategoryFilterLabel => 'Категория';
+
+  @override
   String get videosFilter => 'Видео';
 
   @override

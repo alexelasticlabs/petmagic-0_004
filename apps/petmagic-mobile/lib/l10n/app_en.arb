@@ -52,6 +52,8 @@
   "templateOfTheDayFeedBadge": "Today's pick",
   "templateOfTheDayLoadFailed": "Could not load Template of the Day.",
   "allFilter": "All",
+  "templateFormatFilterLabel": "Format",
+  "templateCategoryFilterLabel": "Category",
   "videosFilter": "Videos",
   "imagesFilter": "Images",
   "trendingFilter": "🔥 Trending",

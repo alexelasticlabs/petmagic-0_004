@@ -134,6 +134,52 @@ void main() {
     expect(selectedIcon.color, Theme.of(context).colorScheme.onPrimary);
   });
 
+  testWidgets('template filters distinguish format and category controls', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        locale: const Locale('en'),
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: TemplateTypeFilters(
+            selectedType: null,
+            categories: const ['Funny'],
+            selectedCategory: null,
+            onTypeSelected: (_) {},
+            onCategorySelected: (_) {},
+          ),
+        ),
+      ),
+    );
+
+    final context = tester.element(find.byType(TemplateTypeFilters));
+    final text = AppLocalizations.of(context);
+
+    expect(find.text(text.templateFormatFilterLabel), findsOneWidget);
+    expect(find.text(text.templateCategoryFilterLabel), findsOneWidget);
+    expect(find.text(text.allFilter), findsNWidgets(2));
+    expect(
+      find.byKey(
+        ValueKey('template-filter-group-${text.templateFormatFilterLabel}'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(
+        ValueKey('template-filter-group-${text.templateCategoryFilterLabel}'),
+      ),
+      findsOneWidget,
+    );
+  });
+
   test(
     'templates top bar alert badge uses theme contrast for danger token',
     () {

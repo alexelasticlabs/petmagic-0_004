@@ -51,6 +51,8 @@
   "templateOfTheDayFeedBadge": "Le choix du jour",
   "templateOfTheDayLoadFailed": "Impossible de charger le modèle du jour.",
   "allFilter": "Tous",
+  "templateFormatFilterLabel": "Format",
+  "templateCategoryFilterLabel": "Catégorie",
   "videosFilter": "Vidéos",
   "imagesFilter": "Images",
   "trendingFilter": "🔥 Tendances",

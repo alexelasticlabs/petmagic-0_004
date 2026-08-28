@@ -181,6 +181,12 @@ class AppLocalizationsEs extends AppLocalizations {
   String get allFilter => 'Todo';
 
   @override
+  String get templateFormatFilterLabel => 'Formato';
+
+  @override
+  String get templateCategoryFilterLabel => 'Categoría';
+
+  @override
   String get videosFilter => 'Vídeos';
 
   @override

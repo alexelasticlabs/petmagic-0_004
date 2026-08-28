@@ -40,68 +40,112 @@ class TemplateTypeFilters extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.only(bottom: 2),
-          child: Row(
-            children: [
-              _FilterPill(
-                label: text.allFilter,
-                icon: Icons.apps_rounded,
-                selected: selectedType == null,
-                onTap: () => onTypeSelected(null),
-                compact: true,
-              ),
-              const SizedBox(width: 8),
-              _FilterPill(
-                label: text.videosFilter,
-                icon: Icons.play_circle_outline_rounded,
-                selected: selectedType == TemplateType.video,
-                onTap: () => onTypeSelected(TemplateType.video),
-                compact: true,
-              ),
-              const SizedBox(width: 8),
-              _FilterPill(
-                label: text.imagesFilter,
-                icon: Icons.image_outlined,
-                selected: selectedType == TemplateType.image,
-                onTap: () => onTypeSelected(TemplateType.image),
-                compact: true,
-              ),
-            ],
+        _TemplateFilterGroup(
+          label: text.templateFormatFilterLabel,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.only(bottom: 2),
+            child: Row(
+              children: [
+                _FilterPill(
+                  label: text.allFilter,
+                  icon: Icons.apps_rounded,
+                  selected: selectedType == null,
+                  onTap: () => onTypeSelected(null),
+                  compact: true,
+                ),
+                const SizedBox(width: 8),
+                _FilterPill(
+                  label: text.videosFilter,
+                  icon: Icons.play_circle_outline_rounded,
+                  selected: selectedType == TemplateType.video,
+                  onTap: () => onTypeSelected(TemplateType.video),
+                  compact: true,
+                ),
+                const SizedBox(width: 8),
+                _FilterPill(
+                  label: text.imagesFilter,
+                  icon: Icons.image_outlined,
+                  selected: selectedType == TemplateType.image,
+                  onTap: () => onTypeSelected(TemplateType.image),
+                  compact: true,
+                ),
+              ],
+            ),
           ),
         ),
         if (normalizedCategories.isNotEmpty) ...[
           const SizedBox(height: 8),
-          SizedBox(
-            height: 36,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: normalizedCategories.length + 1,
-              separatorBuilder: (_, _) => const SizedBox(width: 6),
-              itemBuilder: (context, index) {
-                if (index == 0) {
+          _TemplateFilterGroup(
+            label: text.templateCategoryFilterLabel,
+            child: SizedBox(
+              height: 36,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: normalizedCategories.length + 1,
+                separatorBuilder: (_, _) => const SizedBox(width: 6),
+                itemBuilder: (context, index) {
+                  if (index == 0) {
+                    return _FilterPill(
+                      label: text.allFilter,
+                      icon: Icons.category_outlined,
+                      selected: selectedCategory == null,
+                      onTap: () => onCategorySelected(null),
+                      compact: true,
+                    );
+                  }
+
+                  final category = normalizedCategories[index - 1];
                   return _FilterPill(
-                    label: text.allFilter,
-                    icon: Icons.category_outlined,
-                    selected: selectedCategory == null,
-                    onTap: () => onCategorySelected(null),
+                    label: category,
+                    selected: selectedCategory == category,
+                    onTap: () => onCategorySelected(category),
                     compact: true,
                   );
-                }
-
-                final category = normalizedCategories[index - 1];
-                return _FilterPill(
-                  label: category,
-                  selected: selectedCategory == category,
-                  onTap: () => onCategorySelected(category),
-                  compact: true,
-                );
-              },
+                },
+              ),
             ),
           ),
         ],
       ],
+    );
+  }
+}
+
+class _TemplateFilterGroup extends StatelessWidget {
+  const _TemplateFilterGroup({required this.label, required this.child});
+
+  final String label;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+
+    return Semantics(
+      key: ValueKey('template-filter-group-$label'),
+      container: true,
+      label: label,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          SizedBox(
+            width: 54,
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: colors.textSoft,
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          Expanded(child: child),
+        ],
+      ),
     );
   }
 }
@@ -139,20 +183,7 @@ class _FilterPill extends StatelessWidget {
           vertical: compact ? 6 : 7,
         ),
         decoration: BoxDecoration(
-          gradient: selected
-              ? LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [colors.accent, colors.gold.withValues(alpha: 0.82)],
-                )
-              : LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    colors.surfaceGlass,
-                    colors.surface.withValues(alpha: 0.9),
-                  ],
-                ),
+          color: selected ? colors.accent : colors.surfaceGlass,
           borderRadius: BorderRadius.circular(22),
           border: Border.all(color: selected ? colors.accent : colors.border),
           boxShadow: selected

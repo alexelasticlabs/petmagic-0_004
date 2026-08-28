@@ -52,6 +52,8 @@
   "templateOfTheDayFeedBadge": "Выбор дня",
   "templateOfTheDayLoadFailed": "Не удалось загрузить шаблон дня.",
   "allFilter": "Все",
+  "templateFormatFilterLabel": "Формат",
+  "templateCategoryFilterLabel": "Категория",
   "videosFilter": "Видео",
   "imagesFilter": "Изображения",
   "trendingFilter": "🔥 Тренды",
