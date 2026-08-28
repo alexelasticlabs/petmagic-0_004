@@ -164,6 +164,7 @@ void main() {
     expect(mainSource, contains('SystemChrome.setPreferredOrientations'));
     expect(mainSource, contains('DeviceOrientation.portraitUp'));
     expect(androidManifest, contains('android:screenOrientation="portrait"'));
+    expect(infoPlist, contains('<key>UIRequiresFullScreen</key>\n\t<true/>'));
     expect(infoPlist, contains('UIInterfaceOrientationPortrait'));
     expect(
       infoPlist,
