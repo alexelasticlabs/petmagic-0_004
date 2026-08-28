@@ -43,11 +43,15 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('EN'), findsOneWidget);
+    expect(find.byIcon(Icons.close_rounded), findsOneWidget);
+    expect(find.byType(Radio<Locale>), findsNothing);
+    expect(find.text(text.walletRedeemCancelAction), findsNothing);
 
     await tester.tap(find.text('EN'));
     await tester.pumpAndSettle();
 
     expect(find.text(text.profileSettingsLanguageEnglish), findsWidgets);
+    expect(find.text('EN'), findsNothing);
   });
 
   test('profile settings page uses shared localized language helpers', () {
@@ -70,6 +74,7 @@ void main() {
     );
     expect(bottomSheetSource, contains('profileLanguageSheetOptions ='));
     expect(bottomSheetSource, contains('text.profileSettingsLanguageGerman'));
+    expect(bottomSheetSource, contains('height * 0.65'));
   });
 
   test('language options are sorted by their native labels', () {

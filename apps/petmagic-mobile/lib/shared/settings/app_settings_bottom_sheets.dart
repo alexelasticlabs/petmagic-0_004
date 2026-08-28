@@ -51,6 +51,10 @@ Future<void> showProfileLanguageSheet({
 }) {
   final colors = context.petMagicColors;
   final text = AppLocalizations.of(context);
+  final maxSheetHeight = MediaQuery.sizeOf(context).height * 0.65;
+  final maxListHeight = (maxSheetHeight - 88)
+      .clamp(0, maxSheetHeight)
+      .toDouble();
 
   return showPetMagicModalBottomSheet<void>(
     context: context,
@@ -59,31 +63,20 @@ Future<void> showProfileLanguageSheet({
     builder: (sheetContext, bottomInset) {
       return _ProfileSettingsSheetShell(
         bottomInset: bottomInset,
-        child: SizedBox(
-          height: MediaQuery.sizeOf(sheetContext).height * 0.72,
+        horizontalInset: 0,
+        topInset: 0,
+        borderRadius: 30,
+        contentPadding: const EdgeInsets.fromLTRB(20, 10, 20, 16),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: maxSheetHeight),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const _SheetHandle(),
-              const SizedBox(height: 16),
+              const _SheetHandle(width: 36, height: 4),
+              const SizedBox(height: 8),
               Row(
                 children: [
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(14),
-                      color: colors.accentSoft.withValues(alpha: 0.34),
-                    ),
-                    child: SizedBox(
-                      width: 42,
-                      height: 42,
-                      child: Icon(
-                        Icons.translate_rounded,
-                        color: colors.accent,
-                        size: 22,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       text.profileSettingsLanguageTitle,
@@ -91,54 +84,51 @@ Future<void> showProfileLanguageSheet({
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: colors.textStrong,
-                        fontSize: 28,
-                        fontWeight: FontWeight.w900,
-                        height: 1.1,
+                        fontSize: 25,
+                        fontWeight: FontWeight.w800,
+                        height: 1.15,
                       ),
                     ),
                   ),
+                  IconButton(
+                    onPressed: () => Navigator.of(sheetContext).pop(),
+                    icon: Icon(
+                      Icons.close_rounded,
+                      color: colors.textSoft,
+                      size: 24,
+                    ),
+                    tooltip: MaterialLocalizations.of(
+                      sheetContext,
+                    ).closeButtonTooltip,
+                  ),
                 ],
               ),
-              const SizedBox(height: 14),
-              Expanded(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: colors.border.withValues(alpha: 0.74),
-                    ),
-                    color: colors.surfaceStrong.withValues(alpha: 0.28),
+              Divider(height: 20, color: colors.border.withValues(alpha: 0.58)),
+              ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: maxListHeight),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  padding: EdgeInsets.zero,
+                  itemCount: options.length,
+                  separatorBuilder: (_, _) => Divider(
+                    height: 1,
+                    color: colors.border.withValues(alpha: 0.42),
                   ),
-                  child: ListView.separated(
-                    padding: const EdgeInsets.all(8),
-                    itemCount: options.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 6),
-                    itemBuilder: (context, index) {
-                      final option = options[index];
-                      return _LanguageTile(
-                        locale: option.locale,
-                        nativeLabel: option.nativeLabel,
-                        isSelected: _isSameLocale(
-                          option.locale,
-                          selectedLocale,
-                        ),
-                        onTap: () async {
-                          await onSelect(option.locale);
-                          if (sheetContext.mounted) {
-                            Navigator.of(sheetContext).pop();
-                          }
-                        },
-                      );
-                    },
-                  ),
-                ),
-              ),
-              const SizedBox(height: 6),
-              Center(
-                child: TextButton.icon(
-                  onPressed: () => Navigator.of(sheetContext).pop(),
-                  icon: const Icon(Icons.close_rounded, size: 18),
-                  label: Text(text.walletRedeemCancelAction),
+                  itemBuilder: (context, index) {
+                    final option = options[index];
+                    return _LanguageTile(
+                      locale: option.locale,
+                      nativeLabel: option.nativeLabel,
+                      isSelected: _isSameLocale(option.locale, selectedLocale),
+                      onTap: () async {
+                        final selection = onSelect(option.locale);
+                        if (sheetContext.mounted) {
+                          Navigator.of(sheetContext).pop();
+                        }
+                        await selection;
+                      },
+                    );
+                  },
                 ),
               ),
             ],

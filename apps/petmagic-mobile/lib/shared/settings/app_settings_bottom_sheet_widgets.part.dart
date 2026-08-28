@@ -4,10 +4,18 @@ class _ProfileSettingsSheetShell extends StatelessWidget {
   const _ProfileSettingsSheetShell({
     required this.bottomInset,
     required this.child,
+    this.horizontalInset = 16,
+    this.topInset = 12,
+    this.borderRadius = 32,
+    this.contentPadding = const EdgeInsets.fromLTRB(20, 12, 20, 16),
   });
 
   final double bottomInset;
   final Widget child;
+  final double horizontalInset;
+  final double topInset;
+  final double borderRadius;
+  final EdgeInsets contentPadding;
 
   @override
   Widget build(BuildContext context) {
@@ -15,7 +23,7 @@ class _ProfileSettingsSheetShell extends StatelessWidget {
     final content = DecoratedBox(
       decoration: BoxDecoration(
         color: colors.surfaceGlass,
-        borderRadius: BorderRadius.circular(32),
+        borderRadius: BorderRadius.circular(borderRadius),
         border: Border.all(color: colors.border),
         boxShadow: [
           BoxShadow(
@@ -25,18 +33,20 @@ class _ProfileSettingsSheetShell extends StatelessWidget {
           ),
         ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
-        child: child,
-      ),
+      child: Padding(padding: contentPadding, child: child),
     );
 
     return SafeArea(
       top: false,
       child: Padding(
-        padding: EdgeInsets.fromLTRB(16, 12, 16, bottomInset),
+        padding: EdgeInsets.fromLTRB(
+          horizontalInset,
+          topInset,
+          horizontalInset,
+          bottomInset,
+        ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(32),
+          borderRadius: BorderRadius.circular(borderRadius),
           child: PerformanceGuard.shouldAvoidBlur(context)
               ? content
               : BackdropFilter(
@@ -50,7 +60,10 @@ class _ProfileSettingsSheetShell extends StatelessWidget {
 }
 
 class _SheetHandle extends StatelessWidget {
-  const _SheetHandle();
+  const _SheetHandle({this.width = 56, this.height = 6});
+
+  final double width;
+  final double height;
 
   @override
   Widget build(BuildContext context) {
@@ -58,8 +71,8 @@ class _SheetHandle extends StatelessWidget {
 
     return Center(
       child: Container(
-        width: 56,
-        height: 6,
+        width: width,
+        height: height,
         decoration: BoxDecoration(
           color: colors.border.withValues(alpha: 0.95),
           borderRadius: BorderRadius.circular(999),
@@ -93,15 +106,9 @@ class _LanguageTile extends StatelessWidget {
       child: DecoratedBox(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(15),
-          border: Border.all(
-            color: isSelected
-                ? colors.accent.withValues(alpha: 0.7)
-                : colors.border.withValues(alpha: 0.7),
-            width: isSelected ? 1.4 : 1,
-          ),
           color: isSelected
-              ? colors.accentSoft.withValues(alpha: 0.34)
-              : colors.surfaceGlass.withValues(alpha: 0.22),
+              ? colors.accent.withValues(alpha: 0.13)
+              : Colors.transparent,
         ),
         child: Material(
           color: Colors.transparent,
@@ -111,30 +118,22 @@ class _LanguageTile extends StatelessWidget {
             child: SizedBox(
               height: 54,
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 10),
                 child: Row(
                   children: [
-                    Container(
-                      width: 40,
-                      height: 30,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(10),
-                        color: isSelected
-                            ? colors.accent.withValues(alpha: 0.2)
-                            : colors.surfaceStrong.withValues(alpha: 0.54),
-                      ),
+                    SizedBox(
+                      width: 34,
                       child: Text(
                         locale.languageCode.toUpperCase(),
                         style: TextStyle(
                           color: isSelected ? colors.accent : colors.textMuted,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.45,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.4,
                         ),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         nativeLabel,
@@ -144,33 +143,13 @@ class _LanguageTile extends StatelessWidget {
                           color: isSelected
                               ? colors.textStrong
                               : colors.textSoft,
-                          fontSize: 16.5,
-                          fontWeight: FontWeight.w700,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    AnimatedContainer(
-                      duration: AppTheme.motionFast,
-                      curve: Curves.easeOut,
-                      width: 24,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: isSelected ? colors.accent : Colors.transparent,
-                        border: Border.all(
-                          color: isSelected ? colors.accent : colors.textMuted,
-                          width: 2,
-                        ),
-                      ),
-                      child: isSelected
-                          ? Icon(
-                              Icons.check_rounded,
-                              color: PetMagicPalettes.onColor(colors.accent),
-                              size: 16,
-                            )
-                          : null,
-                    ),
+                    if (isSelected)
+                      Icon(Icons.check_rounded, color: colors.accent, size: 22),
                   ],
                 ),
               ),
