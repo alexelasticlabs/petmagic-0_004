@@ -91,6 +91,7 @@ class _TemplateOfTheDayCostChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
+    final isFree = cost <= 0;
     return DecoratedBox(
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.44),
@@ -102,10 +103,12 @@ class _TemplateOfTheDayCostChip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const PawSparkIcon(size: 13),
-            const SizedBox(width: 5),
+            if (!isFree) ...[
+              const PawSparkIcon(size: 13),
+              const SizedBox(width: 5),
+            ],
             Text(
-              '$cost ${text.walletBalanceUnit}',
+              isFree ? text.freeLabel : '$cost ${text.walletBalanceUnit}',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(

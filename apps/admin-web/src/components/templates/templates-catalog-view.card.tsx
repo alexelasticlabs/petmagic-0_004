@@ -286,6 +286,15 @@ export function formatAnalyticsInteger(value: number | null | undefined, locale:
   return new Intl.NumberFormat(getTemplatesCatalogIntlLocale(locale)).format(value);
 }
 
+export function formatUsdEstimate(value: number, locale: Locale) {
+  return new Intl.NumberFormat(getTemplatesCatalogIntlLocale(locale), {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
 export function formatPercentMetric(value: number | null | undefined, locale: Locale) {
   if (value === undefined || value === null || Number.isNaN(value)) {
     return "-";
@@ -321,7 +330,7 @@ export function getTemplateCardMetrics(
 ) {
   const costValue =
     template.estimatedCostUsd !== undefined && template.estimatedCostUsd !== null
-      ? `$${template.estimatedCostUsd.toFixed(3)}`
+      ? formatUsdEstimate(template.estimatedCostUsd, locale)
       : `${formatAnalyticsInteger(template.tokenCost, locale)} ${copy.tokenUnit}`;
 
   return [

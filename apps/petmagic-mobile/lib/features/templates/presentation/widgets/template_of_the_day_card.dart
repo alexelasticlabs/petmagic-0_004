@@ -198,10 +198,9 @@ class TemplateOfTheDayCard extends StatelessWidget {
                             runSpacing: 7,
                             crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
-                              if (template.tokenCost > 0)
-                                _TemplateOfTheDayCostChip(
-                                  cost: template.tokenCost,
-                                ),
+                              _TemplateOfTheDayCostChip(
+                                cost: template.tokenCost,
+                              ),
                               _TemplateOfTheDayAction(
                                 label: isPremiumLocked
                                     ? text.templateUnlockPremiumAction

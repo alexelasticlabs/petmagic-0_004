@@ -84,11 +84,15 @@ export function TemplateSecureMedia({
   const [remoteMedia, setRemoteMedia] = useState<{
     sourceUrl: string;
     objectUrl: string | null;
+    useDirectUrl: boolean;
     failed: boolean;
-  }>({ sourceUrl: "", objectUrl: null, failed: false });
+  }>({ sourceUrl: "", objectUrl: null, useDirectUrl: false, failed: false });
   const activeObjectUrlRef = useRef<string | null>(null);
   const resolvedUrl =
-    localObjectUrl ?? (remoteMedia.sourceUrl === url ? remoteMedia.objectUrl : null);
+    localObjectUrl ??
+    (remoteMedia.sourceUrl === url
+      ? (remoteMedia.objectUrl ?? (remoteMedia.useDirectUrl ? url : null))
+      : null);
   const loadFailed =
     unsafeRemoteUrl || (!localObjectUrl && remoteMedia.sourceUrl === url && remoteMedia.failed);
   const onLoadFailedRef = useRef(onLoadFailed);
@@ -107,9 +111,13 @@ export function TemplateSecureMedia({
     }
 
     revokeActiveObjectUrl();
-    setRemoteMedia({ sourceUrl: url, objectUrl: null, failed: true });
+    setRemoteMedia({ sourceUrl: url, objectUrl: null, useDirectUrl: false, failed: true });
     onLoadFailedRef.current?.();
   }, [localObjectUrl, revokeActiveObjectUrl, url]);
+  const fallBackToDirectRemoteUrl = useCallback(() => {
+    revokeActiveObjectUrl();
+    setRemoteMedia({ sourceUrl: url, objectUrl: null, useDirectUrl: true, failed: false });
+  }, [revokeActiveObjectUrl, url]);
 
   useEffect(() => {
     onLoadFailedRef.current = onLoadFailed;
@@ -140,6 +148,8 @@ export function TemplateSecureMedia({
     // Template previews are public CDN assets. Sending admin cookies cross-origin
     // makes a valid CORS response require Access-Control-Allow-Credentials and
     // prevents Cloudflare R2 from serving the preview to this isolated renderer.
+    // A regular media element can still display the configured public asset when its
+    // storage origin does not expose CORS headers to JavaScript.
     void fetchWithTimeout(url, { credentials: "omit", signal: controller.signal })
       .then(async (response) => {
         if (!isActive) {
@@ -154,7 +164,7 @@ export function TemplateSecureMedia({
             kind,
             status: response.status,
           });
-          markRemoteMediaFailed();
+          fallBackToDirectRemoteUrl();
           return;
         }
 
@@ -166,7 +176,12 @@ export function TemplateSecureMedia({
         createdObjectUrl = URL.createObjectURL(blob);
         revokeActiveObjectUrl();
         activeObjectUrlRef.current = createdObjectUrl;
-        setRemoteMedia({ sourceUrl: url, objectUrl: createdObjectUrl, failed: false });
+        setRemoteMedia({
+          sourceUrl: url,
+          objectUrl: createdObjectUrl,
+          useDirectUrl: false,
+          failed: false,
+        });
       })
       .catch((error) => {
         if (controller.signal.aborted || !isActive) {
@@ -180,7 +195,7 @@ export function TemplateSecureMedia({
           kind,
           errorName: getMediaFetchErrorName(error),
         });
-        markRemoteMediaFailed();
+        fallBackToDirectRemoteUrl();
       });
 
     return () => {
@@ -196,7 +211,7 @@ export function TemplateSecureMedia({
     logContext?.contentType,
     logContext?.surface,
     logContext?.templateId,
-    markRemoteMediaFailed,
+    fallBackToDirectRemoteUrl,
     revokeActiveObjectUrl,
     unsafeRemoteUrl,
     url,
@@ -242,6 +257,7 @@ export function TemplateSecureMedia({
       height={height}
       loading={loading}
       aria-hidden={ariaHidden || undefined}
+      referrerPolicy="no-referrer"
       onError={markRemoteMediaFailed}
     />
   );

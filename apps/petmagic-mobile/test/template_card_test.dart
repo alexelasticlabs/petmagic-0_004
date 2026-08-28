@@ -963,6 +963,37 @@ void main() {
     },
   );
 
+  testWidgets('TemplateCard labels a zero-cost featured template as free', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      buildTemplateCardHost(
+        const TemplateItem(
+          templateId: 'featured-free',
+          templateType: TemplateType.image,
+          title: 'Featured free template',
+          shortDescription: 'A no-cost template.',
+          petPhotoRequirements: ['Clear face'],
+          category: 'Funny',
+          tags: ['funny'],
+          isPremium: false,
+          tokenCost: 0,
+        ),
+        theme: AppTheme.dark(),
+        locale: const Locale('ru'),
+        size: const Size(188, 260),
+        featuredData: const TemplateCardFeaturedData(
+          badgeLabel: 'Выбор дня',
+          actionLabel: 'Попробовать шаблон',
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('Бесплатно'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'TemplateCard constrains Russian featured badge on phone-width cards',
     (tester) async {

@@ -223,7 +223,9 @@ class _TokenChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
     final textStyle = Theme.of(context).textTheme.labelLarge;
+    final isFree = cost <= 0;
     return DecoratedBox(
       decoration: BoxDecoration(
         gradient: const LinearGradient(
@@ -249,10 +251,12 @@ class _TokenChip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const PawSparkIcon(size: 15),
-            const SizedBox(width: 5),
+            if (!isFree) ...[
+              const PawSparkIcon(size: 15),
+              const SizedBox(width: 5),
+            ],
             Text(
-              '$cost',
+              isFree ? text.freeLabel : '$cost',
               style: textStyle?.copyWith(
                 color: Colors.white,
                 fontSize: 12,

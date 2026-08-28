@@ -47,6 +47,7 @@ class TemplateTypeFilters extends StatelessWidget {
             children: [
               _FilterPill(
                 label: text.allFilter,
+                icon: Icons.apps_rounded,
                 selected: selectedType == null,
                 onTap: () => onTypeSelected(null),
                 compact: true,
@@ -82,6 +83,7 @@ class TemplateTypeFilters extends StatelessWidget {
                 if (index == 0) {
                   return _FilterPill(
                     label: text.allFilter,
+                    icon: Icons.category_outlined,
                     selected: selectedCategory == null,
                     onTap: () => onCategorySelected(null),
                     compact: true,

@@ -25,7 +25,7 @@ const editorSectionsPath = fileURLToPath(
 const secureMediaPath = fileURLToPath(new URL("./template-secure-media.tsx", import.meta.url));
 
 describe("template preview media URL exposure", () => {
-  it("does not render backend template media URLs directly in image or video src attributes", () => {
+  it("keeps template media inside the guarded renderer and falls back for configured public assets", () => {
     const sources = [
       readTemplatesCatalogViewLibrarySource(),
       readFileSync(phonePreviewPath, "utf8"),
@@ -91,9 +91,12 @@ describe("template preview media URL exposure", () => {
     expect(secureMediaSource).not.toContain(
       'clientLogger.warn("templates.secure_media_unsafe_host_blocked", { url'
     );
-    expect(secureMediaSource).not.toContain("function shouldUseDirectMediaUrl(");
-    expect(secureMediaSource).not.toContain("directMediaUrl");
-    expect(secureMediaSource).not.toContain("public cross-origin media can render directly");
+    expect(secureMediaSource).toContain("const fallBackToDirectRemoteUrl = useCallback(");
+    expect(secureMediaSource).toContain("useDirectUrl: true");
+    expect(secureMediaSource).toContain('referrerPolicy="no-referrer"');
+    expect(secureMediaSource).toContain(
+      "storage origin does not expose CORS headers to JavaScript"
+    );
   });
 
   it("blocks unsafe template media URLs before direct rendering or fetching", () => {
