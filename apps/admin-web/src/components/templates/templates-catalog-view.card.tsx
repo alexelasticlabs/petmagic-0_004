@@ -78,6 +78,13 @@ export function TemplateCatalogCard({
     template.previewAsset?.contentType?.trim() ?? "",
     previewUrl
   );
+  const mediaFallback = (
+    <div className={styles.cardMediaFallback} role="status">
+      <ImageIcon className={styles.cardMediaPlaceholderIcon} aria-hidden="true" />
+      <strong>{copy.previewUnavailable}</strong>
+      <span>{copy.previewUnavailableDescription}</span>
+    </div>
+  );
   const actionItems: AdminActionMenuItem[] = [
     {
       id: "analytics",
@@ -134,6 +141,7 @@ export function TemplateCatalogCard({
               playsInline
               preload="metadata"
               ariaLabel={safeTemplateTitle}
+              fallback={mediaFallback}
               logContext={{
                 templateId: template.templateId,
                 contentType: template.previewAsset?.contentType,
@@ -148,6 +156,7 @@ export function TemplateCatalogCard({
               alt={safeTemplateTitle}
               width={640}
               height={360}
+              fallback={mediaFallback}
               logContext={{
                 templateId: template.templateId,
                 contentType: template.previewAsset?.contentType,

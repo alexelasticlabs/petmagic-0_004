@@ -104,6 +104,18 @@ describe("templates catalog visual contract", () => {
     expect(cssSource).toContain("flex-shrink: 0;");
   });
 
+  it("shows an operator-facing fallback instead of a blank card when preview media fails", () => {
+    const catalogSource = readTemplatesCatalogViewLibrarySource();
+    const cssSource = readFileSync(catalogCssPath, "utf8");
+
+    expect(catalogSource).toContain("fallback={mediaFallback}");
+    expect(catalogSource).toContain("copy.previewUnavailable");
+    expect(catalogSource).toContain("copy.previewUnavailableDescription");
+    expect(cssSource).toContain(".cardMediaFallback {");
+    expect(cssSource).toContain(".cardMediaFallback strong {");
+    expect(cssSource).toContain(".cardMediaFallback span {");
+  });
+
   it("keeps list action controls stable in the sticky catalog table column", () => {
     const catalogSource = readTemplatesCatalogViewLibrarySource();
     const cssSource = readFileSync(catalogCssPath, "utf8");

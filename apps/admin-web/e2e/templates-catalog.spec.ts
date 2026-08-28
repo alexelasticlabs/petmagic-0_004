@@ -8,6 +8,7 @@ const adminUserId = "11111111-1111-1111-1111-111111111111";
 const readyTemplateId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
 const missingPreviewTemplateId = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
 const qaOnlyTemplateId = "cccccccc-cccc-cccc-cccc-cccccccccccc";
+const unavailablePreviewUrl = "https://cdn.example.com/templates/qa-neon-preview.png";
 const previewDataUrl =
   "data:image/svg+xml;charset=utf-8," +
   encodeURIComponent(
@@ -164,7 +165,7 @@ const catalogTemplates: CatalogTemplate[] = [
     tokenCost: 16,
     tags: ["qa", "neon"],
     previewAsset: {
-      url: previewDataUrl,
+      url: unavailablePreviewUrl,
       fileName: "qa-neon-preview.svg",
       contentType: "image/svg+xml",
       fileSizeBytes: 512,
@@ -692,6 +693,10 @@ test("unified templates catalog supports publishing filters and responsive cards
     main.getByRole("heading", { name: "Preview Needed Motion", exact: true })
   ).toBeVisible();
   await expect(main.getByRole("heading", { name: "QA Neon Portrait", exact: true })).toBeVisible();
+  const unavailablePreviewCard = main.locator("article").filter({ hasText: "QA Neon Portrait" });
+  await expect(
+    unavailablePreviewCard.getByText("Не удалось показать превью", { exact: true })
+  ).toBeVisible();
   await expect
     .poll(() =>
       hasCatalogQuery(apiState.catalogRequests, {

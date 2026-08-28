@@ -52,6 +52,8 @@ describe("template preview media URL exposure", () => {
     expect(secureMediaSource).toContain("const activeObjectUrlRef = useRef<string | null>(null);");
     expect(secureMediaSource).toContain("const revokeActiveObjectUrl = useCallback(");
     expect(secureMediaSource).toContain("const markRemoteMediaFailed = useCallback(");
+    expect(secureMediaSource).toContain("fallback?: ReactNode;");
+    expect(secureMediaSource).toContain("if (loadFailed && fallback) {");
     expect(secureMediaSource).toContain(
       "revokeActiveObjectUrl();\n        activeObjectUrlRef.current = createdObjectUrl;"
     );

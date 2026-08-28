@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
 import { isUnsafeAdminMediaHost } from "@/lib/admin-unsafe-remote-host";
 import { clientLogger } from "@/lib/client-logger";
@@ -23,6 +23,7 @@ type TemplateSecureMediaProps = {
   playsInline?: boolean;
   ariaHidden?: boolean;
   ariaLabel?: string;
+  fallback?: ReactNode;
   onLoadFailed?: () => void;
   logContext?: {
     templateId?: string;
@@ -76,6 +77,7 @@ export function TemplateSecureMedia({
   playsInline = false,
   ariaHidden = false,
   ariaLabel,
+  fallback,
   onLoadFailed,
   logContext,
 }: TemplateSecureMediaProps) {
@@ -218,6 +220,10 @@ export function TemplateSecureMedia({
   ]);
 
   if (!resolvedUrl) {
+    if (loadFailed && fallback) {
+      return fallback;
+    }
+
     return (
       <span
         className={className}
