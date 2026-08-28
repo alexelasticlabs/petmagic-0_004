@@ -51,7 +51,7 @@
   "templateOfTheDayFeedBadge": "Le choix du jour",
   "templateOfTheDayLoadFailed": "Impossible de charger le modèle du jour.",
   "allFilter": "Tous",
-  "templateFormatFilterLabel": "Format",
+  "templateFormatFilterLabel": "Type de média",
   "templateCategoryFilterLabel": "Catégorie",
   "videosFilter": "Vidéos",
   "imagesFilter": "Images",

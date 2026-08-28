@@ -178,7 +178,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get allFilter => 'Alle';
 
   @override
-  String get templateFormatFilterLabel => 'Format';
+  String get templateFormatFilterLabel => 'Medienformat';
 
   @override
   String get templateCategoryFilterLabel => 'Kategorie';

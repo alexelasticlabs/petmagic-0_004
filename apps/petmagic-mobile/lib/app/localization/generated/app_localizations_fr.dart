@@ -180,7 +180,7 @@ class AppLocalizationsFr extends AppLocalizations {
   String get allFilter => 'Tous';
 
   @override
-  String get templateFormatFilterLabel => 'Format';
+  String get templateFormatFilterLabel => 'Type de média';
 
   @override
   String get templateCategoryFilterLabel => 'Catégorie';
