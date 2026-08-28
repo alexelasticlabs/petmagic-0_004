@@ -9,6 +9,7 @@ import 'package:petmagic_mobile/app/router/go_router_app_navigator.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
+import 'package:petmagic_mobile/core/platform/app_runtime_info.dart';
 import 'package:petmagic_mobile/features/profile/domain/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
 import 'package:petmagic_mobile/features/profile/application/profile_controller.dart';
@@ -16,31 +17,47 @@ import 'package:petmagic_mobile/features/profile/presentation/profile_settings_d
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 
 void main() {
-  testWidgets(
-    'linked accounts screen shows value proposition and provider rows',
-    (tester) async {
-      await _pumpLinkedAccountsPage(
-        tester,
-        linkedAccounts: const <MobileLinkedAccount>[],
-      );
+  testWidgets('linked accounts screen hides Apple on Android', (tester) async {
+    await _pumpLinkedAccountsPage(
+      tester,
+      linkedAccounts: const <MobileLinkedAccount>[],
+    );
 
-      expect(find.text('Linked accounts'), findsOneWidget);
-      expect(
-        find.text(
-          'Connect Google or Apple to keep access to your generations, purchases, and PawSpark on any device.',
-        ),
-        findsOneWidget,
-      );
+    expect(find.text('Linked accounts'), findsOneWidget);
+    expect(
+      find.text(
+        'Connect Google to keep access to your generations, purchases, and PawSpark on any device.',
+      ),
+      findsOneWidget,
+    );
 
-      expect(find.text('Google'), findsOneWidget);
-      expect(find.text('Apple'), findsOneWidget);
-      expect(find.text('Email'), findsOneWidget);
-      expect(find.text('pet@example.com'), findsOneWidget);
+    expect(find.text('Google'), findsOneWidget);
+    expect(find.text('Apple'), findsNothing);
+    expect(find.text('Email'), findsOneWidget);
+    expect(find.text('pet@example.com'), findsOneWidget);
 
-      expect(find.text('Connect'), findsNWidgets(2));
-      expect(find.text('Change password'), findsOneWidget);
-    },
-  );
+    expect(find.text('Connect'), findsOneWidget);
+    expect(find.text('Change password'), findsOneWidget);
+  });
+
+  testWidgets('linked accounts screen shows Apple on iOS', (tester) async {
+    await _pumpLinkedAccountsPage(
+      tester,
+      linkedAccounts: const <MobileLinkedAccount>[],
+      runtimeInfo: const DefaultAppRuntimeInfo(
+        platform: AppRuntimePlatform.ios,
+      ),
+    );
+
+    expect(
+      find.text(
+        'Connect Google or Apple to keep access to your generations, purchases, and PawSpark on any device.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Apple'), findsOneWidget);
+    expect(find.text('Connect'), findsNWidgets(2));
+  });
 
   test(
     'linked accounts provider labels use localized short labels instead of api values',
@@ -96,7 +113,7 @@ void main() {
     expect(find.text('Connected and ready to sign in.'), findsNWidgets(2));
     expect(find.text('Disconnect'), findsOneWidget);
     expect(find.text('Change password'), findsOneWidget);
-    expect(find.text('Connect'), findsOneWidget);
+    expect(find.text('Connect'), findsNothing);
   });
 
   testWidgets('linked accounts screen shows retry on load failure', (
@@ -209,11 +226,15 @@ void main() {
 Future<void> _pumpLinkedAccountsPage(
   WidgetTester tester, {
   required List<MobileLinkedAccount> linkedAccounts,
+  AppRuntimeInfo runtimeInfo = const DefaultAppRuntimeInfo(
+    platform: AppRuntimePlatform.android,
+  ),
 }) async {
   final container = ProviderContainer(
     retry: (attempt, error) => null,
     overrides: [
       profileControllerProvider.overrideWith(_FakeProfileController.new),
+      appRuntimeInfoProvider.overrideWithValue(runtimeInfo),
       linkedAccountsProvider.overrideWith((ref) async => linkedAccounts),
     ],
   );

@@ -5,6 +5,7 @@ import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/errors/app_unavailable_state.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
+import 'package:petmagic_mobile/core/platform/app_runtime_info.dart';
 import 'package:petmagic_mobile/features/profile/application/external_auth_gateway.dart';
 import 'package:petmagic_mobile/features/profile/domain/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/application/profile_repository.dart';
@@ -44,6 +45,11 @@ class _ProfileLinkedAccountsSettingsSectionState
     final colors = context.petMagicColors;
     final state = ref.watch(profileControllerProvider);
     final profile = state.profile;
+    final appleSignInAvailable = ref.watch(
+      appRuntimeInfoProvider.select(
+        (runtimeInfo) => runtimeInfo.platform == AppRuntimePlatform.ios,
+      ),
+    );
     final hasInternet = ref.watch(
       networkStatusControllerProvider.select((status) => status.hasInternet),
     );
@@ -106,7 +112,12 @@ class _ProfileLinkedAccountsSettingsSectionState
         child: ListView(
           padding: EdgeInsets.fromLTRB(20, 18, 20, widget.bottomInset),
           children: [
-            _LinkedDetailHeader(title: widget.title, subtitle: widget.subtitle),
+            _LinkedDetailHeader(
+              title: widget.title,
+              subtitle: appleSignInAvailable
+                  ? text.profileDetailsLinkedAccountsBodyIos
+                  : widget.subtitle,
+            ),
             const SizedBox(height: 22),
             if (state.errorMessage != null) ...[
               ProfileGlassCard(
@@ -198,22 +209,23 @@ class _ProfileLinkedAccountsSettingsSectionState
                           .read(profileControllerProvider.notifier)
                           .unlinkExternalAccount(ExternalAuthProvider.google),
                     ),
-                    _LinkedAccountRow(
-                      providerLabel: text.authAppleShortLabel,
-                      icon: Icons.apple_rounded,
-                      account: _findLinkedAccount(
-                        linkedAccounts,
-                        ExternalAuthProvider.apple,
+                    if (appleSignInAvailable)
+                      _LinkedAccountRow(
+                        providerLabel: text.authAppleShortLabel,
+                        icon: Icons.apple_rounded,
+                        account: _findLinkedAccount(
+                          linkedAccounts,
+                          ExternalAuthProvider.apple,
+                        ),
+                        isBusy: state.isSaving,
+                        actionsEnabled: accountActionsEnabled,
+                        onConnect: () => ref
+                            .read(profileControllerProvider.notifier)
+                            .linkExternalAccount(ExternalAuthProvider.apple),
+                        onDisconnect: () => ref
+                            .read(profileControllerProvider.notifier)
+                            .unlinkExternalAccount(ExternalAuthProvider.apple),
                       ),
-                      isBusy: state.isSaving,
-                      actionsEnabled: accountActionsEnabled,
-                      onConnect: () => ref
-                          .read(profileControllerProvider.notifier)
-                          .linkExternalAccount(ExternalAuthProvider.apple),
-                      onDisconnect: () => ref
-                          .read(profileControllerProvider.notifier)
-                          .unlinkExternalAccount(ExternalAuthProvider.apple),
-                    ),
                     _LinkedAccountEmailRow(
                       email: profile?.email,
                       showDivider: false,

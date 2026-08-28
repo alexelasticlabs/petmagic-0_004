@@ -1964,6 +1964,10 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get profileDetailsLinkedAccountsBody =>
+      'Подключите Google, чтобы сохранить доступ к генерациям, покупкам и PawSpark на любом устройстве.';
+
+  @override
+  String get profileDetailsLinkedAccountsBodyIos =>
       'Подключите Google или Apple, чтобы сохранить доступ к генерациям, покупкам и PawSpark на любом устройстве.';
 
   @override

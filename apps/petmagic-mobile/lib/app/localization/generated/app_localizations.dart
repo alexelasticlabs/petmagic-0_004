@@ -3615,8 +3615,14 @@ abstract class AppLocalizations {
   /// No description provided for @profileDetailsLinkedAccountsBody.
   ///
   /// In en, this message translates to:
-  /// **'Connect Google or Apple to keep access to your generations, purchases, and PawSpark on any device.'**
+  /// **'Connect Google to keep access to your generations, purchases, and PawSpark on any device.'**
   String get profileDetailsLinkedAccountsBody;
+
+  /// No description provided for @profileDetailsLinkedAccountsBodyIos.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect Google or Apple to keep access to your generations, purchases, and PawSpark on any device.'**
+  String get profileDetailsLinkedAccountsBodyIos;
 
   /// No description provided for @profileDetailsLinkedAccountsStatus.
   ///

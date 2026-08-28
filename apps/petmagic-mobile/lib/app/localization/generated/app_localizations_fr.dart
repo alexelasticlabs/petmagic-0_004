@@ -1992,7 +1992,11 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get profileDetailsLinkedAccountsBody =>
-      'Les fournisseurs connectés apparaîtront ici dès que la liaison sera activée pour votre compte.';
+      'Connectez Google pour conserver l’accès à vos créations, achats et PawSpark sur tous vos appareils.';
+
+  @override
+  String get profileDetailsLinkedAccountsBodyIos =>
+      'Connectez Google ou Apple pour conserver l’accès à vos créations, achats et PawSpark sur tous vos appareils.';
 
   @override
   String get profileDetailsLinkedAccountsStatus =>

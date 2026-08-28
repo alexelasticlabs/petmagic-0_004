@@ -1970,6 +1970,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get profileDetailsLinkedAccountsBody =>
+      'Connect Google to keep access to your generations, purchases, and PawSpark on any device.';
+
+  @override
+  String get profileDetailsLinkedAccountsBodyIos =>
       'Connect Google or Apple to keep access to your generations, purchases, and PawSpark on any device.';
 
   @override

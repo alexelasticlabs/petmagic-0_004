@@ -1984,7 +1984,11 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get profileDetailsLinkedAccountsBody =>
-      'Verbundene Anbieter werden hier angezeigt, sobald die Verknüpfung für Ihr Konto aktiviert ist.';
+      'Verbinden Sie Google, um den Zugriff auf Ihre Kreationen, Käufe und PawSpark auf jedem Gerät zu behalten.';
+
+  @override
+  String get profileDetailsLinkedAccountsBodyIos =>
+      'Verbinden Sie Google oder Apple, um den Zugriff auf Ihre Kreationen, Käufe und PawSpark auf jedem Gerät zu behalten.';
 
   @override
   String get profileDetailsLinkedAccountsStatus =>
