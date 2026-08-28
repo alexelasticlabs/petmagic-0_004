@@ -18,6 +18,9 @@ import 'package:visibility_detector/visibility_detector.dart';
 part 'template_of_the_day_card_chrome.part.dart';
 part 'template_of_the_day_card_media.part.dart';
 
+/// Shared by every card in the templates catalogue: a portrait 2:3 frame.
+const double templateCardAspectRatio = 2 / 3;
+
 class TemplateOfTheDayCard extends StatelessWidget {
   const TemplateOfTheDayCard({
     required this.template,
@@ -53,13 +56,12 @@ class TemplateOfTheDayCard extends StatelessWidget {
     final visibleTags = template.tags.take(3).toList(growable: false);
     return LayoutBuilder(
       builder: (context, constraints) {
-        final height = constraints.maxWidth < 340 ? 208.0 : 232.0;
         return PetMagicInteractiveSurface(
           onTap: onPressed,
           borderRadius: BorderRadius.circular(22),
           scaleDown: 0.985,
-          child: SizedBox(
-            height: height,
+          child: AspectRatio(
+            aspectRatio: templateCardAspectRatio,
             child: DecoratedBox(
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(22),

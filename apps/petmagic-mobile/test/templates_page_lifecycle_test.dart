@@ -1054,102 +1054,107 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('templates page shows template of the day above the grid', (
-    tester,
-  ) async {
-    final featured = TemplateOfTheDayItem(
-      templateId: 'template-2',
-      title: 'Daily portrait',
-      subtitle: 'Today magic idea',
-      badgeText: 'Template of the Day',
-      templateType: TemplateType.image,
-      isPremium: false,
-      requiredPlan: 'free',
-      date: DateTime.utc(2026, 6, 14),
-      source: 'manual',
-      category: 'Portrait',
-      tags: const ['daily', 'portrait'],
-      tokenCost: 5,
-    );
-    final controller = FakeTemplatesController(
-      items: [
-        templateFixture('template-1', 'Template 1'),
-        templateFixture('template-2', 'Daily portrait'),
-      ],
-      templateOfTheDay: featured,
-    );
-
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          appLaunchControllerProvider.overrideWith(
-            AuthenticatedAppLaunchController.new,
-          ),
-          walletControllerProvider.overrideWith(IdleWalletController.new),
-          templatesControllerProvider.overrideWith(() => controller),
-          realtimeClientProvider.overrideWith(
-            (ref) => const NoopRealtimeClient(),
-          ),
+  testWidgets(
+    'templates page shows template of the day as the first grid card',
+    (tester) async {
+      final featured = TemplateOfTheDayItem(
+        templateId: 'template-2',
+        title: 'Daily portrait',
+        subtitle: 'Today magic idea',
+        badgeText: 'Template of the Day',
+        templateType: TemplateType.image,
+        isPremium: false,
+        requiredPlan: 'free',
+        date: DateTime.utc(2026, 6, 14),
+        source: 'manual',
+        category: 'Portrait',
+        tags: const ['daily', 'portrait'],
+        tokenCost: 5,
+      );
+      final controller = FakeTemplatesController(
+        items: [
+          templateFixture('template-1', 'Template 1'),
+          templateFixture('template-2', 'Daily portrait'),
         ],
-        child: MaterialApp(
-          theme: AppTheme.light(),
-          locale: const Locale('ru'),
-          localizationsDelegates: const [
-            AppLocalizations.delegate,
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
+        templateOfTheDay: featured,
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appLaunchControllerProvider.overrideWith(
+              AuthenticatedAppLaunchController.new,
+            ),
+            walletControllerProvider.overrideWith(IdleWalletController.new),
+            templatesControllerProvider.overrideWith(() => controller),
+            realtimeClientProvider.overrideWith(
+              (ref) => const NoopRealtimeClient(),
+            ),
           ],
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: const Scaffold(body: TemplatesPage()),
+          child: MaterialApp(
+            theme: AppTheme.light(),
+            locale: const Locale('ru'),
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: const Scaffold(body: TemplatesPage()),
+          ),
         ),
-      ),
-    );
-    await tester.pump();
-    await tester.pump();
+      );
+      await tester.pump();
+      await tester.pump();
 
-    final context = tester.element(find.byType(TemplatesPage));
-    final text = AppLocalizations.of(context);
+      final context = tester.element(find.byType(TemplatesPage));
+      final text = AppLocalizations.of(context);
 
-    final featuredCard = tester.widget<TemplateOfTheDayCard>(
-      find.byType(TemplateOfTheDayCard),
-    );
-    final visibleCards = tester.widgetList<TemplateCard>(
-      find.byType(TemplateCard),
-    );
+      final featuredCard = tester.widget<TemplateOfTheDayCard>(
+        find.byType(TemplateOfTheDayCard),
+      );
+      final visibleCards = tester.widgetList<TemplateCard>(
+        find.byType(TemplateCard),
+      );
 
-    expect(featuredCard.template.templateId, 'template-2');
-    expect(featuredCard.template.tokenCost, 5);
-    expect(
-      tester.getSize(find.byType(TemplateOfTheDayCard)).width,
-      greaterThan(300),
-    );
-    expect(visibleCards.single.template.templateId, 'template-1');
-    expect(find.text('Daily portrait'), findsOneWidget);
-    expect(find.textContaining('#daily'), findsOneWidget);
-    expect(
-      find.descendant(
-        of: find.byType(TemplateOfTheDayCard),
-        matching: find.text(text.templateOfTheDayTitle),
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(
-        of: find.byType(TemplateOfTheDayCard),
-        matching: find.text('Template of the Day'),
-      ),
-      findsNothing,
-    );
-    expect(find.text('5 ${text.walletBalanceUnit}'), findsOneWidget);
-    expect(
-      find.descendant(
-        of: find.byType(TemplateOfTheDayCard),
-        matching: find.text(text.templateOfTheDayTryAction),
-      ),
-      findsOneWidget,
-    );
-  });
+      expect(featuredCard.template.templateId, 'template-2');
+      expect(featuredCard.template.tokenCost, 5);
+      final featuredCardSize = tester.getSize(
+        find.byType(TemplateOfTheDayCard),
+      );
+      expect(featuredCardSize.width, greaterThan(0));
+      expect(
+        featuredCardSize.height,
+        closeTo(featuredCardSize.width * 1.5, 0.1),
+      );
+      expect(visibleCards.single.template.templateId, 'template-1');
+      expect(find.text('Daily portrait'), findsOneWidget);
+      expect(find.textContaining('#daily'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(TemplateOfTheDayCard),
+          matching: find.text(text.templateOfTheDayTitle),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byType(TemplateOfTheDayCard),
+          matching: find.text('Template of the Day'),
+        ),
+        findsNothing,
+      );
+      expect(find.text('5 ${text.walletBalanceUnit}'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(TemplateOfTheDayCard),
+          matching: find.text(text.templateOfTheDayTryAction),
+        ),
+        findsOneWidget,
+      );
+    },
+  );
 
   testWidgets(
     'template feed promotes template of the day and removes duplicate',

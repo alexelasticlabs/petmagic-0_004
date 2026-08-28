@@ -157,19 +157,19 @@ class _TemplateOfTheDayBadge extends StatelessWidget {
         border: Border.all(color: colors.border.withValues(alpha: 0.48)),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 11, color: foreground),
-            const SizedBox(width: 4),
+            Icon(icon, size: 10, color: foreground),
+            const SizedBox(width: 3),
             Text(
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: foreground,
-                fontSize: 9.5,
+                fontSize: 9,
                 fontWeight: FontWeight.w900,
                 height: 1,
               ),
@@ -200,12 +200,12 @@ class _TemplateOfTheDayAction extends StatelessWidget {
           borderRadius: BorderRadius.circular(999),
         ),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.arrow_forward_rounded, size: 13, color: textColor),
-              const SizedBox(width: 5),
+              Icon(Icons.arrow_forward_rounded, size: 12, color: textColor),
+              const SizedBox(width: 4),
               Flexible(
                 child: Text(
                   label,
@@ -213,7 +213,7 @@ class _TemplateOfTheDayAction extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: textColor,
-                    fontSize: 10.5,
+                    fontSize: 9.5,
                     fontWeight: FontWeight.w900,
                     height: 1,
                   ),

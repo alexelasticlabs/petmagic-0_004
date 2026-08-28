@@ -171,6 +171,7 @@ class _TemplateFeedSliversState extends ConsumerState<_TemplateFeedSlivers> {
       searchQuery: widget.searchQuery,
     );
     final visibleEntries = <_TemplateGridEntry>[
+      ?featuredEntry,
       for (final template in state.items)
         if (featuredEntry == null ||
             template.templateId != featuredEntry.template.templateId)
@@ -179,21 +180,8 @@ class _TemplateFeedSliversState extends ConsumerState<_TemplateFeedSlivers> {
 
     return SliverMainAxisGroup(
       slivers: [
-        if (featuredEntry != null)
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(6, 8, 6, 6),
-              child: TemplateOfTheDayCard(
-                template: featuredEntry.templateOfTheDay!,
-                hasPremiumAccess: hasPremiumAccess,
-                onPressed: () => widget.onTemplateOfTheDaySelected(
-                  featuredEntry.templateOfTheDay!,
-                ),
-              ),
-            ),
-          ),
         SliverPadding(
-          padding: const EdgeInsets.fromLTRB(6, 2, 6, 6),
+          padding: const EdgeInsets.fromLTRB(6, 8, 6, 6),
           sliver: SliverLayoutBuilder(
             builder: (context, constraints) {
               final logicalCardWidth = (constraints.crossAxisExtent - 5) / 2;
@@ -209,12 +197,26 @@ class _TemplateFeedSliversState extends ConsumerState<_TemplateFeedSlivers> {
                   crossAxisCount: 2,
                   crossAxisSpacing: 5,
                   mainAxisSpacing: 6,
-                  childAspectRatio: 0.72,
+                  childAspectRatio: templateCardAspectRatio,
                 ),
                 itemBuilder: (context, index) {
                   final entry = visibleEntries[index];
                   final template = entry.template;
                   final featured = entry.templateOfTheDay;
+                  if (featured != null) {
+                    return TemplateOfTheDayCard(
+                      key: ValueKey(
+                        _templateCardIdentity(
+                          template: template,
+                          featured: featured,
+                        ),
+                      ),
+                      template: featured,
+                      hasPremiumAccess: hasPremiumAccess,
+                      onPressed: () =>
+                          widget.onTemplateOfTheDaySelected(featured),
+                    );
+                  }
                   final templateIdentity = _templateCardIdentity(
                     template: template,
                     featured: featured,
