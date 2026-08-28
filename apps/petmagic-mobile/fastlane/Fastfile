@@ -22,7 +22,7 @@ platform :android do
       track: ENV.fetch("SOURCE_TRACK", "internal"),
       track_promote_to: ENV.fetch("TARGET_TRACK"),
       version_code: ENV.fetch("VERSION_CODE").to_i,
-      rollout: ENV.fetch("ROLLOUT", "1.0").to_f,
+      rollout: ENV.fetch("ROLLOUT", "1.0"),
       json_key: ENV.fetch("GOOGLE_PLAY_JSON_KEY_PATH"),
       skip_upload_metadata: true,
       skip_upload_images: true,
