@@ -37,6 +37,8 @@ public sealed class AdminNotificationOutboxTopologyTests
         Assert.Contains("generation.refund_exhausted", templates, StringComparison.Ordinal);
         Assert.Contains("economy.incident.detected", economy, StringComparison.Ordinal);
         Assert.Contains("DeduplicationKey", support, StringComparison.Ordinal);
+        Assert.Contains("hasText", support, StringComparison.Ordinal);
+        Assert.Contains("attachmentCount", support, StringComparison.Ordinal);
         Assert.Contains("DeduplicationKey", templates, StringComparison.Ordinal);
         Assert.Contains("DeduplicationKey", economy, StringComparison.Ordinal);
     }

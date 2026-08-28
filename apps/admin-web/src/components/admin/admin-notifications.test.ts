@@ -43,8 +43,24 @@ describe("server-backed admin notifications", () => {
 
     expect(ru.title).toBe("Новое сообщение в поддержке");
     expect(ru.message).toContain("1234…9012");
+    expect(ru.message).toContain("Пользователь написал сообщение.");
     expect(en.title).toBe("New support message");
     expect(unknown).toMatchObject({ category: "economy", tone: "error" });
+  });
+
+  it("distinguishes text messages from attachments without exposing customer content", () => {
+    const attachmentOnly = localizeAdminNotification(
+      event({ payload: { conversationId: "conversation-1", hasText: false, attachmentCount: 4 } }),
+      "ru"
+    );
+    const textWithAttachment = localizeAdminNotification(
+      event({ payload: { conversationId: "conversation-1", hasText: true, attachmentCount: 1 } }),
+      "en"
+    );
+
+    expect(attachmentOnly.message).toContain("Пользователь прикрепил 4 файла.");
+    expect(textWithAttachment.message).toContain("The customer sent a message with 1 file.");
+    expect(attachmentOnly.message).not.toContain("messageId");
   });
 
   it("keeps operator copy first and technical detail secondary", () => {

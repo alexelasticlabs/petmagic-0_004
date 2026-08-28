@@ -147,16 +147,20 @@ export function localizeAdminNotification(
   const payload = event.payload;
   const id = (key: string) => compactId(payload[key]);
   switch (event.type) {
-    case "support.message.received":
+    case "support.message.received": {
+      const attachmentCount = getBoundedPayloadCount(payload.attachmentCount);
+      const hasText = payload.hasText !== false;
+      const receivedWhat = formatSupportNotificationContent({ attachmentCount, hasText, locale });
       return {
         title: locale === "ru" ? "Новое сообщение в поддержке" : "New support message",
         message:
           locale === "ru"
-            ? `Диалог ${id("conversationId")} ждёт ответа оператора.`
-            : `Conversation ${id("conversationId")} is waiting for an operator response.`,
+            ? `${receivedWhat} Диалог ${id("conversationId")} ждёт ответа оператора.`
+            : `${receivedWhat} Conversation ${id("conversationId")} is waiting for an operator response.`,
         category: "support",
         tone: "info",
       };
+    }
     case "generation.failed":
       return {
         title: locale === "ru" ? "Генерация завершилась ошибкой" : "Generation failed",
@@ -403,6 +407,42 @@ function localizeHref(href: string | null | undefined, locale: "ru" | "en") {
 
 function safePayloadText(value: unknown) {
   return typeof value === "string" ? sanitizeAdminNotificationText(value, 80) : "—";
+}
+
+function getBoundedPayloadCount(value: unknown): number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0
+    ? Math.min(value, 99)
+    : 0;
+}
+
+function formatSupportNotificationContent({
+  attachmentCount,
+  hasText,
+  locale,
+}: {
+  attachmentCount: number;
+  hasText: boolean;
+  locale: "ru" | "en";
+}) {
+  if (attachmentCount === 0) {
+    return locale === "ru" ? "Пользователь написал сообщение." : "The customer sent a message.";
+  }
+
+  const attachmentLabel =
+    locale === "ru"
+      ? `Пользователь ${hasText ? "написал сообщение и прикрепил" : "прикрепил"} ${attachmentCount} ${formatRussianAttachmentWord(attachmentCount)}.`
+      : `The customer ${hasText ? "sent a message with" : "attached"} ${attachmentCount} ${attachmentCount === 1 ? "file" : "files"}.`;
+
+  return attachmentLabel;
+}
+
+function formatRussianAttachmentWord(count: number) {
+  const lastTwoDigits = count % 100;
+  const lastDigit = count % 10;
+  if (lastTwoDigits >= 11 && lastTwoDigits <= 14) return "файлов";
+  if (lastDigit === 1) return "файл";
+  if (lastDigit >= 2 && lastDigit <= 4) return "файла";
+  return "файлов";
 }
 
 function compactId(value: unknown) {

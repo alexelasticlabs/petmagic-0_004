@@ -207,7 +207,9 @@ public sealed partial class SupportChatService
                 supportChatDbContext,
                 conversation.Id,
                 message.Id,
-                message.CreatedAtUtc);
+                message.CreatedAtUtc,
+                hasText: !string.IsNullOrWhiteSpace(body),
+                attachmentCount: normalizedAttachments.Count);
         }
 
         await supportChatDbContext.SaveChangesAsync(cancellationToken);
@@ -338,7 +340,9 @@ public sealed partial class SupportChatService
                 supportChatDbContext,
                 conversation.Id,
                 message.Id,
-                message.CreatedAtUtc);
+                message.CreatedAtUtc,
+                hasText: !string.IsNullOrWhiteSpace(command.Body),
+                attachmentCount: 1);
         }
 
         await supportChatDbContext.SaveChangesAsync(cancellationToken);

@@ -75,8 +75,11 @@ internal sealed class SupportChatPushNotificationOutbox(
         SupportChatDbContext dbContext,
         Guid conversationId,
         Guid messageId,
-        DateTime occurredAtUtc)
+        DateTime occurredAtUtc,
+        bool hasText,
+        int attachmentCount)
     {
+        var normalizedAttachmentCount = Math.Max(0, attachmentCount);
         var deduplicationKey = $"support_admin_notification:{messageId:D}";
         if (dbContext.PushOutboxMessages.Local.Any(x => x.DeduplicationKey == deduplicationKey))
         {
@@ -90,6 +93,8 @@ internal sealed class SupportChatPushNotificationOutbox(
             {
                 conversationId,
                 messageId,
+                hasText,
+                attachmentCount = normalizedAttachmentCount,
             }, JsonOptions),
             "support",
             AdminNotificationPriorities.Normal,
