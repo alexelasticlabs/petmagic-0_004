@@ -172,8 +172,8 @@ class _LanguageTile extends StatelessWidget {
   }
 }
 
-class _ThemeChip extends StatelessWidget {
-  const _ThemeChip({
+class _ThemeModeTile extends StatelessWidget {
+  const _ThemeModeTile({
     required this.label,
     required this.icon,
     required this.isSelected,
@@ -189,45 +189,57 @@ class _ThemeChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 2),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          curve: Curves.easeOut,
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
+    return Semantics(
+      button: true,
+      selected: isSelected,
+      label: label,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            curve: Curves.easeOut,
+            height: 64,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
               color: isSelected
-                  ? colors.accent.withValues(alpha: 0.56)
-                  : colors.border.withValues(alpha: 0.62),
+                  ? colors.accent.withValues(alpha: 0.14)
+                  : Colors.transparent,
             ),
-            color: isSelected
-                ? colors.accent.withValues(alpha: 0.18)
-                : Colors.transparent,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                icon,
-                size: 20,
-                color: isSelected ? colors.accent : colors.textMuted,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: isSelected ? colors.accent : colors.textSoft,
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w700,
+            child: Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: (isSelected ? colors.accent : colors.textMuted)
+                        .withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    icon,
+                    size: 21,
+                    color: isSelected ? colors.accent : colors.textMuted,
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      color: isSelected ? colors.textStrong : colors.textSoft,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                if (isSelected)
+                  Icon(Icons.check_rounded, color: colors.accent, size: 22),
+              ],
+            ),
           ),
         ),
       ),

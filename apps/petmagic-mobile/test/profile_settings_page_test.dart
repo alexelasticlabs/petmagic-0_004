@@ -106,6 +106,14 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text(text.profileSettingsThemeDark), findsOneWidget);
+    expect(find.byIcon(Icons.close_rounded), findsOneWidget);
+    expect(find.text(text.walletRedeemCancelAction), findsNothing);
+    final bottomSheets = find.byType(BottomSheet);
+    expect(
+      tester.getTopLeft(bottomSheets.last).dy,
+      0,
+      reason: 'Theme selection must begin at the top edge of the screen.',
+    );
 
     await tester.tap(find.text(text.profileSettingsThemeDark));
     await tester.pumpAndSettle();

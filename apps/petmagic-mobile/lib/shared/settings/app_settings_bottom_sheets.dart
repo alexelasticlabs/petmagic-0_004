@@ -177,6 +177,10 @@ Future<void> showProfileThemeSheet({
 }) {
   final colors = context.petMagicColors;
   final text = AppLocalizations.of(context);
+  final screenHeight = Overlay.of(
+    context,
+    rootOverlay: true,
+  ).context.size!.height;
 
   final options = [
     (
@@ -200,82 +204,87 @@ Future<void> showProfileThemeSheet({
     context: context,
     backgroundColor: Colors.transparent,
     isScrollControlled: true,
+    constraints: BoxConstraints.tightFor(height: screenHeight),
     builder: (sheetContext, bottomInset) {
+      final sheetHeight = screenHeight - bottomInset;
+
       return _ProfileSettingsSheetShell(
         bottomInset: bottomInset,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const _SheetHandle(),
-            const SizedBox(height: 18),
-            Text(
-              text.profileSettingsThemeTitle,
-              style: TextStyle(
-                color: colors.textStrong,
-                fontSize: 36,
-                fontWeight: FontWeight.w900,
-                height: 1.05,
-              ),
-            ),
-            const SizedBox(height: 14),
-            Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(
-                  color: colors.border.withValues(alpha: 0.78),
-                ),
-                color: colors.surfaceStrong.withValues(alpha: 0.46),
-              ),
-              child: Row(
+        horizontalInset: 0,
+        topInset: 0,
+        borderRadius: 0,
+        contentPadding: EdgeInsets.zero,
+        child: SizedBox(
+          height: sheetHeight,
+          child: SafeArea(
+            top: true,
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  for (final option in options)
-                    Expanded(
-                      child: _ThemeChip(
-                        label: option.label,
-                        icon: option.icon,
-                        isSelected: selectedThemeMode == option.mode,
-                        onTap: () async {
-                          await onSelect(option.mode);
-                          if (sheetContext.mounted) {
-                            Navigator.of(sheetContext).pop();
-                          }
-                        },
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          text.profileSettingsThemeTitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: colors.textStrong,
+                            fontSize: 26,
+                            fontWeight: FontWeight.w800,
+                            height: 1.15,
+                          ),
+                        ),
                       ),
+                      IconButton(
+                        onPressed: () => Navigator.of(sheetContext).pop(),
+                        icon: Icon(
+                          Icons.close_rounded,
+                          color: colors.textSoft,
+                          size: 24,
+                        ),
+                        tooltip: MaterialLocalizations.of(
+                          sheetContext,
+                        ).closeButtonTooltip,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    text.profileSettingsThemeSubtitle,
+                    style: TextStyle(
+                      color: colors.textSoft,
+                      fontSize: 15,
+                      height: 1.4,
+                      fontWeight: FontWeight.w500,
                     ),
+                  ),
+                  const SizedBox(height: 20),
+                  for (var index = 0; index < options.length; index++) ...[
+                    _ThemeModeTile(
+                      label: options[index].label,
+                      icon: options[index].icon,
+                      isSelected: selectedThemeMode == options[index].mode,
+                      onTap: () async {
+                        await onSelect(options[index].mode);
+                        if (sheetContext.mounted) {
+                          Navigator.of(sheetContext).pop();
+                        }
+                      },
+                    ),
+                    if (index < options.length - 1)
+                      Divider(
+                        height: 1,
+                        color: colors.border.withValues(alpha: 0.55),
+                      ),
+                  ],
                 ],
               ),
             ),
-            const SizedBox(height: 20),
-            Center(
-              child: Icon(
-                Icons.brightness_6_rounded,
-                size: 26,
-                color: colors.textMuted,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Center(
-              child: Text(
-                text.profileSettingsThemeSubtitle,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: colors.textSoft,
-                  fontSize: 15,
-                  height: 1.4,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-            const SizedBox(height: 6),
-            Center(
-              child: TextButton(
-                onPressed: () => Navigator.of(sheetContext).pop(),
-                child: Text(text.walletRedeemCancelAction),
-              ),
-            ),
-          ],
+          ),
         ),
       );
     },
