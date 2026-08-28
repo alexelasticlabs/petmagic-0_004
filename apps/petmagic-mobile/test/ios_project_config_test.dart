@@ -144,6 +144,16 @@ void main() {
     expect(project, contains('PrivacyInfo.xcprivacy in Resources'));
   });
 
+  test('iOS release declares only exempt encryption for TestFlight', () {
+    final infoPlist = File('ios/Runner/Info.plist').readAsStringSync();
+
+    expect(infoPlist, contains('<key>ITSAppUsesNonExemptEncryption</key>'));
+    expect(
+      infoPlist,
+      contains('<key>ITSAppUsesNonExemptEncryption</key>\n\t<false/>'),
+    );
+  });
+
   test('mobile release configuration allows portrait and landscape', () {
     final mainSource = File('lib/main.dart').readAsStringSync();
     final androidManifest = File(
