@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 import 'package:petmagic_mobile/core/operations/request_cancellation.dart';
 import 'package:flutter/material.dart';
@@ -14,6 +16,20 @@ import 'package:petmagic_mobile/features/profile/application/profile_controller.
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_detail_page.dart';
 
 void main() {
+  test('legal detail keeps only the acceptance date as status metadata', () {
+    final source = File(
+      'lib/features/profile/presentation/profile_settings_detail_legal_content.part.dart',
+    ).readAsStringSync();
+
+    expect(source, contains('_LegalConsentStatusCard'));
+    expect(source, contains('termsOfUseAcceptedAtUtc'));
+    expect(source, contains('privacyPolicyAcceptedAtUtc'));
+    expect(source, contains('profileLegalAcceptedAtLabel'));
+    expect(source, isNot(contains('profileLegalVersionLabel')));
+    expect(source, isNot(contains('profileLegalPublishedLabel')));
+    expect(source, isNot(contains('profileLegalAcceptedVersionLabel')));
+  });
+
   testWidgets(
     'legal detail stays offline without loading and retries on reconnect',
     (tester) async {

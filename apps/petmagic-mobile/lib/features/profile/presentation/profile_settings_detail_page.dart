@@ -331,17 +331,6 @@ bool _profileSettingsDetailRequiresAuth(ProfileSettingsDetailKind kind) {
   };
 }
 
-MobileLegalDocument? _documentFromValueOrNull(
-  ProfileSettingsDetailKind kind,
-  MobileLegalDocuments? value,
-) {
-  if (value == null) {
-    return null;
-  }
-
-  return _documentFromValue(kind, value);
-}
-
 MobileLegalDocument _documentFromValue(
   ProfileSettingsDetailKind kind,
   MobileLegalDocuments value,
@@ -359,64 +348,4 @@ String _formatDate(DateTime? value, Locale locale) {
   return DateFormat.yMMMd(
     locale.toLanguageTag(),
   ).add_Hm().format(value.toLocal());
-}
-
-class _InfoRow extends StatelessWidget {
-  const _InfoRow({
-    required this.label,
-    required this.value,
-    this.showDivider = true,
-  });
-
-  final String label;
-  final String value;
-  final bool showDivider;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.petMagicColors;
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        border: showDivider
-            ? Border(
-                bottom: BorderSide(
-                  color: colors.border.withValues(alpha: 0.75),
-                ),
-              )
-            : null,
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  color: colors.textMuted,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-            const SizedBox(width: 18),
-            Expanded(
-              child: Text(
-                value,
-                textAlign: TextAlign.right,
-                style: TextStyle(
-                  color: colors.textStrong,
-                  fontSize: 14,
-                  height: 1.35,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }

@@ -2143,13 +2143,10 @@ class AppLocalizationsRu extends AppLocalizations {
       'Этому аккаунту нужно принять актуальные версии юридических документов.';
 
   @override
-  String get profileLegalVersionLabel => 'Текущая версия';
+  String get profileLegalConsentAcceptedTitle => 'Согласие подтверждено';
 
   @override
-  String get profileLegalPublishedLabel => 'Опубликовано';
-
-  @override
-  String get profileLegalAcceptedVersionLabel => 'Принятая версия';
+  String get profileLegalConsentRequiredTitle => 'Требуется согласие';
 
   @override
   String get profileLegalAcceptedAtLabel => 'Дата принятия';

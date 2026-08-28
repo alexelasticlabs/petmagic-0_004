@@ -33,6 +33,11 @@ class _ProfileSettingsLegalDetailContent extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
+    final acceptedAt = kind == ProfileSettingsDetailKind.terms
+        ? profile?.legalAcceptance.termsOfUseAcceptedAtUtc
+        : profile?.legalAcceptance.privacyPolicyAcceptedAtUtc;
+    final hasAcceptedCurrentDocuments =
+        profile?.legalAcceptance.isCurrentAccepted == true;
 
     return ProfileScreenBackground(
       child: SafeArea(
@@ -56,53 +61,12 @@ class _ProfileSettingsLegalDetailContent extends ConsumerWidget {
               const SizedBox(height: 18),
             ],
             ProfileSectionLabel(label: text.profileDetailsCurrentStatusSection),
-            ProfileGlassCard(
-              padding: EdgeInsets.zero,
-              child: Column(
-                children: [
-                  _InfoRow(
-                    label: text.profileAccountConsentLabel,
-                    value: profile?.legalAcceptance.isCurrentAccepted == true
-                        ? text.profileLegalAcceptanceCurrent
-                        : text.profileLegalAcceptanceRequired,
-                  ),
-                  _InfoRow(
-                    label: text.profileLegalVersionLabel,
-                    value:
-                        _documentFromValueOrNull(kind, documents)?.version ??
-                        '—',
-                  ),
-                  _InfoRow(
-                    label: text.profileLegalPublishedLabel,
-                    value: _formatDate(
-                      _documentFromValueOrNull(kind, documents)?.publishedAtUtc,
-                      locale,
-                    ),
-                  ),
-                  _InfoRow(
-                    label: text.profileLegalAcceptedVersionLabel,
-                    value: kind == ProfileSettingsDetailKind.terms
-                        ? (profile?.legalAcceptance.termsOfUseAcceptedVersion ??
-                              '—')
-                        : (profile
-                                  ?.legalAcceptance
-                                  .privacyPolicyAcceptedVersion ??
-                              '—'),
-                  ),
-                  _InfoRow(
-                    label: text.profileLegalAcceptedAtLabel,
-                    value: _formatDate(
-                      kind == ProfileSettingsDetailKind.terms
-                          ? profile?.legalAcceptance.termsOfUseAcceptedAtUtc
-                          : profile?.legalAcceptance.privacyPolicyAcceptedAtUtc,
-                      locale,
-                    ),
-                    showDivider: false,
-                  ),
-                ],
-              ),
+            _LegalConsentStatusCard(
+              accepted: hasAcceptedCurrentDocuments,
+              acceptedAt: acceptedAt,
+              locale: locale,
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 24),
             if (documents == null && !hasInternet) ...[
               PetMagicUnavailableView(
                 kind: AppUnavailableKind.offline,
@@ -206,6 +170,85 @@ class _ProfileSettingsLegalDetailContent extends ConsumerWidget {
               },
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _LegalConsentStatusCard extends StatelessWidget {
+  const _LegalConsentStatusCard({
+    required this.accepted,
+    required this.acceptedAt,
+    required this.locale,
+  });
+
+  final bool accepted;
+  final DateTime? acceptedAt;
+  final Locale locale;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
+    final tone = accepted ? colors.accent : colors.gold;
+
+    return ProfileGlassCard(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: tone.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(
+              accepted ? Icons.verified_rounded : Icons.info_outline_rounded,
+              color: tone,
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  accepted
+                      ? text.profileLegalConsentAcceptedTitle
+                      : text.profileLegalConsentRequiredTitle,
+                  style: TextStyle(
+                    color: colors.textStrong,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                if (accepted) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    text.profileLegalAcceptedAtLabel,
+                    style: TextStyle(
+                      color: colors.textMuted,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _formatDate(acceptedAt, locale),
+                    style: TextStyle(
+                      color: colors.textSoft,
+                      fontSize: 14,
+                      height: 1.35,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

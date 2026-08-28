@@ -3906,23 +3906,17 @@ abstract class AppLocalizations {
   /// **'This account needs to accept the current legal document versions.'**
   String get profileLegalAcceptanceRequired;
 
-  /// No description provided for @profileLegalVersionLabel.
+  /// No description provided for @profileLegalConsentAcceptedTitle.
   ///
   /// In en, this message translates to:
-  /// **'Current version'**
-  String get profileLegalVersionLabel;
+  /// **'Consent confirmed'**
+  String get profileLegalConsentAcceptedTitle;
 
-  /// No description provided for @profileLegalPublishedLabel.
+  /// No description provided for @profileLegalConsentRequiredTitle.
   ///
   /// In en, this message translates to:
-  /// **'Published'**
-  String get profileLegalPublishedLabel;
-
-  /// No description provided for @profileLegalAcceptedVersionLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Accepted version'**
-  String get profileLegalAcceptedVersionLabel;
+  /// **'Consent required'**
+  String get profileLegalConsentRequiredTitle;
 
   /// No description provided for @profileLegalAcceptedAtLabel.
   ///

@@ -2146,13 +2146,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'This account needs to accept the current legal document versions.';
 
   @override
-  String get profileLegalVersionLabel => 'Current version';
+  String get profileLegalConsentAcceptedTitle => 'Consent confirmed';
 
   @override
-  String get profileLegalPublishedLabel => 'Published';
-
-  @override
-  String get profileLegalAcceptedVersionLabel => 'Accepted version';
+  String get profileLegalConsentRequiredTitle => 'Consent required';
 
   @override
   String get profileLegalAcceptedAtLabel => 'Accepted at';
