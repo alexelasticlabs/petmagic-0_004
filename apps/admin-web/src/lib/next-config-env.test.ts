@@ -194,6 +194,8 @@ describe("next admin env config", () => {
     expect(compose).toContain("ADMIN_WEB_ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION:-false");
     expect(compose).toContain("BACKEND_PUBLIC_BASE_URL is required for public backend media URLs");
     expect(compose).toContain("BACKEND_PUBLIC_BASE_URL is required for public template media URLs");
+    expect(compose).toContain("TEMPLATES_R2_PUBLIC_BASE_URL:");
+    expect(compose).toContain("R2_PUBLIC_URL is required for template media CSP");
     expect(compose).toContain("${DOCKER_BIND_ADDRESS:-127.0.0.1}:${POSTGRES_HOST_PORT:-5432}:5432");
     expect(compose).toContain(
       "${DOCKER_BIND_ADDRESS:-127.0.0.1}:${MAILPIT_WEB_HOST_PORT:-8025}:8025"

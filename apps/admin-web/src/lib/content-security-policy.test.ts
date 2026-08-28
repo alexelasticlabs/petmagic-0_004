@@ -8,7 +8,9 @@ describe("buildNonceContentSecurityPolicy", () => {
       "nonce-value_123",
       "https://api.petgpt.app",
       "production",
-      "https://cdn.petgpt.app, https://pub-123.r2.dev"
+      "https://cdn.petgpt.app",
+      false,
+      "https://pub-123.r2.dev/templates-media"
     );
 
     expect(policy).toContain("script-src 'self' 'nonce-nonce-value_123' 'strict-dynamic'");
@@ -67,6 +69,35 @@ describe("buildNonceContentSecurityPolicy", () => {
         )
       ).toThrow();
     }
+  });
+
+  it("uses only the origin from a path-based R2 public URL", () => {
+    const policy = buildNonceContentSecurityPolicy(
+      "nonce-value",
+      "https://api.petgpt.app",
+      "production",
+      "https://cdn.petgpt.app",
+      false,
+      "https://media.petgpt.app/r2/templates"
+    );
+
+    expect(policy).toContain(
+      "img-src 'self' data: blob: https://api.petgpt.app https://cdn.petgpt.app https://media.petgpt.app"
+    );
+    expect(policy).not.toContain("https://media.petgpt.app/r2/templates");
+  });
+
+  it("rejects an unsafe production R2 public URL", () => {
+    expect(() =>
+      buildNonceContentSecurityPolicy(
+        "nonce-value",
+        "https://api.petgpt.app",
+        "production",
+        "https://cdn.petgpt.app",
+        false,
+        "https://127.0.0.1/private"
+      )
+    ).toThrow("TEMPLATES_R2_PUBLIC_BASE_URL cannot target local, private, or placeholder hosts.");
   });
 
   it("rejects unsafe production API origins", () => {

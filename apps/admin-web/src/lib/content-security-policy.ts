@@ -51,6 +51,7 @@ function resolveApiOrigins(
 
 function resolveMediaOrigins(
   configuredMediaOrigins = process.env.ADMIN_MEDIA_ORIGINS,
+  configuredTemplateR2PublicBaseUrl = process.env.TEMPLATES_R2_PUBLIC_BASE_URL,
   nodeEnv = process.env.NODE_ENV
 ): string[] {
   const origins = new Set<string>();
@@ -84,6 +85,33 @@ function resolveMediaOrigins(
     origins.add(parsed.origin);
   }
 
+  const normalizedR2PublicBaseUrl = configuredTemplateR2PublicBaseUrl?.trim();
+  if (normalizedR2PublicBaseUrl) {
+    const parsed = new URL(normalizedR2PublicBaseUrl);
+    if (parsed.username || parsed.password || parsed.search || parsed.hash) {
+      throw new Error(
+        "TEMPLATES_R2_PUBLIC_BASE_URL must be credential-free and cannot contain query strings or fragments."
+      );
+    }
+    if (nodeEnv === "production") {
+      if (parsed.protocol !== "https:") {
+        throw new Error("TEMPLATES_R2_PUBLIC_BASE_URL must use HTTPS in production.");
+      }
+      if (isUnsafeAdminMediaHost(parsed.hostname)) {
+        throw new Error(
+          "TEMPLATES_R2_PUBLIC_BASE_URL cannot target local, private, or placeholder hosts."
+        );
+      }
+    } else if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+      throw new Error("TEMPLATES_R2_PUBLIC_BASE_URL must use HTTP or HTTPS.");
+    }
+
+    // R2 may be served under a path on a custom domain, while CSP directives
+    // accept only origins. Keep the configured path for storage URLs and add
+    // just the browser origin here.
+    origins.add(parsed.origin);
+  }
+
   return Array.from(origins);
 }
 
@@ -92,7 +120,8 @@ export function buildNonceContentSecurityPolicy(
   configuredApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL,
   nodeEnv = process.env.NODE_ENV,
   configuredMediaOrigins = process.env.ADMIN_MEDIA_ORIGINS,
-  allowLocalApiBaseUrlInProduction = shouldAllowLocalApiBaseUrlInProduction()
+  allowLocalApiBaseUrlInProduction = shouldAllowLocalApiBaseUrlInProduction(),
+  configuredTemplateR2PublicBaseUrl = process.env.TEMPLATES_R2_PUBLIC_BASE_URL
 ): string {
   if (!/^[A-Za-z0-9+/=_-]+$/.test(nonce)) {
     throw new Error("CSP nonce contains unsupported characters.");
@@ -103,7 +132,11 @@ export function buildNonceContentSecurityPolicy(
     nodeEnv,
     allowLocalApiBaseUrlInProduction
   );
-  const mediaOrigins = resolveMediaOrigins(configuredMediaOrigins, nodeEnv);
+  const mediaOrigins = resolveMediaOrigins(
+    configuredMediaOrigins,
+    configuredTemplateR2PublicBaseUrl,
+    nodeEnv
+  );
   const remoteOrigins = Array.from(new Set([...apiOrigins, ...mediaOrigins]));
   const connectSrc = ["'self'", ...remoteOrigins].join(" ");
   const imgSrc = ["'self'", "data:", "blob:", ...remoteOrigins].join(" ");
