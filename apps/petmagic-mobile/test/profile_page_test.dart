@@ -455,7 +455,7 @@ void main() {
     'profile page preloads wallet once for authenticated users without snapshot',
     (tester) async {
       final walletController = _CountingWalletController(
-        initialState: const WalletState(isLoading: false),
+        initialState: const WalletState(isLoading: true),
       );
 
       final router = GoRouter(

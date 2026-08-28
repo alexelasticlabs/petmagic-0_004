@@ -100,7 +100,11 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
     WalletState walletState, {
     required bool forceRefresh,
   }) {
-    if (walletState.isLoading || walletState.isRefreshing) {
+    // WalletController starts with isLoading=true before any request exists.
+    // Do not treat that idle bootstrap state as an active wallet load: otherwise
+    // the profile card can wait forever for a balance until WalletPage is opened.
+    if (walletState.isRefreshing ||
+        (walletState.isLoading && walletState.wallet != null)) {
       return false;
     }
 
