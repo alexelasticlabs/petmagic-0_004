@@ -1316,7 +1316,7 @@
   "appUnavailableOfflineTitle": "Нет подключения",
   "appUnavailableOfflineMessage": "Проверьте интернет и попробуйте снова. Мы автоматически повторим загрузку, когда соединение восстановится.",
   "appUnavailableServerTitle": "Сервер недоступен",
-  "appUnavailableServerMessage": "PetMagic сейчас не может связаться с бекендом. Попробуйте ещё раз через минуту.",
+  "appUnavailableServerMessage": "PetMagic временно недоступен. Попробуйте ещё раз через минуту.",
   "localBackendAndroidHintTitle": "Локальный бекенд на Android",
   "localBackendAndroidHintMessage": "Эта debug-сборка использует {baseUrl}. На реальном Android адреса localhost и 127.0.0.1 указывают на сам телефон. Выполните adb reverse tcp:{port} tcp:{port} или укажите LAN IP компьютера в API_BASE_URL.",
   "@localBackendAndroidHintMessage": {

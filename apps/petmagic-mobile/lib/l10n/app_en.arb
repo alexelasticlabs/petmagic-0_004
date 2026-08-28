@@ -1322,7 +1322,7 @@
   "appUnavailableOfflineTitle": "You're offline",
   "appUnavailableOfflineMessage": "Check your connection and try again. We'll retry automatically when you're back online.",
   "appUnavailableServerTitle": "Server is unavailable",
-  "appUnavailableServerMessage": "PetMagic could not reach the backend right now. Please try again in a moment.",
+  "appUnavailableServerMessage": "PetMagic is temporarily unavailable. Please try again in a moment.",
   "localBackendAndroidHintTitle": "Local backend on Android",
   "localBackendAndroidHintMessage": "This debug build points to {baseUrl}. On a real Android phone, localhost and 127.0.0.1 point to the phone itself. Run adb reverse tcp:{port} tcp:{port} or set API_BASE_URL to your computer's LAN IP.",
   "@localBackendAndroidHintMessage": {

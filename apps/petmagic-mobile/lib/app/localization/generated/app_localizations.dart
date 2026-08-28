@@ -7656,7 +7656,7 @@ abstract class AppLocalizations {
   /// No description provided for @appUnavailableServerMessage.
   ///
   /// In en, this message translates to:
-  /// **'PetMagic could not reach the backend right now. Please try again in a moment.'**
+  /// **'PetMagic is temporarily unavailable. Please try again in a moment.'**
   String get appUnavailableServerMessage;
 
   /// No description provided for @localBackendAndroidHintTitle.

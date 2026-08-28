@@ -4305,7 +4305,7 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get appUnavailableServerMessage =>
-      'PetMagic nie może teraz połączyć się z backendem. Spróbuj ponownie za chwilę.';
+      'PetMagic jest chwilowo niedostępny. Spróbuj ponownie za moment.';
 
   @override
   String get localBackendAndroidHintTitle => 'Lokalny backend na Androidzie';

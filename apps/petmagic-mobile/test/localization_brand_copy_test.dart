@@ -194,8 +194,7 @@ void main() {
     expect(pl['appUnavailableServerTitle'], 'Serwer niedostępny');
     expect(
       pl['appUnavailableServerMessage'],
-      'PetMagic nie może teraz połączyć się z backendem. '
-      'Spróbuj ponownie za chwilę.',
+      'PetMagic jest chwilowo niedostępny. Spróbuj ponownie za moment.',
     );
 
     final brokenFragments = [

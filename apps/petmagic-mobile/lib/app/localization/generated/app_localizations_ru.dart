@@ -4281,7 +4281,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get appUnavailableServerMessage =>
-      'PetMagic сейчас не может связаться с бекендом. Попробуйте ещё раз через минуту.';
+      'PetMagic временно недоступен. Попробуйте ещё раз через минуту.';
 
   @override
   String get localBackendAndroidHintTitle => 'Локальный бекенд на Android';

@@ -4266,7 +4266,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get appUnavailableServerMessage =>
-      'PetMagic could not reach the backend right now. Please try again in a moment.';
+      'PetMagic is temporarily unavailable. Please try again in a moment.';
 
   @override
   String get localBackendAndroidHintTitle => 'Local backend on Android';
