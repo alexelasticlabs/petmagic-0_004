@@ -76,7 +76,12 @@ void main() {
             },
           );
         });
-      final dataSource = TemplatesRemoteDataSource(dio);
+      final dataSource = TemplatesRemoteDataSource(
+        dio,
+        runtimeInfo: const DefaultAppRuntimeInfo(
+          locale: AppLocale(languageTag: 'ru-BY', countryCode: 'BY'),
+        ),
+      );
 
       final response = await dataSource.fetchFeed(
         const TemplatesQuery(
@@ -131,6 +136,7 @@ void main() {
         'search': 'magic',
         'cursor': 'cursor-1',
         'take': 30,
+        'locale': 'ru-BY',
       });
       expect(capturedOptions?.queryParameters, isNot(contains('page')));
       expect(capturedOptions?.queryParameters, isNot(contains('pageSize')));
@@ -235,12 +241,18 @@ void main() {
           },
         );
       });
-    final dataSource = TemplatesRemoteDataSource(dio);
+    final dataSource = TemplatesRemoteDataSource(
+      dio,
+      runtimeInfo: const DefaultAppRuntimeInfo(
+        locale: AppLocale(languageTag: 'ru-BY', countryCode: 'BY'),
+      ),
+    );
 
     final response = await dataSource.fetchTemplateOfTheDay();
     final template = response.toDomain();
 
     expect(capturedOptions?.path, '/api/templates/template-of-the-day');
+    expect(capturedOptions?.queryParameters, {'locale': 'ru-BY'});
     expect(template?.templateId, 'template-day-1');
     expect(template?.templateType, TemplateType.video);
     expect(template?.isPremium, isTrue);
