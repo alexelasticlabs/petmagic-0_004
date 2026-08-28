@@ -171,16 +171,29 @@ class _TemplateFeedSliversState extends ConsumerState<_TemplateFeedSlivers> {
       searchQuery: widget.searchQuery,
     );
     final visibleEntries = <_TemplateGridEntry>[
-      ?featuredEntry,
       for (final template in state.items)
-        if (template.templateId != widget.templateOfTheDay?.templateId)
+        if (featuredEntry == null ||
+            template.templateId != featuredEntry.template.templateId)
           _TemplateGridEntry(template: template),
     ];
 
     return SliverMainAxisGroup(
       slivers: [
+        if (featuredEntry != null)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(6, 8, 6, 6),
+              child: TemplateOfTheDayCard(
+                template: featuredEntry.templateOfTheDay!,
+                hasPremiumAccess: hasPremiumAccess,
+                onPressed: () => widget.onTemplateOfTheDaySelected(
+                  featuredEntry.templateOfTheDay!,
+                ),
+              ),
+            ),
+          ),
         SliverPadding(
-          padding: const EdgeInsets.fromLTRB(6, 8, 6, 6),
+          padding: const EdgeInsets.fromLTRB(6, 2, 6, 6),
           sliver: SliverLayoutBuilder(
             builder: (context, constraints) {
               final logicalCardWidth = (constraints.crossAxisExtent - 5) / 2;

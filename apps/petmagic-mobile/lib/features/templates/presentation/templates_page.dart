@@ -26,6 +26,7 @@ import 'package:petmagic_mobile/features/templates/presentation/template_feed_pl
 import 'package:petmagic_mobile/features/templates/presentation/template_preview_page.dart';
 import 'package:petmagic_mobile/features/templates/application/templates_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/template_card.dart';
+import 'package:petmagic_mobile/features/templates/presentation/widgets/template_of_the_day_card.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/template_flow_sheets.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/template_type_filters.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/create_with_pet_block.dart';

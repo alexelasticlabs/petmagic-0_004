@@ -19,6 +19,7 @@ import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 import 'package:petmagic_mobile/features/templates/application/templates_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/template_card.dart';
+import 'package:petmagic_mobile/features/templates/presentation/widgets/template_of_the_day_card.dart';
 import 'package:petmagic_mobile/features/wallet/application/wallet_controller.dart';
 import 'package:petmagic_mobile/shared/notifications/petmagic_notification_center.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
@@ -1053,7 +1054,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('templates page shows template of the day as first grid card', (
+  testWidgets('templates page shows template of the day above the grid', (
     tester,
   ) async {
     final featured = TemplateOfTheDayItem(
@@ -1110,19 +1111,24 @@ void main() {
     final context = tester.element(find.byType(TemplatesPage));
     final text = AppLocalizations.of(context);
 
-    final visibleCards = tester
-        .widgetList<TemplateCard>(find.byType(TemplateCard))
-        .toList();
+    final featuredCard = tester.widget<TemplateOfTheDayCard>(
+      find.byType(TemplateOfTheDayCard),
+    );
+    final visibleCards = tester.widgetList<TemplateCard>(
+      find.byType(TemplateCard),
+    );
 
-    expect(visibleCards, isNotEmpty);
-    expect(visibleCards.first.template.templateId, 'template-2');
-    expect(visibleCards.first.template.tokenCost, 5);
-    expect(visibleCards.first.featuredData, isNotNull);
-    expect(find.text(text.templateOfTheDayTitle), findsNothing);
+    expect(featuredCard.template.templateId, 'template-2');
+    expect(featuredCard.template.tokenCost, 5);
+    expect(
+      tester.getSize(find.byType(TemplateOfTheDayCard)).width,
+      greaterThan(300),
+    );
+    expect(visibleCards.single.template.templateId, 'template-1');
     expect(find.text('Daily portrait'), findsOneWidget);
     expect(find.textContaining('#daily'), findsOneWidget);
+    expect(find.text('5 ${text.walletBalanceUnit}'), findsOneWidget);
     expect(find.text(text.templateOfTheDayTryAction), findsOneWidget);
-    expect(find.text(text.templateOfTheDayFeedBadge), findsOneWidget);
   });
 
   testWidgets(
@@ -1184,10 +1190,10 @@ void main() {
           .map((card) => card.template.templateId)
           .toList();
 
-      expect(visibleCardIds.length, greaterThanOrEqualTo(2));
-      expect(visibleCardIds.take(2).toList(), ['template-2', 'template-1']);
-      expect(visibleCardIds.where((id) => id == 'template-2'), hasLength(1));
-      expect(find.text(text.templateOfTheDayFeedBadge), findsOneWidget);
+      expect(visibleCardIds, containsAllInOrder(['template-1', 'template-3']));
+      expect(visibleCardIds, isNot(contains('template-2')));
+      expect(find.byType(TemplateOfTheDayCard), findsOneWidget);
+      expect(find.text(text.templateOfTheDayTryAction), findsOneWidget);
     },
   );
 
@@ -1299,17 +1305,15 @@ void main() {
 
       final context = tester.element(find.byType(TemplatesPage));
       final text = AppLocalizations.of(context);
-      final firstCard = tester.widget<TemplateCard>(
-        find.byType(TemplateCard).first,
+      final featuredCard = tester.widget<TemplateOfTheDayCard>(
+        find.byType(TemplateOfTheDayCard),
       );
 
       expect(tester.takeException(), isNull);
-      expect(firstCard.template.templateId, 'template-premium-video');
-      expect(firstCard.featuredData, isNotNull);
-      expect(firstCard.template.isPremium, isTrue);
-      expect(find.text(text.templateOfTheDayTitle), findsNothing);
+      expect(featuredCard.template.templateId, 'template-premium-video');
+      expect(featuredCard.template.isPremium, isTrue);
       expect(find.text(text.templateUnlockPremiumAction), findsOneWidget);
-      expect(find.text(text.templateOfTheDayFeedBadge), findsOneWidget);
+      expect(find.text('Template of the Day'), findsOneWidget);
     },
   );
 }
