@@ -13,14 +13,30 @@ final flutterAppRuntimeInfoProvider = Provider<AppRuntimeInfo>((ref) {
 });
 
 final class FlutterAppRuntimeInfo implements AppRuntimeInfo {
-  const FlutterAppRuntimeInfo({this.localeOverride});
+  const FlutterAppRuntimeInfo({
+    this.localeOverride,
+    this.platformLocaleOverride,
+  });
 
   final Locale? localeOverride;
+  final Locale? platformLocaleOverride;
 
   @override
   AppLocale get locale {
-    final locale =
-        localeOverride ?? WidgetsBinding.instance.platformDispatcher.locale;
+    final selectedLocale = localeOverride;
+    if (selectedLocale?.countryCode case final selectedCountryCode?) {
+      return AppLocale(
+        languageTag: selectedLocale!.toLanguageTag(),
+        countryCode: selectedCountryCode,
+      );
+    }
+
+    final platformLocale =
+        platformLocaleOverride ??
+        WidgetsBinding.instance.platformDispatcher.locale;
+    final locale = selectedLocale == null
+        ? platformLocale
+        : Locale(selectedLocale.languageCode, platformLocale.countryCode);
     return AppLocale(
       languageTag: locale.toLanguageTag(),
       countryCode: locale.countryCode,

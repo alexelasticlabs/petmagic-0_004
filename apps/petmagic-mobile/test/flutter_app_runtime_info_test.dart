@@ -11,4 +11,17 @@ void main() {
     expect(runtimeInfo.locale.languageTag, 'pl-PL');
     expect(runtimeInfo.locale.countryCode, 'PL');
   });
+
+  test(
+    'keeps the device storefront when the selected language has no region',
+    () {
+      const runtimeInfo = FlutterAppRuntimeInfo(
+        localeOverride: Locale('ru'),
+        platformLocaleOverride: Locale('en', 'US'),
+      );
+
+      expect(runtimeInfo.locale.languageTag, 'ru-US');
+      expect(runtimeInfo.locale.countryCode, 'US');
+    },
+  );
 }
