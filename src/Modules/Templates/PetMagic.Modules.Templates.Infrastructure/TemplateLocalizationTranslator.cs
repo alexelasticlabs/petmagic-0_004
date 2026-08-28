@@ -29,7 +29,8 @@ internal static class TemplateLocalizationTranslator
         IEnumerable<string> targetLocales,
         string? sourceLocale,
         HttpClient httpClient,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? musicDescription = null)
     {
         var normalizedSourceLocale = NormalizeLocale(sourceLocale) ?? SourceLocale;
         var payload = new Dictionary<string, TemplateLocalizedTexts>(StringComparer.OrdinalIgnoreCase);
@@ -51,7 +52,8 @@ internal static class TemplateLocalizationTranslator
                 klingPrompt,
                 normalizedSourceLocale,
                 httpClient,
-                cancellationToken);
+                cancellationToken,
+                musicDescription);
             if (translatedTexts is null)
             {
                 continue;
@@ -70,7 +72,8 @@ internal static class TemplateLocalizationTranslator
         string? locale,
         string? imagePrompt = null,
         string? preprocessingPrompt = null,
-        string? klingPrompt = null)
+        string? klingPrompt = null,
+        string? musicDescription = null)
     {
         var fallback = new TemplateLocalizedTexts(
             title,
@@ -78,7 +81,8 @@ internal static class TemplateLocalizationTranslator
             null,
             imagePrompt,
             preprocessingPrompt,
-            klingPrompt);
+            klingPrompt,
+            musicDescription);
 
         var normalizedLocale = NormalizeLocale(locale);
         if (string.IsNullOrWhiteSpace(normalizedLocale) || string.Equals(normalizedLocale, SourceLocale, StringComparison.OrdinalIgnoreCase))
@@ -105,7 +109,8 @@ internal static class TemplateLocalizationTranslator
                 localizedTexts.PetPhotoRequirements,
                 localizedTexts.ImagePrompt ?? imagePrompt,
                 localizedTexts.PreprocessingPrompt ?? preprocessingPrompt,
-                localizedTexts.KlingPrompt ?? klingPrompt);
+                localizedTexts.KlingPrompt ?? klingPrompt,
+                localizedTexts.MusicDescription ?? musicDescription);
         }
         catch (JsonException)
         {
@@ -152,7 +157,8 @@ internal static class TemplateLocalizationTranslator
         string? klingPrompt,
         string sourceLocale,
         HttpClient httpClient,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? musicDescription)
     {
         var batch = TranslationBatch.Create(
             title,
@@ -160,7 +166,8 @@ internal static class TemplateLocalizationTranslator
             petPhotoRequirements,
             imagePrompt,
             preprocessingPrompt,
-            klingPrompt);
+            klingPrompt,
+            musicDescription);
 
         var translatedParts = await TranslateBatchAsync(targetLocale, batch.Values, sourceLocale, httpClient, cancellationToken);
         if (translatedParts is not null)
@@ -174,6 +181,7 @@ internal static class TemplateLocalizationTranslator
         var translatedImagePrompt = await TranslateOptionalAsync(targetLocale, imagePrompt, sourceLocale, httpClient, cancellationToken);
         var translatedPreprocessingPrompt = await TranslateOptionalAsync(targetLocale, preprocessingPrompt, sourceLocale, httpClient, cancellationToken);
         var translatedKlingPrompt = await TranslateOptionalAsync(targetLocale, klingPrompt, sourceLocale, httpClient, cancellationToken);
+        var translatedMusicDescription = await TranslateOptionalAsync(targetLocale, musicDescription, sourceLocale, httpClient, cancellationToken);
 
         if (string.IsNullOrWhiteSpace(translatedTitle) || string.IsNullOrWhiteSpace(translatedShortDescription))
         {
@@ -186,7 +194,8 @@ internal static class TemplateLocalizationTranslator
             translatedPetPhotoRequirements,
             translatedImagePrompt,
             translatedPreprocessingPrompt,
-            translatedKlingPrompt);
+            translatedKlingPrompt,
+            translatedMusicDescription);
     }
 
     private static async Task<string?> TranslateOptionalAsync(
@@ -427,14 +436,16 @@ internal static class TemplateLocalizationTranslator
         IReadOnlyList<string>? PetPhotoRequirements,
         string? ImagePrompt,
         string? PreprocessingPrompt,
-        string? KlingPrompt);
+        string? KlingPrompt,
+        string? MusicDescription = null);
 
     private sealed record TranslationBatch(
         IReadOnlyList<string> Values,
         int RequirementsCount,
         int? ImagePromptIndex,
         int? PreprocessingPromptIndex,
-        int? KlingPromptIndex)
+        int? KlingPromptIndex,
+        int? MusicDescriptionIndex)
     {
         public static TranslationBatch Create(
             string title,
@@ -442,7 +453,8 @@ internal static class TemplateLocalizationTranslator
             IReadOnlyList<string>? petPhotoRequirements,
             string? imagePrompt,
             string? preprocessingPrompt,
-            string? klingPrompt)
+            string? klingPrompt,
+            string? musicDescription)
         {
             var values = new List<string> { title, shortDescription };
             var requirementsCount = petPhotoRequirements?.Count ?? 0;
@@ -472,7 +484,20 @@ internal static class TemplateLocalizationTranslator
                 values.Add(klingPrompt);
             }
 
-            return new TranslationBatch(values, requirementsCount, imagePromptIndex, preprocessingPromptIndex, klingPromptIndex);
+            int? musicDescriptionIndex = null;
+            if (!string.IsNullOrWhiteSpace(musicDescription))
+            {
+                musicDescriptionIndex = values.Count;
+                values.Add(musicDescription);
+            }
+
+            return new TranslationBatch(
+                values,
+                requirementsCount,
+                imagePromptIndex,
+                preprocessingPromptIndex,
+                klingPromptIndex,
+                musicDescriptionIndex);
         }
 
         public TemplateLocalizedTexts? ToLocalizedTexts(IReadOnlyList<string> translatedParts)
@@ -504,7 +529,8 @@ internal static class TemplateLocalizationTranslator
                 translatedRequirements,
                 ReadOptional(translatedParts, ImagePromptIndex),
                 ReadOptional(translatedParts, PreprocessingPromptIndex),
-                ReadOptional(translatedParts, KlingPromptIndex));
+                ReadOptional(translatedParts, KlingPromptIndex),
+                ReadOptional(translatedParts, MusicDescriptionIndex));
         }
 
         private static string? ReadOptional(IReadOnlyList<string> values, int? index)

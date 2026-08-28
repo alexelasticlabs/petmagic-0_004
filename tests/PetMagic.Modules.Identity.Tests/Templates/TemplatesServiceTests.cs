@@ -51,7 +51,8 @@ public sealed partial class TemplatesServiceTests
     }
 
     private static TemplatesOptions CreateTemplatesServiceOptions(
-        string templateOfTheDayBusinessTimeZone = "UTC")
+        string templateOfTheDayBusinessTimeZone = "UTC",
+        string[]? supportedLocalizationLocales = null)
     {
         return new TemplatesOptions
         {
@@ -72,7 +73,7 @@ public sealed partial class TemplatesServiceTests
                 "fal-ai/kling-video/v3/pro/motion-control",
                 "fal-ai/kling-video/v3/standard/motion-control"
             ],
-            SupportedLocalizationLocales = ["ru", "de", "es", "fr", "it", "pl"],
+            SupportedLocalizationLocales = supportedLocalizationLocales ?? ["ru", "de", "es", "fr", "it", "pl"],
             SeedSampleTemplates = false,
             TemplateOfTheDayBusinessTimeZone = templateOfTheDayBusinessTimeZone
         };
@@ -93,10 +94,11 @@ public sealed partial class TemplatesServiceTests
                 CreatePreviewAsset($"https://cdn.example.com/{slug}.jpg", $"{slug}.jpg", "image/jpeg"),
                 "openai/gpt-image-2/edit",
                 "Keep the same pet.",
-                TemplateStatus.Active.ToString()),
+                TemplateStatus.Active.ToString(),
+                PetPhotoRequirements: ["One pet"]),
             CancellationToken.None);
 
-        Assert.True(created.IsSuccess);
+        Assert.True(created.IsSuccess, created.Error.Code);
         return created.Value.TemplateId;
     }
 
@@ -120,10 +122,11 @@ public sealed partial class TemplatesServiceTests
                 "fal-ai/kling-video/v3/pro/motion-control",
                 "Smooth cinematic motion.",
                 true,
-                TemplateStatus.Active.ToString()),
+                TemplateStatus.Active.ToString(),
+                PetPhotoRequirements: ["One pet"]),
             CancellationToken.None);
 
-        Assert.True(created.IsSuccess);
+        Assert.True(created.IsSuccess, created.Error.Code);
         return created.Value.TemplateId;
     }
 

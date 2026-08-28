@@ -309,8 +309,7 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
             services.AddHostedService<TemplateGenerationWorker>();
         }
 
-        if (options.FirebasePush.IsConfigured
-            && string.Equals(
+        if (string.Equals(
                 resolvedSchedulerComponent,
                 TemplateSchedulerConfigFingerprint.ApiComponent,
                 StringComparison.Ordinal))
@@ -374,11 +373,9 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         using var scope = serviceProvider.CreateScope();
         var options = scope.ServiceProvider.GetRequiredService<TemplatesOptions>();
         var dbContext = scope.ServiceProvider.GetRequiredService<TemplatesDbContext>();
-        var httpClientFactory = scope.ServiceProvider.GetRequiredService<IHttpClientFactory>();
-
         await dbContext.Database.MigrateAsync();
         await SyncWatermarkSettingsStoreAsync(scope.ServiceProvider, dbContext, options, cancellationToken: default);
-        await BackfillTemplateLocalizationsAsync(dbContext, options, httpClientFactory, cancellationToken: default);
+        await BackfillTemplateLocalizationsAsync(dbContext, options, cancellationToken: default);
 
         if (options.SeedSampleTemplates)
         {
@@ -438,7 +435,6 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
     private static async Task BackfillTemplateLocalizationsAsync(
         TemplatesDbContext dbContext,
         TemplatesOptions options,
-        IHttpClientFactory httpClientFactory,
         CancellationToken cancellationToken)
     {
         if (!options.LocalizationBackfillEnabled)
@@ -447,7 +443,7 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         }
 
         var templates = await dbContext.TemplateItems
-            .Where(template => template.DeletedAtUtc == null && string.IsNullOrWhiteSpace(template.LocalizedTextsJson))
+            .Where(template => template.DeletedAtUtc == null)
             .ToArrayAsync(cancellationToken);
 
         if (templates.Length == 0)
@@ -457,18 +453,12 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
 
         foreach (var template in templates)
         {
-            var petPhotoRequirements = DeserializeRequirements(template.PetPhotoRequirements);
-            template.LocalizedTextsJson = await TemplateLocalizationTranslator.GenerateAsync(
-                template.Title,
-                template.ShortDescription,
-                petPhotoRequirements,
-                template.ImagePrompt,
-                template.PreprocessingPrompt,
-                template.KlingPrompt,
-                options.SupportedLocalizationLocales,
-                options.SourceLocalizationLocale,
-                httpClientFactory.CreateClient(TemplateLocalizationTranslator.HttpClientName),
-                cancellationToken);
+            await TemplateLocalizationOutbox.EnqueueForTemplateAsync(
+                dbContext,
+                template,
+                options,
+                cancellationToken,
+                onlyMissingTranslations: true);
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -484,22 +474,6 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
             .ToArray();
 
         return values.Length == 0 ? fallback : values;
-    }
-
-    private static string[]? DeserializeRequirements(string? requirements)
-    {
-        if (string.IsNullOrWhiteSpace(requirements))
-        {
-            return null;
-        }
-
-        return requirements
-            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Select(value => value.Trim())
-            .Where(value => !string.IsNullOrWhiteSpace(value))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Take(6)
-            .ToArray();
     }
 
     private static void AddMediaStorage(IServiceCollection services, TemplatesOptions options)

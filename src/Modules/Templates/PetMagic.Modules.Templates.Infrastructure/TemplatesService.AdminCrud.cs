@@ -85,6 +85,7 @@ internal sealed partial class TemplatesService
         }
 
         dbContext.TemplateItems.Add(template);
+        await TemplateLocalizationOutbox.EnqueueForTemplateAsync(dbContext, template, options, cancellationToken);
         await ClaimTemplateAssetsAfterUpdateAsync(
             template.Id,
             cancellationToken,
@@ -144,9 +145,13 @@ internal sealed partial class TemplatesService
             }
         }
 
+        var localizationFingerprintBeforeUpdate = TemplateLocalizationOutbox.CreateSourceFingerprint(template, options.SourceLocalizationLocale);
         template.Title = command.Title.Trim();
         template.ShortDescription = command.ShortDescription.Trim();
-        template.PetPhotoRequirements = SerializeRequirements(command.PetPhotoRequirements);
+        if (command.PetPhotoRequirements is not null)
+        {
+            template.PetPhotoRequirements = SerializeRequirements(command.PetPhotoRequirements);
+        }
         template.Category = categoryNameResult.Value;
         template.Tags = SerializeTags(command.Tags);
         template.IsPremium = command.IsPremium;
@@ -164,6 +169,15 @@ internal sealed partial class TemplatesService
         template.PromoBadgeMode = ParsePromoBadgeMode(command.PromoBadgeMode);
         template.ImageModel = command.ImageModel.Trim();
         template.ImagePrompt = ResolvePrompt(command.ImagePrompt, options.DefaultImagePrompt);
+        var localizationChanged = !string.Equals(
+            localizationFingerprintBeforeUpdate,
+            TemplateLocalizationOutbox.CreateSourceFingerprint(template, options.SourceLocalizationLocale),
+            StringComparison.Ordinal);
+        if (localizationChanged || string.IsNullOrWhiteSpace(template.LocalizedTextsJson))
+        {
+            template.LocalizedTextsJson = null;
+            await TemplateLocalizationOutbox.EnqueueForTemplateAsync(dbContext, template, options, cancellationToken);
+        }
         var now = DateTime.UtcNow;
         var effectivePreviewAsset = ResolveEffectiveTemplateAsset(
             template,
@@ -340,6 +354,7 @@ internal sealed partial class TemplatesService
         }
 
         dbContext.TemplateItems.Add(template);
+        await TemplateLocalizationOutbox.EnqueueForTemplateAsync(dbContext, template, options, cancellationToken);
         await ClaimTemplateAssetsAfterUpdateAsync(
             template.Id,
             cancellationToken,
@@ -437,9 +452,13 @@ internal sealed partial class TemplatesService
             command.KeepReferenceMotionAsset);
         var (duration, orientation) = await ResolveReferenceMetadataAsync(effectiveReferenceMotionAsset, cancellationToken);
 
+        var localizationFingerprintBeforeUpdate = TemplateLocalizationOutbox.CreateSourceFingerprint(template, options.SourceLocalizationLocale);
         template.Title = command.Title.Trim();
         template.ShortDescription = command.ShortDescription.Trim();
-        template.PetPhotoRequirements = SerializeRequirements(command.PetPhotoRequirements);
+        if (command.PetPhotoRequirements is not null)
+        {
+            template.PetPhotoRequirements = SerializeRequirements(command.PetPhotoRequirements);
+        }
         template.Category = categoryNameResult.Value;
         template.Tags = SerializeTags(command.Tags);
         template.IsPremium = command.IsPremium;
@@ -463,7 +482,15 @@ internal sealed partial class TemplatesService
         template.KlingPrompt = ResolvePrompt(command.KlingPrompt, options.DefaultKlingPrompt);
         template.KeepOriginalSound = command.KeepOriginalSound;
         template.Status = statusResult.Value;
-        template.LocalizedTextsJson = null;
+        var localizationChanged = !string.Equals(
+            localizationFingerprintBeforeUpdate,
+            TemplateLocalizationOutbox.CreateSourceFingerprint(template, options.SourceLocalizationLocale),
+            StringComparison.Ordinal);
+        if (localizationChanged || string.IsNullOrWhiteSpace(template.LocalizedTextsJson))
+        {
+            template.LocalizedTextsJson = null;
+            await TemplateLocalizationOutbox.EnqueueForTemplateAsync(dbContext, template, options, cancellationToken);
+        }
         var now = DateTime.UtcNow;
 
         var obsoleteAssetUrls = CollectObsoleteAssetUrls([

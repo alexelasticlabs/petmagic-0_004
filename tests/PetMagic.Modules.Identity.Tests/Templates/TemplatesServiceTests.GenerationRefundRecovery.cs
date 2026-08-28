@@ -129,7 +129,8 @@ public sealed partial class TemplatesServiceTests
         Assert.Equal(5, receipt.PreviousRefundAttemptCount);
         Assert.Equal("economy.temporarily_unavailable", receipt.PreviousRefundLastErrorCode);
         Assert.Equal(64, receipt.RequestHash.Length);
-        var outboxMessage = await dbContext.PushOutboxMessages.SingleAsync();
+        var outboxMessage = await dbContext.PushOutboxMessages.SingleAsync(
+            message => message.Kind == TemplateAdminAuditOutbox.Kind);
         Assert.Equal(TemplateAdminAuditOutbox.Kind, outboxMessage.Kind);
         Assert.Equal($"templates_admin_audit:{receipt.Id:D}", outboxMessage.DeduplicationKey);
         Assert.Equal(PushOutboxStatus.Sent, outboxMessage.Status);
@@ -217,7 +218,9 @@ public sealed partial class TemplatesServiceTests
         Assert.Equal(2, persisted.RefundAttemptCount);
         Assert.Equal("economy.temporarily_unavailable", persisted.RefundLastErrorCode);
         Assert.Empty(await dbContext.AdminGenerationRefundRetryReceipts.ToListAsync());
-        Assert.Empty(await dbContext.PushOutboxMessages.ToListAsync());
+        Assert.Empty(await dbContext.PushOutboxMessages
+            .Where(message => message.Kind == TemplateAdminAuditOutbox.Kind)
+            .ToListAsync());
         Assert.Empty(audit.Entries);
     }
 
@@ -252,9 +255,16 @@ public sealed partial class TemplatesServiceTests
 
         Assert.True(result.IsSuccess);
         var receipt = await dbContext.AdminGenerationRefundRetryReceipts.SingleAsync();
-        var queued = await dbContext.PushOutboxMessages.SingleAsync();
+        var queued = await dbContext.PushOutboxMessages.SingleAsync(
+            message => message.Kind == TemplateAdminAuditOutbox.Kind);
         Assert.Equal(PushOutboxStatus.Queued, queued.Status);
         Assert.Equal($"templates_admin_audit:{receipt.Id:D}", queued.DeduplicationKey);
+
+        var localizationMessages = await dbContext.PushOutboxMessages
+            .Where(message => message.Kind == TemplateLocalizationOutbox.Kind)
+            .ToArrayAsync();
+        dbContext.PushOutboxMessages.RemoveRange(localizationMessages);
+        await dbContext.SaveChangesAsync();
 
         var pushDelivery = new RecordingTemplatePushDeliverySender();
         var pushProcessor = new TemplatePushOutboxProcessor(

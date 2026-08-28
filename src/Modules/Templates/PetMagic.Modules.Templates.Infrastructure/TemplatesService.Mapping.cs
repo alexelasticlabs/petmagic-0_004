@@ -36,7 +36,12 @@ internal sealed partial class TemplatesService
 
     private static PublicTemplateCatalogMetadataResponse MapPublicCatalogMetadataItem(TemplateItem template, string? locale)
     {
-        var localizedTexts = TemplateLocalizationTranslator.Resolve(template.Title, template.ShortDescription, template.LocalizedTextsJson, locale);
+        var localizedTexts = TemplateLocalizationTranslator.Resolve(
+            template.Title,
+            template.ShortDescription,
+            template.LocalizedTextsJson,
+            locale,
+            musicDescription: template.MusicDescription);
         var previewAsset = GetAsset(template, TemplateAssetKind.Preview);
         return MapPublicCatalogMetadataItem(
             template.Id,
@@ -194,7 +199,12 @@ internal sealed partial class TemplatesService
 
     private static PublicTemplateListItemResponse MapPublicListItem(TemplateItem template, string? locale)
     {
-        var localizedTexts = TemplateLocalizationTranslator.Resolve(template.Title, template.ShortDescription, template.LocalizedTextsJson, locale);
+        var localizedTexts = TemplateLocalizationTranslator.Resolve(
+            template.Title,
+            template.ShortDescription,
+            template.LocalizedTextsJson,
+            locale,
+            musicDescription: template.MusicDescription);
         var previewAsset = GetAsset(template, TemplateAssetKind.Preview);
 
         return new PublicTemplateListItemResponse(
@@ -208,7 +218,7 @@ internal sealed partial class TemplatesService
             template.IsPremium,
             template.TokenCost,
             previewAsset,
-            template.MusicDescription,
+            localizedTexts.MusicDescription ?? template.MusicDescription,
             template.ReferenceVideoDurationSeconds,
             localizedTexts.PetPhotoRequirements ?? DeserializeRequirements(template.PetPhotoRequirements),
             template.SupportsGenerationResultInput,
@@ -251,7 +261,12 @@ internal sealed partial class TemplatesService
         double? previewDurationSeconds,
         string? locale)
     {
-        var localizedTexts = TemplateLocalizationTranslator.Resolve(title, shortDescription, localizedTextsJson, locale);
+        var localizedTexts = TemplateLocalizationTranslator.Resolve(
+            title,
+            shortDescription,
+            localizedTextsJson,
+            locale,
+            musicDescription: musicDescription);
         var previewAsset = string.IsNullOrWhiteSpace(previewUrl)
             ? null
             : new TemplateAssetResponse(
@@ -286,7 +301,7 @@ internal sealed partial class TemplatesService
             isPremium,
             tokenCost,
             previewAsset,
-            musicDescription,
+            localizedTexts.MusicDescription ?? musicDescription,
             referenceVideoDurationSeconds,
             localizedTexts.PetPhotoRequirements ?? DeserializeRequirements(petPhotoRequirements),
             supportsGenerationResultInput,
@@ -383,7 +398,12 @@ internal sealed partial class TemplatesService
 
     private static TemplateDetailDto MapTemplateDetail(TemplateItem template, string? locale)
     {
-        var localizedTexts = TemplateLocalizationTranslator.Resolve(template.Title, template.ShortDescription, template.LocalizedTextsJson, locale);
+        var localizedTexts = TemplateLocalizationTranslator.Resolve(
+            template.Title,
+            template.ShortDescription,
+            template.LocalizedTextsJson,
+            locale,
+            musicDescription: template.MusicDescription);
         var previewAsset = GetAsset(template, TemplateAssetKind.Preview);
         var thumbnailAsset = GetAsset(template, TemplateAssetKind.Thumbnail);
         var detailPreviewAsset = GetAsset(template, TemplateAssetKind.DetailPreview) ?? previewAsset;
@@ -406,7 +426,7 @@ internal sealed partial class TemplatesService
                 DurationMs: ToDurationMs(detailPreviewAsset?.DurationSeconds ?? previewAsset?.DurationSeconds),
                 SizeBytes: detailPreviewAsset?.FileSizeBytes ?? previewAsset?.FileSizeBytes,
                 MediaVersion: template.Version),
-            template.MusicDescription,
+            localizedTexts.MusicDescription ?? template.MusicDescription,
             template.ReferenceVideoDurationSeconds,
             localizedTexts.PetPhotoRequirements ?? DeserializeRequirements(template.PetPhotoRequirements),
             template.SupportsGenerationResultInput,
@@ -455,7 +475,12 @@ internal sealed partial class TemplatesService
         double? detailPreviewDurationSeconds,
         string? locale)
     {
-        var localizedTexts = TemplateLocalizationTranslator.Resolve(title, shortDescription, localizedTextsJson, locale);
+        var localizedTexts = TemplateLocalizationTranslator.Resolve(
+            title,
+            shortDescription,
+            localizedTextsJson,
+            locale,
+            musicDescription: musicDescription);
         var previewAsset = string.IsNullOrWhiteSpace(previewUrl)
             ? null
             : new TemplateAssetResponse(
@@ -499,7 +524,7 @@ internal sealed partial class TemplatesService
                 DurationMs: ToDurationMs(detailPreviewDurationSeconds ?? previewDurationSeconds),
                 SizeBytes: detailPreviewFileSizeBytes ?? previewFileSizeBytes,
                 MediaVersion: version),
-            musicDescription,
+            localizedTexts.MusicDescription ?? musicDescription,
             referenceVideoDurationSeconds,
             localizedTexts.PetPhotoRequirements ?? DeserializeRequirements(petPhotoRequirements),
             supportsGenerationResultInput,

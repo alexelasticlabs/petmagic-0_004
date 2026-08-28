@@ -139,7 +139,8 @@ public sealed class TemplatesInfrastructureConfigurationTests
             "TemplatesInfrastructureServiceCollectionExtensions.cs"));
 
         Assert.Contains("if (!options.LocalizationBackfillEnabled)", source, StringComparison.Ordinal);
-        Assert.Contains("BackfillTemplateLocalizationsAsync(dbContext, options, httpClientFactory", source, StringComparison.Ordinal);
+        Assert.Contains("BackfillTemplateLocalizationsAsync(dbContext, options, cancellationToken", source, StringComparison.Ordinal);
+        Assert.Contains("TemplateLocalizationOutbox.EnqueueForTemplateAsync", source, StringComparison.Ordinal);
     }
 
     [Fact]
