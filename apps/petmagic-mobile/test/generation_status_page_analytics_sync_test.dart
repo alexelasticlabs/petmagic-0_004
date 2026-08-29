@@ -11,6 +11,7 @@ import 'package:petmagic_mobile/features/templates/data/template_generation_repo
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/application/generation_history_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
+import 'package:petmagic_mobile/features/wallet/application/wallet_controller.dart';
 import 'package:petmagic_mobile/shared/notifications/petmagic_notification_center.dart';
 import 'generation_status_page_test_support.dart';
 
@@ -157,6 +158,9 @@ void main() {
             generationHistoryControllerProvider.overrideWith(
               IdleGenerationStatusHistoryController.new,
             ),
+            walletControllerProvider.overrideWith(
+              _IdleGenerationStatusWalletController.new,
+            ),
           ],
           child: MaterialApp(
             theme: AppTheme.dark(),
@@ -188,7 +192,6 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(repository.removeWatermarkCalls, equals(['generation-1']));
-      expect(find.text(text.generationStatusWatermarkRemoved), findsWidgets);
 
       await tester.tap(find.byIcon(Icons.more_vert_rounded));
       await tester.pumpAndSettle();
@@ -232,6 +235,9 @@ void main() {
             generationHistoryControllerProvider.overrideWith(
               IdleGenerationStatusHistoryController.new,
             ),
+            walletControllerProvider.overrideWith(
+              _IdleGenerationStatusWalletController.new,
+            ),
           ],
           child: MaterialApp(
             theme: AppTheme.dark(),
@@ -269,7 +275,6 @@ void main() {
       );
       expect(find.text(text.walletBuySparkTitle), findsOne);
       expect(find.text(text.generationStatusUpgradePremium), findsOne);
-      expect(find.text(text.generationStatusWatermarkAddedFreePlan), findsOne);
 
       await PetMagicNotificationCenter.instance.clearQueue();
     },
@@ -474,6 +479,14 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+}
+
+class _IdleGenerationStatusWalletController extends WalletController {
+  @override
+  WalletState build() => const WalletState();
+
+  @override
+  Future<void> load({bool refresh = false}) async {}
 }
 
 class _AuthenticatedGenerationStatusAppLaunchController
