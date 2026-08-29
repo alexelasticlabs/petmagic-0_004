@@ -34,6 +34,7 @@ class TemplateGenerationResult {
     this.completedAtUtc,
     this.chargedAtUtc,
     this.refundedAtUtc,
+    this.refundState = 'not_applicable',
     this.isUnread = false,
     this.queuePosition,
     this.estimatedWaitSeconds,
@@ -93,6 +94,7 @@ class TemplateGenerationResult {
   final DateTime? completedAtUtc;
   final DateTime? chargedAtUtc;
   final DateTime? refundedAtUtc;
+  final String refundState;
   final bool userMediaExpired;
   final bool isUnread;
   final int? queuePosition;
@@ -153,6 +155,7 @@ class TemplateGenerationResult {
     DateTime? completedAtUtc,
     DateTime? chargedAtUtc,
     DateTime? refundedAtUtc,
+    String? refundState,
     bool? userMediaExpired,
     bool? isUnread,
     int? queuePosition,
@@ -221,6 +224,7 @@ class TemplateGenerationResult {
       completedAtUtc: completedAtUtc ?? this.completedAtUtc,
       chargedAtUtc: chargedAtUtc ?? this.chargedAtUtc,
       refundedAtUtc: refundedAtUtc ?? this.refundedAtUtc,
+      refundState: refundState ?? this.refundState,
       userMediaExpired: userMediaExpired ?? this.userMediaExpired,
       isUnread: isUnread ?? this.isUnread,
       queuePosition: queuePosition ?? this.queuePosition,

@@ -530,7 +530,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.tap(
-      find.text(text.generationStatusContactSupportAction).first,
+      find.text(text.generationStatusSupportShortAction).first,
     );
     await tester.pumpAndSettle();
     expect(find.text('support-route'), findsOneWidget);

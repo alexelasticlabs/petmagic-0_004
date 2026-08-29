@@ -78,9 +78,9 @@ extension _GenerationStatusPageView on _GenerationStatusPageState {
                     onRetry: () => _load(),
                   )
                 else if (generation != null) ...[
-                  _StatusHero(generation: generation),
-                  const SizedBox(height: 14),
                   if (generation.isCompleted) ...[
+                    _StatusHero(generation: generation),
+                    const SizedBox(height: 14),
                     _ResultCard(
                       generation: generation,
                       onOpenViewer: () => _openFullscreenPreview(generation),
@@ -191,8 +191,9 @@ extension _GenerationStatusPageView on _GenerationStatusPageState {
                       ),
                   ] else if (generation.isFailed) ...[
                     _FailureCard(generation: generation),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 22),
                     _FailedActions(
+                      isPhotoFailure: isPhotoFailure(generation),
                       onPickAnotherPhoto: () => context.appNavigator.go(
                         _templatesDestinationForGeneration(generation),
                       ),
@@ -201,7 +202,7 @@ extension _GenerationStatusPageView on _GenerationStatusPageState {
                         const SupportChatDestination(),
                       ),
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 22),
                     if (_hasSubmittedFeedback)
                       _FeedbackSubmittedCard(
                         message: text.generationStatusFeedbackThanksMessage,
@@ -219,30 +220,9 @@ extension _GenerationStatusPageView on _GenerationStatusPageState {
                           ),
                         ),
                       ),
-                    const SizedBox(height: 14),
-                    _DetailsCard(
-                      title: text.generationStatusDetailsTitle,
-                      rows: [
-                        (
-                          text.templateFlowTemplateLabel,
-                          generation.templateTitle ??
-                              text.generationStatusUntitledFallback,
-                        ),
-                        (
-                          text.generationStatusTypeLabel,
-                          typeLabel(text, generation),
-                        ),
-                        (
-                          text.generationStatusAttemptLabel,
-                          '${generation.attemptCount}',
-                        ),
-                        (
-                          text.templateFlowCostLabel,
-                          '${generation.tokenCost} ${text.walletBalanceUnit}',
-                        ),
-                      ],
-                    ),
                   ] else if (generation.isCancelled) ...[
+                    _StatusHero(generation: generation),
+                    const SizedBox(height: 14),
                     _CancelledCard(generation: generation),
                     const SizedBox(height: 14),
                     _ActiveActions(
@@ -269,6 +249,8 @@ extension _GenerationStatusPageView on _GenerationStatusPageState {
                       ],
                     ),
                   ] else ...[
+                    _StatusHero(generation: generation),
+                    const SizedBox(height: 14),
                     _ActiveGenerationCard(generation: generation),
                     const SizedBox(height: 14),
                     if (generation.canCancelQueued) ...[

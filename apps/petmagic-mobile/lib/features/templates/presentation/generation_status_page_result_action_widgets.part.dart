@@ -249,6 +249,7 @@ String _useAsInputLabel(AppLocalizations text) =>
 
 class _FailedActions extends StatelessWidget {
   const _FailedActions({
+    required this.isPhotoFailure,
     required this.onPickAnotherPhoto,
     required this.onRetry,
     required this.onSupport,
@@ -257,6 +258,7 @@ class _FailedActions extends StatelessWidget {
   final VoidCallback onPickAnotherPhoto;
   final VoidCallback onRetry;
   final VoidCallback onSupport;
+  final bool isPhotoFailure;
 
   @override
   Widget build(BuildContext context) {
@@ -264,19 +266,59 @@ class _FailedActions extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        FilledButton(
-          onPressed: onPickAnotherPhoto,
-          child: Text(text.generationStatusPickAnotherPhotoAction),
+        SizedBox(
+          height: 58,
+          child: FilledButton.icon(
+            onPressed: isPhotoFailure ? onPickAnotherPhoto : onRetry,
+            icon: Icon(
+              isPhotoFailure
+                  ? Icons.photo_library_outlined
+                  : Icons.refresh_rounded,
+            ),
+            label: Text(
+              isPhotoFailure
+                  ? text.generationStatusPickAnotherPhotoAction
+                  : text.generationStatusRetryAction,
+            ),
+          ),
         ),
         const SizedBox(height: 8),
-        OutlinedButton(
-          onPressed: onRetry,
-          child: Text(text.generationStatusRetryAction),
+        SizedBox(
+          height: 58,
+          child: OutlinedButton.icon(
+            onPressed: isPhotoFailure ? onRetry : onPickAnotherPhoto,
+            icon: Icon(
+              isPhotoFailure
+                  ? Icons.refresh_rounded
+                  : Icons.photo_library_outlined,
+            ),
+            label: Text(
+              isPhotoFailure
+                  ? text.generationStatusRetryAction
+                  : text.generationStatusPickAnotherPhotoAction,
+            ),
+          ),
         ),
-        const SizedBox(height: 8),
-        OutlinedButton(
-          onPressed: onSupport,
-          child: Text(text.generationStatusContactSupportAction),
+        const SizedBox(height: 20),
+        Divider(color: context.petMagicColors.border.withValues(alpha: 0.7)),
+        const SizedBox(height: 14),
+        Center(
+          child: Column(
+            children: [
+              Text(
+                text.generationStatusSupportPrompt,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: context.petMagicColors.textMuted,
+                ),
+              ),
+              TextButton.icon(
+                onPressed: onSupport,
+                iconAlignment: IconAlignment.end,
+                icon: const Icon(Icons.arrow_forward_rounded, size: 18),
+                label: Text(text.generationStatusContactSupportAction),
+              ),
+            ],
+          ),
         ),
       ],
     );

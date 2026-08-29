@@ -3592,6 +3592,25 @@ class AppLocalizationsPl extends AppLocalizations {
       'Skontaktuj się ze wsparciem';
 
   @override
+  String get generationStatusSupportShortAction => 'Support';
+
+  @override
+  String get generationStatusActionsTitle => 'Actions';
+
+  @override
+  String get generationStatusActionsSubtitle => 'What would you like to do?';
+
+  @override
+  String get generationStatusRetryActionSubtitle =>
+      'Repeat the current generation';
+
+  @override
+  String get generationStatusPickAnotherPhotoSubtitle => 'Use a new image';
+
+  @override
+  String get generationStatusContactSupportSubtitle => 'If the problem repeats';
+
+  @override
   String get generationStatusOpenGalleryAction => 'Otwórz galerię';
 
   @override
@@ -3661,6 +3680,9 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get generationStatusFailedTitle => 'Nie udało się utworzyć wyniku';
+
+  @override
+  String get generationStatusTechnicalError => 'Technical error';
 
   @override
   String get generationStatusTokensRefundedHint =>
@@ -3793,7 +3815,25 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get generationStatusFailureTechnicalHint =>
-      'Nie udało się utworzyć wyniku z powodu problemu technicznego. Tokeny zostały zwrócone na Twoje saldo.';
+      'Podczas generowania wystąpił błąd techniczny.';
+
+  @override
+  String generationStatusRefundedBalance(Object count) {
+    return '$count PawSpark wróciło na Twoje saldo';
+  }
+
+  @override
+  String get generationStatusRefundPending => 'Trwa zwrot PawSpark';
+
+  @override
+  String get generationStatusRefundFailed =>
+      'Nie udało się automatycznie zwrócić PawSpark';
+
+  @override
+  String get generationStatusSupportPrompt => 'Problem się powtarza?';
+
+  @override
+  String get generationStatusOptionalLabel => 'Opcjonalne';
 
   @override
   String get generationStatusStatusCompleted => 'Twój wynik jest gotowy';

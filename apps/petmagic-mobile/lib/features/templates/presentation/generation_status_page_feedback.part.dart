@@ -152,12 +152,23 @@ class _FailedFeedbackCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            text.failedTitle,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              color: colors.textStrong,
-              fontWeight: FontWeight.w800,
-            ),
+          Row(
+            children: [
+              Text(
+                text.failedTitle,
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: colors.textStrong,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                text.optionalLabel,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: colors.textMuted),
+              ),
+            ],
           ),
           const SizedBox(height: 10),
           Wrap(
@@ -281,6 +292,7 @@ class _FeedbackText {
   const _FeedbackText({
     required this.failedTitle,
     required this.failedReasons,
+    required this.optionalLabel,
     required this.reportTitle,
     required this.reportReasons,
     required this.commentLabel,
@@ -290,6 +302,7 @@ class _FeedbackText {
 
   final String failedTitle;
   final List<(String, String)> failedReasons;
+  final String optionalLabel;
   final String reportTitle;
   final List<(String, String)> reportReasons;
   final String commentLabel;
@@ -302,12 +315,12 @@ _FeedbackText _feedbackText(BuildContext context) {
   return _FeedbackText(
     failedTitle: text.generationStatusFailedFeedbackTitle,
     failedReasons: [
-      ('not_completed', text.generationStatusFailedFeedbackNotCompleted),
-      ('too_long', text.generationStatusFailedFeedbackTooLong),
-      ('credits_charged', text.generationStatusFailedFeedbackPawSparkCharged),
       ('stuck', text.generationStatusFailedFeedbackStuck),
+      ('too_long', text.generationStatusFailedFeedbackTooLong),
+      ('not_completed', text.generationStatusFailedFeedbackNotCompleted),
       ('other', text.generationStatusFailedFeedbackOther),
     ],
+    optionalLabel: text.generationStatusOptionalLabel,
     reportTitle: text.generationStatusReportFeedbackTitle,
     reportReasons: [
       ('low_quality', text.generationStatusReportFeedbackLowQuality),

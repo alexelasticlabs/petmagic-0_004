@@ -3154,7 +3154,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get templateTryAction => 'Попробовать шаблон';
 
   @override
-  String get templateUnlockPremiumAction => 'Разблокировать Premium';
+  String get templateUnlockPremiumAction => 'Открыть Premium';
 
   @override
   String get templateGuestPreview => 'Гостевой просмотр';
@@ -3567,6 +3567,27 @@ class AppLocalizationsRu extends AppLocalizations {
   String get generationStatusContactSupportAction => 'Сообщить в поддержку';
 
   @override
+  String get generationStatusSupportShortAction => 'Поддержка';
+
+  @override
+  String get generationStatusActionsTitle => 'Действия';
+
+  @override
+  String get generationStatusActionsSubtitle => 'Что вы хотите сделать?';
+
+  @override
+  String get generationStatusRetryActionSubtitle =>
+      'Повторить текущую генерацию';
+
+  @override
+  String get generationStatusPickAnotherPhotoSubtitle =>
+      'Использовать новое изображение';
+
+  @override
+  String get generationStatusContactSupportSubtitle =>
+      'Если проблема повторяется';
+
+  @override
   String get generationStatusOpenGalleryAction => 'Открыть галерею';
 
   @override
@@ -3636,6 +3657,9 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get generationStatusFailedTitle => 'Не удалось создать результат';
+
+  @override
+  String get generationStatusTechnicalError => 'Техническая ошибка';
 
   @override
   String get generationStatusTokensRefundedHint =>
@@ -3767,7 +3791,25 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get generationStatusFailureTechnicalHint =>
-      'Не удалось создать результат из-за технической ошибки. Мы вернули PawSpark на ваш баланс.';
+      'Во время генерации произошла техническая ошибка.';
+
+  @override
+  String generationStatusRefundedBalance(Object count) {
+    return '$count PawSpark возвращены на баланс';
+  }
+
+  @override
+  String get generationStatusRefundPending => 'Возврат PawSpark обрабатывается';
+
+  @override
+  String get generationStatusRefundFailed =>
+      'Не удалось автоматически вернуть PawSpark';
+
+  @override
+  String get generationStatusSupportPrompt => 'Проблема повторяется?';
+
+  @override
+  String get generationStatusOptionalLabel => 'Необязательно';
 
   @override
   String get generationStatusStatusCompleted => 'Ваш результат готов';

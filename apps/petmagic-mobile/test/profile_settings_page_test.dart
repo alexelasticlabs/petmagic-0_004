@@ -47,6 +47,7 @@ void main() {
     expect(find.byIcon(Icons.close_rounded), findsOneWidget);
     expect(find.byType(Radio<Locale>), findsNothing);
     expect(find.text(text.walletRedeemCancelAction), findsNothing);
+    expect(tester.getTopLeft(find.byType(BottomSheet).last).dy, greaterThan(0));
 
     await tester.tap(find.text('EN'));
     await tester.pumpAndSettle();
@@ -108,12 +109,7 @@ void main() {
     expect(find.text(text.profileSettingsThemeDark), findsOneWidget);
     expect(find.byIcon(Icons.close_rounded), findsOneWidget);
     expect(find.text(text.walletRedeemCancelAction), findsNothing);
-    final bottomSheets = find.byType(BottomSheet);
-    expect(
-      tester.getTopLeft(bottomSheets.last).dy,
-      0,
-      reason: 'Theme selection must begin at the top edge of the screen.',
-    );
+    expect(tester.getTopLeft(find.byType(BottomSheet).last).dy, greaterThan(0));
 
     await tester.tap(find.text(text.profileSettingsThemeDark));
     await tester.pumpAndSettle();

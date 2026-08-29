@@ -3192,7 +3192,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get templateTryAction => 'Vorlage ausprobieren';
 
   @override
-  String get templateUnlockPremiumAction => 'Premium freischalten';
+  String get templateUnlockPremiumAction => 'Premium öffnen';
 
   @override
   String get templateGuestPreview => 'Gastvorschau';
@@ -3615,6 +3615,25 @@ class AppLocalizationsDe extends AppLocalizations {
   String get generationStatusContactSupportAction => 'Support kontaktieren';
 
   @override
+  String get generationStatusSupportShortAction => 'Support';
+
+  @override
+  String get generationStatusActionsTitle => 'Actions';
+
+  @override
+  String get generationStatusActionsSubtitle => 'What would you like to do?';
+
+  @override
+  String get generationStatusRetryActionSubtitle =>
+      'Repeat the current generation';
+
+  @override
+  String get generationStatusPickAnotherPhotoSubtitle => 'Use a new image';
+
+  @override
+  String get generationStatusContactSupportSubtitle => 'If the problem repeats';
+
+  @override
   String get generationStatusOpenGalleryAction => 'Galerie offnen';
 
   @override
@@ -3686,6 +3705,9 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get generationStatusFailedTitle =>
       'Ergebnis konnte nicht erstellt werden';
+
+  @override
+  String get generationStatusTechnicalError => 'Technical error';
 
   @override
   String get generationStatusTokensRefundedHint =>
@@ -3818,7 +3840,26 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get generationStatusFailureTechnicalHint =>
-      'Das Ergebnis konnte wegen eines technischen Problems nicht erstellt werden. PawSpark wurden deinem Guthaben zurückerstattet.';
+      'Während der Generierung ist ein technischer Fehler aufgetreten.';
+
+  @override
+  String generationStatusRefundedBalance(Object count) {
+    return '$count PawSpark wurden deinem Guthaben zurückgegeben';
+  }
+
+  @override
+  String get generationStatusRefundPending =>
+      'Die PawSpark-Rückerstattung wird bearbeitet';
+
+  @override
+  String get generationStatusRefundFailed =>
+      'PawSpark konnten nicht automatisch zurückgegeben werden';
+
+  @override
+  String get generationStatusSupportPrompt => 'Tritt das Problem erneut auf?';
+
+  @override
+  String get generationStatusOptionalLabel => 'Freiwillig';
 
   @override
   String get generationStatusStatusCompleted => 'Dein Ergebnis ist fertig';

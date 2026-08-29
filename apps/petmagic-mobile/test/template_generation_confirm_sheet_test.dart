@@ -9,7 +9,7 @@ import 'package:petmagic_mobile/features/templates/presentation/widgets/template
 
 void main() {
   testWidgets(
-    'generation confirmation is full screen and stays overflow-free on compact displays',
+    'generation confirmation stays compact and overflow-free on compact displays',
     (tester) async {
       tester.view.physicalSize = const Size(320, 568);
       tester.view.devicePixelRatio = 1;
@@ -24,7 +24,10 @@ void main() {
       await tester.tap(find.text('Open'));
       await tester.pumpAndSettle();
 
-      expect(tester.getTopLeft(find.byType(BottomSheet).last).dy, 0);
+      expect(
+        tester.getTopLeft(find.byType(BottomSheet).last).dy,
+        greaterThan(0),
+      );
       expect(find.text('Ready to create'), findsOneWidget);
       expect(find.text('Usually takes 10–60 seconds'), findsOneWidget);
       expect(find.text('Create magic'), findsOneWidget);

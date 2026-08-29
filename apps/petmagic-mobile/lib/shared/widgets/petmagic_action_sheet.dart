@@ -12,21 +12,17 @@ enum PetMagicActionSheetStep { main, uploadSource }
 Future<PetMagicActionSheetResult?> showPetMagicActionSheet(
   BuildContext context,
 ) {
-  final screenHeight = Overlay.of(
-    context,
-    rootOverlay: true,
-  ).context.size!.height;
-
   return showPetMagicModalBottomSheet<PetMagicActionSheetResult>(
     context: context,
     isScrollControlled: true,
     useSafeArea: false,
     backgroundColor: Colors.transparent,
     barrierColor: Theme.of(context).colorScheme.scrim.withValues(alpha: 0.55),
-    constraints: BoxConstraints.tightFor(height: screenHeight),
+    constraints: BoxConstraints(
+      maxHeight: MediaQuery.sizeOf(context).height * 0.82,
+    ),
     builder: (sheetContext, bottomInset) => PetMagicActionSheet(
       bottomInset: bottomInset,
-      screenHeight: screenHeight,
       onPickFromGallery: () =>
           Navigator.of(sheetContext).pop(PetMagicActionSheetResult.gallery),
       onOpenCamera: () =>
@@ -44,14 +40,12 @@ class PetMagicActionSheet extends StatefulWidget {
     required this.onOpenCamera,
     required this.onSelectExistingPet,
     this.bottomInset = 0,
-    this.screenHeight,
   });
 
   final VoidCallback onPickFromGallery;
   final VoidCallback onOpenCamera;
   final VoidCallback onSelectExistingPet;
   final double bottomInset;
-  final double? screenHeight;
 
   @override
   State<PetMagicActionSheet> createState() => _PetMagicActionSheetState();
@@ -63,12 +57,6 @@ class _PetMagicActionSheetState extends State<PetMagicActionSheet> {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
-    final screenHeight =
-        widget.screenHeight ?? MediaQuery.sizeOf(context).height;
-    final contentHeight = (screenHeight - widget.bottomInset)
-        .clamp(0.0, screenHeight)
-        .toDouble();
-
     return PopScope<void>(
       canPop: _step == PetMagicActionSheetStep.main,
       onPopInvokedWithResult: (didPop, result) {
@@ -85,15 +73,9 @@ class _PetMagicActionSheetState extends State<PetMagicActionSheet> {
         bottom: false,
         child: Padding(
           padding: EdgeInsets.only(bottom: widget.bottomInset),
-          child: SizedBox(
-            height: contentHeight,
-            width: double.infinity,
-            child: ClipRRect(
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(30),
-              ),
-              child: _buildSheetSurface(context, colors: colors),
-            ),
+          child: ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+            child: _buildSheetSurface(context, colors: colors),
           ),
         ),
       ),
@@ -107,7 +89,7 @@ class _PetMagicActionSheetState extends State<PetMagicActionSheet> {
     return DecoratedBox(
       decoration: BoxDecoration(color: colors.surface),
       child: SafeArea(
-        top: true,
+        top: false,
         bottom: false,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),

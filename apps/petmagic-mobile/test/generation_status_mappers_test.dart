@@ -189,7 +189,36 @@ void main() {
         text.generationStatusEtaStartsSoon,
       );
     });
+
+    test('photo failures are identified without changing generic retry', () {
+      expect(
+        isPhotoFailure(
+          _generationWithFailure(failureCode: 'source_photo_invalid'),
+        ),
+        true,
+      );
+      expect(
+        isPhotoFailure(_generationWithFailure(failureCode: 'provider_timeout')),
+        false,
+      );
+    });
   });
+}
+
+TemplateGenerationResult _generationWithFailure({required String failureCode}) {
+  final now = DateTime.utc(2026, 6, 15, 12);
+  return TemplateGenerationResult(
+    generationId: 'generation-1',
+    userId: 'user-1',
+    templateId: 'template-1',
+    status: TemplateGenerationStatus.failed,
+    tokenCost: 3,
+    attemptCount: 1,
+    createdAtUtc: now,
+    updatedAtUtc: now,
+    userMediaExpired: false,
+    failureCode: failureCode,
+  );
 }
 
 TemplateGenerationResult _generation({

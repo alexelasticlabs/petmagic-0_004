@@ -3146,7 +3146,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get templateTryAction => 'Try template';
 
   @override
-  String get templateUnlockPremiumAction => 'Unlock Premium';
+  String get templateUnlockPremiumAction => 'Open Premium';
 
   @override
   String get templateGuestPreview => 'Guest preview';
@@ -3560,6 +3560,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String get generationStatusContactSupportAction => 'Contact support';
 
   @override
+  String get generationStatusSupportShortAction => 'Support';
+
+  @override
+  String get generationStatusActionsTitle => 'Actions';
+
+  @override
+  String get generationStatusActionsSubtitle => 'What would you like to do?';
+
+  @override
+  String get generationStatusRetryActionSubtitle =>
+      'Repeat the current generation';
+
+  @override
+  String get generationStatusPickAnotherPhotoSubtitle => 'Use a new image';
+
+  @override
+  String get generationStatusContactSupportSubtitle => 'If the problem repeats';
+
+  @override
   String get generationStatusOpenGalleryAction => 'Open gallery';
 
   @override
@@ -3629,6 +3648,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get generationStatusFailedTitle => 'Could not create result';
+
+  @override
+  String get generationStatusTechnicalError => 'Technical error';
 
   @override
   String get generationStatusTokensRefundedHint =>
@@ -3759,7 +3781,26 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get generationStatusFailureTechnicalHint =>
-      'Could not create the result due to a technical issue. PawSpark were returned to your balance.';
+      'A technical issue occurred during generation.';
+
+  @override
+  String generationStatusRefundedBalance(Object count) {
+    return '$count PawSpark returned to your balance';
+  }
+
+  @override
+  String get generationStatusRefundPending =>
+      'PawSpark refund is being processed';
+
+  @override
+  String get generationStatusRefundFailed =>
+      'Could not return PawSpark automatically';
+
+  @override
+  String get generationStatusSupportPrompt => 'Problem repeats?';
+
+  @override
+  String get generationStatusOptionalLabel => 'Optional';
 
   @override
   String get generationStatusStatusCompleted => 'Your result is ready';

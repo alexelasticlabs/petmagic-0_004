@@ -544,46 +544,47 @@ void main() {
     );
   });
 
-  testWidgets('failed filter renders reason and recovery actions', (
-    tester,
-  ) async {
-    await tester.binding.setSurfaceSize(const Size(390, 900));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
+  testWidgets(
+    'failed filter renders compact status, refund and recovery actions',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
 
-    final harness = GalleryHarness();
-    addTearDown(harness.router.dispose);
+      final harness = GalleryHarness();
+      addTearDown(harness.router.dispose);
 
-    await tester.pumpWidget(harness.app());
-    await tester.pumpAndSettle();
-    final text = galleryText(tester);
+      await tester.pumpWidget(harness.app());
+      await tester.pumpAndSettle();
+      final text = galleryText(tester);
 
-    final failedChip = find.widgetWithText(
-      ChoiceChip,
-      text.generationStatusFilterFailed,
-    );
-    await tester.ensureVisible(failedChip);
-    await tester.tap(failedChip, warnIfMissed: false);
-    await tester.pumpAndSettle();
+      final failedChip = find.widgetWithText(
+        ChoiceChip,
+        text.generationStatusFilterFailed,
+      );
+      await tester.ensureVisible(failedChip);
+      await tester.tap(failedChip, warnIfMissed: false);
+      await tester.pumpAndSettle();
 
-    expect(harness.controller.loadCalls.last, GenerationHistoryFilter.failed);
-    expect(find.text('Funny Hoodie'), findsOneWidget);
-    expect(find.text('Movie Star Pet Poster'), findsNothing);
-    expect(find.text('Little Space Explorer'), findsNothing);
-    expect(find.text(text.generationStatusFailedTitle), findsOneWidget);
-    expect(
-      find.text(text.generationStatusFailureTechnicalHint),
-      findsOneWidget,
-    );
-    expect(find.text(text.generationStatusTokensRefundedShort), findsOneWidget);
-    expect(
-      find.text(text.generationStatusPickAnotherPhotoAction),
-      findsOneWidget,
-    );
-    expect(
-      find.text(text.generationStatusContactSupportAction),
-      findsOneWidget,
-    );
-  });
+      expect(harness.controller.loadCalls.last, GenerationHistoryFilter.failed);
+      expect(find.text('Funny Hoodie'), findsOneWidget);
+      expect(find.text('Movie Star Pet Poster'), findsNothing);
+      expect(find.text('Little Space Explorer'), findsNothing);
+      expect(find.text(text.generationStatusTechnicalError), findsOneWidget);
+      expect(
+        find.text(text.generationStatusRefundedBalance(60)),
+        findsOneWidget,
+      );
+      expect(find.text(text.generationStatusRetryAction), findsOneWidget);
+      expect(
+        find.text(text.generationStatusPickAnotherPhotoAction),
+        findsOneWidget,
+      );
+      expect(
+        find.text(text.generationStatusSupportShortAction),
+        findsOneWidget,
+      );
+    },
+  );
 
   testWidgets('ready card action sheet exposes all actions and opens details', (
     tester,
@@ -750,19 +751,12 @@ void main() {
     expect(actionsSource, isNot(contains('generation.status.name')));
   });
 
-  test('gallery gold CTA foreground is derived from its button tone', () {
+  test('gallery premium upsell avoids a separate gold CTA', () {
     final chromeSource = _readGalleryChromeSource();
 
-    expect(chromeSource, contains('final backgroundColor = colors.gold;'));
-    expect(
-      chromeSource,
-      contains('final foregroundColor = colors.on(backgroundColor);'),
-    );
-    expect(chromeSource, isNot(contains('Color(0xFFF5BD3E)')));
-    expect(
-      chromeSource,
-      isNot(contains('foregroundColor: const Color(0xFF241403)')),
-    );
+    expect(chromeSource, isNot(contains('PremiumShimmerButton')));
+    expect(chromeSource, isNot(contains('_GalleryGoldShimmerButton')));
+    expect(chromeSource, isNot(contains('boxShadow:')));
   });
 
   test('gallery premium upsell uses theme tokens for chrome copy', () {
@@ -771,10 +765,10 @@ void main() {
     expect(chromeSource, contains('final accent = colors.gold;'));
     expect(
       chromeSource,
-      contains('border: Border.all(color: accent.withValues(alpha: 0.74))'),
+      contains('border: Border.all(color: accent.withValues(alpha: 0.24))'),
     );
     expect(chromeSource, contains('color: colors.textStrong'));
-    expect(chromeSource, contains('colors.textSoft.withValues('));
+    expect(chromeSource, contains('color: colors.textSoft'));
     expect(chromeSource, isNot(contains('const Color(0xFFF2C14E)')));
     expect(chromeSource, isNot(contains('const Color(0xFFFFC342)')));
     expect(chromeSource, isNot(contains('const Color(0xFF735018)')));

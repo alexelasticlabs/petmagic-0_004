@@ -64,6 +64,7 @@ abstract final class GenerationCacheCodec {
       'estimatedDurationLabel': generation.estimatedDurationLabel,
       'chargedAtUtc': generation.chargedAtUtc?.toUtc().toIso8601String(),
       'refundedAtUtc': generation.refundedAtUtc?.toUtc().toIso8601String(),
+      'refundState': generation.refundState,
       'userMediaExpired': generation.userMediaExpired,
       'isUnread': generation.isUnread,
       'queuePosition': generation.queuePosition,

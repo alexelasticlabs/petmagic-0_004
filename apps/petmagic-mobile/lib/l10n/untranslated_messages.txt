@@ -1,1 +1,51 @@
-{}
+{
+  "de": [
+    "generationStatusSupportShortAction",
+    "generationStatusActionsTitle",
+    "generationStatusActionsSubtitle",
+    "generationStatusRetryActionSubtitle",
+    "generationStatusPickAnotherPhotoSubtitle",
+    "generationStatusContactSupportSubtitle",
+    "generationStatusTechnicalError"
+  ],
+
+  "es": [
+    "generationStatusSupportShortAction",
+    "generationStatusActionsTitle",
+    "generationStatusActionsSubtitle",
+    "generationStatusRetryActionSubtitle",
+    "generationStatusPickAnotherPhotoSubtitle",
+    "generationStatusContactSupportSubtitle",
+    "generationStatusTechnicalError"
+  ],
+
+  "fr": [
+    "generationStatusSupportShortAction",
+    "generationStatusActionsTitle",
+    "generationStatusActionsSubtitle",
+    "generationStatusRetryActionSubtitle",
+    "generationStatusPickAnotherPhotoSubtitle",
+    "generationStatusContactSupportSubtitle",
+    "generationStatusTechnicalError"
+  ],
+
+  "it": [
+    "generationStatusSupportShortAction",
+    "generationStatusActionsTitle",
+    "generationStatusActionsSubtitle",
+    "generationStatusRetryActionSubtitle",
+    "generationStatusPickAnotherPhotoSubtitle",
+    "generationStatusContactSupportSubtitle",
+    "generationStatusTechnicalError"
+  ],
+
+  "pl": [
+    "generationStatusSupportShortAction",
+    "generationStatusActionsTitle",
+    "generationStatusActionsSubtitle",
+    "generationStatusRetryActionSubtitle",
+    "generationStatusPickAnotherPhotoSubtitle",
+    "generationStatusContactSupportSubtitle",
+    "generationStatusTechnicalError"
+  ]
+}

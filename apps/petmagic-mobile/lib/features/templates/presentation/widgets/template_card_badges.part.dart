@@ -1,5 +1,6 @@
 part of 'template_card.dart';
 
+// ignore: unused_element
 class _TemplateFeaturedMetaChip extends StatelessWidget {
   const _TemplateFeaturedMetaChip({
     required this.icon,
@@ -256,7 +257,7 @@ class _TokenChip extends StatelessWidget {
               const SizedBox(width: 5),
             ],
             Text(
-              isFree ? text.freeLabel : '$cost',
+              isFree ? text.freeLabel : '$cost ${text.walletBalanceUnit}',
               style: textStyle?.copyWith(
                 color: Colors.white,
                 fontSize: 12,
@@ -300,6 +301,7 @@ class _TagChip extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 class _MusicDescription extends StatelessWidget {
   const _MusicDescription({required this.text});
 
@@ -401,6 +403,7 @@ class _AccessTag extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 String? _formatFeaturedCountdown(DateTime? target) {
   if (target == null) {
     return null;
@@ -428,6 +431,7 @@ String? _formatFeaturedCountdown(DateTime? target) {
   return '$totalHours:$minutes';
 }
 
+// ignore: unused_element
 String? _formatFeaturedPopularity(
   BuildContext context,
   int? popularityCount, {

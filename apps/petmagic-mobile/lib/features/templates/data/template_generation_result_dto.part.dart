@@ -32,6 +32,7 @@ class TemplateGenerationDto {
     this.estimatedDurationLabel,
     this.chargedAtUtc,
     this.refundedAtUtc,
+    this.refundState = 'not_applicable',
     this.isUnread = false,
     this.queuePosition,
     this.estimatedWaitSeconds,
@@ -88,6 +89,7 @@ class TemplateGenerationDto {
   final String? estimatedDurationLabel;
   final DateTime? chargedAtUtc;
   final DateTime? refundedAtUtc;
+  final String refundState;
   final bool userMediaExpired;
   final bool isUnread;
   final int? queuePosition;
@@ -164,6 +166,7 @@ class TemplateGenerationDto {
       estimatedDurationLabel: json['estimatedDurationLabel'] as String?,
       chargedAtUtc: _dateTime(json['chargedAtUtc']),
       refundedAtUtc: _dateTime(json['refundedAtUtc']),
+      refundState: json['refundState'] as String? ?? 'not_applicable',
       userMediaExpired:
           media?.state == GalleryMediaState.expired ||
           (json['userMediaExpired'] as bool? ?? false),
@@ -238,6 +241,7 @@ class TemplateGenerationDto {
       completedAtUtc: completedAtUtc,
       chargedAtUtc: chargedAtUtc,
       refundedAtUtc: refundedAtUtc,
+      refundState: refundState,
       userMediaExpired: userMediaExpired,
       isUnread: isUnread,
       queuePosition: queuePosition,

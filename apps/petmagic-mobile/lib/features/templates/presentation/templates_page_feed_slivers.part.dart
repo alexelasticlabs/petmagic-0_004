@@ -204,15 +204,26 @@ class _TemplateFeedSliversState extends ConsumerState<_TemplateFeedSlivers> {
                   final template = entry.template;
                   final featured = entry.templateOfTheDay;
                   if (featured != null) {
-                    return TemplateOfTheDayCard(
+                    return TemplateCard(
                       key: ValueKey(
                         _templateCardIdentity(
                           template: template,
                           featured: featured,
                         ),
                       ),
-                      template: featured,
+                      template: template,
                       hasPremiumAccess: hasPremiumAccess,
+                      imageCacheWidth: imageCacheWidth,
+                      playbackManager: playbackManager,
+                      featuredData: TemplateCardFeaturedData(
+                        badgeLabel: text.templateOfTheDayFeedBadge,
+                        actionLabel: text.templateTryAction,
+                        countdownTarget: _templateOfTheDayCountdownTarget(
+                          featured,
+                        ),
+                        popularityCount: featured.popularityCount,
+                        isNew: featured.isNew,
+                      ),
                       onPressed: () =>
                           widget.onTemplateOfTheDaySelected(featured),
                     );

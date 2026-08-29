@@ -83,6 +83,16 @@ String failureReasonMessage(
   return text.generationStatusFailureTechnicalHint;
 }
 
+bool isPhotoFailure(TemplateGenerationResult generation) {
+  final combined =
+      '${generation.failureCode ?? ''} ${generation.failureMessage ?? ''}'
+          .toLowerCase();
+  return combined.contains('photo') ||
+      combined.contains('face') ||
+      combined.contains('pet') ||
+      combined.contains('quality');
+}
+
 String galleryMediaStateMessage(
   AppLocalizations text,
   TemplateGenerationResult generation,

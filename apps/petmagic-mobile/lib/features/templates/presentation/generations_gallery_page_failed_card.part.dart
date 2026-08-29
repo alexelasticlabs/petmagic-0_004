@@ -15,8 +15,6 @@ class _FailedCard extends ConsumerWidget {
     )?.toString();
     final canRenderPreview = canRenderImagePreview(safePreviewImageUrl);
     final localPreviewFile = _localMediaFile(generation.localPreviewPath);
-    final failureReason = failureReasonMessage(text, generation);
-
     void openGeneration() {
       if (generation.isUnread) {
         ref
@@ -27,6 +25,11 @@ class _FailedCard extends ConsumerWidget {
     }
 
     void pickAnotherPhoto() {
+      context.appNavigator.go(_templatesDestinationForGeneration(generation));
+    }
+
+    void retryGeneration() {
+      _notifySoon(context, text.generationStatusRetrySoonMessage);
       context.appNavigator.go(_templatesDestinationForGeneration(generation));
     }
 
@@ -47,18 +50,11 @@ class _FailedCard extends ConsumerWidget {
         child: Ink(
           decoration: BoxDecoration(
             color: colors.surfaceGlass,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: colors.border.withValues(alpha: 0.7)),
-            boxShadow: [
-              BoxShadow(
-                color: colors.shadow.withValues(alpha: 0.14),
-                blurRadius: 16,
-                offset: const Offset(0, 6),
-              ),
-            ],
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: colors.border.withValues(alpha: 0.45)),
           ),
           child: Padding(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -66,13 +62,13 @@ class _FailedCard extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     SizedBox(
-                      width: 88,
-                      height: 88,
+                      width: 120,
+                      height: 120,
                       child: Stack(
                         children: [
                           Positioned.fill(
                             child: ClipRRect(
-                              borderRadius: BorderRadius.circular(16),
+                              borderRadius: BorderRadius.circular(18),
                               child: localPreviewFile != null
                                   ? Image.file(
                                       localPreviewFile,
@@ -112,127 +108,240 @@ class _FailedCard extends ConsumerWidget {
                         ],
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 14),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            generation.templateTitle ??
-                                text.generationStatusResultTitle,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.titleMedium
-                                ?.copyWith(
-                                  color: colors.textStrong,
-                                  fontWeight: FontWeight.w900,
+                      child: SizedBox(
+                        height: 120,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    generation.templateTitle ??
+                                        text.generationStatusResultTitle,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(
+                                          color: colors.textStrong,
+                                          fontWeight: FontWeight.w900,
+                                          height: 1.12,
+                                        ),
+                                  ),
                                 ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '${typeLabel(text, generation)} · ${generation.tokenCost} ${text.walletBalanceUnit}',
-                            style: Theme.of(context).textTheme.labelMedium
-                                ?.copyWith(
-                                  color: colors.textMuted,
-                                  fontWeight: FontWeight.w700,
+                                IconButton(
+                                  visualDensity: VisualDensity.compact,
+                                  onPressed: () => _showFailedCardActions(
+                                    context,
+                                    text,
+                                    ref,
+                                    generation,
+                                  ),
+                                  icon: Icon(
+                                    Icons.more_vert_rounded,
+                                    color: colors.textMuted,
+                                  ),
                                 ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            text.generationStatusFailedTitle,
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(
-                                  color: colors.danger,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                          ),
-                          if (generation.refundedAtUtc != null ||
-                              generation.tokenCost > 0)
+                              ],
+                            ),
+                            const SizedBox(height: 4),
                             Text(
-                              text.generationStatusTokensRefundedShort,
+                              '${typeLabel(text, generation)} · ${generation.tokenCost} ${text.walletBalanceUnit}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: Theme.of(context).textTheme.labelMedium
                                   ?.copyWith(
                                     color: colors.textMuted,
-                                    fontWeight: FontWeight.w600,
+                                    fontWeight: FontWeight.w700,
                                   ),
                             ),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: () => _showFailedCardActions(
-                        context,
-                        text,
-                        ref,
-                        generation,
-                      ),
-                      icon: Icon(
-                        Icons.more_vert_rounded,
-                        color: colors.textMuted,
+                            const Spacer(),
+                            _FailedGenerationStatusLine(
+                              icon: Icons.error_outline_rounded,
+                              label: text.generationStatusTechnicalError,
+                              color: colors.danger,
+                            ),
+                            if (_shouldShowRefundStatus(generation)) ...[
+                              const SizedBox(height: 7),
+                              _FailedGenerationStatusLine(
+                                icon: _refundStatusIcon(generation),
+                                label: _refundStatusLabel(text, generation),
+                                color: _refundStatusColor(colors, generation),
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: colors.surfaceStrong.withValues(alpha: 0.75),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: colors.border.withValues(alpha: 0.7),
-                    ),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(
-                          Icons.info_outline_rounded,
-                          size: 16,
-                          color: colors.gold,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            failureReason,
-                            style: Theme.of(context).textTheme.labelMedium
-                                ?.copyWith(
-                                  color: colors.textSoft,
-                                  height: 1.25,
-                                ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                const SizedBox(height: 16),
+                Divider(
+                  color: colors.border.withValues(alpha: 0.45),
+                  height: 1,
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 14),
                 FilledButton(
-                  onPressed: pickAnotherPhoto,
+                  onPressed: retryGeneration,
                   style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(56),
                     backgroundColor: colors.accent,
                     foregroundColor: colors.backgroundBottom,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
                   ),
-                  child: Text(text.generationStatusPickAnotherPhotoAction),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.refresh_rounded, size: 20),
+                      const SizedBox(width: 8),
+                      Text(text.generationStatusRetryAction),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 8),
-                OutlinedButton(
-                  onPressed: openSupport,
-                  child: Text(text.generationStatusContactSupportAction),
-                ),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: openGeneration,
-                    child: Text(text.generationStatusOpenStatusAction),
+                TextButton(
+                  onPressed: pickAnotherPhoto,
+                  style: TextButton.styleFrom(
+                    foregroundColor: colors.textSoft,
+                    padding: const EdgeInsets.symmetric(vertical: 10),
                   ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(text.generationStatusPickAnotherPhotoAction),
+                      const SizedBox(width: 6),
+                      const Icon(Icons.arrow_forward_rounded, size: 18),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Divider(
+                  color: colors.border.withValues(alpha: 0.45),
+                  height: 1,
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton(
+                          onPressed: openGeneration,
+                          style: TextButton.styleFrom(
+                            foregroundColor: colors.textSoft,
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                          ),
+                          child: Text(
+                            text.generationStatusDetailsTitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: openSupport,
+                          style: TextButton.styleFrom(
+                            foregroundColor: colors.textSoft,
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(text.generationStatusSupportShortAction),
+                              const SizedBox(width: 4),
+                              const Icon(Icons.arrow_forward_rounded, size: 16),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+bool _shouldShowRefundStatus(TemplateGenerationResult generation) =>
+    generation.tokenCost > 0 &&
+    (generation.refundedAtUtc != null ||
+        generation.refundState == 'refunded' ||
+        generation.refundState == 'pending' ||
+        generation.refundState == 'failed');
+
+String _refundStatusLabel(
+  AppLocalizations text,
+  TemplateGenerationResult generation,
+) {
+  return switch (generation.refundState) {
+    'pending' => text.generationStatusRefundPending,
+    'failed' => text.generationStatusRefundFailed,
+    _ => text.generationStatusRefundedBalance(generation.tokenCost),
+  };
+}
+
+IconData _refundStatusIcon(TemplateGenerationResult generation) {
+  return switch (generation.refundState) {
+    'pending' => Icons.schedule_rounded,
+    'failed' => Icons.error_outline_rounded,
+    _ => Icons.check_rounded,
+  };
+}
+
+Color _refundStatusColor(
+  PetMagicColors colors,
+  TemplateGenerationResult generation,
+) {
+  return switch (generation.refundState) {
+    'failed' => colors.danger,
+    'pending' => colors.textMuted,
+    _ => colors.accent,
+  };
+}
+
+class _FailedGenerationStatusLine extends StatelessWidget {
+  const _FailedGenerationStatusLine({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: color),
+        const SizedBox(width: 7),
+        Expanded(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

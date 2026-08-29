@@ -3613,6 +3613,25 @@ class AppLocalizationsIt extends AppLocalizations {
   String get generationStatusContactSupportAction => 'Contatta supporto';
 
   @override
+  String get generationStatusSupportShortAction => 'Support';
+
+  @override
+  String get generationStatusActionsTitle => 'Actions';
+
+  @override
+  String get generationStatusActionsSubtitle => 'What would you like to do?';
+
+  @override
+  String get generationStatusRetryActionSubtitle =>
+      'Repeat the current generation';
+
+  @override
+  String get generationStatusPickAnotherPhotoSubtitle => 'Use a new image';
+
+  @override
+  String get generationStatusContactSupportSubtitle => 'If the problem repeats';
+
+  @override
   String get generationStatusOpenGalleryAction => 'Apri galleria';
 
   @override
@@ -3683,6 +3702,9 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get generationStatusFailedTitle => 'Impossibile creare il risultato';
+
+  @override
+  String get generationStatusTechnicalError => 'Technical error';
 
   @override
   String get generationStatusTokensRefundedHint =>
@@ -3816,7 +3838,26 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get generationStatusFailureTechnicalHint =>
-      'Impossibile creare il risultato a causa di un problema tecnico. I PawSpark sono stati restituiti al tuo saldo.';
+      'Si è verificato un errore tecnico durante la generazione.';
+
+  @override
+  String generationStatusRefundedBalance(Object count) {
+    return '$count PawSpark sono stati restituiti al tuo saldo';
+  }
+
+  @override
+  String get generationStatusRefundPending =>
+      'Il rimborso PawSpark è in elaborazione';
+
+  @override
+  String get generationStatusRefundFailed =>
+      'Impossibile restituire automaticamente i PawSpark';
+
+  @override
+  String get generationStatusSupportPrompt => 'Il problema si ripete?';
+
+  @override
+  String get generationStatusOptionalLabel => 'Facoltativo';
 
   @override
   String get generationStatusStatusCompleted => 'Il tuo risultato è pronto';

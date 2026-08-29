@@ -3206,7 +3206,7 @@ class AppLocalizationsFr extends AppLocalizations {
   String get templateTryAction => 'Essayer le modèle';
 
   @override
-  String get templateUnlockPremiumAction => 'Débloquer Premium';
+  String get templateUnlockPremiumAction => 'Ouvrir Premium';
 
   @override
   String get templateGuestPreview => 'Aperçu invité';
@@ -3628,6 +3628,25 @@ class AppLocalizationsFr extends AppLocalizations {
   String get generationStatusContactSupportAction => 'Contacter le support';
 
   @override
+  String get generationStatusSupportShortAction => 'Support';
+
+  @override
+  String get generationStatusActionsTitle => 'Actions';
+
+  @override
+  String get generationStatusActionsSubtitle => 'What would you like to do?';
+
+  @override
+  String get generationStatusRetryActionSubtitle =>
+      'Repeat the current generation';
+
+  @override
+  String get generationStatusPickAnotherPhotoSubtitle => 'Use a new image';
+
+  @override
+  String get generationStatusContactSupportSubtitle => 'If the problem repeats';
+
+  @override
   String get generationStatusOpenGalleryAction => 'Ouvrir la galerie';
 
   @override
@@ -3699,6 +3718,9 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get generationStatusFailedTitle => 'Impossible de créer le résultat';
+
+  @override
+  String get generationStatusTechnicalError => 'Technical error';
 
   @override
   String get generationStatusTokensRefundedHint =>
@@ -3833,7 +3855,26 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get generationStatusFailureTechnicalHint =>
-      'Impossible de créer le résultat en raison d\'un problème technique. Les PawSpark ont été recrédités sur votre solde.';
+      'Une erreur technique s\'est produite pendant la génération.';
+
+  @override
+  String generationStatusRefundedBalance(Object count) {
+    return '$count PawSpark ont été retournés sur votre solde';
+  }
+
+  @override
+  String get generationStatusRefundPending =>
+      'Le remboursement des PawSpark est en cours';
+
+  @override
+  String get generationStatusRefundFailed =>
+      'Impossible de retourner automatiquement les PawSpark';
+
+  @override
+  String get generationStatusSupportPrompt => 'Le problème se reproduit ?';
+
+  @override
+  String get generationStatusOptionalLabel => 'Facultatif';
 
   @override
   String get generationStatusStatusCompleted => 'Votre résultat est prêt';

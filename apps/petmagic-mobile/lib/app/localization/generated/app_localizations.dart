@@ -5703,7 +5703,7 @@ abstract class AppLocalizations {
   /// No description provided for @templateUnlockPremiumAction.
   ///
   /// In en, this message translates to:
-  /// **'Unlock Premium'**
+  /// **'Open Premium'**
   String get templateUnlockPremiumAction;
 
   /// No description provided for @templateGuestPreview.
@@ -6435,6 +6435,42 @@ abstract class AppLocalizations {
   /// **'Contact support'**
   String get generationStatusContactSupportAction;
 
+  /// No description provided for @generationStatusSupportShortAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Support'**
+  String get generationStatusSupportShortAction;
+
+  /// No description provided for @generationStatusActionsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Actions'**
+  String get generationStatusActionsTitle;
+
+  /// No description provided for @generationStatusActionsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'What would you like to do?'**
+  String get generationStatusActionsSubtitle;
+
+  /// No description provided for @generationStatusRetryActionSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Repeat the current generation'**
+  String get generationStatusRetryActionSubtitle;
+
+  /// No description provided for @generationStatusPickAnotherPhotoSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Use a new image'**
+  String get generationStatusPickAnotherPhotoSubtitle;
+
+  /// No description provided for @generationStatusContactSupportSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'If the problem repeats'**
+  String get generationStatusContactSupportSubtitle;
+
   /// No description provided for @generationStatusOpenGalleryAction.
   ///
   /// In en, this message translates to:
@@ -6560,6 +6596,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not create result'**
   String get generationStatusFailedTitle;
+
+  /// No description provided for @generationStatusTechnicalError.
+  ///
+  /// In en, this message translates to:
+  /// **'Technical error'**
+  String get generationStatusTechnicalError;
 
   /// No description provided for @generationStatusTokensRefundedHint.
   ///
@@ -6780,8 +6822,38 @@ abstract class AppLocalizations {
   /// No description provided for @generationStatusFailureTechnicalHint.
   ///
   /// In en, this message translates to:
-  /// **'Could not create the result due to a technical issue. PawSpark were returned to your balance.'**
+  /// **'A technical issue occurred during generation.'**
   String get generationStatusFailureTechnicalHint;
+
+  /// No description provided for @generationStatusRefundedBalance.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} PawSpark returned to your balance'**
+  String generationStatusRefundedBalance(Object count);
+
+  /// No description provided for @generationStatusRefundPending.
+  ///
+  /// In en, this message translates to:
+  /// **'PawSpark refund is being processed'**
+  String get generationStatusRefundPending;
+
+  /// No description provided for @generationStatusRefundFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not return PawSpark automatically'**
+  String get generationStatusRefundFailed;
+
+  /// No description provided for @generationStatusSupportPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Problem repeats?'**
+  String get generationStatusSupportPrompt;
+
+  /// No description provided for @generationStatusOptionalLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional'**
+  String get generationStatusOptionalLabel;
 
   /// No description provided for @generationStatusStatusCompleted.
   ///

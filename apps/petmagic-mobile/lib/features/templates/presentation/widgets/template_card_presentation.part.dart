@@ -80,65 +80,15 @@ class _TemplateDetails extends StatelessWidget {
     final titleStyle = Theme.of(context).textTheme.titleMedium;
     final metaStyle = Theme.of(context).textTheme.labelMedium;
     final tags = template.tags.take(2).toList(growable: false);
-    final musicDescription = template.musicDescription?.trim();
-    final showMusicDescription =
-        template.isVideo &&
-        musicDescription != null &&
-        musicDescription.isNotEmpty;
     final isPremiumLocked = template.isPremium && !hasPremiumAccess;
     final isFeatured = featuredData != null;
     final actionLabel = isPremiumLocked
         ? text.templateUnlockPremiumAction
-        : featuredData?.actionLabel ?? text.templateTryAction;
-    final featuredCountdownLabel = isFeatured
-        ? _formatFeaturedCountdown(featuredData!.countdownTarget)
-        : null;
-    final featuredPopularityLabel = isFeatured
-        ? _formatFeaturedPopularity(
-            context,
-            featuredData!.popularityCount,
-            showTodayFallback: featuredData!.showPopularityTodayFallback,
-          )
-        : null;
-    final colors = context.petMagicColors;
+        : text.templateTryAction;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (isFeatured)
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              // Keep the purchase decision visible on the featured card too:
-              // featured metadata supplements the normal card information,
-              // rather than replacing it.
-              _TokenChip(cost: template.tokenCost),
-              if (featuredCountdownLabel != null)
-                _TemplateFeaturedMetaChip(
-                  icon: Icons.timer_outlined,
-                  label: featuredCountdownLabel,
-                  accent: colors.accent,
-                ),
-              if (featuredPopularityLabel != null)
-                _TemplateFeaturedMetaChip(
-                  icon: Icons.pets_rounded,
-                  label: featuredPopularityLabel,
-                  accent: colors.gold,
-                ),
-            ],
-          )
-        else
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              _TokenChip(cost: template.tokenCost),
-              if (showGuestPreview)
-                _TemplateStatusChip(label: text.templateGuestPreview),
-            ],
-          ),
-        const SizedBox(height: 6),
         Text(
           template.title,
           maxLines: 2,
@@ -147,7 +97,7 @@ class _TemplateDetails extends StatelessWidget {
             color: Colors.white,
             fontSize: 13.5,
             fontWeight: FontWeight.w700,
-            height: 1.04,
+            height: 1.08,
             letterSpacing: -0.12,
             shadows: [
               const Shadow(
@@ -158,9 +108,19 @@ class _TemplateDetails extends StatelessWidget {
             ],
           ),
         ),
-        if (showMusicDescription) ...[
+        if (template.shortDescription.trim().isNotEmpty) ...[
           const SizedBox(height: 4),
-          _MusicDescription(text: musicDescription),
+          Text(
+            template.shortDescription,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Colors.white.withValues(alpha: 0.82),
+              fontSize: 10.5,
+              height: 1.16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ],
         if (tags.isNotEmpty) ...[
           const SizedBox(height: 4),
@@ -182,7 +142,7 @@ class _TemplateDetails extends StatelessWidget {
             ),
           ),
         ],
-        const SizedBox(height: 4),
+        const SizedBox(height: 6),
         Wrap(
           spacing: 5,
           runSpacing: 5,
@@ -200,7 +160,7 @@ class _TemplateDetails extends StatelessWidget {
               const _MetaDot(),
             ],
             ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 92),
+              constraints: const BoxConstraints(maxWidth: 78),
               child: Text(
                 template.category,
                 maxLines: 1,
@@ -213,10 +173,15 @@ class _TemplateDetails extends StatelessWidget {
               ),
             ),
             if (template.isPremium) _AccessTag(label: text.premiumLabel),
+            _TokenChip(cost: template.tokenCost),
           ],
         ),
-        const SizedBox(height: 6),
-        _TemplateActionButton(
+        if (showGuestPreview) ...[
+          const SizedBox(height: 4),
+          _TemplateStatusChip(label: text.templateGuestPreview),
+        ],
+        const SizedBox(height: 8),
+        TemplateCardCta(
           label: actionLabel,
           isPremiumLockCta: isPremiumLocked,
           isPremiumTemplateCta: template.isPremium || isFeatured,
@@ -227,12 +192,13 @@ class _TemplateDetails extends StatelessWidget {
   }
 }
 
-class _TemplateActionButton extends StatelessWidget {
-  const _TemplateActionButton({
+class TemplateCardCta extends StatelessWidget {
+  const TemplateCardCta({
     required this.label,
     required this.onPressed,
     this.isPremiumLockCta = false,
     this.isPremiumTemplateCta = false,
+    super.key,
   });
 
   final String label;
@@ -245,7 +211,6 @@ class _TemplateActionButton extends StatelessWidget {
     final textStyle = Theme.of(context).textTheme.labelLarge;
     final colors = context.petMagicColors;
     final usePremiumStyle = isPremiumLockCta || isPremiumTemplateCta;
-    final useSoftPremiumStyle = isPremiumTemplateCta && !isPremiumLockCta;
     final foregroundColor = usePremiumStyle
         ? colors.on(
             isPremiumLockCta
@@ -270,7 +235,7 @@ class _TemplateActionButton extends StatelessWidget {
                   ],
                   stops: [0, 0.54, 1],
                 )
-              : useSoftPremiumStyle
+              : isPremiumTemplateCta
               ? const LinearGradient(
                   begin: Alignment.centerLeft,
                   end: Alignment.centerRight,
@@ -282,9 +247,7 @@ class _TemplateActionButton extends StatelessWidget {
                   stops: [0, 0.58, 1],
                 )
               : const LinearGradient(
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                  colors: [Color(0xD910C878), Color(0xCCF2C96A)],
+                  colors: [Color(0xFF168A62), Color(0xFF15956A)],
                 ),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
@@ -295,40 +258,34 @@ class _TemplateActionButton extends StatelessWidget {
           ),
           boxShadow: [
             BoxShadow(
-              color:
-                  (isPremiumLockCta
-                          ? const Color(0xFFE4901F)
-                          : useSoftPremiumStyle
-                          ? const Color(0xFFD8A64B)
-                          : const Color(0xFF10C878))
-                      .withValues(alpha: 0.24),
-              blurRadius: useSoftPremiumStyle ? 10 : 14,
-              offset: Offset(0, useSoftPremiumStyle ? 6 : 8),
+              color: Colors.black.withValues(alpha: 0.16),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 48),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    label,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: textStyle?.copyWith(
-                      color: foregroundColor,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      height: 1.05,
-                    ),
+          constraints: const BoxConstraints.tightFor(height: 52),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Center(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: textStyle?.copyWith(
+                    color: foregroundColor,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    height: 1.05,
                   ),
                 ),
-                const SizedBox(width: 5),
-                Container(
+              ),
+              Positioned(
+                right: 14,
+                child: Container(
                   width: usePremiumStyle ? 22 : null,
                   height: usePremiumStyle ? 22 : null,
                   decoration: usePremiumStyle
@@ -346,8 +303,8 @@ class _TemplateActionButton extends StatelessWidget {
                           size: usePremiumStyle ? 13.5 : 16,
                         ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),

@@ -245,39 +245,97 @@ class _FailureCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
-    return _Panel(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return Column(
+      children: [
+        Container(
+          width: 104,
+          height: 104,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: colors.danger.withValues(alpha: 0.12),
+            border: Border.all(color: colors.danger.withValues(alpha: 0.2)),
+          ),
+          child: Icon(
+            Icons.sentiment_dissatisfied_rounded,
+            color: colors.danger,
+            size: 50,
+          ),
+        ),
+        const SizedBox(height: 20),
+        Text(
+          text.generationStatusFailedTitle,
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+            color: colors.textStrong,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          failureReasonMessage(text, generation),
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+            color: colors.textMuted,
+            height: 1.35,
+          ),
+        ),
+        const SizedBox(height: 18),
+        _RefundStatus(generation: generation),
+      ],
+    );
+  }
+}
+
+class _RefundStatus extends StatelessWidget {
+  const _RefundStatus({required this.generation});
+
+  final TemplateGenerationResult generation;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
+    final state = generation.refundedAtUtc != null
+        ? 'refunded'
+        : generation.refundState.toLowerCase();
+    final isRefunded = state == 'refunded';
+    final isPending = state == 'pending';
+    final color = isRefunded
+        ? colors.accent
+        : isPending
+        ? colors.gold
+        : colors.danger;
+    final icon = isRefunded
+        ? Icons.check_circle_rounded
+        : isPending
+        ? Icons.hourglass_top_rounded
+        : Icons.error_outline_rounded;
+    final label = isRefunded
+        ? text.generationStatusRefundedBalance(generation.tokenCost)
+        : isPending
+        ? text.generationStatusRefundPending
+        : text.generationStatusRefundFailed;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withValues(alpha: 0.28)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
-            children: [
-              Icon(Icons.error_outline_rounded, color: colors.danger),
-              const SizedBox(width: 8),
-              Text(
-                text.generationStatusFailedTitle,
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  color: colors.danger,
-                  fontWeight: FontWeight.w800,
-                ),
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: isRefunded ? color : colors.textSoft,
+                fontWeight: FontWeight.w700,
               ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            failureReasonMessage(text, generation),
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: colors.textSoft,
-              height: 1.4,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            generation.refundedAtUtc != null
-                ? text.generationStatusTokensRefundedHint
-                : text.generationStatusSupportHint,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: colors.textMuted,
-              fontWeight: FontWeight.w600,
             ),
           ),
         ],

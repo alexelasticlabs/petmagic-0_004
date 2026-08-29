@@ -44,28 +44,20 @@ Future<bool?> showTemplateGenerationConfirmSheet({
 }) {
   final text = AppLocalizations.of(context);
   final colors = context.petMagicColors;
-  final screenHeight = Overlay.of(
-    context,
-    rootOverlay: true,
-  ).context.size!.height;
+  final maxSheetHeight = MediaQuery.sizeOf(context).height * 0.82;
   return showPetMagicModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
     useSafeArea: false,
     backgroundColor: Colors.transparent,
-    constraints: BoxConstraints.tightFor(height: screenHeight),
     builder: (sheetContext, bottomInset) {
-      final contentHeight = (screenHeight - bottomInset)
-          .clamp(0.0, screenHeight)
-          .toDouble();
       return SafeArea(
         top: false,
         bottom: false,
         child: Padding(
           padding: EdgeInsets.only(bottom: bottomInset),
-          child: SizedBox(
-            height: contentHeight,
-            width: double.infinity,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: maxSheetHeight),
             child: ClipRRect(
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(30),
@@ -73,7 +65,7 @@ Future<bool?> showTemplateGenerationConfirmSheet({
               child: DecoratedBox(
                 decoration: BoxDecoration(color: colors.backgroundBottom),
                 child: SafeArea(
-                  top: true,
+                  top: false,
                   bottom: false,
                   child: _TemplateGenerationConfirmContent(
                     template: template,

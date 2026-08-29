@@ -248,6 +248,22 @@ Future<void> _showFailedCardActions(
                         );
                       },
                     ),
+                    ListTile(
+                      leading: Icon(
+                        Icons.visibility_off_outlined,
+                        color: colors.danger,
+                      ),
+                      title: Text(
+                        text.generationStatusDeleteAction,
+                        style: TextStyle(color: colors.danger),
+                      ),
+                      onTap: () {
+                        Navigator.of(sheetContext).pop();
+                        unawaited(
+                          _deleteGeneration(context, text, ref, generation),
+                        );
+                      },
+                    ),
                   ],
                 ),
               ),
