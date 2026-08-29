@@ -122,7 +122,8 @@ internal sealed class FalQueueClient(
             if (string.IsNullOrWhiteSpace(requestId)
                 || statusUrl is null
                 || responseUrl is null
-                || cancelUrl is null)
+                || cancelUrl is null
+                || !HaveSameQueueRequestPath(statusUrl, responseUrl, cancelUrl))
             {
                 logger.LogWarning(
                     "fal queue returned an invalid submit payload. MediaType={MediaType} Stage={Stage} Model={Model} ProviderRequestIdHash={ProviderRequestIdHash} QueueBaseUrl={QueueBaseUrl}",
@@ -391,7 +392,10 @@ internal sealed class FalQueueClient(
             model,
             requestId,
             "cancel");
-        return validatedStatus is null || validatedResponse is null || validatedCancel is null
+        return validatedStatus is null
+            || validatedResponse is null
+            || validatedCancel is null
+            || !HaveSameQueueRequestPath(validatedStatus, validatedResponse, validatedCancel)
             ? null
             : new ProviderQueueSubmission(
                 requestId,
@@ -686,11 +690,50 @@ internal sealed class FalQueueClient(
             return null;
         }
 
-        var expectedPath = $"{queueBaseUri.AbsolutePath.TrimEnd('/')}/{model.Trim('/')}/requests/{requestId}/{terminalSuffix}";
-        return string.Equals(callbackUri.AbsolutePath, expectedPath, StringComparison.Ordinal)
-            ? callbackUri
-            : null;
+        var modelSegments = model
+            .Trim('/')
+            .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (modelSegments.Length < 2
+            || modelSegments.Any(segment =>
+                string.Equals(Uri.UnescapeDataString(segment), ".", StringComparison.Ordinal)
+                || string.Equals(Uri.UnescapeDataString(segment), "..", StringComparison.Ordinal)))
+        {
+            return null;
+        }
+
+        var terminalSuffixes = string.Equals(terminalSuffix, "response", StringComparison.Ordinal)
+            ? new[] { string.Empty, "/response" }
+            : new[] { $"/{terminalSuffix}" };
+        for (var segmentCount = modelSegments.Length; segmentCount >= 2; segmentCount--)
+        {
+            var modelRoute = string.Join('/', modelSegments.Take(segmentCount));
+            var modelUri = new Uri(queueBaseUri, modelRoute);
+            var requestPath = $"{modelUri.AbsolutePath.TrimEnd('/')}/requests/{requestId}";
+            if (terminalSuffixes.Any(suffix =>
+                string.Equals(callbackUri.AbsolutePath, requestPath + suffix, StringComparison.Ordinal)))
+            {
+                return callbackUri;
+            }
+        }
+
+        return null;
     }
+
+    private static bool HaveSameQueueRequestPath(Uri statusUrl, Uri responseUrl, Uri cancelUrl)
+    {
+        var statusRequestPath = TrimTerminalPath(statusUrl.AbsolutePath, "/status");
+        var responseRequestPath = responseUrl.AbsolutePath.EndsWith("/response", StringComparison.Ordinal)
+            ? TrimTerminalPath(responseUrl.AbsolutePath, "/response")
+            : responseUrl.AbsolutePath;
+        var cancelRequestPath = TrimTerminalPath(cancelUrl.AbsolutePath, "/cancel");
+        return string.Equals(statusRequestPath, responseRequestPath, StringComparison.Ordinal)
+            && string.Equals(statusRequestPath, cancelRequestPath, StringComparison.Ordinal);
+    }
+
+    private static string TrimTerminalPath(string path, string terminalPath) =>
+        path.EndsWith(terminalPath, StringComparison.Ordinal)
+            ? path[..^terminalPath.Length]
+            : path;
 
     private static string? TryReadCancellationStatus(string body)
     {

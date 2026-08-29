@@ -121,6 +121,57 @@ public sealed class FalQueueClientRateLimiterTests
         Assert.Equal(0, handler.ResponseCount);
     }
 
+    [Theory]
+    [InlineData("openai/gpt-image-2/edit", "openai/gpt-image-2")]
+    [InlineData("fal-ai/flux-2-pro/edit", "fal-ai/flux-2-pro")]
+    [InlineData("fal-ai/kling-video/v3/standard/motion-control", "fal-ai/kling-video")]
+    public async Task RunAsync_ShouldAcceptCanonicalCallbacksForNestedModelRoute(
+        string model,
+        string canonicalModelRoute)
+    {
+        ResetLocalRateLimiterState();
+        await using var dbContext = CreateDbContext();
+        var handler = new CanonicalCallbackFalHandler(canonicalModelRoute);
+        var client = CreateClient(dbContext, handler, maxRequestsPerMinute: 1);
+
+        var result = await client.RunAsync(
+            model,
+            new { image_url = "https://cdn.example.com/pet.jpg" },
+            new FalQueueStageKind("image", FalQueueStages.ImageGeneration),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : "unexpected failure");
+        Assert.Equal(1, handler.SubmitCount);
+        Assert.Equal(1, handler.StatusCount);
+        Assert.Equal(1, handler.ResponseCount);
+    }
+
+    [Fact]
+    public async Task SubmitAsync_ShouldRejectCallbacksThatResolveToDifferentCanonicalModelRoutes()
+    {
+        ResetLocalRateLimiterState();
+        await using var dbContext = CreateDbContext();
+        var handler = new InvalidCallbackFalHandler(
+            """
+            {
+              "request_id": "fal-request-1",
+              "status_url": "https://queue.fal.test/fal-ai/kling-video/requests/fal-request-1/status",
+              "response_url": "https://queue.fal.test/fal-ai/kling-video/v3/requests/fal-request-1",
+              "cancel_url": "https://queue.fal.test/fal-ai/kling-video/requests/fal-request-1/cancel"
+            }
+            """);
+        var client = CreateClient(dbContext, handler, maxRequestsPerMinute: 1);
+
+        var result = await client.SubmitAsync(
+            "fal-ai/kling-video/v3/standard/motion-control",
+            new { image_url = "https://cdn.example.com/pet.jpg" },
+            new FalQueueStageKind("video", FalQueueStages.VideoGeneration),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(TemplatesErrors.AiProviderSubmissionUnknown.Code, result.Error.Code);
+    }
+
     [Fact]
     public async Task SubmitAsync_ShouldReturnSubmissionUnknown_WhenAcceptedPayloadIsMalformed()
     {
@@ -468,6 +519,57 @@ public sealed class FalQueueClientRateLimiterTests
             }
 
             if (path.EndsWith("/response", StringComparison.Ordinal))
+            {
+                ResponseCount++;
+                return JsonAsync("""{"images":[]}""");
+            }
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+        }
+
+        private static Task<HttpResponseMessage> JsonAsync(string json)
+        {
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(json, Encoding.UTF8, "application/json")
+            });
+        }
+    }
+
+    private sealed class CanonicalCallbackFalHandler(string canonicalModelRoute) : HttpMessageHandler
+    {
+        public int SubmitCount { get; private set; }
+
+        public int StatusCount { get; private set; }
+
+        public int ResponseCount { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            var path = request.RequestUri?.AbsolutePath ?? string.Empty;
+            var requestPath = $"/{canonicalModelRoute}/requests/fal-request-1";
+            if (request.Method == HttpMethod.Post)
+            {
+                SubmitCount++;
+                return JsonAsync($$"""
+                    {
+                      "request_id": "fal-request-1",
+                      "status_url": "https://queue.fal.test/{{canonicalModelRoute}}/requests/fal-request-1/status",
+                      "response_url": "https://queue.fal.test/{{canonicalModelRoute}}/requests/fal-request-1",
+                      "cancel_url": "https://queue.fal.test/{{canonicalModelRoute}}/requests/fal-request-1/cancel"
+                    }
+                    """);
+            }
+
+            if (string.Equals(path, requestPath + "/status", StringComparison.Ordinal))
+            {
+                StatusCount++;
+                return JsonAsync("""{"status":"COMPLETED","request_id":"fal-request-1"}""");
+            }
+
+            if (string.Equals(path, requestPath, StringComparison.Ordinal))
             {
                 ResponseCount++;
                 return JsonAsync("""{"images":[]}""");
