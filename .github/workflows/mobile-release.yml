@@ -46,7 +46,37 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  verify:
+    name: Verify before test delivery
+    runs-on: [self-hosted, macOS, petmagic-mobile]
+    defaults:
+      run:
+        working-directory: apps/petmagic-mobile
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with: { flutter-version: '3.44.5', cache: false }
+      - name: Configure persistent dependency cache
+        shell: bash
+        run: |
+          cache_root="$HOME/.cache/petmagic-ci"
+          mkdir -p "$cache_root/pub"
+          echo "PUB_CACHE=$cache_root/pub" >> "$GITHUB_ENV"
+      - name: Resolve dependencies
+        run: flutter pub get
+      - name: Verify generated localization
+        run: |
+          flutter gen-l10n
+          dart format --output=none --set-exit-if-changed lib test integration_test tool
+          dart tool/check_generation_status_l10n.dart
+          dart tool/check_l10n_completeness.dart
+      - name: Analyze
+        run: flutter analyze --fatal-infos
+      - name: Test
+        run: flutter test --concurrency=1 --exclude-tags=platform-golden
+
   android:
+    needs: verify
     if: github.event_name == 'push' || inputs.platform != 'ios'
     runs-on: [self-hosted, macOS, petmagic-mobile]
     environment: ${{ github.event_name == 'push' && 'production' || inputs.environment }}
@@ -178,6 +208,7 @@ jobs:
             build-google-play-key.json
 
   ios:
+    needs: verify
     if: github.event_name == 'push' || inputs.platform != 'android'
     runs-on: [self-hosted, macOS, petmagic-mobile]
     environment: ${{ github.event_name == 'push' && 'production' || inputs.environment }}

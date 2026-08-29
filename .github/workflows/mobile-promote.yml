@@ -26,6 +26,11 @@ on:
         required: false
         default: false
         type: boolean
+      confirm_production_submission:
+        description: Explicitly confirm a production submission after store metadata is complete
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -35,7 +40,19 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  guard:
+    runs-on: [self-hosted, macOS, petmagic-mobile]
+    steps:
+      - name: Require explicit production confirmation
+        shell: bash
+        run: |
+          if [ "${{ inputs.confirm_production_submission }}" != "true" ]; then
+            echo 'Production promotion skipped: set confirm_production_submission=true only after completing store metadata and review declarations.'
+          fi
+
   promote:
+    needs: guard
+    if: inputs.confirm_production_submission
     runs-on: [self-hosted, macOS, petmagic-mobile]
     environment: production
     defaults:
