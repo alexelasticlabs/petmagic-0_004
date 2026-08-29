@@ -439,6 +439,29 @@ void main() {
     expect(budgetSource, contains('trimDecodedImageCache();'));
     expect(appSource, contains('DecodedImageCacheLifecycleObserver('));
   });
+
+  test('template memory pressure keeps reusable disk media cached', () {
+    final source = File(
+      'lib/features/templates/presentation/templates_page.dart',
+    ).readAsStringSync();
+    final handlerStart = source.indexOf('void _handleMemoryPressure()');
+    final nextHandler = source.indexOf(
+      'void _handleScreenBecameVisible',
+      handlerStart,
+    );
+
+    expect(handlerStart, greaterThanOrEqualTo(0));
+    expect(nextHandler, greaterThan(handlerStart));
+
+    final handler = source.substring(handlerStart, nextHandler);
+    expect(handler, contains('trimDecodedImageCache();'));
+    expect(
+      handler,
+      contains("disposeAll(reason: 'templates_memory_pressure')"),
+    );
+    expect(handler, contains('TemplateMediaCache.releaseMemoryReferences()'));
+    expect(handler, isNot(contains('TemplateMediaCache.clearAll()')));
+  });
 }
 
 Iterable<String> _extractCalls(String source, String callName) sync* {

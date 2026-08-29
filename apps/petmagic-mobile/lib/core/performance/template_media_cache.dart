@@ -85,6 +85,10 @@ class TemplateMediaCache {
   @visibleForTesting
   static int get maxPreviewDownloadBytesForTesting => _maxPreviewDownloadBytes;
 
+  @visibleForTesting
+  static int get rememberedFileReferenceCountForTesting =>
+      _thumbnailFilesByUrl.length + _previewFilesByUrl.length;
+
   static String cacheKeyForMedia(String url, {int? mediaVersion}) {
     final normalized = persistentSafeMediaCacheKeyUrl(url);
     if (mediaVersion == null || mediaVersion <= 0) {
@@ -357,6 +361,11 @@ class TemplateMediaCache {
         url,
         mediaVersion: mediaVersion,
       );
+
+  /// Releases bounded in-memory file lookups while preserving disk cache and
+  /// in-flight fetch coordination. Disk metadata is resolved again on demand.
+  static void releaseMemoryReferences() =>
+      _TemplateMediaCacheMaintenance.releaseMemoryReferences();
 
   @visibleForTesting
   static Future<int> trimThumbnailCacheDirectoryForTesting(

@@ -22,6 +22,7 @@ import 'package:petmagic_mobile/shared/navigation/app_navigation_context.dart';
 import 'package:petmagic_mobile/shared/payments/external_checkout_result.dart';
 import 'package:petmagic_mobile/shared/payments/payment_method_sheet.dart';
 import 'package:petmagic_mobile/shared/widgets/pawspark_icon.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_animated_value_text.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 import 'package:petmagic_mobile/shared/widgets/premium_crown_icon.dart';
 import 'package:petmagic_mobile/shared/widgets/premium_shimmer_button.dart';

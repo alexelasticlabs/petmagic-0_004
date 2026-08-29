@@ -45,8 +45,36 @@ class _GenerationProgressBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.petMagicColors;
     final clamped = value.clamp(0, 1).toDouble();
+    final Widget progressFill;
+    if (PetMotion.reduceMotion(context)) {
+      progressFill = _GenerationProgressFill(value: clamped);
+    } else {
+      progressFill = TweenAnimationBuilder<double>(
+        tween: Tween<double>(end: clamped),
+        duration: PetMotion.medium,
+        curve: PetMotion.emphasized,
+        builder: (context, animatedValue, _) {
+          return _GenerationProgressFill(value: animatedValue);
+        },
+      );
+    }
+
+    return Semantics(
+      value: '${(clamped * 100).round()}%',
+      child: ExcludeSemantics(child: progressFill),
+    );
+  }
+}
+
+class _GenerationProgressFill extends StatelessWidget {
+  const _GenerationProgressFill({required this.value});
+
+  final double value;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
     return ClipRRect(
       borderRadius: BorderRadius.circular(999),
       child: SizedBox(
@@ -56,7 +84,7 @@ class _GenerationProgressBar extends StatelessWidget {
           children: [
             ColoredBox(color: colors.border.withValues(alpha: 0.62)),
             FractionallySizedBox(
-              widthFactor: clamped,
+              widthFactor: value,
               alignment: Alignment.centerLeft,
               child: DecoratedBox(
                 decoration: BoxDecoration(
@@ -72,7 +100,7 @@ class _GenerationProgressBar extends StatelessWidget {
             Align(
               alignment: Alignment.centerLeft,
               child: FractionallySizedBox(
-                widthFactor: clamped,
+                widthFactor: value,
                 child: DecoratedBox(
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.12),

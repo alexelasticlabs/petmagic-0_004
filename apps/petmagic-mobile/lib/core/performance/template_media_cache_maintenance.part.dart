@@ -26,6 +26,11 @@ final class _TemplateMediaCacheMaintenance {
     return TemplateMediaCache.previewVideoCache.removeFile(cacheKey);
   }
 
+  static void releaseMemoryReferences() {
+    TemplateMediaCache._thumbnailFilesByUrl.clear();
+    TemplateMediaCache._previewFilesByUrl.clear();
+  }
+
   @visibleForTesting
   static Future<int> trimThumbnailCacheDirectoryForTesting(
     Directory thumbnailCacheDirectory, {

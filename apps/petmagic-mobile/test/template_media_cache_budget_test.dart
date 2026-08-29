@@ -156,11 +156,62 @@ void main() {
       expect(requestCountsByPath['/template-preview.mp4'], 1);
       final firstFetch = TemplateMediaCache.fetchPreviewFile(sharedVideoUrl);
       await Future<void>.delayed(Duration.zero);
+      TemplateMediaCache.releaseMemoryReferences();
       final secondFetch = TemplateMediaCache.fetchPreviewFile(sharedVideoUrl);
       final files = await Future.wait([firstFetch, secondFetch]);
 
       expect(files[0].path, files[1].path);
       expect(requestCountsByPath['/shared-template-preview.mp4'], 1);
+    },
+  );
+
+  test(
+    'memory reference release preserves reusable disk cache entries',
+    () async {
+      await TemplateMediaCache.clearAll();
+      addTearDown(TemplateMediaCache.clearAll);
+
+      const thumbnailUrl =
+          'https://cdn.example.com/templates/memory-release-thumb.jpg';
+      const previewUrl =
+          'https://cdn.example.com/templates/memory-release-preview.mp4';
+      await TemplateMediaCache.thumbnailCache.putFile(
+        thumbnailUrl,
+        Uint8List.fromList([0xFF, 0xD8, 0xFF, 0xD9]),
+        maxAge: const Duration(hours: 1),
+        fileExtension: 'jpg',
+      );
+      await TemplateMediaCache.previewVideoCache.putFile(
+        previewUrl,
+        Uint8List.fromList([0, 0, 0, 24, 102, 116, 121, 112, 109, 112, 52, 50]),
+        maxAge: const Duration(hours: 1),
+        fileExtension: 'mp4',
+      );
+
+      expect(
+        await TemplateMediaCache.getCachedThumbnailFile(thumbnailUrl),
+        isNotNull,
+      );
+      expect(
+        await TemplateMediaCache.getCachedPreviewFile(previewUrl),
+        isNotNull,
+      );
+      expect(
+        TemplateMediaCache.rememberedFileReferenceCountForTesting,
+        equals(2),
+      );
+
+      TemplateMediaCache.releaseMemoryReferences();
+
+      expect(TemplateMediaCache.rememberedFileReferenceCountForTesting, isZero);
+      expect(
+        await TemplateMediaCache.getCachedThumbnailFile(thumbnailUrl),
+        isNotNull,
+      );
+      expect(
+        await TemplateMediaCache.getCachedPreviewFile(previewUrl),
+        isNotNull,
+      );
     },
   );
 

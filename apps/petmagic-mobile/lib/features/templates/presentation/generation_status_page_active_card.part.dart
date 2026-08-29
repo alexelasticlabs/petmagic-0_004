@@ -83,13 +83,15 @@ class _ActiveGenerationCard extends StatelessWidget {
                     ),
                     if (serverProgress != null) ...[
                       const SizedBox(width: 12),
-                      Text(
-                        '$serverProgress%',
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(
-                              color: colors.accent,
-                              fontWeight: FontWeight.w900,
-                            ),
+                      ExcludeSemantics(
+                        child: Text(
+                          '$serverProgress%',
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
+                                color: colors.accent,
+                                fontWeight: FontWeight.w900,
+                              ),
+                        ),
                       ),
                     ],
                   ],

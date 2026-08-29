@@ -5,6 +5,7 @@ import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/errors/app_unavailable_state.dart';
 import 'package:petmagic_mobile/shared/widgets/motion.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_animated_button_child.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_animated_value_text.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_async_state_view.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_image_state.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_interactive_surface.dart';
@@ -152,6 +153,81 @@ void main() {
     expect(duration, lessThan(PetMotion.medium));
     expect(duration.inMilliseconds, greaterThanOrEqualTo(60));
   });
+
+  testWidgets('animated value transitions only between confirmed values', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_animatedValueHost('120'));
+    await tester.pumpAndSettle();
+
+    await tester.pumpWidget(_animatedValueHost('95'));
+
+    expect(find.text('120'), findsOneWidget);
+    expect(find.text('95'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('animated-value')),
+        matching: find.byType(AnimatedSwitcher),
+      ),
+      findsOneWidget,
+    );
+
+    await tester.pumpAndSettle();
+    expect(find.text('120'), findsNothing);
+    expect(find.text('95'), findsOneWidget);
+  });
+
+  testWidgets('animated value snaps in reduced and degraded motion modes', (
+    tester,
+  ) async {
+    for (final mediaQueryData in const [
+      MediaQueryData(
+        size: Size(500, 900),
+        devicePixelRatio: 2,
+        disableAnimations: true,
+      ),
+      MediaQueryData(size: Size(390, 844), devicePixelRatio: 3),
+    ]) {
+      await tester.pumpWidget(
+        _animatedValueHost('120', mediaQueryData: mediaQueryData),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.pumpWidget(
+        _animatedValueHost('95', mediaQueryData: mediaQueryData),
+      );
+
+      expect(find.text('120'), findsNothing);
+      expect(find.text('95'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('animated-value')),
+          matching: find.byType(AnimatedSwitcher),
+        ),
+        findsNothing,
+      );
+
+      await tester.pumpWidget(const SizedBox.shrink());
+    }
+  });
+}
+
+Widget _animatedValueHost(
+  String value, {
+  MediaQueryData mediaQueryData = const MediaQueryData(
+    size: Size(500, 900),
+    devicePixelRatio: 2,
+  ),
+}) {
+  return _host(
+    MediaQuery(
+      data: mediaQueryData,
+      child: PetMagicAnimatedValueText(
+        key: const Key('animated-value'),
+        value: value,
+      ),
+    ),
+  );
 }
 
 Widget _host(Widget child) {

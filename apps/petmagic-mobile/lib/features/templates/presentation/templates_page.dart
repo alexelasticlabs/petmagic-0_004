@@ -198,20 +198,12 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
     ref
         .read(templateFeedPlaybackManagerProvider)
         .disposeAll(reason: 'templates_memory_pressure');
-    unawaited(
-      TemplateMediaCache.clearAll().catchError((
-        Object error,
-        StackTrace stackTrace,
-      ) {
-        AppLogger.warn(
-          feature: 'Templates',
-          operation: 'memory_pressure_cache_trim',
-          message: 'Template media cache trim failed after memory pressure.',
-          error: error,
-          stackTrace: stackTrace,
-        );
-      }),
-    );
+    TemplateMediaCache.releaseMemoryReferences();
+
+    // Disk-cached media does not contribute to memory pressure. Keeping it
+    // avoids network downloads and image/video decode work after the app
+    // resumes; only decoded images, active playback controllers, and bounded
+    // in-memory file lookups are released here.
   }
 
   void _handleScreenBecameVisible({required bool fromAppResume}) {

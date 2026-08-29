@@ -6,6 +6,7 @@ import 'package:petmagic_mobile/app/theme/petmagic_typography.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/wallet/application/wallet_controller.dart';
 import 'package:petmagic_mobile/shared/widgets/pawspark_icon.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_animated_value_text.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_interactive_surface.dart';
 
 class TemplatesTopBarSlot extends ConsumerWidget {
@@ -195,8 +196,8 @@ class _TokenBalance extends StatelessWidget {
                 children: [
                   const PawSparkIcon(size: 18),
                   const SizedBox(width: 6),
-                  Text(
-                    '$balance',
+                  PetMagicAnimatedValueText(
+                    value: '$balance',
                     style: Theme.of(context).textTheme.labelLarge?.copyWith(
                       color: colors.textStrong,
                       fontSize: 13,

@@ -1038,6 +1038,25 @@ void main() {
     expect(source, isNot(contains('NetworkImage(url)')));
   });
 
+  test('generation progress animates updates only when motion is allowed', () {
+    final source = File(
+      'lib/features/templates/presentation/generation_status_page_active_chrome.part.dart',
+    ).readAsStringSync();
+
+    expect(source, contains('if (PetMotion.reduceMotion(context))'));
+    expect(source, contains('TweenAnimationBuilder<double>('));
+    expect(source, contains('tween: Tween<double>(end: clamped)'));
+    expect(source, contains('duration: PetMotion.medium'));
+    expect(source, contains('curve: PetMotion.emphasized'));
+    expect(source, contains("value: '\${(clamped * 100).round()}%'"));
+    expect(
+      generationStatusSectionsLibrarySource,
+      contains(
+        "ExcludeSemantics(\n                        child: Text(\n                          '\$serverProgress%'",
+      ),
+    );
+  });
+
   test('generation result media URLs are checked before network use', () {
     final pageSource = generationStatusLibrarySource;
     final sectionsSource = generationStatusSectionsLibrarySource;

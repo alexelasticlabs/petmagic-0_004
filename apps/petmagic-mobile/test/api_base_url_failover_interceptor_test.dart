@@ -118,6 +118,76 @@ void main() {
       'https://api.petgpt.app:5000/media/file.jpg',
     );
   });
+
+  test('preserves unchanged nested JSON container identities', () {
+    final resolver = _FakeBaseUrlResolver(
+      resolvedBaseUrl: 'https://api.petgpt.app',
+      candidates: const ['https://api.petgpt.app'],
+    );
+    final interceptor = ApiBaseUrlFailoverInterceptor(
+      dio: Dio(),
+      baseUrlResolver: resolver,
+    );
+    final nestedList = <Object?>['https://cdn.petgpt.app/media/file.jpg', 42];
+    final nestedMap = <String, dynamic>{
+      'url': 'https://cdn.petgpt.app/media/file.jpg',
+      'items': nestedList,
+    };
+    final payload = <String, dynamic>{
+      'serverClientId': 'web-client',
+      'nested': nestedMap,
+    };
+    final response = Response<Object?>(
+      data: payload,
+      requestOptions: RequestOptions(baseUrl: 'https://api.petgpt.app'),
+    );
+
+    interceptor.onResponse(response, ResponseInterceptorHandler());
+
+    expect(identical(response.data, payload), isTrue);
+    expect(
+      identical((response.data! as Map<String, dynamic>)['nested'], nestedMap),
+      isTrue,
+    );
+    expect(identical(nestedMap['items'], nestedList), isTrue);
+  });
+
+  test('copies only the response path containing a rewritten URL', () {
+    final resolver = _FakeBaseUrlResolver(
+      resolvedBaseUrl: 'https://api.petgpt.app',
+      candidates: const ['https://api.petgpt.app'],
+    );
+    final interceptor = ApiBaseUrlFailoverInterceptor(
+      dio: Dio(),
+      baseUrlResolver: resolver,
+    );
+    final unchangedBranch = <String, dynamic>{
+      'url': 'https://cdn.petgpt.app/media/file.jpg',
+    };
+    final rewrittenBranch = <String, dynamic>{
+      'url': 'http://localhost:5000/media/file.jpg',
+    };
+    final payload = <String, dynamic>{
+      'unchanged': unchangedBranch,
+      'rewritten': rewrittenBranch,
+    };
+    final response = Response<Object?>(
+      data: payload,
+      requestOptions: RequestOptions(baseUrl: 'https://api.petgpt.app'),
+    );
+
+    interceptor.onResponse(response, ResponseInterceptorHandler());
+
+    final rewrittenPayload = response.data! as Map<String, dynamic>;
+    expect(identical(rewrittenPayload, payload), isFalse);
+    expect(identical(rewrittenPayload['unchanged'], unchangedBranch), isTrue);
+    expect(identical(rewrittenPayload['rewritten'], rewrittenBranch), isFalse);
+    expect(
+      (rewrittenPayload['rewritten'] as Map<String, dynamic>)['url'],
+      'https://api.petgpt.app:5000/media/file.jpg',
+    );
+    expect(rewrittenBranch['url'], 'http://localhost:5000/media/file.jpg');
+  });
 }
 
 class _FakeBaseUrlResolver extends ApiBaseUrlResolver {

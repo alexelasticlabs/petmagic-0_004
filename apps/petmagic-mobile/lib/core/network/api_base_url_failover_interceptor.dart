@@ -157,28 +157,64 @@ class ApiBaseUrlFailoverInterceptor extends Interceptor {
       return value;
     }
 
+    return _rewriteLocalhostUrlsWithUri(value, activeUri);
+  }
+
+  Object? _rewriteLocalhostUrlsWithUri(Object? value, Uri activeUri) {
     if (value is String) {
       return _replaceLocalhostPrefix(value, activeUri);
     }
 
     if (value is List) {
-      return value
-          .map((item) => _rewriteLocalhostUrls(item, activeBaseUrl))
-          .toList(growable: false);
+      List<Object?>? rewritten;
+      for (var index = 0; index < value.length; index++) {
+        final item = value[index];
+        final rewrittenItem = _rewriteLocalhostUrlsWithUri(item, activeUri);
+        if (identical(rewrittenItem, item)) {
+          continue;
+        }
+
+        rewritten ??= List<Object?>.from(value, growable: false);
+        rewritten[index] = rewrittenItem;
+      }
+
+      return rewritten ?? value;
     }
 
     if (value is Map<String, dynamic>) {
-      return value.map<String, dynamic>(
-        (key, item) =>
-            MapEntry(key, _rewriteLocalhostUrls(item, activeBaseUrl)),
-      );
+      Map<String, dynamic>? rewritten;
+      for (final entry in value.entries) {
+        final rewrittenItem = _rewriteLocalhostUrlsWithUri(
+          entry.value,
+          activeUri,
+        );
+        if (identical(rewrittenItem, entry.value)) {
+          continue;
+        }
+
+        rewritten ??= Map<String, dynamic>.from(value);
+        rewritten[entry.key] = rewrittenItem;
+      }
+
+      return rewritten ?? value;
     }
 
     if (value is Map) {
-      return value.map<dynamic, dynamic>(
-        (key, item) =>
-            MapEntry(key, _rewriteLocalhostUrls(item, activeBaseUrl)),
-      );
+      Map<Object?, Object?>? rewritten;
+      for (final entry in value.entries) {
+        final rewrittenItem = _rewriteLocalhostUrlsWithUri(
+          entry.value,
+          activeUri,
+        );
+        if (identical(rewrittenItem, entry.value)) {
+          continue;
+        }
+
+        rewritten ??= Map<Object?, Object?>.from(value);
+        rewritten[entry.key] = rewrittenItem;
+      }
+
+      return rewritten ?? value;
     }
 
     return value;

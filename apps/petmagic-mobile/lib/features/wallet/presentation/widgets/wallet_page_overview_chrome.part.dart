@@ -124,6 +124,9 @@ class _BalanceCard extends StatelessWidget {
     final localeTag = Localizations.localeOf(context).toLanguageTag();
     final colors = context.petMagicColors;
     final balance = wallet?.balance ?? 0;
+    final formattedBalance = NumberFormat.decimalPattern(
+      localeTag,
+    ).format(balance);
     return ProfileGlassCard(
       padding: const EdgeInsets.all(20),
       child: LayoutBuilder(
@@ -151,8 +154,8 @@ class _BalanceCard extends StatelessWidget {
                     FittedBox(
                       fit: BoxFit.scaleDown,
                       alignment: Alignment.centerLeft,
-                      child: Text(
-                        NumberFormat.decimalPattern(localeTag).format(balance),
+                      child: PetMagicAnimatedValueText(
+                        value: formattedBalance,
                         style: TextStyle(
                           color: colors.textStrong,
                           fontSize: compact ? 46 : 52,
