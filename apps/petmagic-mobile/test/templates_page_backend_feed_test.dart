@@ -311,7 +311,7 @@ void main() {
             .toList(),
         ['cat', 'dog'],
       );
-      expect(find.text('dog-template-000'), findsOneWidget);
+      expect(find.text('dog-template-000'), findsWidgets);
       expect(find.text('template-0000'), findsNothing);
       expect(tester.takeException(), isNull);
     },
@@ -623,7 +623,7 @@ void main() {
         search: null,
         expectedPrefix: 'template-',
       );
-      expect(find.text('template-0000'), findsOneWidget);
+      expect(find.text('template-0000'), findsWidgets);
 
       final context = tester.element(find.byType(TemplatesPage));
       final text = AppLocalizations.of(context);

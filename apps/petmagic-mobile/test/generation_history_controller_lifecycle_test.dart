@@ -15,6 +15,10 @@ void main() {
     ].map((path) => File(path).readAsStringSync()).join('\n');
 
     final buildBody = _methodBody(source, 'build');
+    final hydrateCachedUnreadBody = _methodBody(
+      source,
+      '_hydrateCachedUnreadCount',
+    );
     final loadBody = _methodBody(source, '_load');
     final autoRefreshBody = _methodBody(source, '_scheduleNextAutoRefresh');
     final offlineBannerBody = _methodBody(source, '_scheduleOfflineBannerHide');
@@ -31,15 +35,22 @@ void main() {
     );
 
     expect(buildBody, contains('_isScreenVisible = false;'));
-    expect(buildBody, contains('if (!ref.mounted)'));
+    expect(buildBody, isNot(contains('Future.microtask')));
+    expect(buildBody, isNot(contains('readCachedUnreadGenerationCount')));
     expect(buildBody, isNot(contains('_startAutoRefresh();')));
-    expect(buildBody, contains('if (!_isScreenVisible)'));
     expect(buildBody, contains('networkStatusControllerProvider'));
     expect(buildBody, contains('appLaunchControllerProvider'));
     expect(buildBody, contains('_handleAuthStatusChanged'));
     expect(
       buildBody,
       contains('(_, hasInternet) => _handleNetworkStatusChanged(hasInternet)'),
+    );
+    expect(hydrateCachedUnreadBody, contains('!ref.mounted'));
+    expect(hydrateCachedUnreadBody, contains('!_isAuthenticated'));
+    expect(hydrateCachedUnreadBody, contains('!_isScreenVisible'));
+    expect(
+      hydrateCachedUnreadBody,
+      contains('readCachedUnreadGenerationCount'),
     );
     expect(loadBody, contains('!ref.mounted || !_isAuthenticated'));
     expect(autoRefreshBody, contains('!_isAuthenticated'));

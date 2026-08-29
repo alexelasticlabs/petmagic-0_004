@@ -33,6 +33,7 @@ void main() {
         'lib/features/templates/presentation/generation_status_page_result_action_widgets.part.dart',
         'lib/features/templates/presentation/generation_status_page_result_details.part.dart',
         'lib/features/templates/presentation/generation_status_page_fullscreen_viewer.part.dart',
+        'lib/features/templates/presentation/generation_status_page_watermark_actions.part.dart',
       );
       final templateFlowSource = _readSource(
         'lib/features/templates/presentation/widgets/template_flow_sheets.dart',
@@ -106,6 +107,7 @@ String _readSource(
   String? fourthPath,
   String? fifthPath,
   String? sixthPath,
+  String? seventhPath,
 ]) {
   final buffer = StringBuffer(File(firstPath).readAsStringSync());
   for (final path in [
@@ -114,6 +116,7 @@ String _readSource(
     fourthPath,
     fifthPath,
     sixthPath,
+    seventhPath,
   ]) {
     if (path != null) {
       buffer

@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
@@ -65,17 +66,24 @@ Widget buildTemplatesPageApp({
   required Widget child,
   Locale locale = const Locale('en'),
 }) {
-  return MaterialApp(
-    theme: AppTheme.light(),
-    locale: locale,
-    localizationsDelegates: const [
-      AppLocalizations.delegate,
-      GlobalMaterialLocalizations.delegate,
-      GlobalWidgetsLocalizations.delegate,
-      GlobalCupertinoLocalizations.delegate,
+  return ProviderScope(
+    overrides: [
+      generationHistoryControllerProvider.overrideWith(
+        IdleTemplatesGenerationHistoryController.new,
+      ),
     ],
-    supportedLocales: AppLocalizations.supportedLocales,
-    home: Scaffold(body: child),
+    child: MaterialApp(
+      theme: AppTheme.light(),
+      locale: locale,
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: Scaffold(body: child),
+    ),
   );
 }
 
@@ -154,6 +162,15 @@ class IdleWalletController extends WalletController {
 
   @override
   Future<void> load({bool refresh = false}) async {}
+}
+
+class IdleTemplatesGenerationHistoryController
+    extends GenerationHistoryController {
+  @override
+  GenerationHistoryState build() => const GenerationHistoryState();
+
+  @override
+  void setScreenVisible(bool visible, {bool clearLoadingState = true}) {}
 }
 
 class TrackingWalletController extends WalletController {

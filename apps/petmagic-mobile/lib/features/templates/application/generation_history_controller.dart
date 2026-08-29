@@ -150,6 +150,7 @@ abstract class _GenerationHistoryControllerBase
   Timer? _offlineBannerTimer;
   Timer? _autoRefreshTimer;
   bool _isScreenVisible = false;
+  bool _hasHydratedCachedUnreadCount = false;
   bool _hasInternet = true;
   bool _isAuthenticated = false;
   bool _isRealtimeConnected = false;
@@ -169,6 +170,37 @@ abstract class _GenerationHistoryControllerBase
   Set<String> _locallyReadUnreadGenerationIds = const {};
   int _autoRefreshFailureStreak = 0;
   int _loadEpoch = 0;
+
+  Future<void> _hydrateCachedUnreadCount() async {
+    if (_hasHydratedCachedUnreadCount ||
+        !ref.mounted ||
+        !_isAuthenticated ||
+        !_isScreenVisible) {
+      return;
+    }
+
+    _hasHydratedCachedUnreadCount = true;
+    int? cachedUnread;
+    try {
+      cachedUnread = await _repository.readCachedUnreadGenerationCount();
+    } catch (error, stackTrace) {
+      AppLogger.warn(
+        feature: 'Templates.GenerationHistory',
+        operation: 'hydrate_cached_unread_count',
+        message: 'Generation history cached unread hydration failed',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      return;
+    }
+    if (!ref.mounted || !_isAuthenticated || !_isScreenVisible) {
+      return;
+    }
+
+    if (cachedUnread != null) {
+      state = state.copyWith(unreadCount: cachedUnread);
+    }
+  }
 
   void setScreenVisible(bool visible, {bool clearLoadingState = true}) =>
       _setScreenVisible(visible, clearLoadingState: clearLoadingState);
@@ -342,25 +374,6 @@ class GenerationHistoryController extends _GenerationHistoryControllerBase
       _cancelActiveUnreadRefresh('generation_history_disposed');
       unawaited(galleryStore.cancelActiveDownloads());
       _pauseRealtime();
-    });
-    Future.microtask(() async {
-      if (!ref.mounted) {
-        return;
-      }
-
-      final cachedUnread = await _repository.readCachedUnreadGenerationCount();
-      if (!ref.mounted) {
-        return;
-      }
-
-      if (cachedUnread != null) {
-        state = state.copyWith(unreadCount: cachedUnread);
-      }
-      if (!_isScreenVisible) {
-        return;
-      }
-
-      await refreshUnreadCount();
     });
     return const GenerationHistoryState();
   }

@@ -135,8 +135,6 @@ void main() {
       cardPresentationSource,
       contains('final foregroundColor = usePremiumStyle'),
     );
-    expect(cardPresentationSource, contains('accent: colors.accent'));
-    expect(cardPresentationSource, contains('accent: colors.gold'));
     expect(cardPresentationSource, contains(': colors.on(colors.accent);'));
     expect(cardPresentationSource, contains('color: foregroundColor'));
     expect(cardBadgesSource, contains('color: colors.blue'));

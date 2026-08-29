@@ -14,6 +14,7 @@ import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/templates/domain/templates_query.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
+import 'package:petmagic_mobile/features/templates/application/generation_history_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_preview_page.dart';
 import 'package:petmagic_mobile/features/templates/application/templates_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
@@ -226,6 +227,9 @@ void main() {
             realtimeClientProvider.overrideWith(
               (ref) => const NoopRealtimeClient(),
             ),
+            generationHistoryControllerProvider.overrideWith(
+              IdleTemplatesGenerationHistoryController.new,
+            ),
           ],
           child: MaterialApp.router(
             builder: (context, child) => AppNavigationScope(
@@ -314,6 +318,9 @@ void main() {
           templatesRepositoryProvider.overrideWithValue(repository),
           realtimeClientProvider.overrideWith(
             (ref) => const NoopRealtimeClient(),
+          ),
+          generationHistoryControllerProvider.overrideWith(
+            IdleTemplatesGenerationHistoryController.new,
           ),
         ],
         child: TemplatesTickerModeHost(

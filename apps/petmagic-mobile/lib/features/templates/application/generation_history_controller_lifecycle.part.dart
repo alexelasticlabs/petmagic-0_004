@@ -16,6 +16,7 @@ mixin _GenerationHistoryControllerLifecycle
 
     if (visible) {
       _scheduleLocalArtifactCleanup();
+      unawaited(_hydrateCachedUnreadCount());
       if (!_hasInternet) {
         return;
       }
@@ -43,11 +44,13 @@ mixin _GenerationHistoryControllerLifecycle
 
     _isAuthenticated = isAuthenticated;
     if (!isAuthenticated) {
+      _hasHydratedCachedUnreadCount = false;
       _stopPrivateGenerationActivity();
       return;
     }
 
     if (_isScreenVisible && _hasInternet) {
+      unawaited(_hydrateCachedUnreadCount());
       _startAutoRefresh();
       unawaited(_resumeRealtimeIfNeeded());
     }

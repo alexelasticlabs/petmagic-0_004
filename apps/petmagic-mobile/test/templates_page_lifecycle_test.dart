@@ -19,7 +19,6 @@ import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 import 'package:petmagic_mobile/features/templates/application/templates_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/template_card.dart';
-import 'package:petmagic_mobile/features/templates/presentation/widgets/template_of_the_day_card.dart';
 import 'package:petmagic_mobile/features/wallet/application/wallet_controller.dart';
 import 'package:petmagic_mobile/shared/notifications/petmagic_notification_center.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
@@ -247,7 +246,7 @@ void main() {
       await tester.pump();
 
       expect(controller.loadInitialCalls, [false]);
-      expect(find.text('Magic video'), findsOneWidget);
+      expect(find.text('Magic video'), findsWidgets);
       expect(controller.state.query, activeQuery);
       expect(controller.state.itemsQueryKey, activeQuery.cacheKey);
       expect(_searchFieldText(tester), 'magic');
@@ -269,7 +268,7 @@ void main() {
       expect(controller.state.query, activeQuery);
       expect(controller.state.itemsQueryKey, activeQuery.cacheKey);
       expect(_searchFieldText(tester), 'magic');
-      expect(find.text('Magic video'), findsOneWidget);
+      expect(find.text('Magic video'), findsWidgets);
     },
   );
 
@@ -1111,36 +1110,35 @@ void main() {
       final context = tester.element(find.byType(TemplatesPage));
       final text = AppLocalizations.of(context);
 
-      final featuredCard = tester.widget<TemplateOfTheDayCard>(
-        find.byType(TemplateOfTheDayCard),
-      );
-      final visibleCards = tester.widgetList<TemplateCard>(
-        find.byType(TemplateCard),
-      );
+      final featuredCardFinder = find.byType(TemplateCard).first;
+      final visibleCards = tester
+          .widgetList<TemplateCard>(find.byType(TemplateCard))
+          .toList(growable: false);
+      final featuredCard = visibleCards.first;
 
       expect(featuredCard.template.templateId, 'template-2');
       expect(featuredCard.template.tokenCost, 5);
-      final featuredCardSize = tester.getSize(
-        find.byType(TemplateOfTheDayCard),
-      );
+      expect(featuredCard.featuredData, isNotNull);
+      final featuredCardSize = tester.getSize(featuredCardFinder);
       expect(featuredCardSize.width, greaterThan(0));
       expect(
         featuredCardSize.height,
         closeTo(featuredCardSize.width * 1.5, 0.1),
       );
-      expect(visibleCards.single.template.templateId, 'template-1');
-      expect(find.text('Daily portrait'), findsOneWidget);
+      expect(visibleCards[1].template.templateId, 'template-1');
+      expect(visibleCards[1].featuredData, isNull);
+      expect(find.text('Daily portrait'), findsWidgets);
       expect(find.textContaining('#daily'), findsOneWidget);
       expect(
         find.descendant(
-          of: find.byType(TemplateOfTheDayCard),
-          matching: find.text(text.templateOfTheDayTitle),
+          of: featuredCardFinder,
+          matching: find.text(text.templateOfTheDayFeedBadge),
         ),
         findsOneWidget,
       );
       expect(
         find.descendant(
-          of: find.byType(TemplateOfTheDayCard),
+          of: featuredCardFinder,
           matching: find.text('Template of the Day'),
         ),
         findsNothing,
@@ -1148,8 +1146,8 @@ void main() {
       expect(find.text('5 ${text.walletBalanceUnit}'), findsOneWidget);
       expect(
         find.descendant(
-          of: find.byType(TemplateOfTheDayCard),
-          matching: find.text(text.templateOfTheDayTryAction),
+          of: featuredCardFinder,
+          matching: find.text(text.templateTryAction),
         ),
         findsOneWidget,
       );
@@ -1210,26 +1208,29 @@ void main() {
 
       final context = tester.element(find.byType(TemplatesPage));
       final text = AppLocalizations.of(context);
-      final initialRegularCardIds = tester
+      final initialCards = tester
           .widgetList<TemplateCard>(find.byType(TemplateCard))
+          .toList(growable: false);
+      final initialRegularCardIds = initialCards
+          .where((card) => card.featuredData == null)
           .map((card) => card.template.templateId)
-          .toList();
+          .toList(growable: false);
 
       expect(initialRegularCardIds, contains('template-1'));
       expect(initialRegularCardIds, isNot(contains('template-2')));
-      final featuredCard = tester.widget<TemplateOfTheDayCard>(
-        find.byType(TemplateOfTheDayCard),
-      );
+      final featuredCard = initialCards.first;
       expect(featuredCard.template.templateId, 'template-2');
-      expect(find.text(text.templateOfTheDayTryAction), findsOneWidget);
+      expect(featuredCard.featuredData, isNotNull);
+      expect(find.text(text.templateTryAction), findsWidgets);
 
       await tester.drag(find.byType(CustomScrollView), const Offset(0, -500));
       await tester.pump();
 
       final scrolledRegularCardIds = tester
           .widgetList<TemplateCard>(find.byType(TemplateCard))
+          .where((card) => card.featuredData == null)
           .map((card) => card.template.templateId)
-          .toList();
+          .toList(growable: false);
       expect(scrolledRegularCardIds, contains('template-3'));
       expect(scrolledRegularCardIds, isNot(contains('template-2')));
     },
@@ -1277,7 +1278,7 @@ void main() {
     final text = AppLocalizations.of(context);
 
     expect(find.text('Could not load Template of the Day'), findsNothing);
-    expect(find.text('Template 1'), findsOneWidget);
+    expect(find.text('Template 1'), findsWidgets);
     expect(find.text(text.retryAction), findsNothing);
     expect(controller.loadInitialCalls, isNot(contains(true)));
   });
@@ -1343,15 +1344,16 @@ void main() {
 
       final context = tester.element(find.byType(TemplatesPage));
       final text = AppLocalizations.of(context);
-      final featuredCard = tester.widget<TemplateOfTheDayCard>(
-        find.byType(TemplateOfTheDayCard),
+      final featuredCard = tester.widget<TemplateCard>(
+        find.byType(TemplateCard).first,
       );
 
       expect(tester.takeException(), isNull);
       expect(featuredCard.template.templateId, 'template-premium-video');
       expect(featuredCard.template.isPremium, isTrue);
+      expect(featuredCard.featuredData, isNotNull);
       expect(find.text(text.templateUnlockPremiumAction), findsOneWidget);
-      expect(find.text('Template of the Day'), findsOneWidget);
+      expect(find.text(text.templateOfTheDayFeedBadge), findsOneWidget);
     },
   );
 }

@@ -178,6 +178,9 @@ void main() {
             ),
           ),
           templatesRepositoryProvider.overrideWithValue(repository),
+          generationHistoryControllerProvider.overrideWith(
+            IdleTemplatesGenerationHistoryController.new,
+          ),
           realtimeClientProvider.overrideWith(
             (ref) => const NoopRealtimeClient(),
           ),
@@ -266,6 +269,9 @@ void main() {
           templatesRepositoryProvider.overrideWithValue(repository),
           appPermissionCoordinatorProvider.overrideWithValue(
             permissionCoordinator,
+          ),
+          generationHistoryControllerProvider.overrideWith(
+            IdleTemplatesGenerationHistoryController.new,
           ),
           realtimeClientProvider.overrideWith(
             (ref) => const NoopRealtimeClient(),
@@ -381,6 +387,9 @@ void main() {
           ),
           templateGenerationRepositoryProvider.overrideWithValue(
             generationRepository,
+          ),
+          generationHistoryControllerProvider.overrideWith(
+            IdleTemplatesGenerationHistoryController.new,
           ),
           petRepositoryProvider.overrideWithValue(
             TemplateGenerationPetRepositoryAdapter(generationRepository),
@@ -502,6 +511,9 @@ void main() {
             ),
           ),
           templatesRepositoryProvider.overrideWithValue(repository),
+          generationHistoryControllerProvider.overrideWith(
+            IdleTemplatesGenerationHistoryController.new,
+          ),
           realtimeClientProvider.overrideWith(
             (ref) => const NoopRealtimeClient(),
           ),
@@ -580,6 +592,9 @@ void main() {
           walletControllerProvider.overrideWith(IdleWalletController.new),
           profileControllerProvider.overrideWith(FakeProfileController.new),
           templatesControllerProvider.overrideWith(FakeTemplatesController.new),
+          generationHistoryControllerProvider.overrideWith(
+            IdleTemplatesGenerationHistoryController.new,
+          ),
           realtimeClientProvider.overrideWith(
             (ref) => const NoopRealtimeClient(),
           ),
@@ -683,6 +698,9 @@ void main() {
             ),
           ),
           templatesRepositoryProvider.overrideWithValue(repository),
+          generationHistoryControllerProvider.overrideWith(
+            IdleTemplatesGenerationHistoryController.new,
+          ),
           realtimeClientProvider.overrideWith(
             (ref) => const NoopRealtimeClient(),
           ),
@@ -784,6 +802,9 @@ void main() {
           ),
           templateGenerationRepositoryProvider.overrideWithValue(
             generationRepository,
+          ),
+          generationHistoryControllerProvider.overrideWith(
+            IdleTemplatesGenerationHistoryController.new,
           ),
           petRepositoryProvider.overrideWithValue(
             TemplateGenerationPetRepositoryAdapter(generationRepository),
