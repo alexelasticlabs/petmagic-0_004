@@ -295,6 +295,64 @@ public sealed partial class TemplatesServiceTests
     }
 
     [Fact]
+    public async Task ListPageAsync_ShouldUseSignedInputPreviewForFailedGeneration()
+    {
+        await using var dbContext = CreateDbContext();
+        var mediaStorage = new RecordingMediaStorage(signReadUrls: true);
+        var generationService = CreateGenerationService(
+            dbContext,
+            mediaStorage: mediaStorage);
+        var templateId = await CreateActiveImageTemplateAsync(
+            CreateService(dbContext),
+            "Failed preview portrait",
+            "Portrait",
+            ["history"]);
+        var userId = Guid.NewGuid();
+        var generationId = Guid.NewGuid();
+        var inputMediaId = Guid.NewGuid();
+        var inputPreviewPath = "templates-media/private/failed-input-preview.webp";
+        var now = DateTime.UtcNow;
+
+        dbContext.TemplateGenerationJobs.Add(new TemplateGenerationJob
+        {
+            Id = generationId,
+            UserId = userId,
+            TemplateId = templateId,
+            Status = TemplateGenerationStatus.Failed,
+            TokenCost = 3,
+            SourceImageUrl = "templates-media/private/failed-input-original.jpg",
+            SourceImageFileName = "failed-input-original.jpg",
+            SourceImageContentType = "image/jpeg",
+            InputMediaAssetId = inputMediaId,
+            CreatedAtUtc = now.AddMinutes(-1),
+            QueuedAtUtc = now.AddMinutes(-1),
+            UpdatedAtUtc = now,
+            CompletedAtUtc = now,
+            LastErrorCode = "templates.ai_provider_failed"
+        });
+        dbContext.TemplateMediaRecords.Add(CreateGenerationMediaRecord(
+            inputMediaId,
+            userId,
+            generationId,
+            "user_upload",
+            "templates-media/private/failed-input-original.jpg",
+            inputPreviewPath,
+            now.AddMinutes(-1)));
+        await dbContext.SaveChangesAsync();
+
+        var page = await generationService.ListPageAsync(
+            userId,
+            new TemplateGenerationHistoryQuery("failed", null, 20),
+            isPremium: false,
+            CancellationToken.None);
+
+        Assert.True(page.IsSuccess, page.Error.Code);
+        var item = Assert.Single(page.Value.Items);
+        Assert.Equal($"{inputPreviewPath}?signed=1", item.Media.PreviewUrl);
+        Assert.Contains(inputPreviewPath, mediaStorage.ReadUrls);
+    }
+
+    [Fact]
     public async Task ListAdminGenerationsAsync_ShouldReturnBatchedRelationshipAndPreviewFields()
     {
         await using var dbContext = CreateDbContext();

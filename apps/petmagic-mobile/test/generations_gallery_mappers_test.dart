@@ -166,6 +166,16 @@ void main() {
         );
         expect(previewUrl(image), 'https://cdn.petmagic.app/result.jpg');
 
+        final failedImageWithInputPreview = _generation(
+          templateType: 'Image',
+          inputPreviewUrl: ' https://cdn.petmagic.app/input-preview.jpg ',
+          sourceImageAsset: _asset('https://cdn.petmagic.app/source.jpg'),
+        );
+        expect(
+          previewUrl(failedImageWithInputPreview),
+          'https://cdn.petmagic.app/input-preview.jpg',
+        );
+
         final imageWithResultPreview = _generation(
           templateType: 'Image',
           resultPreviewUrl: ' https://cdn.petmagic.app/result-thumb.jpg ',
@@ -352,6 +362,7 @@ TemplateGenerationResult _generation({
   String? estimatedDurationLabel,
   TemplateAsset? sourceImageAsset,
   String? normalizedImageUrl,
+  String? inputPreviewUrl,
   String? resultPreviewUrl,
   String? outputUrl,
   double? outputVideoDurationSeconds,
@@ -376,6 +387,7 @@ TemplateGenerationResult _generation({
     estimatedDurationLabel: estimatedDurationLabel,
     sourceImageAsset: sourceImageAsset,
     normalizedImageUrl: normalizedImageUrl,
+    inputPreviewUrl: inputPreviewUrl,
     resultPreviewUrl: resultPreviewUrl,
     outputUrl: outputUrl,
     outputVideoDurationSeconds: outputVideoDurationSeconds,

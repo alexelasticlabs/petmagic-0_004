@@ -67,43 +67,51 @@ class _FailedCard extends ConsumerWidget {
                       child: Stack(
                         children: [
                           Positioned.fill(
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(18),
-                              child: localPreviewFile != null
-                                  ? Image.file(
-                                      localPreviewFile,
-                                      fit: BoxFit.cover,
-                                      cacheWidth:
-                                          _generationGalleryThumbnailCacheWidth,
-                                      filterQuality: FilterQuality.medium,
-                                    )
-                                  : !canRenderPreview
-                                  ? _ThumbnailPlaceholder(
-                                      generation: generation,
-                                    )
-                                  : CachedNetworkImage(
-                                      imageUrl: safePreviewImageUrl!,
-                                      cacheKey:
-                                          persistentSafeGenerationMediaUrl(
-                                            safePreviewImageUrl.toString(),
-                                          ),
-                                      fit: BoxFit.cover,
-                                      memCacheWidth:
-                                          _generationGalleryThumbnailCacheWidth,
-                                      maxWidthDiskCache:
-                                          _generationGalleryThumbnailCacheWidth,
-                                      filterQuality: FilterQuality.medium,
-                                      errorWidget: (context, url, error) =>
-                                          _ThumbnailPlaceholder(
-                                            generation: generation,
-                                          ),
-                                    ),
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: colors.surfaceStrong,
+                                borderRadius: BorderRadius.circular(18),
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(18),
+                                child: localPreviewFile != null
+                                    ? Image.file(
+                                        localPreviewFile,
+                                        fit: BoxFit.contain,
+                                        cacheWidth:
+                                            _generationGalleryThumbnailCacheWidth,
+                                        filterQuality: FilterQuality.medium,
+                                      )
+                                    : !canRenderPreview
+                                    ? _ThumbnailPlaceholder(
+                                        generation: generation,
+                                      )
+                                    : CachedNetworkImage(
+                                        imageUrl: safePreviewImageUrl!,
+                                        cacheKey:
+                                            persistentSafeGenerationMediaUrl(
+                                              safePreviewImageUrl.toString(),
+                                            ),
+                                        fit: BoxFit.contain,
+                                        memCacheWidth:
+                                            _generationGalleryThumbnailCacheWidth,
+                                        maxWidthDiskCache:
+                                            _generationGalleryThumbnailCacheWidth,
+                                        filterQuality: FilterQuality.medium,
+                                        fadeInDuration: Duration.zero,
+                                        placeholderFadeInDuration:
+                                            Duration.zero,
+                                        placeholder: (context, url) =>
+                                            _ThumbnailPlaceholder(
+                                              generation: generation,
+                                            ),
+                                        errorWidget: (context, url, error) =>
+                                            _ThumbnailPlaceholder(
+                                              generation: generation,
+                                            ),
+                                      ),
+                              ),
                             ),
-                          ),
-                          Positioned(
-                            left: 6,
-                            top: 6,
-                            child: _TypeBadge(generation: generation),
                           ),
                         ],
                       ),

@@ -3,7 +3,6 @@ part of 'random_template_sheet.dart';
 class _RandomTemplateSheetContent extends StatelessWidget {
   const _RandomTemplateSheetContent({
     required this.bottomInset,
-    required this.screenHeight,
     required this.categories,
     required this.type,
     required this.category,
@@ -17,7 +16,6 @@ class _RandomTemplateSheetContent extends StatelessWidget {
   });
 
   final double bottomInset;
-  final double screenHeight;
   final List<String> categories;
   final TemplateType? type;
   final String? category;
@@ -39,12 +37,18 @@ class _RandomTemplateSheetContent extends StatelessWidget {
       top: false,
       child: Padding(
         padding: EdgeInsets.only(bottom: bottomInset),
-        child: SizedBox(
-          height: screenHeight - bottomInset,
+        child: ClipRRect(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
           child: DecoratedBox(
-            decoration: BoxDecoration(color: colors.surface),
+            decoration: BoxDecoration(
+              color: colors.surface,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(28),
+              ),
+              border: Border.all(color: colors.border.withValues(alpha: 0.7)),
+            ),
             child: SafeArea(
-              top: true,
+              top: false,
               bottom: false,
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),

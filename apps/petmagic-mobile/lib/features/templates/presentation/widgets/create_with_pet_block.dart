@@ -255,33 +255,33 @@ Future<PetProfile?> showTemplatePetPickerSheet(
     isScrollControlled: true,
     builder: (sheetContext, bottomInset) {
       final maxHeight = MediaQuery.sizeOf(sheetContext).height * 0.72;
-      final preferredHeight = 216.0 + (pets.length * 80);
-      final sheetHeight = preferredHeight > maxHeight
-          ? maxHeight
-          : preferredHeight;
+      final useScrollableList = 216 + (pets.length * 80) > maxHeight;
 
       return SafeArea(
         top: false,
         child: Padding(
           padding: EdgeInsets.fromLTRB(16, 8, 16, bottomInset),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: colors.surfaceGlass,
-              borderRadius: BorderRadius.circular(28),
-              border: Border.all(color: colors.border.withValues(alpha: 0.88)),
-              boxShadow: [
-                BoxShadow(
-                  color: colors.shadow.withValues(alpha: 0.42),
-                  blurRadius: 26,
-                  offset: const Offset(0, 16),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: maxHeight),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: colors.surfaceGlass,
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(
+                  color: colors.border.withValues(alpha: 0.88),
                 ),
-              ],
-            ),
-            child: SizedBox(
-              height: sheetHeight,
+                boxShadow: [
+                  BoxShadow(
+                    color: colors.shadow.withValues(alpha: 0.42),
+                    blurRadius: 26,
+                    offset: const Offset(0, 16),
+                  ),
+                ],
+              ),
               child: Material(
                 type: MaterialType.transparency,
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     const SizedBox(height: 10),
                     Container(
@@ -343,21 +343,21 @@ Future<PetProfile?> showTemplatePetPickerSheet(
                       ),
                     ),
                     const SizedBox(height: 12),
-                    Expanded(
-                      child: ListView.separated(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        itemCount: pets.length,
-                        separatorBuilder: (_, _) => const SizedBox(height: 8),
-                        itemBuilder: (context, index) {
-                          final pet = pets[index];
-                          return _PetPickerOption(
-                            pet: pet,
-                            isSelected: pet.id == selectedPetId,
-                            onTap: () => Navigator.of(sheetContext).pop(pet),
-                          );
-                        },
+                    if (useScrollableList)
+                      Flexible(
+                        child: _PetPickerList(
+                          pets: pets,
+                          selectedPetId: selectedPetId,
+                          onPick: (pet) => Navigator.of(sheetContext).pop(pet),
+                        ),
+                      )
+                    else
+                      _PetPickerList(
+                        pets: pets,
+                        selectedPetId: selectedPetId,
+                        onPick: (pet) => Navigator.of(sheetContext).pop(pet),
+                        shrinkWrap: true,
                       ),
-                    ),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
                       child: SizedBox(
@@ -381,6 +381,39 @@ Future<PetProfile?> showTemplatePetPickerSheet(
       );
     },
   );
+}
+
+class _PetPickerList extends StatelessWidget {
+  const _PetPickerList({
+    required this.pets,
+    required this.selectedPetId,
+    required this.onPick,
+    this.shrinkWrap = false,
+  });
+
+  final List<PetProfile> pets;
+  final String? selectedPetId;
+  final ValueChanged<PetProfile> onPick;
+  final bool shrinkWrap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+      shrinkWrap: shrinkWrap,
+      physics: shrinkWrap ? const NeverScrollableScrollPhysics() : null,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      itemCount: pets.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 8),
+      itemBuilder: (context, index) {
+        final pet = pets[index];
+        return _PetPickerOption(
+          pet: pet,
+          isSelected: pet.id == selectedPetId,
+          onTap: () => onPick(pet),
+        );
+      },
+    );
+  }
 }
 
 class _PetPickerOption extends StatelessWidget {

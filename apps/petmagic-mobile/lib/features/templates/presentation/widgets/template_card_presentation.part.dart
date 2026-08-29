@@ -220,8 +220,8 @@ class TemplateCardCta extends StatelessWidget {
         : colors.on(colors.accent);
     return PetMagicInteractiveSurface(
       onTap: onPressed,
-      borderRadius: BorderRadius.circular(16),
-      scaleDown: 0.975,
+      borderRadius: BorderRadius.circular(14),
+      scaleDown: 0.98,
       child: DecoratedBox(
         decoration: BoxDecoration(
           gradient: isPremiumLockCta
@@ -249,23 +249,23 @@ class TemplateCardCta extends StatelessWidget {
               : const LinearGradient(
                   colors: [Color(0xFF168A62), Color(0xFF15956A)],
                 ),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: usePremiumStyle
-                ? const Color(0xFFF9E8B6).withValues(alpha: 0.88)
-                : Colors.white.withValues(alpha: 0.14),
-            width: usePremiumStyle ? 1.3 : 1,
+                ? const Color(0xFFF9E8B6).withValues(alpha: 0.68)
+                : Colors.white.withValues(alpha: 0.12),
+            width: 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.16),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
+              color: Colors.black.withValues(alpha: 0.12),
+              blurRadius: 5,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
         child: ConstrainedBox(
-          constraints: const BoxConstraints.tightFor(height: 52),
+          constraints: const BoxConstraints.tightFor(height: 44),
           child: Stack(
             alignment: Alignment.center,
             children: [
@@ -277,30 +277,34 @@ class TemplateCardCta extends StatelessWidget {
                   textAlign: TextAlign.center,
                   style: textStyle?.copyWith(
                     color: foregroundColor,
-                    fontSize: 11,
+                    fontSize: 10.5,
                     fontWeight: FontWeight.w700,
                     height: 1.05,
                   ),
                 ),
               ),
               Positioned(
-                right: 14,
+                right: 12,
                 child: Container(
-                  width: usePremiumStyle ? 22 : null,
-                  height: usePremiumStyle ? 22 : null,
+                  width: usePremiumStyle ? 20 : null,
+                  height: usePremiumStyle ? 20 : null,
                   decoration: usePremiumStyle
                       ? BoxDecoration(
-                          color: const Color(0x3DFFF3D2),
+                          color: const Color(0x26FFF3D2),
                           shape: BoxShape.circle,
-                          border: Border.all(color: const Color(0xAAFFF0C0)),
+                          border: Border.all(
+                            color: const Color(
+                              0xAAFFF0C0,
+                            ).withValues(alpha: 0.62),
+                          ),
                         )
                       : null,
                   child: isPremiumLockCta
-                      ? const PremiumCrownIcon(size: 13.5)
+                      ? const PremiumCrownIcon(size: 12)
                       : Icon(
                           Icons.arrow_forward_rounded,
                           color: foregroundColor,
-                          size: usePremiumStyle ? 13.5 : 16,
+                          size: usePremiumStyle ? 12 : 15,
                         ),
                 ),
               ),

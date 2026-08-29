@@ -8,7 +8,10 @@ String? normalizePetMediaUrl(String? rawUrl) {
     return null;
   }
 
-  final sanitized = Uri.encodeFull(trimmed.replaceAll('\\', '/'));
+  // Uri.tryParse encodes unsafe characters such as spaces while preserving
+  // existing percent-encoded query values. Re-encoding the complete value
+  // would turn `%2F` into `%252F` and invalidate R2/AWS signed URLs.
+  final sanitized = trimmed.replaceAll('\\', '/');
   final parsed = Uri.tryParse(sanitized);
   final Uri candidate;
   if (parsed?.hasScheme == true) {

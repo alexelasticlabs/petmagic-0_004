@@ -94,6 +94,7 @@ class _PetMagicActionSheetState extends State<PetMagicActionSheet> {
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const _PetMagicActionSheetHandle(),

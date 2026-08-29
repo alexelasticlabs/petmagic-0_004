@@ -762,7 +762,7 @@ void main() {
     expect(find.textContaining('wallet.payment_unavailable'), findsNothing);
   });
 
-  testWidgets('rewards history sheet builds long ledger lazily', (
+  testWidgets('rewards history sheet caps a long ledger and builds it lazily', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 900));
@@ -798,13 +798,48 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
 
+    final sheetRect = tester.getRect(find.byType(BottomSheet).last);
+
     expect(
-      tester.getTopLeft(find.byType(BottomSheet).last).dy,
-      0,
-      reason: 'Rewards history must begin at the top edge of the screen.',
+      sheetRect.top,
+      greaterThan(0),
+      reason: 'Long history should remain a bounded bottom sheet.',
     );
+    expect(sheetRect.height, lessThanOrEqualTo(740));
     expect(find.text('Reward history row 0'), findsOneWidget);
     expect(find.text('Reward history row 119'), findsNothing);
+  });
+
+  testWidgets('rewards history sheet is content-sized for a short ledger', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await pumpRewardsPage(
+      tester,
+      repository: FakeWalletRepository(
+        wallet: walletStateFixture,
+        ledger: ledgerItemsFixture,
+        packs: packsFixture,
+        purchases: purchasesFixture,
+      ),
+    );
+
+    final rewardsContext = tester.element(find.byType(RewardsPage));
+    final text = AppLocalizations.of(rewardsContext);
+
+    await tester.tap(find.text(text.rewardsHistoryTitle));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    final sheetRect = tester.getRect(find.byType(BottomSheet).last);
+
+    expect(
+      sheetRect.height,
+      lessThan(420),
+      reason: 'Short history must not leave an empty full-screen sheet.',
+    );
   });
 }
 

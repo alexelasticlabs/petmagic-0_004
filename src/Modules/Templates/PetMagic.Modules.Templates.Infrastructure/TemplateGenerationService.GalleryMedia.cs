@@ -66,6 +66,23 @@ internal sealed partial class TemplateGenerationService
             : (DateTime?)null;
 
         var signedPreviewUrl = signedResponse.ResultPreviewUrl;
+        if (job.Status is TemplateGenerationStatus.Failed or TemplateGenerationStatus.Cancelled)
+        {
+            var inputPreviewUrl = job.InputMediaAssetId is Guid inputMediaAssetId
+                ? job.MediaRecords
+                    .FirstOrDefault(x => x.Id == inputMediaAssetId
+                        && !x.IsDeleted
+                        && x.MediaType == "image")
+                    ?.PreviewUrl
+                : null;
+            inputPreviewUrl ??= await ResolveInputComparePreviewUrlAsync(
+                job,
+                cancellationToken);
+            signedPreviewUrl = await TryCreateReadUrlAsync(
+                inputPreviewUrl,
+                TimeSpan.FromSeconds(Math.Max(1, options.UserMediaReadUrlTtlSeconds)),
+                cancellationToken);
+        }
         if (string.IsNullOrWhiteSpace(signedPreviewUrl))
         {
             signedPreviewUrl = await TryCreateReadUrlAsync(

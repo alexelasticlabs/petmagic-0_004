@@ -188,12 +188,13 @@ public sealed partial class TemplatesServiceTests
         ITemplateFeedRealtimeService? realtimeService = null,
         ITemplateAiProviderHealthService? aiProviderHealthService = null,
         IAdminAuditLog? adminAuditLog = null,
-        FalQueueClient? falQueueClient = null)
+        FalQueueClient? falQueueClient = null,
+        IMediaStorage? mediaStorage = null)
     {
         return new TemplateGenerationService(
             dbContext,
             billing ?? new PassiveGenerationBilling(),
-            new RecordingMediaStorage(),
+            mediaStorage ?? new RecordingMediaStorage(),
             options ?? CreateTemplatesOptions(),
             realtimeService: realtimeService,
             aiProviderHealthService: aiProviderHealthService,

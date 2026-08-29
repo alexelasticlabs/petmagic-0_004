@@ -130,6 +130,7 @@ String? previewUrl(TemplateGenerationResult generation) {
   );
   final source = _safeMediaUrl(generation.sourceImageAsset?.url);
   final normalized = _safeMediaUrl(generation.normalizedImageUrl);
+  final inputPreview = _safeMediaUrl(generation.inputPreviewUrl);
   final generationIsVideo = isVideoGeneration(generation);
 
   if (resultPreview != null && !isLikelyGenerationVideoUrl(resultPreview)) {
@@ -148,6 +149,9 @@ String? previewUrl(TemplateGenerationResult generation) {
 
   if (output != null && !isLikelyGenerationVideoUrl(output)) {
     return output;
+  }
+  if (inputPreview != null) {
+    return inputPreview;
   }
   if (source != null) {
     return source;

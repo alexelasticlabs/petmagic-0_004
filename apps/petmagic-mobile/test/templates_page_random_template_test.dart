@@ -35,7 +35,7 @@ void main() {
     await PetMagicNotificationCenter.instance.clearQueue();
   });
 
-  testWidgets('templates page opens full-screen random settings sheet', (
+  testWidgets('templates page opens compact random settings sheet', (
     tester,
   ) async {
     final controller = FakeTemplatesController();
@@ -75,10 +75,15 @@ void main() {
     expect(find.text(text.randomTemplateAction), findsOneWidget);
     expect(find.text(text.randomTemplateSheetDescription), findsOneWidget);
     expect(find.byIcon(Icons.close_rounded), findsOneWidget);
+    final bottomSheet = find.byType(BottomSheet).last;
     expect(
-      tester.getTopLeft(find.byType(BottomSheet).last).dy,
-      0,
-      reason: 'Random template settings must begin at the top edge.',
+      tester.getTopLeft(bottomSheet).dy,
+      greaterThan(0),
+      reason: 'Random template settings must stay a bottom sheet.',
+    );
+    expect(
+      tester.getSize(bottomSheet).height,
+      lessThan(tester.view.physicalSize.height / tester.view.devicePixelRatio),
     );
     expect(repository.fetchRandomTemplateCalls, 0);
     expect(find.text(text.randomTemplateAny), findsNothing);

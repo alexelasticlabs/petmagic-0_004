@@ -29,6 +29,7 @@ import 'package:petmagic_mobile/features/templates/presentation/generations_gall
 import 'package:petmagic_mobile/features/templates/presentation/template_preview_page.dart';
 import 'package:petmagic_mobile/features/templates/application/templates_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
+import 'package:petmagic_mobile/features/templates/presentation/widgets/create_with_pet_block.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/template_flow_sheets.dart';
 import 'package:petmagic_mobile/features/wallet/application/wallet_controller.dart';
 import 'package:petmagic_mobile/shared/notifications/petmagic_notification_center.dart';
@@ -51,6 +52,57 @@ void main() {
       milliseconds: 500,
     );
     await PetMagicNotificationCenter.instance.clearQueue();
+  });
+
+  testWidgets('pet picker is content-sized for one pet', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final pet = PetProfile(
+      id: 'pet-picker-1',
+      name: 'Rex',
+      type: 'dog',
+      breed: 'Husky',
+      photosCount: 1,
+      generationsCount: 0,
+      createdAtUtc: DateTime.utc(2026, 1, 1),
+      updatedAtUtc: DateTime.utc(2026, 1, 1),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: Center(
+              child: FilledButton(
+                onPressed: () => showTemplatePetPickerSheet(context, [
+                  pet,
+                ], selectedPetId: pet.id),
+                child: const Text('Open pet picker'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open pet picker'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(
+      tester.getRect(find.byType(BottomSheet).last).height,
+      lessThan(300),
+      reason: 'A single pet must not leave empty space in the picker sheet.',
+    );
   });
 
   test(

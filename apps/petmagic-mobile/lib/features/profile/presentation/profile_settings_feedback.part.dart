@@ -131,7 +131,7 @@ Future<_SettingsFeedbackDraft?> _showSettingsFeedbackSheet(
   return showModalBottomSheet<_SettingsFeedbackDraft>(
     context: context,
     isScrollControlled: true,
-    showDragHandle: true,
+    showDragHandle: false,
     backgroundColor: Colors.transparent,
     builder: (sheetContext) {
       return _SettingsFeedbackSheet(copy: copy);
@@ -186,6 +186,18 @@ class _SettingsFeedbackSheetState extends State<_SettingsFeedbackSheet> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  Align(
+                    alignment: Alignment.center,
+                    child: Container(
+                      width: 36,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 14),
+                      decoration: BoxDecoration(
+                        color: colors.border.withValues(alpha: 0.9),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ),
                   Text(
                     copy.sheetTitle,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(

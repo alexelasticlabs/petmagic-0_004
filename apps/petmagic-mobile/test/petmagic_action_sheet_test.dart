@@ -17,7 +17,12 @@ void main() {
     expect(find.text('Upload from device'), findsOneWidget);
     expect(find.text('Use a pet from your profile'), findsOneWidget);
 
-    expect(tester.getTopLeft(find.byType(BottomSheet).last).dy, greaterThan(0));
+    final bottomSheet = find.byType(BottomSheet).last;
+    expect(tester.getTopLeft(bottomSheet).dy, greaterThan(0));
+    expect(
+      tester.getSize(bottomSheet).height,
+      lessThan(tester.view.physicalSize.height / tester.view.devicePixelRatio),
+    );
 
     await tester.tap(find.text('Upload from device'));
     await tester.pumpAndSettle();
