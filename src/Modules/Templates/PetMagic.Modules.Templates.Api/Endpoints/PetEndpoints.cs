@@ -302,7 +302,7 @@ public static class PetEndpoints
             return ToPetProblem(subjectError);
         }
 
-        var isPremium = await HasPremiumTemplateAccessAsync(context, userId!.Value, cancellationToken);
+        var isPremium = await HasPremiumEntitlementAsync(context, userId!.Value, cancellationToken);
         var result = await petsService.ListGenerationsAsync(userId.Value, petId, isPremium, cancellationToken);
         return result.IsFailure
             ? ToPetProblem(result.Error)
@@ -577,20 +577,23 @@ public static class PetEndpoints
             return true;
         }
 
-        var premiumRaw = context.User.FindFirstValue("premium");
-        if (string.Equals(premiumRaw, "true", StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
+        return await HasPremiumEntitlementAsync(context, userId, cancellationToken);
+    }
 
+    private static async Task<bool> HasPremiumEntitlementAsync(
+        HttpContext context,
+        Guid userId,
+        CancellationToken cancellationToken)
+    {
         var identityService = context.RequestServices.GetService<IIdentityService>();
-        if (identityService is null)
+        if (identityService is not null)
         {
-            return false;
+            var profile = await identityService.GetCurrentUserAsync(userId, cancellationToken);
+            return profile.IsSuccess && profile.Value.IsPremium;
         }
 
-        var profile = await identityService.GetCurrentUserAsync(userId, cancellationToken);
-        return profile.IsSuccess && profile.Value.IsPremium;
+        var premiumRaw = context.User.FindFirstValue("premium");
+        return string.Equals(premiumRaw, "true", StringComparison.OrdinalIgnoreCase);
     }
 
     private static async Task<string> ResolveQueueTierAsync(

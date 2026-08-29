@@ -251,20 +251,23 @@ public static partial class TemplateGenerationEndpoints
             return true;
         }
 
-        var hasPremiumClaim = TryGetPremiumClaim(context.User, out var claimPremiumValue);
-        if (hasPremiumClaim && claimPremiumValue)
-        {
-            return true;
-        }
+        return await HasPremiumEntitlementAsync(context, userId, cancellationToken);
+    }
 
+    private static async Task<bool> HasPremiumEntitlementAsync(
+        HttpContext context,
+        Guid userId,
+        CancellationToken cancellationToken)
+    {
         var identityService = context.RequestServices.GetService<IIdentityService>();
-        if (identityService is null)
+        if (identityService is not null)
         {
-            return hasPremiumClaim && claimPremiumValue;
+            var profile = await identityService.GetCurrentUserAsync(userId, cancellationToken);
+            return profile.IsSuccess && profile.Value.IsPremium;
         }
 
-        var profile = await identityService.GetCurrentUserAsync(userId, cancellationToken);
-        return profile.IsSuccess && profile.Value.IsPremium;
+        var hasPremiumClaim = TryGetPremiumClaim(context.User, out var claimPremiumValue);
+        return hasPremiumClaim && claimPremiumValue;
     }
 
     private static string? NormalizeIdempotencyKey(string? value)

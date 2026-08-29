@@ -121,7 +121,7 @@ public static partial class TemplateGenerationEndpoints
             return ToClientGenerationProblem(subjectError);
         }
 
-        var isPremium = await HasPremiumTemplateAccessAsync(context, userId!.Value, cancellationToken);
+        var isPremium = await HasPremiumEntitlementAsync(context, userId!.Value, cancellationToken);
         var result = await generationService.GetAsync(userId.Value, generationId, isPremium, cancellationToken);
         if (result.IsFailure)
         {
@@ -145,7 +145,7 @@ public static partial class TemplateGenerationEndpoints
             return ToClientGenerationProblem(subjectError);
         }
 
-        var isPremium = await HasPremiumTemplateAccessAsync(context, userId!.Value, cancellationToken);
+        var isPremium = await HasPremiumEntitlementAsync(context, userId!.Value, cancellationToken);
         var result = await generationService.RemoveWatermarkAsync(
             new RemoveGenerationWatermarkCommand(
                 userId.Value,
@@ -174,7 +174,7 @@ public static partial class TemplateGenerationEndpoints
             return ToClientGenerationProblem(subjectError);
         }
 
-        var isPremium = await HasPremiumTemplateAccessAsync(context, userId!.Value, cancellationToken);
+        var isPremium = await HasPremiumEntitlementAsync(context, userId!.Value, cancellationToken);
         var result = await generationService.GetDownloadAsync(userId.Value, generationId, isPremium, cancellationToken);
         if (result.IsFailure)
         {
@@ -197,7 +197,7 @@ public static partial class TemplateGenerationEndpoints
             return ToClientGenerationProblem(subjectError);
         }
 
-        var isPremium = await HasPremiumTemplateAccessAsync(context, userId!.Value, cancellationToken);
+        var isPremium = await HasPremiumEntitlementAsync(context, userId!.Value, cancellationToken);
         var result = await generationService.GetShareAsync(userId.Value, generationId, isPremium, cancellationToken);
         if (result.IsFailure)
         {
@@ -229,7 +229,7 @@ public static partial class TemplateGenerationEndpoints
             return filterProblem;
         }
 
-        var isPremium = await HasPremiumTemplateAccessAsync(context, userId!.Value, cancellationToken);
+        var isPremium = await HasPremiumEntitlementAsync(context, userId!.Value, cancellationToken);
         var result = await generationService.ListPageAsync(
             userId!.Value,
             new TemplateGenerationHistoryQuery(status, skip, take, cursor),

@@ -66,6 +66,7 @@ public sealed record FeedTemplateCardDto(
     string[] Tags,
     bool IsPremium,
     string Access,
+    int TokenCost,
     string? ThumbnailUrl,
     FeedTemplateMediaDto Media,
     string MediaKind,

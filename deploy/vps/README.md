@@ -119,6 +119,7 @@ Important production invariants include:
 - `ASPNETCORE_ENVIRONMENT=Production`;
 - `DOCKER_BIND_ADDRESS=127.0.0.1`;
 - R2 media storage and fal.ai provider enabled;
+- watermark rendering enabled for free-user image and video results;
 - exactly one generation worker with bounded `4/4/1/1` lanes;
 - Firebase push enabled;
 - `BOOTSTRAP_ADMIN_PASSWORD` empty;

@@ -2003,50 +2003,81 @@ public sealed partial class TemplatesServiceTests
     }
 
     [Fact]
-    public async Task GetCompatibleTemplatesAsync_ShouldReturnOnlyTemplatesCompatibleWithCompletedImageResult()
+    public async Task GetCompatibleTemplatesAsync_ShouldReturnRecommendedImageAndVideoTemplatesCompatibleWithCompletedImageResult()
     {
         await using var dbContext = CreateDbContext();
         var service = CreateService(dbContext);
         var generationService = CreateGenerationService(dbContext);
         var userId = Guid.NewGuid();
         var parent = await CreateCompletedImageGenerationAsync(dbContext, service, userId);
-        var compatibleVideo = await CreateGenerationResultVideoTemplateAsync(
-            service,
+        var now = DateTime.UtcNow;
+        TemplateItem CreateCompatibleTemplate(
+            string title,
+            TemplateType type,
+            bool supportsResultInput,
+            TemplateType requiredInputType,
+            bool recommended)
+        {
+            var templateId = Guid.NewGuid();
+            return new TemplateItem
+            {
+                Id = templateId,
+                TemplateType = type,
+                Title = title,
+                ShortDescription = $"{title} description",
+                Category = "Result",
+                Tags = "[\"from-result\"]",
+                TokenCost = 20,
+                SupportsGenerationResultInput = supportsResultInput,
+                RequiredInputMediaType = requiredInputType,
+                RecommendedAfterImageGeneration = recommended,
+                Status = TemplateStatus.Active,
+                CreatedAtUtc = now,
+                PublishedAtUtc = now,
+                UpdatedAtUtc = now,
+                Assets =
+                [
+                    new TemplateAsset
+                    {
+                        Id = Guid.NewGuid(),
+                        TemplateId = templateId,
+                        AssetKind = TemplateAssetKind.Preview,
+                        Url = $"https://cdn.example.com/{templateId:N}.jpg",
+                        FileName = "preview.jpg",
+                        ContentType = "image/jpeg"
+                    }
+                ]
+            };
+        }
+
+        var compatibleVideo = CreateCompatibleTemplate(
             "Compatible Video",
-            supportsGenerationResultInput: true,
-            requiredInputMediaType: TemplateType.Image.ToString(),
-            recommendedAfterImageGeneration: true);
-        await CreateGenerationResultVideoTemplateAsync(
-            service,
-            "Video Result Only",
-            supportsGenerationResultInput: true,
-            requiredInputMediaType: TemplateType.Video.ToString(),
-            recommendedAfterImageGeneration: true);
-        await CreateGenerationResultVideoTemplateAsync(
-            service,
-            "Not Supported",
-            supportsGenerationResultInput: false,
-            requiredInputMediaType: TemplateType.Image.ToString(),
-            recommendedAfterImageGeneration: true);
-        var imageCompatible = await service.CreateImageAsync(
-            new CreateImageTemplateCommand(
-                "Image To Image",
-                "Image result compatible but not a continuation video",
-                "Image",
-                ["from-result"],
-                false,
-                20,
-                TemplatePromoBadgeMode.Auto.ToString(),
-                CreatePreviewAsset("https://cdn.example.com/image-to-image.jpg", "preview.jpg", "image/jpeg"),
-                "openai/gpt-image-2/edit",
-                "keep pet",
-                TemplateStatus.Active.ToString(),
-                null,
-                SupportsGenerationResultInput: true,
-                RequiredInputMediaType: TemplateType.Image.ToString(),
-                RecommendedAfterImageGeneration: true),
-            CancellationToken.None);
-        Assert.True(imageCompatible.IsSuccess);
+            TemplateType.Video,
+            supportsResultInput: true,
+            requiredInputType: TemplateType.Image,
+            recommended: true);
+        var imageCompatible = CreateCompatibleTemplate(
+            "Image To Image",
+            TemplateType.Image,
+            supportsResultInput: true,
+            requiredInputType: TemplateType.Image,
+            recommended: true);
+        dbContext.TemplateItems.AddRange(
+            compatibleVideo,
+            imageCompatible,
+            CreateCompatibleTemplate(
+                "Video Result Only",
+                TemplateType.Video,
+                supportsResultInput: true,
+                requiredInputType: TemplateType.Video,
+                recommended: true),
+            CreateCompatibleTemplate(
+                "Not Supported",
+                TemplateType.Video,
+                supportsResultInput: false,
+                requiredInputType: TemplateType.Image,
+                recommended: true));
+        await dbContext.SaveChangesAsync();
 
         var compatible = await generationService.GetCompatibleTemplatesAsync(
             userId,
@@ -2056,10 +2087,21 @@ public sealed partial class TemplatesServiceTests
         Assert.True(compatible.IsSuccess);
         Assert.Equal(parent.Id, compatible.Value.ResultId);
         Assert.Equal("image", compatible.Value.InputMediaType);
-        var template = Assert.Single(compatible.Value.Templates);
-        Assert.Equal(compatibleVideo, template.Id);
-        Assert.Equal("Video", template.Type);
-        Assert.False(template.IsRecommended);
+        var templates = compatible.Value.Templates;
+        Assert.Collection(
+            templates,
+            template =>
+            {
+                Assert.Equal(compatibleVideo.Id, template.Id);
+                Assert.Equal("Video", template.Type);
+                Assert.True(template.IsRecommended);
+            },
+            template =>
+            {
+                Assert.Equal(imageCompatible.Id, template.Id);
+                Assert.Equal("Image", template.Type);
+                Assert.True(template.IsRecommended);
+            });
     }
 
     [Fact]

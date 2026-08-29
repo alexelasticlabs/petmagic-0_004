@@ -41,6 +41,16 @@ for (const expected of ['vps-fea3ac06', 'Ubuntu 26.04', '/opt/petmagic/current',
   if (!runbook.includes(expected)) failures.push(`VPS runbook does not document ${expected}`);
 }
 
+const preflight = read('deploy/vps/scripts/preflight.sh');
+if (!preflight.includes("'TEMPLATES_WATERMARK_ENABLED=true'")) {
+  failures.push('production preflight does not require watermark rendering');
+}
+
+const compose = read('docker-compose.yml');
+if (compose.includes('TEMPLATES_WATERMARK_ENABLED:-false')) {
+  failures.push('Docker Compose still disables watermark rendering by default');
+}
+
 if (/\bMailtrap\b/i.test(runbook)) failures.push('VPS runbook still describes Mailtrap');
 
 if (failures.length) {

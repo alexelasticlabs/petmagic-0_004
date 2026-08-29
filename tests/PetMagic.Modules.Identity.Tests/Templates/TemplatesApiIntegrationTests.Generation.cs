@@ -384,6 +384,71 @@ public sealed partial class TemplatesApiIntegrationTests
     }
 
     [Fact]
+    public async Task GenerationRead_ShouldNotTreatPrivilegedRoleAsPremiumWatermarkEntitlement()
+    {
+        await using var application = await TestApplication.CreateAsync(startGenerationWorker: false);
+        var templateId = Guid.NewGuid();
+        var generationId = Guid.NewGuid();
+
+        await using (var scope = application.Services.CreateAsyncScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<TemplatesDbContext>();
+            var now = DateTime.UtcNow.AddMinutes(-1);
+            dbContext.TemplateItems.Add(new TemplateItem
+            {
+                Id = templateId,
+                Version = 1,
+                TemplateType = TemplateType.Image,
+                Title = "Privileged Watermark Entitlement",
+                ShortDescription = "Watermark entitlement contract test.",
+                Category = "Watermark",
+                Tags = "watermark,premium-entitlement",
+                TokenCost = 1,
+                Status = TemplateStatus.Active,
+                ImageModel = "openai/gpt-image-2/edit",
+                ImagePrompt = "Keep the same pet.",
+                CreatedAtUtc = now,
+                PublishedAtUtc = now,
+                UpdatedAtUtc = now
+            });
+            var generation = CompletedJob(
+                generationId,
+                TestUserId,
+                templateId,
+                1,
+                now,
+                "privileged-watermark");
+            generation.IsWatermarkRequired = true;
+            generation.WatermarkedResultUrl = "https://cdn.example.com/privileged-watermark-badged.png";
+            dbContext.TemplateGenerationJobs.Add(generation);
+            await dbContext.SaveChangesAsync();
+        }
+
+        var path = $"/api/templates/generations/{generationId:D}";
+        using var freeAdminRequest = new HttpRequestMessage(HttpMethod.Get, path);
+        freeAdminRequest.Headers.Add("X-Test-Role", "Admin");
+        freeAdminRequest.Headers.Add("X-Test-Premium", "false");
+        using var freeAdminResponse = await application.Client.SendAsync(freeAdminRequest);
+        await EnsureSuccessStatusCodeAsync(freeAdminResponse, path);
+        var freeAdminResult = await ReadJsonAsync<TemplateGenerationResponse>(freeAdminResponse);
+
+        Assert.True(freeAdminResult.HasWatermark);
+        Assert.False(freeAdminResult.IsWatermarkRemoved);
+        Assert.Contains("privileged-watermark-badged.png", freeAdminResult.OutputUrl, StringComparison.Ordinal);
+
+        using var premiumAdminRequest = new HttpRequestMessage(HttpMethod.Get, path);
+        premiumAdminRequest.Headers.Add("X-Test-Role", "Admin");
+        premiumAdminRequest.Headers.Add("X-Test-Premium", "true");
+        using var premiumAdminResponse = await application.Client.SendAsync(premiumAdminRequest);
+        await EnsureSuccessStatusCodeAsync(premiumAdminResponse, path);
+        var premiumAdminResult = await ReadJsonAsync<TemplateGenerationResponse>(premiumAdminResponse);
+
+        Assert.False(premiumAdminResult.HasWatermark);
+        Assert.Contains("privileged-watermark-badged.png", freeAdminResult.OutputUrl, StringComparison.Ordinal);
+        Assert.DoesNotContain("privileged-watermark-badged.png", premiumAdminResult.OutputUrl, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task AdminTemplateGenerations_ShouldAcceptCancellingStatusFilter()
     {
         await using var application = await TestApplication.CreateAsync(startGenerationWorker: false);

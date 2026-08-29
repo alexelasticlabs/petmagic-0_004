@@ -321,6 +321,7 @@ internal sealed partial class TemplatesService
         string category,
         string tags,
         bool isPremium,
+        int tokenCost,
         long version,
         string? thumbnailUrl,
         string? thumbnailContentType,
@@ -378,6 +379,7 @@ internal sealed partial class TemplatesService
             DeserializeTags(tags),
             isPremium,
             isPremium ? "premium" : "free",
+            tokenCost,
             resolvedThumbnailUrl,
             new FeedTemplateMediaDto(
                 resolvedThumbnailUrl,

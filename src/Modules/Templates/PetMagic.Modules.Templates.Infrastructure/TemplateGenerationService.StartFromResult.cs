@@ -34,10 +34,10 @@ internal sealed partial class TemplateGenerationService
         var templates = await _visibilityPolicy.ApplyPublic(
                 dbContext.TemplateItems.AsNoTracking().Include(x => x.Assets),
                 new TemplateVisibilityContext())
-            .Where(x => x.TemplateType == TemplateType.Video
-                && x.SupportsGenerationResultInput
+            .Where(x => x.SupportsGenerationResultInput
                 && x.RequiredInputMediaType == inputMediaType.Value)
-            .OrderBy(x => x.Title)
+            .OrderByDescending(x => x.RecommendedAfterImageGeneration)
+            .ThenBy(x => x.Title)
             .ThenBy(x => x.Id)
             .Select(x => new CompatibleGenerationTemplateResponse(
                 x.Id,
@@ -48,7 +48,7 @@ internal sealed partial class TemplateGenerationService
                     .Select(asset => asset.Url)
                     .FirstOrDefault(),
                 x.IsPremium,
-                false,
+                x.RecommendedAfterImageGeneration,
                 x.TokenCost,
                 x.Version))
             .ToArrayAsync(cancellationToken);

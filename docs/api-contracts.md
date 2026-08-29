@@ -69,6 +69,7 @@ Item fields required by mobile:
 - `tags`: string array.
 - `isPremium`: boolean.
 - `access`: `free` or `premium`.
+- `tokenCost`: positive PawSpark cost of one generation. Active public templates must not use `0` as a price.
 - `thumbnailUrl`: nullable static image URL for immediate card paint.
 - `media`: lightweight feed media object:
   - `thumbnailUrl`: static image for placeholders and first paint.

@@ -1000,6 +1000,7 @@ public sealed partial class TemplatesApiIntegrationTests
             "tags",
             "isPremium",
             "access",
+            "tokenCost",
             "thumbnailUrl",
             "media",
             "mediaKind",
@@ -1028,7 +1029,6 @@ public sealed partial class TemplatesApiIntegrationTests
         Assert.DoesNotContain("templateId", itemProperties);
         Assert.DoesNotContain("templateType", itemProperties);
         Assert.DoesNotContain("previewAsset", itemProperties);
-        Assert.DoesNotContain("tokenCost", itemProperties);
         Assert.DoesNotContain("petPhotoRequirements", itemProperties);
         Assert.DoesNotContain("supportsGenerationResultInput", itemProperties);
         Assert.DoesNotContain("requiredInputMediaType", itemProperties);
@@ -1045,6 +1045,7 @@ public sealed partial class TemplatesApiIntegrationTests
         Assert.Equal("Contract", category.GetProperty("title").GetString());
         Assert.Equal("contract", category.GetProperty("slug").GetString());
         Assert.False(item.GetProperty("isPremium").GetBoolean());
+        Assert.Equal(20, item.GetProperty("tokenCost").GetInt32());
         Assert.True(item.GetProperty("version").GetInt64() > 0);
         Assert.Equal(previewAsset.Url, item.GetProperty("thumbnailUrl").GetString());
 
@@ -1076,6 +1077,7 @@ public sealed partial class TemplatesApiIntegrationTests
         Assert.NotNull(typedResponse);
         var typedItem = Assert.Single(typedResponse.Items);
         Assert.Equal(created.TemplateId, typedItem.TemplateId);
+        Assert.Equal(20, typedItem.TokenCost);
         Assert.Equal(previewAsset.Url, typedItem.ThumbnailUrl);
         Assert.True(typedItem.Version > 0);
     }

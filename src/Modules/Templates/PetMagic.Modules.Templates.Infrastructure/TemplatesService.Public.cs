@@ -392,6 +392,7 @@ internal sealed partial class TemplatesService
                 template.Category,
                 template.Tags,
                 template.IsPremium,
+                template.TokenCost,
                 template.Version,
                 template.Thumbnail?.Url,
                 template.Thumbnail?.ContentType,
