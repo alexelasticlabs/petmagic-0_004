@@ -9,6 +9,8 @@ namespace PetMagic.Modules.Identity.Infrastructure;
 
 public sealed partial class IdentityService
 {
+    private static readonly TimeSpan RepeatedExternalLoginSessionWindow = TimeSpan.FromMinutes(30);
+
     public async Task<Result<TokenPairResponse>> ExternalLoginAsync(ExternalLoginCallbackCommand command, CancellationToken cancellationToken)
     {
         var provider = NormalizeExternalProvider(command.Provider);
@@ -130,12 +132,49 @@ public sealed partial class IdentityService
             roles.Add(SystemRoles.User);
         }
 
-        var tokenPair = await IssueTokenPairAsync(user, roles, cancellationToken);
+        var revokedRecentSessionCount = await RevokeRecentExternalLoginSessionsAsync(
+            user.Id,
+            provider,
+            now,
+            cancellationToken);
+        var tokenPair = await IssueTokenPairAsync(user, roles, cancellationToken, provider);
+        if (revokedRecentSessionCount > 0)
+        {
+            await WriteAuditAsync(
+                user.Id,
+                "auth.external_login.recent_sessions_revoked",
+                $"Replaced {revokedRecentSessionCount} recent external-login session(s) from provider: {provider}.",
+                cancellationToken);
+        }
         await WriteAuditAsync(user.Id, "auth.external_login.succeeded", $"External provider: {provider}", cancellationToken);
         LogSocialAuthInformation("social_login_success", provider, user.Id, "succeeded", isNewUser);
         LogSocialAuthInformation(isNewUser ? "new_user_registered" : "existing_user_logged_in", provider, user.Id, "succeeded", isNewUser);
 
         return Result.Success(tokenPair);
+    }
+
+    private async Task<int> RevokeRecentExternalLoginSessionsAsync(
+        Guid userId,
+        string provider,
+        DateTime now,
+        CancellationToken cancellationToken)
+    {
+        var cutoff = now.Subtract(RepeatedExternalLoginSessionWindow);
+        var sessions = await dbContext.RefreshTokenSessions
+            .Where(session =>
+                session.UserId == userId &&
+                session.AuthenticationProvider == provider &&
+                session.RevokedAtUtc == null &&
+                session.ExpiresAtUtc > now &&
+                session.CreatedAtUtc >= cutoff)
+            .ToListAsync(cancellationToken);
+
+        foreach (var session in sessions)
+        {
+            session.RevokedAtUtc = now;
+        }
+
+        return sessions.Count;
     }
 
     public async Task<Result<IReadOnlyList<LinkedAccountResponse>>> GetLinkedAccountsAsync(Guid userId, CancellationToken cancellationToken)

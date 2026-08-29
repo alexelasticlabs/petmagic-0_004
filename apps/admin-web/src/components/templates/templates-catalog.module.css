@@ -66,6 +66,34 @@
 .catalogMetricStrip {
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
+.catalogMetricStrip > button {
+  min-width: 0;
+  display: grid;
+  gap: 0.14rem;
+  padding: 0.52rem 0.64rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-strong);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.catalogMetricStrip > button:hover:not(:disabled) {
+  border-color: var(--border-accent);
+  background: var(--surface-hover);
+}
+.catalogMetricStrip > button:disabled {
+  cursor: default;
+}
+.catalogMetricStrip > button span {
+  color: var(--text-muted);
+  font-size: 0.66rem;
+  font-weight: 600;
+}
+.catalogMetricStrip > button strong {
+  font-size: 0.95rem;
+}
 
 .createMenu {
   position: relative;
@@ -568,7 +596,8 @@
   display: grid;
   /* auto-fit collapses unused tracks, so a small catalogue does not leave
      every real card at a narrow 1/5 width. The max keeps one card readable. */
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 24rem));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16.25rem), 18.75rem));
+  justify-content: start;
   gap: clamp(0.75rem, 0.48rem + 0.45vw, 0.95rem);
   align-items: stretch;
 }
@@ -600,11 +629,40 @@
 .cardMedia {
   position: relative;
   min-width: 0;
-  aspect-ratio: 16 / 9;
+  aspect-ratio: 2 / 3;
   overflow: hidden;
   border-radius: calc(var(--radius) - 1px) calc(var(--radius) - 1px) 0 0;
   border-bottom: 1px solid var(--border-soft);
   background: var(--surface-2);
+}
+.cardStatusOverlay {
+  position: absolute;
+  right: 0.5rem;
+  bottom: 0.5rem;
+  z-index: 1;
+  background: color-mix(in srgb, var(--surface-raised) 85%, transparent);
+  backdrop-filter: blur(8px);
+}
+.cardPlayOverlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 2.6rem;
+  height: 2.6rem;
+  color: var(--accent-contrast);
+  filter: drop-shadow(0 1px 4px color-mix(in srgb, var(--surface-0) 70%, transparent));
+  transform: translate(-50%, -50%);
+}
+.cardDurationOverlay {
+  position: absolute;
+  bottom: 0.5rem;
+  left: 0.5rem;
+  padding: 0.18rem 0.38rem;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface-0) 76%, transparent);
+  color: var(--accent-contrast);
+  font-size: 0.68rem;
+  font-weight: 700;
 }
 
 .cardMediaAsset {
@@ -765,6 +823,10 @@
   color: var(--text-soft);
   font-size: 0.76rem;
   line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .cardDescription {
@@ -819,22 +881,21 @@
 
 .cardMetrics {
   margin-top: auto;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.28rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
 }
 
 .cardMetric {
   min-width: 0;
-  display: flex;
-  flex-direction: column;
+  display: inline-flex;
+  flex-direction: row;
   align-items: center;
   justify-content: center;
-  gap: 0.14rem;
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-sm);
-  padding: 0.3rem 0.2rem;
-  background: var(--surface-2);
+  gap: 0.2rem;
+  border: 0;
+  padding: 0;
+  background: transparent;
   box-shadow: none;
 }
 
@@ -845,17 +906,6 @@
   font-weight: 600;
   line-height: 1.1;
   letter-spacing: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.cardMetricLabel {
-  max-width: 100%;
-  color: var(--text-muted);
-  font-size: 0.58rem;
-  font-weight: 600;
-  line-height: 1.1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -909,18 +959,26 @@
 .cardActionMenu {
   position: relative;
   z-index: 2;
-  flex: 1 1 calc(50% - 0.14rem);
-  min-width: 6.6rem;
+  flex: 0 0 auto;
+  min-width: 2.2rem;
 }
 
 .cardActionMenu > button {
-  width: 100%;
+  width: 2.2rem;
   min-width: 0;
   min-height: 2.1rem;
-  justify-content: space-between;
+  justify-content: center;
   border: 1px solid var(--border-soft);
   background: var(--surface-2);
   color: var(--text-soft);
+}
+.cardActionMenu > button > span:first-child {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 .cardActionMenu > button:hover:not(:disabled) {

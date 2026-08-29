@@ -765,6 +765,10 @@ namespace PetMagic.Modules.Identity.Infrastructure.Data.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("AuthenticationProvider")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
                     b.Property<DateTime>("ExpiresAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -786,6 +790,8 @@ namespace PetMagic.Modules.Identity.Infrastructure.Data.Migrations
                         .IsUnique();
 
                     b.HasIndex("UserId");
+
+                    b.HasIndex("UserId", "AuthenticationProvider", "CreatedAtUtc");
 
                     b.ToTable("refresh_token_sessions", (string)null);
                 });

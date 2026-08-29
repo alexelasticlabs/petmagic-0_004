@@ -57,7 +57,7 @@ internal sealed partial class TemplateGenerationService
         {
             return await SignUserMediaUrlsAsync(
                 await ApplyCompareAccessAsync(
-                    ApplyWatermarkAccess(MapResponse(job, queueEstimate: null), job, isPremium, hasUnlock),
+                    ApplyWatermarkAccess(MapResponse(job, queueEstimate: null, refundAttemptLimit: options.MaxRefundAttempts), job, isPremium, hasUnlock),
                     job,
                     hasCleanAccess,
                     cancellationToken),
@@ -66,7 +66,7 @@ internal sealed partial class TemplateGenerationService
 
         return await SignUserMediaUrlsAsync(
             await ApplyCompareAccessAsync(
-                ApplyWatermarkAccess(MapResponse(job, queueEstimate: queueEstimate), job, isPremium, hasUnlock),
+                ApplyWatermarkAccess(MapResponse(job, queueEstimate: queueEstimate, refundAttemptLimit: options.MaxRefundAttempts), job, isPremium, hasUnlock),
                 job,
                 hasCleanAccess,
                 cancellationToken),
@@ -96,7 +96,7 @@ internal sealed partial class TemplateGenerationService
                 var hasCleanAccess = isPremium || hasUnlock || !job.IsWatermarkRequired || job.IsWatermarkRemoved;
                 mapped.Add(await SignUserMediaUrlsAsync(
                     ApplyCompareAccess(
-                        ApplyWatermarkAccess(MapResponse(job), job, isPremium, hasUnlock),
+                        ApplyWatermarkAccess(MapResponse(job, refundAttemptLimit: options.MaxRefundAttempts), job, isPremium, hasUnlock),
                         job,
                         hasCleanAccess,
                         compareAccessContext),
@@ -176,7 +176,7 @@ internal sealed partial class TemplateGenerationService
             {
                 items.Add(await SignUserMediaUrlsAsync(
                     ApplyCompareAccess(
-                        ApplyWatermarkAccess(MapResponse(job, queueEstimate: null), job, isPremium, hasUnlock),
+                        ApplyWatermarkAccess(MapResponse(job, queueEstimate: null, refundAttemptLimit: options.MaxRefundAttempts), job, isPremium, hasUnlock),
                         job,
                         hasCleanAccess,
                         compareAccessContext),
@@ -202,7 +202,7 @@ internal sealed partial class TemplateGenerationService
             items.Add(await SignUserMediaUrlsAsync(
                 ApplyCompareAccess(
                     ApplyWatermarkAccess(
-                        MapResponse(job, queueEstimate: queueEstimate),
+                        MapResponse(job, queueEstimate: queueEstimate, refundAttemptLimit: options.MaxRefundAttempts),
                         job,
                         isPremium,
                         hasUnlock),

@@ -94,7 +94,8 @@ internal sealed partial class TemplateGenerationService(
         TemplateGenerationJob job,
         int? queuePosition = null,
         int? estimatedWaitSeconds = null,
-        QueueEstimate? queueEstimate = null)
+        QueueEstimate? queueEstimate = null,
+        int refundAttemptLimit = 5)
     {
         queuePosition ??= queueEstimate?.QueuePosition;
         estimatedWaitSeconds ??= queueEstimate?.EstimatedWaitSeconds;
@@ -171,7 +172,26 @@ internal sealed partial class TemplateGenerationService(
             CanCancel: job.Status == TemplateGenerationStatus.Queued
                 || (job.Status is TemplateGenerationStatus.ProviderQueued or TemplateGenerationStatus.ProviderProcessing
                     && (!string.IsNullOrWhiteSpace(job.PreprocessingProviderCancelUrl)
-                        || !string.IsNullOrWhiteSpace(job.MotionProviderCancelUrl))));
+                        || !string.IsNullOrWhiteSpace(job.MotionProviderCancelUrl))),
+            RefundState: ResolvePublicRefundState(job, refundAttemptLimit));
+    }
+
+    private static string ResolvePublicRefundState(
+        TemplateGenerationJob job,
+        int refundAttemptLimit)
+    {
+        if (job.RefundedAtUtc is not null)
+        {
+            return "refunded";
+        }
+
+        if (job.Status is not (TemplateGenerationStatus.Failed or TemplateGenerationStatus.Cancelled)
+            || job.ChargedAtUtc is null)
+        {
+            return "not_applicable";
+        }
+
+        return job.RefundAttemptCount >= refundAttemptLimit ? "failed" : "pending";
     }
 
     private static string? ResolvePublicFailureMessage(string? failureCode)

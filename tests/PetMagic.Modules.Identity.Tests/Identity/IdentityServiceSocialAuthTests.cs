@@ -65,7 +65,14 @@ public sealed partial class IdentityServiceProfileTests
         Assert.Single(await identityDb.Users.ToListAsync());
         Assert.Single(await identityDb.ExternalAuthProviders.ToListAsync());
         Assert.True((await identityDb.ExternalAuthProviders.SingleAsync()).LastUsedAt > oldLastUsed);
-        Assert.Equal(2, await identityDb.RefreshTokenSessions.CountAsync());
+        var sessions = await identityDb.RefreshTokenSessions
+            .Where(session => session.UserId == first.Value.User.UserId)
+            .OrderBy(session => session.CreatedAtUtc)
+            .ToListAsync();
+        Assert.Equal(2, sessions.Count);
+        Assert.Single(sessions, session => session.RevokedAtUtc is null);
+        Assert.Single(sessions, session => session.RevokedAtUtc is not null);
+        Assert.Equal("Google", sessions.Single(session => session.RevokedAtUtc is null).AuthenticationProvider);
     }
 
     [Fact]

@@ -1,6 +1,6 @@
 "use client";
 
-import { AdminMetricStrip, AdminStateCard } from "@/components/admin/admin-primitives";
+import { AdminStateCard } from "@/components/admin/admin-primitives";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import type { UsersManagementPageText } from "@/components/users-management-page.content";
@@ -45,6 +45,7 @@ type UsersManagementSummaryGridProps = {
   setRangeDays: (value: RangeDays) => void;
   totalUsersValue: string;
   activeUsersValue: string;
+  applyQuickFilter: (filter: "all" | "active" | "premium" | "attention" | "new") => void;
   isMetricsError: boolean;
   isMetricsFetching: boolean;
   refreshMetrics: () => Promise<void>;
@@ -59,6 +60,7 @@ export function UsersManagementSummaryGrid({
   setRangeDays,
   totalUsersValue,
   activeUsersValue,
+  applyQuickFilter,
   isMetricsError,
   isMetricsFetching,
   refreshMetrics,
@@ -66,6 +68,13 @@ export function UsersManagementSummaryGrid({
 }: UsersManagementSummaryGridProps) {
   const periodLabel = rangeDays === 7 ? ui.period7 : rangeDays === 90 ? ui.period90 : ui.period30;
 
+  const items = [
+    ["all", ui.summaryTotal, totalUsersValue],
+    ["active", ui.summaryActive, activeUsersValue],
+    ["premium", ui.summaryPremium, premiumUsersValue],
+    ["attention", ui.summaryAttention, blockedUsersValue],
+    ["new", ui.summaryNewForPeriod.replace("{period}", ui.period7), newUsersValue],
+  ] as const;
   return (
     <div className={styles.summarySection}>
       <div className={styles.summaryHeader}>
@@ -87,21 +96,14 @@ export function UsersManagementSummaryGrid({
           </div>
         </div>
       </div>
-      <AdminMetricStrip
-        className={styles.summaryGrid}
-        items={[
-          { label: ui.summaryTotal, value: totalUsersValue },
-          { label: ui.summaryActive, value: activeUsersValue },
-          { label: ui.summaryPremium, value: premiumUsersValue },
-          {
-            label: ui.summaryNewForPeriod.replace("{period}", periodLabel),
-            value: newUsersValue,
-          },
-          ...(blockedUsersValue === "0"
-            ? []
-            : [{ label: ui.summaryBlocked, value: blockedUsersValue }]),
-        ]}
-      />
+      <div className={styles.summaryGrid} aria-label={ui.summaryTitle}>
+        {items.map(([filter, label, value]) => (
+          <button key={filter} type="button" onClick={() => applyQuickFilter(filter)}>
+            <span>{label}</span>
+            <strong>{value}</strong>
+          </button>
+        ))}
+      </div>
       {isMetricsError ? (
         <AdminStateCard
           tone="warning"

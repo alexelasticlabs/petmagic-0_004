@@ -69,9 +69,11 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
             entity.ToTable("refresh_token_sessions");
             entity.HasKey(x => x.Id);
             entity.Property(x => x.TokenHash).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.AuthenticationProvider).HasMaxLength(32);
             entity.Property(x => x.RevokedAtUtc).IsConcurrencyToken();
             entity.HasIndex(x => x.TokenHash).IsUnique();
             entity.HasIndex(x => x.UserId);
+            entity.HasIndex(x => new { x.UserId, x.AuthenticationProvider, x.CreatedAtUtc });
         });
 
         builder.Entity<ExternalAuthProvider>(entity =>

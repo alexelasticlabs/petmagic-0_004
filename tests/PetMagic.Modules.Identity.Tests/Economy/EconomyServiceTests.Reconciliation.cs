@@ -124,6 +124,37 @@ public sealed partial class EconomyServiceTests
     }
 
     [Fact]
+    public async Task RunEconomyReconciliationAsync_ShouldCloseStalePendingStoreOrder()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var packId = AddStarterPack(dbContext);
+        dbContext.PurchaseOrders.Add(new PurchaseOrder
+        {
+            Id = Guid.NewGuid(),
+            UserId = Guid.NewGuid(),
+            PackId = packId,
+            PaymentProvider = "app_store",
+            Status = PurchaseOrderStatus.Pending,
+            PriceAmount = 1.49m,
+            CurrencyCode = "USD",
+            SparkToGrant = 40,
+            CreatedAtUtc = DateTime.UtcNow.AddHours(-2)
+        });
+        await dbContext.SaveChangesAsync();
+
+        var result = await CreateService(dbContext).RunEconomyReconciliationAsync(CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(1, result.Value.AutoFixesApplied);
+        Assert.Equal(PurchaseOrderStatus.Failed, (await dbContext.PurchaseOrders.SingleAsync()).Status);
+        var incident = await dbContext.EconomyIncidents.SingleAsync();
+        Assert.Equal("PurchaseSettlementFailed", incident.Type);
+        Assert.Equal("Resolved", incident.Status);
+        Assert.True(incident.AutoFixApplied);
+    }
+
+    [Fact]
     public async Task RunEconomyReconciliationAsync_ShouldNotCreateMismatchForFailedStripeOrderWithTerminalUnpaidProviderState()
     {
         await using var dbContext = CreateDbContext();

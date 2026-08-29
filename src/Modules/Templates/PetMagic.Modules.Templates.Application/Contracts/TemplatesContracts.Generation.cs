@@ -126,6 +126,9 @@ public sealed record GalleryItemResponse(
     DateTime CreatedAtUtc,
     DateTime UpdatedAtUtc,
     DateTime? CompletedAtUtc,
+    int TokenCost,
+    DateTime? RefundedAtUtc,
+    string RefundState,
     string? TemplateTitle,
     string? TemplateType,
     GalleryMediaResponse Media,
@@ -218,7 +221,8 @@ public sealed record TemplateGenerationResponse(
     DateTime? EstimatedCompletionAtUtc = null,
     string? QueueReason = null,
     int? RetryAfterSeconds = null,
-    bool CanCancel = false)
+    bool CanCancel = false,
+    string RefundState = "not_applicable")
 {
     public Guid JobId => GenerationId;
     public string? MediaUrl => OutputUrl;

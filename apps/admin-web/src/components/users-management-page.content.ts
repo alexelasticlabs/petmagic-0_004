@@ -15,6 +15,14 @@ export type UsersManagementPageText = {
   summaryBlocked: string;
   summaryNew: string;
   summaryNewForPeriod: string;
+  summaryAttention: string;
+  createUser: string;
+  createUserUnavailable: string;
+  workspaceTabsLabel: string;
+  workspaceUsers: string;
+  workspaceSegments: string;
+  workspaceBroadcasts: string;
+  segmentsUnavailable: string;
   registryTitle: string;
   periodLabel: string;
   period7: string;
@@ -44,6 +52,8 @@ export type UsersManagementPageText = {
   userColumn: string;
   accountAndAccess: string;
   plan: string;
+  balance: string;
+  balanceUnavailable: string;
   lastActivity: string;
   noActivity: string;
   registeredAt: string;
@@ -117,6 +127,14 @@ const usersManagementPageText: Record<Locale, UsersManagementPageText> = {
     summaryBlocked: "Заблокированные",
     summaryNew: "Новые",
     summaryNewForPeriod: "Новые за {period}",
+    summaryAttention: "Требуют внимания",
+    createUser: "Пользователь",
+    createUserUnavailable: "Создание пользователя не поддерживается API.",
+    workspaceTabsLabel: "Разделы пользователей",
+    workspaceUsers: "Пользователи",
+    workspaceSegments: "Сегменты",
+    workspaceBroadcasts: "Рассылки",
+    segmentsUnavailable: "Сегменты будут доступны после появления серверного контракта.",
     registryTitle: "Реестр пользователей",
     periodLabel: "Период",
     period7: "7 дней",
@@ -146,6 +164,8 @@ const usersManagementPageText: Record<Locale, UsersManagementPageText> = {
     userColumn: "Пользователь",
     accountAndAccess: "Состояние и доступ",
     plan: "План",
+    balance: "Баланс",
+    balanceUnavailable: "Откройте",
     lastActivity: "Последняя активность",
     noActivity: "Нет активности",
     registeredAt: "Зарегистрирован",
@@ -223,6 +243,14 @@ const usersManagementPageText: Record<Locale, UsersManagementPageText> = {
     summaryBlocked: "Blocked",
     summaryNew: "New",
     summaryNewForPeriod: "New in {period}",
+    summaryAttention: "Needs attention",
+    createUser: "User",
+    createUserUnavailable: "Creating a user is not supported by the API.",
+    workspaceTabsLabel: "User sections",
+    workspaceUsers: "Users",
+    workspaceSegments: "Segments",
+    workspaceBroadcasts: "Campaigns",
+    segmentsUnavailable: "Segments require a server-side contract.",
     registryTitle: "User directory",
     periodLabel: "Period",
     period7: "7 days",
@@ -252,6 +280,8 @@ const usersManagementPageText: Record<Locale, UsersManagementPageText> = {
     userColumn: "User",
     accountAndAccess: "State and access",
     plan: "Plan",
+    balance: "Balance",
+    balanceUnavailable: "Open",
     lastActivity: "Last activity",
     noActivity: "No activity yet",
     registeredAt: "Registered",

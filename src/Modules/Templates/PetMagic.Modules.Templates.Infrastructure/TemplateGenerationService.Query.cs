@@ -14,6 +14,9 @@ namespace PetMagic.Modules.Templates.Infrastructure;
 
 internal sealed partial class TemplateGenerationService
 {
+    private static readonly TimeSpan FailedGenerationVisibleInAllDuration = TimeSpan.FromHours(24);
+    private static readonly TimeSpan FailedGenerationVisibleInProblemsDuration = TimeSpan.FromDays(7);
+
     public async Task<Result<TemplateGenerationResponse>> GetAsync(Guid userId, Guid generationId, CancellationToken cancellationToken)
     {
         return await GetAsync(userId, generationId, isPremium: false, cancellationToken);
@@ -74,6 +77,10 @@ internal sealed partial class TemplateGenerationService
             .Where(x => x.UserId == userId && x.HiddenByUserAtUtc == null);
 
         generationsQuery = ApplyStatusFilter(generationsQuery, appliedFilter);
+        generationsQuery = ApplyGalleryFailureRetention(
+            generationsQuery,
+            appliedFilter,
+            DateTime.UtcNow);
 
         if (!string.IsNullOrWhiteSpace(query.Cursor))
         {
@@ -132,6 +139,32 @@ internal sealed partial class TemplateGenerationService
     {
         var normalized = rawStatus?.Trim().ToLowerInvariant();
         return string.IsNullOrWhiteSpace(normalized) ? "all" : normalized;
+    }
+
+    private static IQueryable<TemplateGenerationJob> ApplyGalleryFailureRetention(
+        IQueryable<TemplateGenerationJob> query,
+        string appliedFilter,
+        DateTime utcNow)
+    {
+        var allVisibleUntilUtc = utcNow.Subtract(FailedGenerationVisibleInAllDuration);
+        var problemsVisibleUntilUtc = utcNow.Subtract(FailedGenerationVisibleInProblemsDuration);
+
+        // Failed jobs with a pending or exhausted refund remain user-visible until
+        // the financial outcome is final. This only shapes the user gallery;
+        // the underlying job and its audit trail are retained independently.
+        return appliedFilter switch
+        {
+            "all" => query.Where(x =>
+                x.Status != TemplateGenerationStatus.Failed
+                || x.CompletedAtUtc == null
+                || x.CompletedAtUtc > allVisibleUntilUtc
+                || (x.TokenCost > 0 && x.ChargedAtUtc != null && x.RefundedAtUtc == null)),
+            "failed" => query.Where(x =>
+                x.CompletedAtUtc == null
+                || x.CompletedAtUtc > problemsVisibleUntilUtc
+                || (x.TokenCost > 0 && x.ChargedAtUtc != null && x.RefundedAtUtc == null)),
+            _ => query
+        };
     }
 
     private static string EncodeGalleryCursor(TemplateGenerationJob job)

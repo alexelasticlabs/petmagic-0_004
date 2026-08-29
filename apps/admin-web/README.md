@@ -30,9 +30,10 @@ npm run build
 
 При самостоятельном запуске этого приложения используйте только один шаблон по
 назначению: `.env.development.example`, `.env.staging.example` или
-`.env.production.example`. Render-конфигурация остаётся в корневых
-`../../render.yaml` и `../../render.production.yaml`; реальные секреты живут в
-platform secret storage.
+`.env.production.example`. Production runtime configuration is owned by the
+VPS runbook and its root-only environment file; see
+[`../../deploy/vps/README.md`](../../deploy/vps/README.md). Real secrets never
+belong in an admin-web environment template committed to Git.
 
 ## Structure
 

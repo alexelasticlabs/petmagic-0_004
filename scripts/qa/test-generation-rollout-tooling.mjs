@@ -1,19 +1,9 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
-import {
-  existsSync,
-  chmodSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -21,8 +11,6 @@ const acceptanceWrapper = read('scripts/load/run-generation-scheduler-v2-accepta
 const acceptanceVerifier = join(repoRoot, 'scripts/load/verify-generation-scheduler-v2-acceptance.mjs');
 const authSubjectValidator = join(repoRoot, 'scripts/load/validate-generation-load-auth-subjects.mjs');
 const k6Source = read('scripts/k6/template-generation-load-test.js');
-const backupScript = join(repoRoot, 'scripts/backup-render-postgres.ps1');
-const backupSource = read('scripts/backup-render-postgres.ps1');
 
 assert(acceptanceWrapper.includes('[[ "$WORKER_COUNT" == "1" ]]'));
 assert(acceptanceWrapper.includes('[[ "$ARTIFACT_ROOT" == "$CANONICAL_ARTIFACT_ROOT" ]]'));
@@ -57,21 +45,10 @@ assert(k6Source.includes("generation_mixed_submissions = ['count==200']"));
 assert(k6Source.includes("generation_mixed_image_submissions = ['count==100']"));
 assert(k6Source.includes("generation_mixed_video_submissions = ['count==100']"));
 
-assert(backupSource.includes('$env:RENDER_POSTGRES_DATABASE_URL'));
-assert(backupSource.includes('$env:PGDATABASE = $databaseUrl'));
-assert(backupSource.includes('--format=custom'));
-assert(backupSource.includes('--list'));
-assert(backupSource.includes('.partial'));
-assert(backupSource.includes('Get-FileHash -LiteralPath $partialBackupPath -Algorithm SHA256'));
-assert(backupSource.includes('Move-Item -LiteralPath $partialBackupPath -Destination $finalBackupPath'));
-assert(!backupSource.includes('[string]$DatabaseUrl'));
-assert(!backupSource.includes('--dbname'));
-
 const tempRoot = mkdtempSync(join(tmpdir(), 'petmagic-rollout-tooling-'));
 try {
   testAuthSubjectValidator();
   testAcceptanceVerifier(join(tempRoot, 'acceptance'));
-  testBackupWithFakePostgresTools(join(tempRoot, 'backup'));
   console.log('generation rollout tooling contracts ok');
 } finally {
   rmSync(tempRoot, { recursive: true, force: true });
@@ -190,210 +167,6 @@ function fakeJwt(subject, signature) {
 
 function fakeUserId(index) {
   return `00000000-0000-4000-8000-${index.toString(16).padStart(12, '0')}`;
-}
-
-function testBackupWithFakePostgresTools(testRoot) {
-  const fakeTools = join(testRoot, 'tools');
-  const outputDir = join(testRoot, 'success');
-  const failedOutputDir = join(testRoot, 'failure');
-  mkdirSync(fakeTools, { recursive: true });
-  const { fakeDump, fakeRestore, failingDump } = writeFakePostgresTools(fakeTools);
-
-  const secret = 'super-secret-backup-password';
-  const env = {
-    ...process.env,
-    RENDER_POSTGRES_DATABASE_URL: `postgresql://backup_user:${secret}@dpg-test.oregon-postgres.render.com/petmagic?sslmode=require`,
-  };
-  const shell = findPowerShell();
-  const missingUrlEnv = { ...process.env };
-  delete missingUrlEnv.RENDER_POSTGRES_DATABASE_URL;
-  let result = runBackup(shell, outputDir, fakeDump, fakeRestore, missingUrlEnv);
-  assert.notEqual(result.status, 0);
-  assert(`${result.stdout}\n${result.stderr}`.includes('RENDER_POSTGRES_DATABASE_URL must be supplied'));
-
-  const nonRenderSecret = 'must-not-be-printed';
-  result = runBackup(shell, outputDir, fakeDump, fakeRestore, {
-    ...process.env,
-    RENDER_POSTGRES_DATABASE_URL: `postgresql://backup_user:${nonRenderSecret}@localhost/petmagic`,
-  });
-  assert.notEqual(result.status, 0);
-  assert(!`${result.stdout}\n${result.stderr}`.includes(nonRenderSecret));
-
-  result = runBackup(shell, outputDir, fakeDump, fakeRestore, env);
-  assert.equal(result.status, 0, result.stderr || result.stdout);
-  assert(!`${result.stdout}\n${result.stderr}`.includes(secret));
-
-  const files = readdirSync(outputDir);
-  const backupFile = exactlyOne(files, name => name.endsWith('.custom.dump'));
-  const manifestFile = exactlyOne(files, name => name.endsWith('.manifest.json'));
-  exactlyOne(files, name => name.endsWith('.restore-list.txt'));
-  assert(!files.some(name => name.endsWith('.partial')));
-  const manifestText = readFileSync(join(outputDir, manifestFile), 'utf8');
-  const manifest = JSON.parse(manifestText.replace(/^\uFEFF/, ''));
-  const backupBytes = readFileSync(join(outputDir, backupFile));
-  assert.equal(manifest.format, 'PostgreSQL custom');
-  assert.equal(manifest.pgRestoreListVerified, true);
-  assert.equal(manifest.sha256, createHash('sha256').update(backupBytes).digest('hex'));
-  for (const forbidden of [secret, 'backup_user', 'dpg-test.oregon-postgres.render.com']) {
-    assert(!manifestText.includes(forbidden), `manifest leaked ${forbidden}`);
-  }
-
-  result = runBackup(shell, failedOutputDir, failingDump, fakeRestore, env);
-  assert.notEqual(result.status, 0);
-  assert(!`${result.stdout}\n${result.stderr}`.includes(secret));
-  assert(existsSync(failedOutputDir));
-  assert(!readdirSync(failedOutputDir).some(name => name.endsWith('.partial') || name.endsWith('.custom.dump')));
-}
-
-function runBackup(shell, outputDir, fakeDump, fakeRestore, env) {
-  return spawnSync(shell, [
-    '-NoProfile',
-    '-ExecutionPolicy', 'Bypass',
-    '-File', backupScript,
-    '-OutputDir', outputDir,
-    '-PgDumpCommand', fakeDump,
-    '-PgRestoreCommand', fakeRestore,
-  ], { encoding: 'utf8', env });
-}
-
-function writeFakePostgresTools(fakeTools) {
-  if (process.platform === 'win32') {
-    const fakeDump = join(fakeTools, 'fake-pg-dump.cmd');
-    const fakeRestore = join(fakeTools, 'fake-pg-restore.cmd');
-    const failingDump = join(fakeTools, 'failing-pg-dump.cmd');
-    writeFileSync(fakeDump, [
-      '@echo off',
-      'if "%~1"=="--version" (',
-      '  echo pg_dump PostgreSQL 16.test',
-      '  exit /b 0',
-      ')',
-      'set "outfile="',
-      ':args',
-      'if "%~1"=="" goto done',
-      'if /i "%~1"=="--file" (',
-      '  set "outfile=%~2"',
-      '  shift',
-      ')',
-      'shift',
-      'goto args',
-      ':done',
-      'if not defined outfile exit /b 8',
-      '> "%outfile%" echo PGDMPfake',
-      'exit /b 0',
-      '',
-    ].join('\r\n'));
-    writeFileSync(fakeRestore, [
-      '@echo off',
-      'if "%~1"=="--version" (',
-      '  echo pg_restore PostgreSQL 16.test',
-      '  exit /b 0',
-      ')',
-      'set "outfile="',
-      'set "listed=false"',
-      ':args',
-      'if "%~1"=="" goto done',
-      'if "%~1"=="--list" set "listed=true"',
-      'if /i "%~1"=="--file" (',
-      '  set "outfile=%~2"',
-      '  shift',
-      ')',
-      'shift',
-      'goto args',
-      ':done',
-      'if not defined outfile exit /b 8',
-      'if "%listed%"=="false" exit /b 8',
-      '> "%outfile%" echo ; archive list',
-      '>> "%outfile%" echo 1; 0 0 TABLE public templates_generation_jobs petmagic',
-      'exit /b 0',
-      '',
-    ].join('\r\n'));
-    writeFileSync(failingDump, [
-      '@echo off',
-      'if "%~1"=="--version" (',
-      '  echo pg_dump PostgreSQL 16.test',
-      '  exit /b 0',
-      ')',
-      'set "outfile="',
-      ':args',
-      'if "%~1"=="" goto done',
-      'if /i "%~1"=="--file" (',
-      '  set "outfile=%~2"',
-      '  shift',
-      ')',
-      'shift',
-      'goto args',
-      ':done',
-      'if defined outfile > "%outfile%" echo partial',
-      'exit /b 9',
-      '',
-    ].join('\r\n'));
-    return { fakeDump, fakeRestore, failingDump };
-  }
-
-  const fakeDump = join(fakeTools, 'fake-pg-dump');
-  const fakeRestore = join(fakeTools, 'fake-pg-restore');
-  const failingDump = join(fakeTools, 'failing-pg-dump');
-  writeFileSync(fakeDump, [
-    '#!/usr/bin/env bash',
-    'if [[ "${1:-}" == "--version" ]]; then echo "pg_dump PostgreSQL 16.test"; exit 0; fi',
-    "outfile=''",
-    'while [[ "$#" -gt 0 ]]; do',
-    '  if [[ "$1" == "--file" ]]; then outfile="$2"; shift; fi',
-    '  shift',
-    'done',
-    '[[ -n "$outfile" ]] || exit 8',
-    'printf "PGDMPfake" > "$outfile"',
-    '',
-  ].join('\n'));
-  writeFileSync(fakeRestore, [
-    '#!/usr/bin/env bash',
-    'if [[ "${1:-}" == "--version" ]]; then echo "pg_restore PostgreSQL 16.test"; exit 0; fi',
-    "outfile=''",
-    'listed=false',
-    'while [[ "$#" -gt 0 ]]; do',
-    '  [[ "$1" == "--list" ]] && listed=true',
-    '  if [[ "$1" == "--file" ]]; then outfile="$2"; shift; fi',
-    '  shift',
-    'done',
-    '[[ -n "$outfile" && "$listed" == true ]] || exit 8',
-    'printf "; archive list\\n1; 0 0 TABLE public templates_generation_jobs petmagic\\n" > "$outfile"',
-    '',
-  ].join('\n'));
-  writeFileSync(failingDump, [
-    '#!/usr/bin/env bash',
-    'if [[ "${1:-}" == "--version" ]]; then echo "pg_dump PostgreSQL 16.test"; exit 0; fi',
-    "outfile=''",
-    'while [[ "$#" -gt 0 ]]; do',
-    '  if [[ "$1" == "--file" ]]; then outfile="$2"; shift; fi',
-    '  shift',
-    'done',
-    '[[ -z "$outfile" ]] || printf "partial" > "$outfile"',
-    'exit 9',
-    '',
-  ].join('\n'));
-  for (const path of [fakeDump, fakeRestore, failingDump]) {
-    chmodSync(path, 0o755);
-  }
-  return { fakeDump, fakeRestore, failingDump };
-}
-
-function findPowerShell() {
-  const candidates = [process.env.PWSH_COMMAND, 'pwsh', 'powershell'].filter(Boolean);
-  for (const candidate of candidates) {
-    const probe = spawnSync(candidate, ['-NoProfile', '-Command', '$PSVersionTable.PSVersion.ToString()'], {
-      encoding: 'utf8',
-    });
-    if (!probe.error && probe.status === 0) {
-      return candidate;
-    }
-  }
-  throw new Error('PowerShell is required for backup tooling contracts.');
-}
-
-function exactlyOne(values, predicate) {
-  const matches = values.filter(predicate);
-  assert.equal(matches.length, 1, `expected one matching artifact, found: ${matches.join(', ')}`);
-  return matches[0];
 }
 
 function read(path) {

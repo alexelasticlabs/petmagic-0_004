@@ -1,408 +1,127 @@
 # PetMagic first-time hosting guide
 
-This guide is the practical first deploy path for PetMagic. It assumes the
-first platform is Render, with GitHub as the deployment source, Cloudflare for
-DNS/R2, and external provider accounts for payments, AI, push, and email.
+This guide describes the current PetMagic hosting model: one dedicated VPS with
+Docker Compose, Caddy, PostgreSQL, and an isolated payment-staging project. It
+is intentionally provider-neutral; the active production server is documented
+in [`deploy/vps/README.md`](../deploy/vps/README.md).
 
-Do not paste real secrets into GitHub, docs, issues, PRs, or assistant chats.
+## Target topology
 
-## What will be hosted
-
-PetMagic is a monorepo. Do not split it into separate repositories for the first
-deploy.
-
-| Runtime | Host target | Source in repo | Public |
-| --- | --- | --- | --- |
-| Backend API | Render Web Service | `Dockerfile.api`, context `.` | Yes |
-| Generation worker | Render Background Worker | `Dockerfile.generation-worker`, context `.` | No |
-| Admin web | Render Web Service | `apps/admin-web/Dockerfile`, context `apps/admin-web` | Yes |
-| PostgreSQL | Render managed Postgres | `petmagic-staging-db` in `render.yaml` | No after setup |
-| Media storage | Cloudflare R2 | Runtime env vars | Public/custom R2 URL |
-
-The Render staging topology is declared in `render.yaml`. Production uses the
-separate `render.production.yaml` Blueprint and production-only secret storage;
-never promote staging by copying local `.env` files.
-
-## What you need to buy or create
-
-### Required for staging
-
-1. GitHub repository access
-   - Already expected: `https://github.com/alexelasticlabs/petmagic-0_004.git`.
-   - Render deploys from GitHub. Push to GitHub, Render pulls the repo and uses
-     `render.yaml`.
-
-2. Render account
-   - Create at `https://render.com`.
-   - Connect the GitHub repository.
-   - Required resources for staging:
-     - one Web Service for API;
-     - one Background Worker for generation;
-     - one Web Service for admin-web;
-     - one managed PostgreSQL database;
-     - one env group plus per-service secrets.
-
-3. Domain and DNS
-   - Recommended domain: `petmagic.app`.
-   - DNS provider: Cloudflare.
-   - Required staging DNS:
-     - `api.staging.petmagic.app`;
-     - `admin.staging.petmagic.app`.
-   - Production DNS:
-     - `api.petgpt.app`;
-     - `admin.petgpt.app`;
-     - app store website/support/privacy domains as required.
-
-4. Cloudflare R2
-   - Used for generated/template media.
-   - Create a staging bucket, for example `petmagic-staging-media`.
-   - Create an R2 access key restricted to that bucket.
-   - Configure a public/custom URL for media reads.
-
-5. fal.ai
-   - Create an account and API key.
-   - Add prepaid credits.
-   - Use one backend-only key with the fal Admin permission required for Account Billing API; never
-     expose it to admin-web or mobile.
-   - Confirm account concurrency manually in the fal dashboard. PetMagic does not infer it from the
-     amount of credits purchased.
-
-6. Email provider
-   - Recommended first option: Resend.
-   - Create sender domain, verify DNS, create API/SMTP credentials.
-   - Configure `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USERNAME`,
-     `EMAIL_PASSWORD`, `EMAIL_FROM_ADDRESS`.
-
-7. Stripe test mode
-   - Create Stripe account.
-   - Use test mode for staging.
-   - Create webhook endpoint for staging API.
-   - Configure test secret key, publishable key, and webhook secret.
-
-8. Firebase
-   - Create staging Firebase project.
-   - Create service account JSON for backend push sending.
-   - Configure Android/iOS app client configs for real devices.
-   - Do not commit real `google-services.json` or
-     `GoogleService-Info.plist` replacements without a separate review.
-
-### Required before public mobile release
-
-1. Apple Developer Program
-   - Required for TestFlight/App Store distribution and Apple platform
-     production capabilities.
-   - Needed for iOS app distribution and App Store purchase validation.
-
-2. Google Play Console
-   - Required for Android production distribution and Play Billing.
-   - Needed for Play Developer API/service account setup.
-
-3. Production signing
-   - Android release keystore and `android/key.properties`.
-   - iOS signing certificates/profiles through Apple Developer.
-   - Keep signing files outside Git.
-
-### Recommended before production
-
-1. Sentry or equivalent error monitoring.
-2. Hosted logs/metrics/alerts.
-3. Password manager or secret manager: 1Password, Vault, or equivalent.
-4. Backup/restore runbook for Postgres.
-
-## Cost model to expect
-
-Prices change. Verify official pages immediately before buying.
-
-Known official references checked on 2026-07-09:
-
-- Render pricing: `https://render.com/pricing`.
-- Cloudflare R2 pricing: `https://developers.cloudflare.com/r2/pricing/`.
-- Apple Developer Program: `https://developer.apple.com/programs/`.
-- Stripe pricing: `https://stripe.com/pricing`.
-- Resend pricing: `https://resend.com/pricing`.
-- Sentry pricing: `https://sentry.io/pricing/`.
-- fal pricing: `https://fal.ai/pricing`.
-
-### Practical staging estimate
-
-Expected monthly baseline before usage-heavy AI/video:
-
-| Item | Expected start |
-| --- | --- |
-| Render API service | paid small/standard instance |
-| Render worker | paid small/standard instance |
-| Render admin-web | paid starter/small instance |
-| Render Postgres | paid managed Postgres |
-| Cloudflare R2 | often near-free at small start, then storage/operation usage |
-| Resend | free or low paid tier depending volume |
-| Stripe | no fixed monthly fee for standard online payments, transaction fees apply |
-| fal.ai | prepaid/usage-based, likely the main variable cost |
-| Sentry | free for solo/dev, paid for team/production volume |
-
-For PetMagic, fal.ai usage and generated media storage/reads are the main
-variable costs. The base infrastructure cost is predictable; generation cost is
-not unless product limits are configured.
-
-### Render vs VPS
-
-Render costs more on the invoice than a small VPS, but removes a lot of
-operational work:
-
-| Area | Render managed path | Single VPS path |
+| Component | Location | Public |
 | --- | --- | --- |
-| Deploy from GitHub | Built in | You build scripts/CI yourself |
-| TLS/custom domains | Built in | Configure reverse proxy and renewal |
-| Postgres | Managed database | Install, tune, backup, restore yourself |
-| Worker supervision | Render worker service | systemd/Docker Compose supervision |
-| Rollback | Platform deploy history | Build your own image/version rollback |
-| Monitoring | Platform basics plus add-ons | Install logs/metrics/alerts yourself |
-| Security updates | Platform handles host layer | You patch OS/Docker/Postgres |
-| HA path | Add instances/managed DB tiers | Complex and manual |
+| API | Docker Compose on the VPS, Caddy reverse proxy | `https://api.petgpt.app` |
+| Admin web | Docker Compose on the VPS, Caddy reverse proxy | `https://admin.petgpt.app` |
+| Generation worker | one Compose worker on the VPS | no |
+| PostgreSQL | Compose volume on the VPS | no |
+| Media | Cloudflare R2 | through application/public media URLs only |
+| Email | Resend SMTP | no |
+| Payment staging | separate Compose project on the VPS | `https://api.staging.petgpt.app` |
 
-A VPS can be cheaper for a prototype, but for PetMagic it is riskier because the
-app has payments, wallet tokens, AI generation jobs, provider webhooks, refunds,
-media storage, push notifications, and background workers. A single VPS is not
-high availability and should not be treated as a stability upgrade.
+Do not expose PostgreSQL, Docker ports, the admin container port, or Mailpit to
+the Internet. Caddy is the only public entry point.
 
-## Step-by-step staging deploy
+## What to obtain before the first server
 
-### 1. Clean local workspace
+1. A dedicated VPS with enough RAM and disk for PostgreSQL, three application
+   containers, backups, and image builds. Keep it separate from unrelated
+   applications.
+2. A domain controlled in Cloudflare. The current production names are
+   `petgpt.app`, `api.petgpt.app`, and `admin.petgpt.app`.
+3. A GitHub deploy key with read-only access only to `alexelasticlabs/petmagic-0_004`.
+4. Cloudflare R2 media and backup buckets with separate least-privilege keys.
+5. Provider accounts and production credentials for fal.ai, Resend, Firebase,
+   Stripe, Google Play, and App Store Connect.
+6. An owner-controlled encrypted escrow copy of the restic password. It must
+   not reside only on the VPS.
 
-From repo root:
+## One-time server setup
 
-```powershell
-node scripts\qa\clean-local-generated-artifacts.mjs
+Follow the bootstrap section of [`deploy/vps/README.md`](../deploy/vps/README.md).
+At minimum:
+
+1. Install Docker Engine, Docker Compose, Caddy, UFW, restic, and PostgreSQL
+   client tools.
+2. Allow only SSH, HTTP, and HTTPS through UFW.
+3. Clone the repository to `/opt/petmagic/current` with the root-only deploy
+   key; do not use a personal developer SSH key for unattended releases.
+4. Install the checked-in systemd units.
+5. Create `/opt/petmagic/shared/env/.env.vps` from
+   `deploy/vps/.env.vps.example`, with `root:root` ownership and mode `0600`.
+6. Install and validate `deploy/vps/Caddyfile` before enabling Caddy.
+7. Run `preflight.sh`, then start the supervisor and backup timer.
+
+Do not paste secrets into a terminal history or commit them into the repository.
+
+## DNS and TLS
+
+Create DNS-only Cloudflare records pointing to the VPS public IP:
+
+| Name | Type | Target |
+| --- | --- | --- |
+| `api.petgpt.app` | A | VPS public IP |
+| `admin.petgpt.app` | A | VPS public IP |
+| `api.staging.petgpt.app` | A | VPS public IP |
+
+Validate Caddy after the records resolve, then check HTTPS from outside the
+server. Do not proxy a partially configured origin or change production DNS
+while restore, preflight, or public smoke checks are failing.
+
+## Normal deployment
+
+Every production update follows the same sequence:
+
+```text
+local validation -> commit on master -> push -> VPS deploy-release.sh -> public smoke -> monitor
 ```
 
-If it only lists generated/cache paths:
+On the VPS, use only:
 
-```powershell
-node scripts\qa\clean-local-generated-artifacts.mjs --apply
+```bash
+sudo bash /opt/petmagic/current/deploy/vps/scripts/deploy-release.sh
 ```
 
-### 2. Run local predeploy checks
+The release script validates the protected environment, requires a clean
+checkout, builds commit-labelled images, restarts the supervised stack, and
+rolls back the checkout/source revision if the release fails. It is the only
+supported deployment command.
 
-Fast path without generating `bin/obj`:
+## Isolated payment staging
 
-```powershell
-node scripts\qa\run-render-predeploy-gate.mjs --skip-dotnet-build
-```
+Payment testing is separate from production:
 
-Full local path before first deploy:
+- host: `api.staging.petgpt.app`;
+- separate PostgreSQL volume, application data paths, JWT, Stripe test keys,
+  and webhook secret;
+- no production database, R2, SMTP, Firebase, OAuth, fal.ai, or store
+  credentials;
+- Mailpit is local-only and the staging email worker is disabled.
 
-```powershell
-node scripts\qa\run-render-predeploy-gate.mjs
-```
+Use staging for Stripe test cards and webhook tests. Use Google Play Internal
+testing and TestFlight/App Store Sandbox for store payments; do not attempt to
+simulate their provider flows by pointing them at production Stripe.
 
-Heavier Docker path before the first Render deploy or after Dockerfile changes:
+## Provider setup checklist
 
-```powershell
-node scripts\qa\run-render-predeploy-gate.mjs --with-docker-build --docker-platform linux/amd64
-```
+| Provider | Production responsibility | Acceptance that remains separate |
+| --- | --- | --- |
+| Cloudflare | DNS, R2 media, private backup bucket | media upload/read and backup restore |
+| Resend | SMTP sender and DNS records | delivery and bounce monitoring |
+| Stripe | live catalog/webhook and isolated staging catalog/webhook | staging success/cancel/retry/refund/replay |
+| Google Play | Android signing, Internal track, purchase verification | licensed tester purchase/consume/replay/restore |
+| Apple | signing, TestFlight, StoreKit catalog, notification route | iPhone Apple Sign In and Sandbox purchase/restore |
+| Firebase | Android/iOS configuration and server credentials | visible FCM/APNs notification on devices |
+| fal.ai | dedicated VPS key and provider callback | controlled generation/callback/R2 canary |
 
-After running checks, clean generated local artifacts again:
+Track only completed evidence in [`release-readiness.md`](release-readiness.md).
 
-```powershell
-node scripts\qa\clean-local-generated-artifacts.mjs --apply
-```
+## Daily operating rules
 
-### 3. Push to GitHub
-
-Render reads `render.yaml` from GitHub. Commit and push the repo before creating
-the Blueprint.
-
-### 4. Create Render Blueprint
-
-In Render:
-
-1. Go to `New > Blueprint`.
-2. Connect `alexelasticlabs/petmagic-0_004`.
-3. Use Blueprint path `render.yaml`.
-4. Review services before applying.
-5. Create only one staging Blueprint for these staging services.
-
-Expected staging resources:
-
-- `petmagic-staging-api`;
-- `petmagic-staging-generation-worker`;
-- `petmagic-staging-admin-web`;
-- `petmagic-staging-db`;
-- `petmagic-staging-shared`.
-
-The worker is one `Standard` instance. Its four dispatch lanes, four reconciliation lanes, one media
-import lane, and one maintenance lane orchestrate fal asynchronously; they are not Render replicas.
-Before applying the Blueprint, and again after sync, manually verify Dashboard autoscaling is off.
-Keep the committed `Templates__GenerationSchedulerV2Enabled=false` during the first
-migration/backfill deploy.
-
-### 5. Configure domains
-
-In Render service settings:
-
-- API custom domain: `api.staging.petmagic.app`;
-- Admin custom domain: `admin.staging.petmagic.app`.
-
-In Cloudflare DNS, add the DNS records Render asks for. Wait until Render marks
-domains as verified and TLS is active.
-
-### 6. Fill Render secrets
-
-Use `docs/render-staging-secrets-checklist.md`.
-
-Important rules:
-
-- Never put secret values into `render.yaml`.
-- `sync: false` values must be filled in Render dashboard/secret workflow.
-- Use staging/test credentials first.
-- Generate `Jwt__SigningKey` as a new long random secret.
-- Ensure `FAL_AI_API_KEY` is server-only and can read the fal billing balance. Scheduler V2 does not
-  implement an application daily-spend cap; the retained spend-limit option stays `0` and unused.
-
-### 7. Deploy order
-
-1. Deploy `petmagic-staging-api`.
-2. Wait for `/health`.
-3. Confirm startup migrations/seeds in logs.
-4. Deploy `petmagic-staging-generation-worker` in V1 compatibility mode and run the canary.
-5. After migration/backfill inspection, create a reviewed Blueprint commit changing the shared
-   `Templates__GenerationSchedulerV2Enabled` value to `true`, run the Blueprint gate, push it, and
-   Manual Sync/redeploy. Do not rely on a Dashboard-only override because Blueprint sync replaces it.
-6. Require bounded-lane start, fresh worker heartbeat/progress, matching fingerprint, and current
-   applied policy revision.
-7. Deploy `petmagic-staging-admin-web`.
-8. Configure provider callbacks.
-9. Run post-deploy smoke.
-
-### 8. Post-deploy smoke
-
-On your local machine, create `.env.staging.local` from
-`.env.staging.local.example` and fill only local runner values.
-
-Then run:
-
-```powershell
-node scripts\qa\check-staging-env-readiness.mjs
-node scripts\qa\run-render-postdeploy-smoke.mjs
-```
-
-The post-deploy smoke is read-only. It checks:
-
-- `https://api.staging.petmagic.app/health`;
-- `https://admin.staging.petmagic.app/ru`.
-
-### 9. Provider validation
-
-After base health is green, validate:
-
-1. R2 upload/read/signed or public media URL behavior.
-2. fal.ai image generation and callback.
-3. fal.ai video generation and callback.
-4. Stripe sandbox checkout and webhook idempotency.
-5. Google Play sandbox purchase validation.
-6. App Store sandbox purchase validation.
-7. Firebase push delivery to real Android/iOS devices.
-
-### 10. Staging gates
-
-Run when `.env.staging.local` is filled:
-
-```powershell
-node scripts\qa\run-economy-staging-infra-gate.mjs
-node scripts\qa\run-staging-generation-scheduler-smoke.mjs
-```
-
-Do not treat local Docker smoke as production evidence. Staging evidence must
-use staging API/DB/worker/provider configuration.
-
-## What to configure in each external service
-
-### Cloudflare
-
-- DNS zone for `petmagic.app`.
-- DNS records for Render custom domains.
-- R2 bucket.
-- R2 access key/secret.
-- Optional custom domain for R2 public media.
-
-### Render
-
-- Blueprint from `render.yaml`.
-- Custom domains.
-- Secret values for all `sync: false` keys.
-- Public Postgres access only temporarily for operator maintenance, then lock
-  it down.
-
-### Stripe
-
-- Test mode secret key.
-- Test mode publishable key.
-- Staging webhook endpoint.
-- Webhook secret.
-- Test products/prices if required by the current economy flow.
-
-### fal.ai
-
-- API key.
-- Prepaid credits.
-- Admin-capable permission on the existing backend-only key so Account Billing balance refresh works.
-- Provider/dashboard billing controls and alerts; there is no Scheduler V2 daily-spend cap.
-- Operator-confirmed concurrency stored in the revisioned generation-control policy.
-- Callback URL:
-  `https://api.staging.petmagic.app/api/templates/provider/fal/webhook`.
-
-### Firebase
-
-- Staging project.
-- Android app config.
-- iOS app config.
-- Backend service account JSON in Render secret storage.
-- Real-device push test.
-
-### Google Play
-
-- Play Console account.
-- App entry.
-- Service account for Play Developer API.
-- Pub/Sub push auth values if server notifications are enabled.
-- Sandbox purchase testers.
-
-### Apple
-
-- Apple Developer Program membership.
-- App ID / Bundle ID.
-- Services ID if used by auth.
-- App Store shared secret.
-- Sandbox testers.
-- TestFlight setup.
-
-### Email provider
-
-- Verified sending domain.
-- DNS records: SPF/DKIM/DMARC as provider requires.
-- SMTP/API credentials in Render secrets.
-- Test password reset/email verification delivery.
-
-## Production promotion checklist
-
-Do not promote staging to production until these are true:
-
-- Staging deploy has green post-deploy smoke.
-- Real provider callback tests passed.
-- Staging generation and economy gates passed.
-- Database backup/restore process is documented and tested.
-- Production secrets are separate from staging secrets.
-- Production domains are configured.
-- Android/iOS release signing is configured outside Git.
-- Error monitoring and alerting are enabled.
-- fal.ai balance thresholds/alerts and provider-side billing controls are verified; the confirmed
-  concurrency timestamp is current.
-
-## Day-one operating rules
-
-- Keep `.env*` real values local and ignored.
-- Commit only `.env*.example`.
-- Run `node scripts\qa\check-repository-sensitive-files.mjs` before every push.
-- Run `node scripts\qa\clean-local-generated-artifacts.mjs --apply` before
-  staging commits if local build artifacts were generated.
-- For production, prefer managed services over one VPS unless you are ready to
-  own backup, restore, updates, monitoring, TLS, rollbacks, and incidents.
+- Check `/health`, systemd status, and bounded logs before restarting anything.
+- Deploy only a reviewed `master` revision through `deploy-release.sh`.
+- Keep exactly one generation worker unless capacity evidence and a reviewed
+  architecture change justify another one.
+- Review backup timer runs and perform isolated restore tests periodically.
+- Do not use a public provider dashboard or a green build as proof that a
+  mobile/device/payment flow works.
+- Record provider acceptance and operational incidents in the release-readiness
+  document so a new task has one reliable current source.

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Historical one-time import artifact. Normal VPS deployment and operations do not invoke this script.
 set -euo pipefail
 umask 077
 
@@ -9,7 +10,7 @@ readonly expected_sha="${2:-}"
 staging_dir=""
 
 if [[ -z "$archive_path" || ! -f "$archive_path" || ! "$expected_sha" =~ ^[0-9a-fA-F]{64}$ ]]; then
-  echo "Usage: $0 /opt/petmagic/shared/backups/import/<render-disk>.tar.gz <expected-sha256>" >&2
+  echo "Usage: $0 /opt/petmagic/shared/backups/import/<api-data>.tar.gz <expected-sha256>" >&2
   exit 1
 fi
 
@@ -24,7 +25,7 @@ esac
 
 actual_sha="$(sha256sum "$resolved_archive" | awk '{print $1}')"
 if [[ "${actual_sha,,}" != "${expected_sha,,}" ]]; then
-  echo "Render disk SHA-256 does not match the source manifest." >&2
+  echo "Initial API-data archive SHA-256 does not match the source manifest." >&2
   exit 1
 fi
 
@@ -99,4 +100,4 @@ printf 'restoredAtUtc=%s\nsourceFile=%s\nsha256=%s\nfileCount=%s\ndataProtection
   "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(basename "$resolved_archive")" "$actual_sha" "$file_count" "$key_count" \
   > /opt/petmagic/shared/backups/render-disk-restore.marker
 
-echo "Render persistent disk restore verified; files: $file_count"
+echo "Initial API-data import restore verified; files: $file_count"

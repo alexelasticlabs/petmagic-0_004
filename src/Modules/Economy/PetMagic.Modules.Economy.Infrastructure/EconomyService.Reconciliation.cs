@@ -317,6 +317,36 @@ public sealed partial class EconomyService
                     continue;
                 }
 
+                if (IsStoreProvider(order.PaymentProvider))
+                {
+                    order.Status = PurchaseOrderStatus.Failed;
+                    await dbContext.SaveChangesAsync(cancellationToken);
+                    stats.AutoFixesApplied++;
+
+                    await UpsertEconomyIncidentAsync(
+                        EconomyIncidentType.PurchaseSettlementFailed,
+                        "Warning",
+                        $"purchase:pending:{order.Id:D}",
+                        $"Store purchase order {order.Id:D} was closed because it was not verified before the reconciliation threshold.",
+                        stats,
+                        status: "Resolved",
+                        userId: order.UserId,
+                        purchaseOrderId: order.Id,
+                        provider: order.PaymentProvider,
+                        externalReferenceId: order.ExternalPaymentId,
+                        autoFixApplied: true,
+                        details: new
+                        {
+                            order.Status,
+                            order.CreatedAtUtc,
+                            order.ExternalPaymentId,
+                            order.PriceAmount,
+                            order.CurrencyCode
+                        },
+                        cancellationToken: cancellationToken);
+                    continue;
+                }
+
                 await UpsertEconomyIncidentAsync(
                     EconomyIncidentType.PurchaseSettlementFailed,
                     "Warning",
@@ -448,6 +478,10 @@ public sealed partial class EconomyService
 
         return true;
     }
+
+    private static bool IsStoreProvider(string provider) =>
+        string.Equals(provider, "google_play", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(provider, "app_store", StringComparison.OrdinalIgnoreCase);
 
     private async Task<PaymentStateResponse?> TryGetStripePaymentStateAsync(
         PurchaseOrder order,

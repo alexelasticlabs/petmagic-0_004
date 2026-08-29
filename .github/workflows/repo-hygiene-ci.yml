@@ -74,8 +74,10 @@ jobs:
       - name: Install admin-web dependencies for YAML validation
         run: npm ci --prefix apps/admin-web --ignore-scripts
 
-      - name: Validate Render deployment preflight
-        run: node scripts/qa/run-render-predeploy-gate.mjs
+      - name: Validate VPS deployment configuration
+        run: |
+          node scripts/qa/check-production-release-config.mjs
+          node scripts/qa/check-vps-deployment.mjs
 
       - name: Validate markdown local links
         run: |

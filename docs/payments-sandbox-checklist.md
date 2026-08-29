@@ -27,7 +27,9 @@ Evidence to capture:
 - Mobile refresh shows updated balance.
 - Admin purchases list shows the order.
 
-Status: `needs verification` until run with Stripe sandbox credentials.
+Status: staging Stripe credentials and a signed `payment_intent.succeeded`
+webhook are configured. Token-pack success, replay, refund, and mobile
+exactly-once acceptance are still `needs verification`.
 
 ## Stripe subscription
 
@@ -42,7 +44,9 @@ Evidence to capture:
 - Mobile premium screen reflects the new state.
 - Admin subscription event log shows the lifecycle.
 
-Status: `needs verification` until run with Stripe sandbox credentials.
+Status: staging Android PaymentSheet has activated Premium with test-mode
+credentials. Cancellation, retry, renewal, refund, and replay acceptance remain
+`needs verification`.
 
 ## Google Play token pack
 
@@ -62,7 +66,9 @@ Evidence to capture:
 - Restore/recovery works after reinstall or local order loss.
 - Admin purchase appears with provider `google_play`.
 
-Status: `needs verification` until Android device, Play Console setup and tester account are available.
+Status: Android `1.0.0+22` is available through Play Internal and Play
+verification credentials/catalog are configured. The missing evidence is an
+eligible license-tester purchase lifecycle, not server access.
 
 ## App Store token pack
 
@@ -78,7 +84,10 @@ Evidence to capture:
 - Restore/recovery works after reinstall or local order loss.
 - Admin purchase appears with provider `app_store`.
 
-Status: `needs verification` until App Store sandbox setup and test device/account are available.
+Status: the signed iOS build `1.0.0 (22)` is available through the TestFlight
+API and App Store catalog/notification configuration exists. TestFlight install,
+Sandbox Apple Account, and the full device purchase lifecycle remain
+`needs verification`.
 
 ## FCM
 
@@ -92,7 +101,9 @@ Evidence to capture on a real device:
 - dedupe key prevents duplicate UI messages;
 - invalid token is disabled by backend sender after FCM rejection.
 
-Status: `needs verification` until Firebase credentials and real device session are available.
+Status: backend registration and outbox delivery are configured. Visible
+foreground/background delivery on a real Android and iPhone remains
+`needs verification`.
 
 ## Mobile wallet UI
 

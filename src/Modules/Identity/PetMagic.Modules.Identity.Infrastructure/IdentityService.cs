@@ -242,7 +242,11 @@ public sealed partial class IdentityService(
     }
 
 
-    private async Task<TokenPairResponse> IssueTokenPairAsync(AppUser user, IEnumerable<string> roles, CancellationToken cancellationToken)
+    private async Task<TokenPairResponse> IssueTokenPairAsync(
+        AppUser user,
+        IEnumerable<string> roles,
+        CancellationToken cancellationToken,
+        string? authenticationProvider = null)
     {
         var now = DateTime.UtcNow;
         var expiresAt = now.AddMinutes(jwtOptions.Value.AccessTokenMinutes);
@@ -277,6 +281,7 @@ public sealed partial class IdentityService(
             Id = sessionId,
             UserId = user.Id,
             TokenHash = HashToken(refreshToken),
+            AuthenticationProvider = authenticationProvider,
             CreatedAtUtc = now,
             ExpiresAtUtc = now.AddDays(jwtOptions.Value.RefreshTokenDays)
         });

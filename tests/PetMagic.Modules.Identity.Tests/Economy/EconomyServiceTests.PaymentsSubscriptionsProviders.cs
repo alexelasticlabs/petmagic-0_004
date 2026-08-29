@@ -1639,6 +1639,47 @@ public sealed partial class EconomyServiceTests
     }
 
     [Fact]
+    public async Task VerifyPackStorePurchaseAsync_ShouldSettleAStaleOrderClosedByReconciliation()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var packId = AddStarterPack(dbContext);
+        EnableStoreProvider(dbContext, "google_play", "android");
+        var packCode = await dbContext.CurrencyPacks
+            .Where(x => x.Id == packId)
+            .Select(x => x.Code)
+            .SingleAsync();
+        var service = CreateService(dbContext);
+
+        var createResult = await service.CreatePackPurchaseAsync(
+            new CreatePackPurchaseCommand(userId, packId, "USD", "google_play", "android", "1.0.0", "US", "en"),
+            CancellationToken.None);
+        Assert.True(createResult.IsSuccess);
+
+        var order = await dbContext.PurchaseOrders.SingleAsync();
+        order.Status = PurchaseOrderStatus.Failed;
+        await dbContext.SaveChangesAsync();
+
+        var result = await service.VerifyPackStorePurchaseAsync(
+            new VerifyPackStorePurchaseCommand(
+                userId,
+                createResult.Value.OrderId,
+                "google_play",
+                BuildStoreProductId("google_play", packCode),
+                "gp-recovered-store-token-1",
+                null,
+                "purchase-recovered-1",
+                DateTime.UtcNow.ToString("O")),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(PurchaseOrderStatus.Succeeded, result.Value.Status);
+        Assert.Equal(PurchaseOrderStatus.Succeeded, (await dbContext.PurchaseOrders.SingleAsync()).Status);
+        Assert.Single(await dbContext.WalletLedgerEntries.Where(x => x.UserId == userId).ToListAsync());
+    }
+
+    [Fact]
     public async Task VerifyPackStorePurchaseAsync_ShouldRecognizeLegacyRawGooglePlayTokenWithoutDuplicating()
     {
         await using var dbContext = CreateDbContext();

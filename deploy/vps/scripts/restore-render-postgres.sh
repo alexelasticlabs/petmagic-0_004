@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Historical one-time import artifact. Normal VPS deployment and operations do not invoke this script.
 set -euo pipefail
 umask 077
 
@@ -10,7 +11,7 @@ readonly expected_sha="${2:-}"
 extract_dir=""
 
 if [[ -z "$dump_path" || ! -f "$dump_path" || ! "$expected_sha" =~ ^[0-9a-fA-F]{64}$ ]]; then
-  echo "Usage: $0 /opt/petmagic/shared/backups/import/<render-export> <expected-sha256>" >&2
+  echo "Usage: $0 /opt/petmagic/shared/backups/import/<database-export> <expected-sha256>" >&2
   exit 1
 fi
 
@@ -25,7 +26,7 @@ esac
 
 actual_sha="$(sha256sum "$resolved_dump" | awk '{print $1}')"
 if [[ "${actual_sha,,}" != "${expected_sha,,}" ]]; then
-  echo "Render export SHA-256 does not match the source manifest." >&2
+  echo "Initial import export SHA-256 does not match the source manifest." >&2
   exit 1
 fi
 
@@ -45,14 +46,14 @@ restore_source="$resolved_dump"
 if [[ "$resolved_dump" == *.tar.gz ]]; then
   mapfile -t archive_entries < <(tar -tzf "$resolved_dump")
   if [[ "${#archive_entries[@]}" -eq 0 ]]; then
-    echo "Render export archive is empty." >&2
+    echo "Initial import archive is empty." >&2
     exit 1
   fi
   while IFS= read -r metadata; do
     case "${metadata:0:1}" in
       -|d) ;;
       *)
-        echo "Render export contains a non-regular archive entry." >&2
+        echo "Initial import archive contains a non-regular archive entry." >&2
         exit 1
         ;;
     esac
@@ -60,7 +61,7 @@ if [[ "$resolved_dump" == *.tar.gz ]]; then
   for entry in "${archive_entries[@]}"; do
     normalized="${entry#./}"
     if [[ "$entry" == /* || "/$normalized/" == */../* ]]; then
-      echo "Render export contains an unsafe path." >&2
+      echo "Initial import archive contains an unsafe path." >&2
       exit 1
     fi
   done
@@ -68,7 +69,7 @@ if [[ "$resolved_dump" == *.tar.gz ]]; then
   tar -xzf "$resolved_dump" -C "$extract_dir"
   mapfile -t toc_files < <(find "$extract_dir" -type f -name toc.dat -print)
   if [[ "${#toc_files[@]}" -ne 1 ]]; then
-    echo "Render directory export must contain exactly one toc.dat." >&2
+    echo "Initial directory export must contain exactly one toc.dat." >&2
     exit 1
   fi
   restore_source="$(dirname "${toc_files[0]}")"
@@ -122,4 +123,4 @@ printf 'restoredAtUtc=%s\nsourceFile=%s\nsha256=%s\npublicTableCount=%s\nmigrati
   "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(basename "$resolved_dump")" "$actual_sha" "$table_count" "$migration_count" \
   > /opt/petmagic/shared/backups/render-restore.marker
 
-echo "Render PostgreSQL restore verified; public tables: $table_count; migrations: $migration_count"
+echo "Initial PostgreSQL import restore verified; public tables: $table_count; migrations: $migration_count"

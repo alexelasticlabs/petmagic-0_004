@@ -295,18 +295,23 @@ test("dashboard switches commerce ranges and stays within the mobile viewport", 
 
   const attentionRegion = page.getByRole("region", { name: "Needs attention", exact: true });
   await expect(attentionRegion).toBeVisible();
-  await expect(
-    attentionRegion.getByText("Unread support conversations", { exact: true })
-  ).toBeVisible();
-  await expect(
-    attentionRegion.getByText("Unassigned conversations", { exact: true })
-  ).toBeVisible();
   await expect(attentionRegion.getByText("Failed payments", { exact: true })).toBeVisible();
   await expect(attentionRegion.getByText("Failed generations", { exact: true })).toBeVisible();
   await expect(
     attentionRegion.getByText("Refund attempts exhausted", { exact: true })
   ).toBeVisible();
   await expect(attentionRegion.getByText("System status", { exact: true })).toBeVisible();
+  await expect(
+    attentionRegion.getByText("Unread support conversations", { exact: true })
+  ).toBeHidden();
+  await expect(attentionRegion.getByText("Unassigned conversations", { exact: true })).toBeHidden();
+  await attentionRegion.getByText("Show 2 more", { exact: true }).click();
+  await expect(
+    attentionRegion.getByText("Unread support conversations", { exact: true })
+  ).toBeVisible();
+  await expect(
+    attentionRegion.getByText("Unassigned conversations", { exact: true })
+  ).toBeVisible();
   await expect(
     attentionRegion.getByRole("link", { name: "Open: Unread support conversations", exact: true })
   ).toHaveAttribute("href", "/en/support?queue=unread");

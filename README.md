@@ -137,12 +137,13 @@ Use `.env.example` as a template only. Real credentials must stay in local `.env
 | --- | --- | --- | --- |
 | Default local Docker Compose | `.env.example` and `docker-compose.yml` | `.env` | staging or production deployment |
 | Isolated local smoke | `.env.local-smoke.example` | `.env.local-smoke` | staging evidence or production secrets |
-| Staging deploy | `render.yaml` and Render secret storage | `.env.staging.local` only for QA runner inputs | direct deployment configuration |
-| Production deploy | `render.production.yaml` and production secret storage | none required | staging or local configuration |
+| Isolated payment staging on the VPS | `deploy/vps/compose.staging.vps.yaml` and `/opt/petmagic-staging/env/.env.staging` | `.env.staging.local` only for local QA inputs | production data or credentials |
+| Production deploy | `deploy/vps/compose.vps.yaml`, `/opt/petmagic/shared/env/.env.vps`, and `deploy/vps/scripts/deploy-release.sh` | none required | staging or local configuration |
 | Standalone admin-web | `apps/admin-web/.env.<environment>.example` | `apps/admin-web/.env.local` for development | root Compose configuration |
 
 The staging runner template intentionally contains both QA inputs and Compose
-parity values. Its comments mark those sections; it never overrides Render.
+parity values. Its comments mark those sections; it never overrides the VPS
+runtime configuration.
 Validate template syntax with `--env-file *.example`, but run a local scenario
 with the corresponding ignored file after copying and filling it.
 
@@ -290,7 +291,7 @@ provider-backed staging proof and signed store artifacts.
 
 - [Release readiness](docs/release-readiness.md) — current production gate and remaining evidence.
 - [API contracts](docs/api-contracts.md), [security](docs/security.md), [authentication](docs/authentication-and-registration.md), [payments](docs/payments-sandbox-checklist.md), and [notifications](docs/notifications-contract.md) — cross-stack contracts and security rules.
-- [Staging deployment](docs/render-staging-deployment.md), [production blueprint](render.production.yaml), and [staging secrets checklist](docs/render-staging-secrets-checklist.md) — deployment source and operator procedure.
+- [VPS deployment runbook](deploy/vps/README.md) — canonical production and isolated-payment-staging procedure.
 - [Observability](docs/observability.md), [logging](docs/observability/logging.md), and [generation release gate](docs/observability/generation-release-gate.md) — production monitoring and gates.
 
 ### Runbooks and validation evidence
@@ -301,7 +302,7 @@ provider-backed staging proof and signed store artifacts.
 
 ### Supplementary guides
 
-- [Hosting first-time guide](docs/hosting-first-time-guide.md) — first staging deployment walkthrough; use the deployment runbook above for current operations.
+- [Hosting first-time guide](docs/hosting-first-time-guide.md) — provider-neutral purchase, access, and first-server checklist; use the VPS runbook for all current operations.
 - [Auth email setup](docs/auth-email-setup.md). Repository agent workflow
   rules are kept only in `AGENTS.md`.
 

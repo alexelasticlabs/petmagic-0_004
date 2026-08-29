@@ -5,7 +5,12 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { type ReactElement, useEffect, useMemo, useState } from "react";
 
-import { DollarIcon, SupportIcon } from "@/components/admin/admin-icons";
+import {
+  DollarIcon,
+  MoreHorizontalIcon,
+  PawIcon,
+  SupportIcon,
+} from "@/components/admin/admin-icons";
 import {
   AdminBadge,
   AdminCard,
@@ -391,6 +396,7 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
               ))}
             </div>
             <div className={styles.profileMeta}>
+              <Metric label={workspaceText.profileId} value={user.userId} />
               <Metric
                 label={workspaceText.profileCreatedAt}
                 value={formatDateTime(user.createdAtUtc, locale)}
@@ -408,15 +414,47 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
           aria-label={workspaceText.quickActionsTitle}
         >
           <Button variant="primary" size="sm" onClick={() => selectTab("wallet", "adjust-balance")}>
-            <DollarIcon className={styles.quickActionIcon} />
-            {workspaceText.quickWallet}
+            <PawIcon className={styles.quickActionIcon} />
+            {workspaceText.quickCredit}
+          </Button>
+          <Button variant="secondary" size="sm" onClick={() => selectTab("access")}>
+            {workspaceText.quickPremium}
           </Button>
           <Button variant="secondary" size="sm" onClick={() => selectTab("support")}>
             <SupportIcon className={styles.quickActionIcon} />
-            {workspaceText.quickSupport}
+            {workspaceText.quickMessage}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => selectTab("access")}
+            aria-label={workspaceText.moreActions}
+          >
+            <MoreHorizontalIcon className={styles.quickActionIcon} />
           </Button>
         </div>
       </section>
+
+      <div className={styles.profileKpis} aria-label={workspaceText.overviewSummaryTitle}>
+        <button type="button" onClick={() => selectTab("wallet")}>
+          {analytics.summary.walletBalance}
+          <span>PawSpark</span>
+        </button>
+        <button type="button" onClick={() => selectTab("content")}>
+          {analytics.summary.totalGenerations}
+          <span>{workspaceText.overviewGenerations}</span>
+        </button>
+        <button type="button" onClick={() => selectTab("content")}>
+          —<span>{workspaceText.petsMetric}</span>
+        </button>
+        <button type="button" onClick={() => selectTab("wallet")}>
+          {analytics.summary.totalPurchases}
+          <span>{workspaceText.overviewPurchases}</span>
+        </button>
+        <button type="button" onClick={() => selectTab("access")}>
+          —<span>{workspaceText.activeSessionsMetric}</span>
+        </button>
+      </div>
 
       <nav className={styles.tabs} aria-label={workspaceText.tabsLabel}>
         {tabs.map((tab) => (
@@ -519,6 +557,22 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
                   <dd>
                     {user.roles.length
                       ? user.roles.map((role) => getUserRoleLabel(role, text)).join(", ")
+                      : "—"}
+                  </dd>
+                </div>
+                <div>
+                  <dt>{workspaceText.contentPurchases}</dt>
+                  <dd>
+                    {analytics.recentPurchases.length
+                      ? `${analytics.recentPurchases[0].priceAmount} ${analytics.recentPurchases[0].currencyCode}`
+                      : "—"}
+                  </dd>
+                </div>
+                <div>
+                  <dt>{workspaceText.contentGenerations}</dt>
+                  <dd>
+                    {analytics.recentGenerations.length
+                      ? sanitizeSensitiveText(analytics.recentGenerations[0].templateTitle, 48)
                       : "—"}
                   </dd>
                 </div>

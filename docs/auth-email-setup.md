@@ -92,17 +92,22 @@ EMAIL_FROM_ADDRESS=no-reply@petgpt.app
 EMAIL_FROM_NAME=PetMagic
 ```
 
-Если используешь Mailtrap для dev:
+Для локального Docker Compose используй встроенный Mailpit. Он запускается
+вместе со стеком и доступен только на локальной машине:
 
 ```env
-EMAIL_HOST=sandbox.smtp.mailtrap.io
-EMAIL_PORT=2525
-EMAIL_USERNAME=your-mailtrap-username
-EMAIL_PASSWORD=your-mailtrap-password
-EMAIL_USE_SSL=true
-EMAIL_FROM_ADDRESS=no-reply@petgpt.app
-EMAIL_FROM_NAME=PetMagic
+EMAIL_HOST=mailpit
+EMAIL_PORT=1025
+EMAIL_USERNAME=
+EMAIL_PASSWORD=
+EMAIL_USE_SSL=false
 ```
+
+Открой `http://localhost:8025`, чтобы увидеть локальные письма. Это не
+production SMTP и не доказательство внешней доставки.
+
+В production PetMagic использует Resend SMTP из root-only VPS environment
+file. Не копируй production SMTP credentials в локальный `.env`.
 
 ### 2.4 Остальное для локального запуска
 
@@ -344,11 +349,11 @@ Fallback-сценарий:
 $env:BACKEND_HOST_PORT="5001"
 $env:GOOGLE_CLIENT_ID="your-google-client-id"
 $env:GOOGLE_CLIENT_SECRET="your-google-client-secret"
-$env:EMAIL_HOST="sandbox.smtp.mailtrap.io"
-$env:EMAIL_PORT="2525"
-$env:EMAIL_USERNAME="your-mailtrap-username"
-$env:EMAIL_PASSWORD="your-mailtrap-password"
-$env:EMAIL_USE_SSL="true"
+$env:EMAIL_HOST="mailpit"
+$env:EMAIL_PORT="1025"
+$env:EMAIL_USERNAME=""
+$env:EMAIL_PASSWORD=""
+$env:EMAIL_USE_SSL="false"
 $env:EMAIL_FROM_ADDRESS="no-reply@petgpt.app"
 $env:EMAIL_FROM_NAME="PetMagic"
 ```
@@ -379,11 +384,11 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:${BACKEND_HOST_PORT}
 GOOGLE_CLIENT_ID=replace_with_google_client_id
 GOOGLE_CLIENT_SECRET=replace_with_google_client_secret
 
-EMAIL_HOST=sandbox.smtp.mailtrap.io
-EMAIL_PORT=2525
-EMAIL_USERNAME=replace_with_mailtrap_username
-EMAIL_PASSWORD=replace_with_mailtrap_password
-EMAIL_USE_SSL=true
+EMAIL_HOST=mailpit
+EMAIL_PORT=1025
+EMAIL_USERNAME=
+EMAIL_PASSWORD=
+EMAIL_USE_SSL=false
 EMAIL_FROM_ADDRESS=no-reply@petgpt.app
 EMAIL_FROM_NAME=PetMagic
 ```

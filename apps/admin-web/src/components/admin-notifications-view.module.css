@@ -18,6 +18,12 @@
   gap: var(--space-2);
   min-width: 0;
 }
+.contextActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
 .contextBar span {
   color: var(--text-muted);
   font-size: 0.76rem;
@@ -48,7 +54,7 @@
   display: grid;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius);
-  overflow: clip;
+  overflow: visible;
   background: var(--surface-1);
 }
 .item {
@@ -92,6 +98,44 @@
   align-items: center;
   gap: var(--space-2);
 }
+.moreActions {
+  position: relative;
+}
+.moreActions summary {
+  min-height: var(--control-height-sm);
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-1);
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: 0 var(--space-2);
+  font-size: 0.8rem;
+  list-style: none;
+}
+.moreActions summary::-webkit-details-marker {
+  display: none;
+}
+.moreActions summary:focus-visible {
+  outline: none;
+  border-color: var(--border-accent);
+  box-shadow: var(--focus-ring);
+}
+.moreActionMenu {
+  position: absolute;
+  z-index: 1;
+  top: calc(100% + var(--space-1));
+  right: 0;
+  display: grid;
+  gap: var(--space-1);
+  min-width: max-content;
+  padding: var(--space-1);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-1);
+  box-shadow: var(--shadow-card);
+}
 .ackForm {
   grid-column: 1 / -1;
   display: grid;
@@ -131,12 +175,22 @@
   .actions {
     justify-content: flex-start;
   }
+  .moreActionMenu {
+    right: auto;
+    left: 0;
+  }
 }
 @media (max-width: 420px) {
   .contextBar,
   .contextBar div {
     align-items: stretch;
     flex-direction: column;
+  }
+  .contextActions {
+    justify-content: stretch;
+  }
+  .contextActions button {
+    flex: 1 1 auto;
   }
   .ackForm {
     grid-template-columns: 1fr;

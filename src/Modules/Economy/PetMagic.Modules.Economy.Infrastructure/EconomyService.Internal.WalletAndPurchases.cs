@@ -876,6 +876,13 @@ public sealed partial class EconomyService
             return Result.Success(order);
         }
 
+        // A stale store checkout is closed by reconciliation, but a later
+        // cryptographically verified receipt or store webhook remains valid.
+        if (string.Equals(order.Status, PurchaseOrderStatus.Failed, StringComparison.Ordinal))
+        {
+            order.Status = PurchaseOrderStatus.Pending;
+        }
+
         var confirmResult = await ConfirmPurchaseInternalAsync(order, cancellationToken);
         if (confirmResult.IsFailure
             && string.Equals(confirmResult.Error.Code, EconomyErrors.PurchaseAlreadyProcessed.Code, StringComparison.Ordinal))

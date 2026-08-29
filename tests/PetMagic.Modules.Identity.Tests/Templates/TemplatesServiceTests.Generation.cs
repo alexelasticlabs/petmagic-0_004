@@ -154,6 +154,51 @@ public sealed partial class TemplatesServiceTests
         Assert.NotNull(response.SourceImageAsset);
         Assert.Equal(string.Empty, response.SourceImageAsset!.FileName);
         Assert.Equal(string.Empty, response.SourceImageAsset!.ContentType);
+        Assert.Equal("not_applicable", response.RefundState);
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task MapResponse_ShouldExposeConfirmedGenerationRefund()
+    {
+        var now = DateTime.UtcNow;
+        var response = TemplateGenerationService.MapResponse(new TemplateGenerationJob
+        {
+            Id = Guid.NewGuid(),
+            UserId = Guid.NewGuid(),
+            TemplateId = Guid.NewGuid(),
+            Status = TemplateGenerationStatus.Failed,
+            TokenCost = 3,
+            CreatedAtUtc = now.AddMinutes(-2),
+            QueuedAtUtc = now.AddMinutes(-2),
+            UpdatedAtUtc = now,
+            ChargedAtUtc = now.AddMinutes(-2),
+            RefundedAtUtc = now.AddMinutes(-1)
+        });
+
+        Assert.Equal("refunded", response.RefundState);
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public Task MapResponse_ShouldExposeExhaustedGenerationRefund()
+    {
+        var now = DateTime.UtcNow;
+        var response = TemplateGenerationService.MapResponse(new TemplateGenerationJob
+        {
+            Id = Guid.NewGuid(),
+            UserId = Guid.NewGuid(),
+            TemplateId = Guid.NewGuid(),
+            Status = TemplateGenerationStatus.Failed,
+            TokenCost = 3,
+            CreatedAtUtc = now.AddMinutes(-2),
+            QueuedAtUtc = now.AddMinutes(-2),
+            UpdatedAtUtc = now,
+            ChargedAtUtc = now.AddMinutes(-2),
+            RefundAttemptCount = 2
+        }, refundAttemptLimit: 2);
+
+        Assert.Equal("failed", response.RefundState);
         return Task.CompletedTask;
     }
 

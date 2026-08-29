@@ -1,30 +1,13 @@
 "use client";
 
-import Link from "next/link";
+import { CaretDownIcon, MoreHorizontalIcon, PawIcon } from "@/components/admin/admin-icons";
 import { useEffect, useMemo, useRef } from "react";
 
-import {
-  CaretDownIcon,
-  DollarIcon,
-  SupportIcon,
-  UserRegisterIcon,
-} from "@/components/admin/admin-icons";
-import {
-  AdminBadge,
-  AdminStatusBadge,
-  adminTableStyles,
-} from "@/components/admin/admin-primitives";
+import { adminTableStyles } from "@/components/admin/admin-primitives";
 import { Button } from "@/components/ui/button";
 import { UserAvatarView } from "@/components/users/user-avatar";
 import type { UsersManagementPageText } from "@/components/users-management-page.content";
-import {
-  accountStatusColors,
-  getAccountStatus,
-  getUserAvatarLabel,
-  getUserRoleLabel,
-  getUserRoleTone,
-  premiumStatusColors,
-} from "@/components/users-management-page.helpers";
+import { getAccountStatus, getUserAvatarLabel } from "@/components/users-management-page.helpers";
 import styles from "@/components/users-management-page.module.css";
 import type { UserListItem } from "@/lib/api-client";
 import { formatDateTime } from "@/lib/format-date-time";
@@ -43,6 +26,7 @@ type UsersManagementUsersTableProps = {
   ui: UsersManagementPageText;
   onTogglePageSelection: (userIds: readonly string[], selected: boolean) => void;
   onToggleUserSelection: (userId: string, selected: boolean) => void;
+  onOpenUser: (user: UserListItem) => void;
 };
 
 export function UsersManagementUsersTable({
@@ -57,6 +41,7 @@ export function UsersManagementUsersTable({
   ui,
   onTogglePageSelection,
   onToggleUserSelection,
+  onOpenUser,
 }: UsersManagementUsersTableProps) {
   const shouldShowPagination = totalPages > 1 || currentPage > 1;
   const selectAllRef = useRef<HTMLInputElement>(null);
@@ -88,7 +73,7 @@ export function UsersManagementUsersTable({
         <table className={adminTableStyles.table}>
           <thead>
             <tr>
-              <th>
+              <th aria-label={ui.bulkEmail.selectAllLabel}>
                 <div className={styles.tableUserHeader}>
                   <input
                     ref={selectAllRef}
@@ -102,14 +87,14 @@ export function UsersManagementUsersTable({
                       onTogglePageSelection(eligibleUserIds, event.target.checked)
                     }
                   />
-                  <span>{ui.userColumn}</span>
                 </div>
               </th>
-              <th>{ui.accountAndAccess}</th>
+              <th>{ui.userColumn}</th>
+              <th>{ui.filterStatus}</th>
               <th>{ui.plan}</th>
+              <th>{ui.balance}</th>
               <th>{ui.lastActivity}</th>
-              <th>{ui.registeredAt}</th>
-              <th>{ui.quickActions}</th>
+              <th aria-label={ui.quickActions} />
             </tr>
           </thead>
           <tbody>
@@ -120,8 +105,11 @@ export function UsersManagementUsersTable({
               const canReceiveBulkEmail = user.isActive && user.emailConfirmed;
 
               return (
-                <tr key={user.userId}>
-                  <td data-label={ui.userColumn}>
+                <tr key={user.userId} className={styles.userRow} onClick={() => onOpenUser(user)}>
+                  <td
+                    data-label={ui.bulkEmail.selectAllLabel}
+                    onClick={(event) => event.stopPropagation()}
+                  >
                     <div className={styles.selectionIdentityRow}>
                       <input
                         type="checkbox"
@@ -142,54 +130,45 @@ export function UsersManagementUsersTable({
                           onToggleUserSelection(user.userId, event.target.checked)
                         }
                       />
-                      <Link
-                        href={`/${locale}/users/${encodeURIComponent(user.userId)}`}
-                        className={styles.identityCell}
-                        aria-label={`${ui.openProfile}: ${userLabel}`}
-                      >
-                        <UserAvatarView
-                          avatar={user.avatar}
-                          label={`${text.avatarLabel}: ${getUserAvatarLabel(user)}`}
-                          fallbackLabel={getUserAvatarLabel(user)}
-                        />
-                        <div className={styles.identityCopy}>
-                          <span className={styles.userAnchor}>{userLabel}</span>
-                          <span className={styles.userMeta}>{maskEmail(user.email)}</span>
-                        </div>
-                        <CaretDownIcon className={styles.identityArrow} aria-hidden="true" />
-                      </Link>
                     </div>
                   </td>
-                  <td data-label={ui.accountAndAccess}>
-                    <div className={styles.statusCell}>
-                      <AdminStatusBadge color={accountStatusColors[status]}>
-                        {status === "blocked"
-                          ? ui.blockedBadge
-                          : status === "unconfirmed"
-                            ? ui.unconfirmedBadge
-                            : ui.activeBadge}
-                      </AdminStatusBadge>
-                      <div className={styles.roleList}>
-                        {user.roles.map((role) => (
-                          <AdminBadge
-                            key={role}
-                            tone={getUserRoleTone(role)}
-                            className={styles.rolePill}
-                          >
-                            {getUserRoleLabel(role, text)}
-                          </AdminBadge>
-                        ))}
+                  <td data-label={ui.userColumn}>
+                    <button
+                      type="button"
+                      className={styles.identityCell}
+                      onClick={() => onOpenUser(user)}
+                      aria-label={`${ui.openProfile}: ${userLabel}`}
+                    >
+                      <UserAvatarView
+                        avatar={user.avatar}
+                        label={`${text.avatarLabel}: ${getUserAvatarLabel(user)}`}
+                        fallbackLabel={getUserAvatarLabel(user)}
+                      />
+                      <div className={styles.identityCopy}>
+                        <span className={styles.userAnchor}>{userLabel}</span>
+                        <span className={styles.userMeta}>{maskEmail(user.email)}</span>
                       </div>
-                    </div>
+                    </button>
+                  </td>
+                  <td data-label={ui.filterStatus}>
+                    <span className={styles.compactStatus} data-status={status}>
+                      {status === "blocked"
+                        ? ui.blockedBadge
+                        : status === "unconfirmed"
+                          ? ui.unconfirmedBadge
+                          : ui.activeBadge}
+                    </span>
                   </td>
                   <td data-label={ui.plan}>
-                    <AdminStatusBadge
-                      color={
-                        user.isPremium ? premiumStatusColors.premium : premiumStatusColors.free
-                      }
-                    >
+                    <span className={user.isPremium ? styles.premiumPlan : styles.freePlan}>
                       {user.isPremium ? text.premiumLabel : text.freeLabel}
-                    </AdminStatusBadge>
+                    </span>
+                  </td>
+                  <td data-label={ui.balance}>
+                    <span className={styles.balanceValue}>
+                      <PawIcon />
+                      {ui.balanceUnavailable}
+                    </span>
                   </td>
                   <td data-label={ui.lastActivity}>
                     {user.lastActivityAtUtc ? (
@@ -202,45 +181,19 @@ export function UsersManagementUsersTable({
                       </div>
                     )}
                   </td>
-                  <td data-label={ui.registeredAt}>
-                    <time dateTime={user.createdAtUtc} className={styles.registrationCell}>
-                      {formatDateTime(user.createdAtUtc, locale)}
-                    </time>
-                  </td>
-                  <td data-label={ui.quickActions} className={styles.actionsCell}>
-                    <div
-                      className={styles.quickActions}
-                      role="group"
-                      aria-label={`${ui.quickActions}: ${userName || maskEmail(user.email)}`}
+                  <td
+                    data-label={ui.quickActions}
+                    className={styles.actionsCell}
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <button
+                      type="button"
+                      className={styles.rowMenuButton}
+                      aria-label={`${ui.quickActions}: ${userLabel}`}
+                      onClick={() => onOpenUser(user)}
                     >
-                      <Link
-                        href={`/${locale}/users/${encodeURIComponent(user.userId)}`}
-                        className={`ui-button ui-button--primary ui-button--sm ${styles.quickActionLink} ${styles.quickActionPrimary}`}
-                        aria-label={`${ui.quickProfile}: ${userName || maskEmail(user.email)}`}
-                        title={`${ui.quickProfile}: ${userName || maskEmail(user.email)}`}
-                      >
-                        <UserRegisterIcon className={styles.quickActionIcon} />
-                        <span className={styles.quickActionText}>{ui.quickProfile}</span>
-                      </Link>
-                      <Link
-                        href={`/${locale}/users/${encodeURIComponent(user.userId)}?tab=wallet`}
-                        className={`ui-button ui-button--secondary ui-button--sm ${styles.quickActionLink}`}
-                        aria-label={`${ui.quickWallet}: ${userName || maskEmail(user.email)}`}
-                        title={`${ui.quickWallet}: ${userName || maskEmail(user.email)}`}
-                      >
-                        <DollarIcon className={styles.quickActionIcon} />
-                        <span className={styles.quickActionText}>{ui.quickWallet}</span>
-                      </Link>
-                      <Link
-                        href={`/${locale}/users/${encodeURIComponent(user.userId)}?tab=support`}
-                        className={`ui-button ui-button--ghost ui-button--sm ${styles.quickActionLink}`}
-                        aria-label={`${ui.quickSupport}: ${userName || maskEmail(user.email)}`}
-                        title={`${ui.quickSupport}: ${userName || maskEmail(user.email)}`}
-                      >
-                        <SupportIcon className={styles.quickActionIcon} />
-                        <span className={styles.quickActionText}>{ui.quickSupport}</span>
-                      </Link>
-                    </div>
+                      <MoreHorizontalIcon />
+                    </button>
                   </td>
                 </tr>
               );

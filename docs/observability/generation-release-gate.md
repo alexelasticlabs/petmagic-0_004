@@ -112,7 +112,7 @@ Production rollout is blocked if any of these are true:
 
 `PetMagicFalProviderInflightNearLimit`
 - Check confirmed policy revision, reserved headroom, durable active attempts, and queue wait. Reduce
-  admission or confirm higher provider capacity before scaling traffic; do not add Render workers to
+  admission or confirm higher provider capacity before scaling traffic; do not add VPS workers to
   manufacture fal capacity.
 
 `PetMagicFalProviderSubmitFailures`

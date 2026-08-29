@@ -184,18 +184,77 @@ export function UsersManagementUsersFilters({
         </span>
       </label>
 
-      <div className={styles.selectField}>
-        <span className={styles.filterLabel}>{ui.sortLabel}</span>
-        <Select
-          value={sortMode}
-          options={sortOptions}
-          onChange={(value) => {
-            setSortMode(value as UserSortMode);
-            resetUsersPage();
-          }}
-          ariaLabel={ui.sortLabel}
-          showSelectedDescription={false}
-        />
+      <div className={styles.quickFilterChips} aria-label={ui.filtersLabel}>
+        {[
+          [
+            "all",
+            ui.any,
+            () => {
+              setPremiumFilter("all");
+              setStatusFilter("all");
+              resetUsersPage();
+            },
+          ],
+          [
+            "active",
+            ui.summaryActive,
+            () => {
+              setPremiumFilter("all");
+              setStatusFilter("active");
+              resetUsersPage();
+            },
+          ],
+          [
+            "premium",
+            ui.summaryPremium,
+            () => {
+              setPremiumFilter("premium");
+              setStatusFilter("all");
+              resetUsersPage();
+            },
+          ],
+          [
+            "unconfirmed",
+            ui.unconfirmedBadge,
+            () => {
+              setPremiumFilter("all");
+              setStatusFilter("unconfirmed");
+              resetUsersPage();
+            },
+          ],
+          [
+            "blocked",
+            ui.blockedBadge,
+            () => {
+              setPremiumFilter("all");
+              setStatusFilter("blocked");
+              resetUsersPage();
+            },
+          ],
+          [
+            "new",
+            ui.summaryNew,
+            () => {
+              setSortMode("created_desc");
+              resetUsersPage();
+            },
+          ],
+        ].map(([id, label, onClick]) => (
+          <button
+            key={id as string}
+            type="button"
+            className={
+              (id === "all" && premiumFilter === "all" && statusFilter === "all") ||
+              id === premiumFilter ||
+              id === statusFilter
+                ? styles.quickFilterActive
+                : ""
+            }
+            onClick={onClick as () => void}
+          >
+            {label as string}
+          </button>
+        ))}
       </div>
 
       <div className={styles.filterActions}>
@@ -208,6 +267,18 @@ export function UsersManagementUsersFilters({
         >
           {filtersButtonLabel}
         </Button>
+        <div className={styles.sortCompact}>
+          <Select
+            value={sortMode}
+            options={sortOptions}
+            onChange={(value) => {
+              setSortMode(value as UserSortMode);
+              resetUsersPage();
+            }}
+            ariaLabel={ui.sortLabel}
+            showSelectedDescription={false}
+          />
+        </div>
         {hasResettableControls ? (
           <Button
             className={styles.resetFiltersButton}

@@ -217,6 +217,84 @@ public sealed partial class TemplatesServiceTests
     }
 
     [Fact]
+    public async Task ListPageAsync_ShouldApplyFailedGenerationGalleryRetentionWithoutHidingUnresolvedRefunds()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var generationService = CreateGenerationService(dbContext);
+        var templateId = await CreateActiveImageTemplateAsync(
+            service,
+            "Failure retention portrait",
+            "Portrait",
+            ["history"]);
+        var userId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+        var recentRefundedId = Guid.NewGuid();
+        var oneDayRefundedId = Guid.NewGuid();
+        var oneWeekRefundedId = Guid.NewGuid();
+        var unresolvedRefundId = Guid.NewGuid();
+
+        TemplateGenerationJob FailedJob(
+            Guid id,
+            DateTime completedAtUtc,
+            DateTime? refundedAtUtc) => new()
+            {
+                Id = id,
+                UserId = userId,
+                TemplateId = templateId,
+                Status = TemplateGenerationStatus.Failed,
+                TokenCost = 3,
+                SourceImageUrl = "https://cdn.example.com/source.jpg",
+                SourceImageFileName = "source.jpg",
+                SourceImageContentType = "image/jpeg",
+                LastErrorCode = TemplatesErrors.AiProviderFailed.Code,
+                CreatedAtUtc = completedAtUtc.AddMinutes(-2),
+                QueuedAtUtc = completedAtUtc.AddMinutes(-2),
+                StartedAtUtc = completedAtUtc.AddMinutes(-1),
+                CompletedAtUtc = completedAtUtc,
+                UpdatedAtUtc = completedAtUtc,
+                ChargedAtUtc = completedAtUtc.AddMinutes(-2),
+                RefundedAtUtc = refundedAtUtc
+            };
+
+        dbContext.TemplateGenerationJobs.AddRange(
+            FailedJob(recentRefundedId, now.AddHours(-2), now.AddHours(-1)),
+            FailedJob(oneDayRefundedId, now.AddDays(-2), now.AddDays(-2)),
+            FailedJob(oneWeekRefundedId, now.AddDays(-8), now.AddDays(-8)),
+            FailedJob(unresolvedRefundId, now.AddDays(-8), null));
+        await dbContext.SaveChangesAsync();
+
+        var all = await generationService.ListPageAsync(
+            userId,
+            new TemplateGenerationHistoryQuery("all", null, 20),
+            isPremium: false,
+            CancellationToken.None);
+        var failed = await generationService.ListPageAsync(
+            userId,
+            new TemplateGenerationHistoryQuery("failed", null, 20),
+            isPremium: false,
+            CancellationToken.None);
+
+        Assert.True(all.IsSuccess);
+        Assert.True(failed.IsSuccess);
+        Assert.Contains(all.Value.Items, item => item.GenerationId == recentRefundedId);
+        Assert.Contains(all.Value.Items, item => item.GenerationId == unresolvedRefundId);
+        Assert.DoesNotContain(all.Value.Items, item => item.GenerationId == oneDayRefundedId);
+        Assert.DoesNotContain(all.Value.Items, item => item.GenerationId == oneWeekRefundedId);
+        Assert.Contains(failed.Value.Items, item => item.GenerationId == recentRefundedId);
+        Assert.Contains(failed.Value.Items, item => item.GenerationId == oneDayRefundedId);
+        Assert.Contains(failed.Value.Items, item => item.GenerationId == unresolvedRefundId);
+        Assert.DoesNotContain(failed.Value.Items, item => item.GenerationId == oneWeekRefundedId);
+
+        var refundedItem = Assert.Single(
+            all.Value.Items,
+            item => item.GenerationId == recentRefundedId);
+        Assert.Equal(3, refundedItem.TokenCost);
+        Assert.Equal("refunded", refundedItem.RefundState);
+        Assert.NotNull(refundedItem.RefundedAtUtc);
+    }
+
+    [Fact]
     public async Task ListAdminGenerationsAsync_ShouldReturnBatchedRelationshipAndPreviewFields()
     {
         await using var dbContext = CreateDbContext();

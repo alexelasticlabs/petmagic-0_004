@@ -8,6 +8,8 @@ public sealed class RefreshTokenSession
 
     public string TokenHash { get; set; } = string.Empty;
 
+    public string? AuthenticationProvider { get; set; }
+
     public DateTime CreatedAtUtc { get; set; }
 
     public DateTime ExpiresAtUtc { get; set; }

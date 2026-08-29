@@ -410,6 +410,18 @@ export function TemplatesCatalogView({
     setVisibilityFilter("all");
     resetCatalogContext();
   }
+  function showActiveTemplates() {
+    if (isCatalogInteractionLocked) return;
+    setArchiveFilter("active");
+    setStatusFilter("Active");
+    setReadinessFilter("all");
+    setVisibilityFilter("all");
+    resetCatalogContext();
+  }
+  function showAllTemplates() {
+    if (isCatalogInteractionLocked) return;
+    resetCatalogFilters();
+  }
 
   function showTemplatesMissingPreview() {
     if (isCatalogInteractionLocked) {
@@ -533,6 +545,11 @@ export function TemplatesCatalogView({
         locale={locale}
         summary={summary}
         templateType={templateType}
+        onShowAll={showAllTemplates}
+        onShowActive={showActiveTemplates}
+        onShowDrafts={showDraftTemplates}
+        onShowMissingPreview={showTemplatesMissingPreview}
+        onShowQaOnly={showQaOnlyTemplates}
       />
 
       <div className={styles.tabRow} role="group" aria-label={copy.archiveTabsLabel}>

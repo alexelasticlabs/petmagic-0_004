@@ -18,6 +18,7 @@ import {
   acknowledgeAdminNotification,
   archiveAdminNotification,
   fetchAdminNotifications,
+  markAllAdminNotificationsRead,
   markAdminNotificationRead,
   type AdminNotificationEvent,
   type AdminNotificationPriority,
@@ -60,6 +61,11 @@ export function AdminNotificationsView({ locale }: { locale: Locale }) {
   const page = query.data?.pages[0];
   const items = query.data?.pages.flatMap((item) => item.items) ?? [];
   const copy = locale === "ru" ? ruCopy : enCopy;
+  const [isMarkingAllRead, setIsMarkingAllRead] = useState(false);
+  const [bulkFeedback, setBulkFeedback] = useState<{
+    tone: "info" | "error";
+    message: string;
+  } | null>(null);
 
   function setFilter(key: "state" | "priority" | "category", value: string) {
     const params = new URLSearchParams(searchParams.toString());
@@ -72,6 +78,21 @@ export function AdminNotificationsView({ locale }: { locale: Locale }) {
   const refresh = () =>
     void queryClient.invalidateQueries({ queryKey: adminQueryKeys.notificationsRoot });
 
+  async function markAllAsRead() {
+    if (isMarkingAllRead || !page?.unreadCount) return;
+
+    setIsMarkingAllRead(true);
+    setBulkFeedback(null);
+    try {
+      await markAllAdminNotificationsRead(page.asOfUtc);
+      refresh();
+    } catch {
+      setBulkFeedback({ tone: "error", message: copy.markAllReadError });
+    } finally {
+      setIsMarkingAllRead(false);
+    }
+  }
+
   return (
     <div className={styles.page}>
       <section className={styles.contextBar} aria-label={copy.contextLabel}>
@@ -81,14 +102,35 @@ export function AdminNotificationsView({ locale }: { locale: Locale }) {
             {page?.asOfUtc ? copy.updated(formatDate(page.asOfUtc, locale)) : copy.syncing}
           </span>
         </div>
-        <button
-          type="button"
-          className="ui-button ui-button--secondary ui-button--sm"
-          onClick={refresh}
-        >
-          {copy.refresh}
-        </button>
+        <div className={styles.contextActions}>
+          <button
+            type="button"
+            className="ui-button ui-button--secondary ui-button--sm"
+            disabled={isMarkingAllRead || !page?.unreadCount}
+            onClick={() => void markAllAsRead()}
+          >
+            {isMarkingAllRead ? copy.markingAllRead : copy.markAllRead}
+          </button>
+          <button
+            type="button"
+            className="ui-button ui-button--secondary ui-button--sm"
+            onClick={refresh}
+          >
+            {copy.refresh}
+          </button>
+        </div>
       </section>
+
+      {bulkFeedback ? (
+        <p
+          className={`${styles.mutationFeedback} ${
+            bulkFeedback.tone === "error" ? styles.mutationError : ""
+          }`}
+          role={bulkFeedback.tone === "error" ? "alert" : "status"}
+        >
+          {bulkFeedback.message}
+        </p>
+      ) : null}
 
       <AdminMetricStrip
         items={[
@@ -262,16 +304,6 @@ function NotificationRow({
             {copy.open}
           </Link>
         ) : null}
-        {!item.readAtUtc ? (
-          <button
-            type="button"
-            className="ui-button ui-button--secondary ui-button--sm"
-            disabled={busy}
-            onClick={() => void run(() => markAdminNotificationRead(item.notificationId))}
-          >
-            {copy.read}
-          </button>
-        ) : null}
         {criticalPending ? (
           <button
             type="button"
@@ -282,14 +314,29 @@ function NotificationRow({
             {copy.ack}
           </button>
         ) : null}
-        <button
-          type="button"
-          className="ui-button ui-button--secondary ui-button--sm"
-          disabled={busy}
-          onClick={() => void run(() => archiveAdminNotification(item.notificationId))}
-        >
-          {copy.archive}
-        </button>
+        <details className={styles.moreActions}>
+          <summary>{copy.moreActions}</summary>
+          <div className={styles.moreActionMenu}>
+            {!item.readAtUtc ? (
+              <button
+                type="button"
+                className="ui-button ui-button--secondary ui-button--sm"
+                disabled={busy}
+                onClick={() => void run(() => markAdminNotificationRead(item.notificationId))}
+              >
+                {copy.read}
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className="ui-button ui-button--secondary ui-button--sm"
+              disabled={busy}
+              onClick={() => void run(() => archiveAdminNotification(item.notificationId))}
+            >
+              {copy.archive}
+            </button>
+          </div>
+        </details>
       </div>
       {mutationFeedback ? (
         <p
@@ -350,6 +397,9 @@ const ruCopy = {
   syncing: "Синхронизация…",
   updated: (value: string) => `Обновлено ${value}`,
   refresh: "Обновить",
+  markAllRead: "Отметить всё прочитанным",
+  markingAllRead: "Отмечаем…",
+  markAllReadError: "Не удалось отметить уведомления прочитанными. Попробуйте ещё раз.",
   unread: "Непрочитанные",
   critical: "Критические без подтверждения",
   visible: "В выборке",
@@ -368,6 +418,7 @@ const ruCopy = {
   read: "Прочитано",
   ack: "Подтвердить",
   archive: "В архив",
+  moreActions: "Ещё",
   reason: "Причина подтверждения",
   confirmAck: "Подтвердить событие",
   conflict: "Событие уже изменил другой оператор. Загружено актуальное состояние.",
@@ -398,6 +449,9 @@ const enCopy = {
   syncing: "Syncing…",
   updated: (value: string) => `Updated ${value}`,
   refresh: "Refresh",
+  markAllRead: "Mark all read",
+  markingAllRead: "Marking…",
+  markAllReadError: "Could not mark notifications as read. Try again.",
   unread: "Unread",
   critical: "Critical unacknowledged",
   visible: "In view",
@@ -416,6 +470,7 @@ const enCopy = {
   read: "Mark read",
   ack: "Acknowledge",
   archive: "Archive",
+  moreActions: "More",
   reason: "Acknowledgement reason",
   confirmAck: "Confirm acknowledgement",
   conflict: "Another operator already changed this event. The latest state has been loaded.",
