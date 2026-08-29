@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.BackgroundWorkers;
 using PetMagic.BuildingBlocks.Observability;
 using PetMagic.Modules.Identity.Infrastructure.Options;
 
@@ -26,22 +27,33 @@ internal sealed class EmailDispatchWorker(
         }
 
         var consecutiveFailures = 0;
+        var initialIdleDelay = TimeSpan.FromMilliseconds(Math.Max(1, options.DispatchPollIntervalMilliseconds));
+        var idleBackoff = new AdaptiveIdlePollBackoff(
+            initialIdleDelay,
+            initialIdleDelay > TimeSpan.FromSeconds(5) ? initialIdleDelay : TimeSpan.FromSeconds(5));
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
-                using var scope = scopeFactory.CreateScope();
-                var processor = scope.ServiceProvider.GetRequiredService<EmailDispatchProcessor>();
-                var processed = await processor.ProcessNextAsync(stoppingToken);
-
-                if (!processed)
+                bool processed;
+                using (var scope = scopeFactory.CreateScope())
                 {
-                    processed = await processor.CleanupNextExpiredDispatchAsync(stoppingToken);
+                    var processor = scope.ServiceProvider.GetRequiredService<EmailDispatchProcessor>();
+                    processed = await processor.ProcessNextAsync(stoppingToken);
+
+                    if (!processed)
+                    {
+                        processed = await processor.CleanupNextExpiredDispatchAsync(stoppingToken);
+                    }
                 }
 
-                if (!processed)
+                if (processed)
                 {
-                    await Task.Delay(options.DispatchPollIntervalMilliseconds, stoppingToken);
+                    idleBackoff.Reset();
+                }
+                else
+                {
+                    await idleBackoff.DelayAsync(stoppingToken);
                 }
 
                 consecutiveFailures = 0;
@@ -52,6 +64,7 @@ internal sealed class EmailDispatchWorker(
             }
             catch (Exception exception)
             {
+                idleBackoff.Reset();
                 consecutiveFailures++;
                 logger.LogError(
                     "Email dispatch worker loop failed. ConsecutiveFailures={ConsecutiveFailures} ExceptionType={ExceptionType}",

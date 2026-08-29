@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.BackgroundWorkers;
 using PetMagic.BuildingBlocks.Observability;
 
 namespace PetMagic.Modules.Templates.Infrastructure;
@@ -12,15 +13,25 @@ internal sealed class TemplatePushOutboxWorker(
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        var idleBackoff = new AdaptiveIdlePollBackoff();
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
-                await using var scope = scopeFactory.CreateAsyncScope();
-                var processor = scope.ServiceProvider.GetRequiredService<TemplatePushOutboxProcessor>();
-                if (!await processor.ProcessNextAsync(stoppingToken))
+                bool processed;
+                await using (var scope = scopeFactory.CreateAsyncScope())
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
+                    var processor = scope.ServiceProvider.GetRequiredService<TemplatePushOutboxProcessor>();
+                    processed = await processor.ProcessNextAsync(stoppingToken);
+                }
+
+                if (processed)
+                {
+                    idleBackoff.Reset();
+                }
+                else
+                {
+                    await idleBackoff.DelayAsync(stoppingToken);
                 }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -29,6 +40,7 @@ internal sealed class TemplatePushOutboxWorker(
             }
             catch (Exception exception)
             {
+                idleBackoff.Reset();
                 logger.LogWarning(
                     "Template push outbox worker iteration failed. ExceptionType={ExceptionType}",
                     SafeLogValues.ExceptionType(exception));

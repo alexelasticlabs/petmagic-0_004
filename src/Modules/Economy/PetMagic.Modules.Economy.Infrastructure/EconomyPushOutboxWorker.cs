@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.BackgroundWorkers;
 using PetMagic.BuildingBlocks.Observability;
 
 namespace PetMagic.Modules.Economy.Infrastructure;
@@ -13,17 +14,26 @@ internal sealed class EconomyPushOutboxWorker(
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var consecutiveFailures = 0;
+        var idleBackoff = new AdaptiveIdlePollBackoff();
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
-                using var scope = scopeFactory.CreateScope();
-                var processor = scope.ServiceProvider.GetRequiredService<EconomyPushOutboxProcessor>();
-                var processed = await processor.ProcessNextAsync(stoppingToken);
-                consecutiveFailures = 0;
-                if (!processed)
+                bool processed;
+                using (var scope = scopeFactory.CreateScope())
                 {
-                    await Task.Delay(1_000, stoppingToken);
+                    var processor = scope.ServiceProvider.GetRequiredService<EconomyPushOutboxProcessor>();
+                    processed = await processor.ProcessNextAsync(stoppingToken);
+                }
+
+                consecutiveFailures = 0;
+                if (processed)
+                {
+                    idleBackoff.Reset();
+                }
+                else
+                {
+                    await idleBackoff.DelayAsync(stoppingToken);
                 }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -32,6 +42,7 @@ internal sealed class EconomyPushOutboxWorker(
             }
             catch (Exception exception)
             {
+                idleBackoff.Reset();
                 consecutiveFailures++;
                 logger.LogWarning(
                     "Economy push outbox worker failed. ConsecutiveFailures={ConsecutiveFailures} ExceptionType={ExceptionType}",
