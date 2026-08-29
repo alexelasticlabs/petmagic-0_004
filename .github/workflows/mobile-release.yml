@@ -1,6 +1,13 @@
 name: mobile-release
 
 on:
+  push:
+    branches: [master]
+    paths:
+      # A new store build must have a unique version code. Releasing only when
+      # pubspec changes prevents duplicate internal uploads for code-only or
+      # documentation commits.
+      - apps/petmagic-mobile/pubspec.yaml
   workflow_dispatch:
     inputs:
       environment:
@@ -40,14 +47,14 @@ concurrency:
 
 jobs:
   android:
-    if: inputs.platform != 'ios'
+    if: github.event_name == 'push' || inputs.platform != 'ios'
     runs-on: [self-hosted, macOS, petmagic-mobile]
-    environment: ${{ inputs.environment || 'production' }}
+    environment: ${{ github.event_name == 'push' && 'production' || inputs.environment }}
     defaults:
       run:
         working-directory: apps/petmagic-mobile
     env:
-      RELEASE_ENVIRONMENT: ${{ inputs.environment || 'production' }}
+      RELEASE_ENVIRONMENT: ${{ github.event_name == 'push' && 'production' || inputs.environment }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
@@ -143,22 +150,22 @@ jobs:
           test -n "$firebase_app_id" && test "$firebase_app_id" != "null"
           npx --yes firebase-tools@15.22.4 crashlytics:symbols:upload --app="$firebase_app_id" "build/symbols/$RELEASE_ENVIRONMENT"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        if: inputs.retain_artifacts
+        if: github.event_name == 'push' || inputs.retain_artifacts
         with:
-          name: android-${{ inputs.environment || 'production' }}-release-${{ github.run_id }}
+          name: android-${{ github.event_name == 'push' && 'production' || inputs.environment }}-release-${{ github.run_id }}
           path: |
-            apps/petmagic-mobile/build/app/outputs/bundle/${{ inputs.environment || 'production' }}Release/app-${{ inputs.environment || 'production' }}-release.aab
-            apps/petmagic-mobile/build/symbols/${{ inputs.environment || 'production' }}
+            apps/petmagic-mobile/build/app/outputs/bundle/${{ github.event_name == 'push' && 'production' || inputs.environment }}Release/app-${{ github.event_name == 'push' && 'production' || inputs.environment }}-release.aab
+            apps/petmagic-mobile/build/symbols/${{ github.event_name == 'push' && 'production' || inputs.environment }}
           retention-days: 7
           if-no-files-found: error
       - name: Upload exact artifact to Play Internal
-        if: inputs.publish
+        if: github.event_name == 'push' || inputs.publish
         env:
-          AAB_PATH: ${{ github.workspace }}/apps/petmagic-mobile/build/app/outputs/bundle/${{ inputs.environment || 'production' }}Release/app-${{ inputs.environment || 'production' }}-release.aab
+          AAB_PATH: ${{ github.workspace }}/apps/petmagic-mobile/build/app/outputs/bundle/${{ github.event_name == 'push' && 'production' || inputs.environment }}Release/app-${{ github.event_name == 'push' && 'production' || inputs.environment }}-release.aab
           GOOGLE_PLAY_JSON_KEY_PATH: ${{ github.workspace }}/apps/petmagic-mobile/build-google-play-key.json
         run: GOOGLE_PLAY_PACKAGE_NAME="$APP_PACKAGE_NAME" bundle exec fastlane android upload_internal
       - name: Store publication skipped
-        if: ${{ !inputs.publish }}
+        if: ${{ github.event_name != 'push' && !inputs.publish }}
         run: echo 'Build completed without Play Internal upload because publish=false.'
       - name: Remove temporary Android credentials
         if: always()
@@ -171,14 +178,14 @@ jobs:
             build-google-play-key.json
 
   ios:
-    if: inputs.platform != 'android'
+    if: github.event_name == 'push' || inputs.platform != 'android'
     runs-on: [self-hosted, macOS, petmagic-mobile]
-    environment: ${{ inputs.environment || 'production' }}
+    environment: ${{ github.event_name == 'push' && 'production' || inputs.environment }}
     defaults:
       run:
         working-directory: apps/petmagic-mobile
     env:
-      RELEASE_ENVIRONMENT: ${{ inputs.environment || 'production' }}
+      RELEASE_ENVIRONMENT: ${{ github.event_name == 'push' && 'production' || inputs.environment }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
@@ -231,7 +238,7 @@ jobs:
           APP_STORE_CONNECT_KEY_P8: ${{ secrets.APP_STORE_CONNECT_KEY_P8 }}
           MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
-          MATCH_READONLY: ${{ inputs.signing_mode != 'bootstrap' }}
+          MATCH_READONLY: ${{ github.event_name == 'push' || inputs.signing_mode != 'bootstrap' }}
         run: APP_STORE_BUNDLE_ID="$APP_PACKAGE_NAME" bundle exec fastlane ios sync_signing
       - name: Build signed IPA once
         run: |
@@ -263,16 +270,16 @@ jobs:
           test -x "$upload_symbols"
           "$upload_symbols" -gsp ios/Runner/GoogleService-Info.plist -p ios build/ios/archive/Runner.xcarchive/dSYMs
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        if: inputs.retain_artifacts
+        if: github.event_name == 'push' || inputs.retain_artifacts
         with:
-          name: ios-${{ inputs.environment || 'production' }}-symbols-${{ github.run_id }}
+          name: ios-${{ github.event_name == 'push' && 'production' || inputs.environment }}-symbols-${{ github.run_id }}
           path: |
-            apps/petmagic-mobile/build/symbols/ios-${{ inputs.environment || 'production' }}
+            apps/petmagic-mobile/build/symbols/ios-${{ github.event_name == 'push' && 'production' || inputs.environment }}
             apps/petmagic-mobile/build/ios/archive/Runner.xcarchive/dSYMs
           retention-days: 7
           if-no-files-found: error
       - name: Upload exact artifact to TestFlight
-        if: inputs.publish
+        if: github.event_name == 'push' || inputs.publish
         env:
           APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
@@ -286,7 +293,7 @@ jobs:
           IPA_PATH="$IPA_PATH" APP_STORE_BUNDLE_ID="$APP_PACKAGE_NAME" \
             bundle exec fastlane ios upload_testflight
       - name: Store publication skipped
-        if: ${{ !inputs.publish }}
+        if: ${{ github.event_name != 'push' && !inputs.publish }}
         run: echo 'Build completed without TestFlight upload because publish=false.'
       - name: Remove temporary iOS Firebase configuration
         if: always()
