@@ -284,9 +284,9 @@ class _GenerationDetailsList extends StatelessWidget {
                 Expanded(
                   child: Text(
                     row.$1,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: colors.textMuted,
-                    ),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: colors.textMuted),
                   ),
                 ),
                 const SizedBox(width: 12),

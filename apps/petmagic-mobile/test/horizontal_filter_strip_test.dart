@@ -35,10 +35,7 @@ void main() {
 
       expect(tester.getTopLeft(find.byKey(firstFilter)).dx, 18);
       expect(scrollView, findsOneWidget);
-      expect(
-        tester.widget<SingleChildScrollView>(scrollView).padding,
-        isNull,
-      );
+      expect(tester.widget<SingleChildScrollView>(scrollView).padding, isNull);
       expect(
         find.descendant(of: filterStrip, matching: find.byType(ShaderMask)),
         findsNothing,
