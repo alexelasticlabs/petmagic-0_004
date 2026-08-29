@@ -916,6 +916,51 @@ void main() {
   );
 
   test(
+    'mergeFetchedGeneration keeps local media when only signed URL query changes',
+    () async {
+      final ready = generationFixture(
+        generationId: 'generation-ready',
+        status: TemplateGenerationStatus.completed,
+        outputUrl:
+            'https://cdn.petmagic.app/result.jpg?signature=new&expires=200',
+      );
+      final localRecord = GenerationGalleryMediaRecord(
+        generationId: 'generation-ready',
+        accountScope: 'user-1',
+        userId: 'user-1',
+        status: TemplateGenerationStatus.completed.name,
+        updatedAtUtc: ready.updatedAtUtc,
+        lastSyncedAtUtc: DateTime.utc(2026, 6, 14, 12, 4),
+        version: 1,
+        previewRemoteUrl:
+            'https://cdn.petmagic.app/result.jpg?signature=old&expires=100',
+        outputRemoteUrl:
+            'https://cdn.petmagic.app/result.jpg?signature=old&expires=100',
+        previewLocalPath: '/local/generation-ready-preview.jpg',
+        outputLocalPath: '/local/generation-ready-output.jpg',
+        isDownloadComplete: true,
+      );
+      final repository = FakeTemplateGenerationRepository();
+      final store = FakeGenerationGalleryStore(
+        localReadyRecords: [localRecord],
+      );
+      final harness = GenerationHistoryControllerHarness(
+        repository: repository,
+        store: store,
+      );
+      addTearDown(harness.dispose);
+
+      await harness.controller.mergeFetchedGeneration(ready);
+      await Future<void>.delayed(Duration.zero);
+
+      final item = harness.state.items.single;
+      expect(item.localPreviewPath, '/local/generation-ready-preview.jpg');
+      expect(item.localOutputPath, '/local/generation-ready-output.jpg');
+      expect(item.isLocalMediaReady, isTrue);
+    },
+  );
+
+  test(
     'mergeFetchedGeneration ignores stale local media records for changed URLs',
     () async {
       final ready = generationFixture(

@@ -111,6 +111,7 @@ extension on _GenerationsGalleryPageState {
               childAspectRatio: 0.82,
             ),
             itemBuilder: (context, index) => _ReadyGridCard(
+              key: ValueKey(filteredItems[index].generationId),
               generation: filteredItems[index],
               galleryState: this,
             ),
@@ -131,8 +132,10 @@ extension on _GenerationsGalleryPageState {
           sliver: SliverList.separated(
             itemCount: filteredItems.length,
             separatorBuilder: (context, index) => const SizedBox(height: 12),
-            itemBuilder: (context, index) =>
-                _ActiveCard(generation: filteredItems[index]),
+            itemBuilder: (context, index) => _ActiveCard(
+              key: ValueKey(filteredItems[index].generationId),
+              generation: filteredItems[index],
+            ),
           ),
         ),
         _paginationFooterSliver(state, bottomInset),
@@ -146,8 +149,10 @@ extension on _GenerationsGalleryPageState {
           sliver: SliverList.separated(
             itemCount: filteredItems.length,
             separatorBuilder: (context, index) => const SizedBox(height: 12),
-            itemBuilder: (context, index) =>
-                _FailedCard(generation: filteredItems[index]),
+            itemBuilder: (context, index) => _FailedCard(
+              key: ValueKey(filteredItems[index].generationId),
+              generation: filteredItems[index],
+            ),
           ),
         ),
         _paginationFooterSliver(state, bottomInset),
@@ -163,9 +168,15 @@ extension on _GenerationsGalleryPageState {
           itemBuilder: (context, index) {
             final generation = filteredItems[index];
             if (generation.isFailed) {
-              return _FailedCard(generation: generation);
+              return _FailedCard(
+                key: ValueKey(generation.generationId),
+                generation: generation,
+              );
             }
-            return _ActiveCard(generation: generation);
+            return _ActiveCard(
+              key: ValueKey(generation.generationId),
+              generation: generation,
+            );
           },
         ),
       ),

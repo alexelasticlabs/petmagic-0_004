@@ -212,13 +212,23 @@ final class GenerationDestination extends AppDestination {
 }
 
 final class GenerationResultInputDestination extends AppDestination {
-  const GenerationResultInputDestination(this.generationId);
+  const GenerationResultInputDestination(
+    this.generationId, {
+    this.selectedTemplateId,
+  });
 
   final String generationId;
+  final String? selectedTemplateId;
 
   @override
-  String get location =>
-      '/generation-results/${Uri.encodeComponent(generationId)}/use-input';
+  String get location {
+    final path =
+        '/generation-results/${Uri.encodeComponent(generationId)}/use-input';
+    final templateId = selectedTemplateId?.trim();
+    return templateId == null || templateId.isEmpty
+        ? path
+        : '$path?template=${Uri.encodeQueryComponent(templateId)}';
+  }
 }
 
 final class TemplatePreviewDestination extends AppDestination {

@@ -14,6 +14,7 @@ import 'package:petmagic_mobile/features/templates/application/generation_reposi
 import 'package:petmagic_mobile/features/templates/domain/generation_media_kind.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/application/template_error_key_mapper.dart';
+import 'package:petmagic_mobile/shared/files/persistent_media_url.dart';
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 
 part 'generation_history_controller_cache.part.dart';
@@ -85,6 +86,9 @@ class GenerationHistoryState {
     }
     return null;
   }
+
+  int get activeGenerationCount =>
+      items.where((item) => !item.isTerminal).length;
 
   GenerationHistoryState copyWith({
     List<TemplateGenerationResult>? items,

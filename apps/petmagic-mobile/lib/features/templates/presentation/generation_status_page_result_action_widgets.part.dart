@@ -1,251 +1,10 @@
 part of 'generation_status_page.dart';
 
-class _ReadyActionsRow extends StatelessWidget {
-  const _ReadyActionsRow({
-    required this.onGenerateSimilar,
-    required this.onUseAsInput,
-    required this.onSave,
-    required this.onShare,
-    required this.hasWatermark,
-    required this.isWatermarkRemoved,
-    required this.canRemoveWatermark,
-    required this.removeWatermarkCostCredits,
-    required this.isRemovingWatermark,
-    required this.isGeneratingSimilar,
-    required this.onUpgrade,
-    this.watermarkMessage,
-    this.onRemoveWatermark,
-  });
-
-  final VoidCallback? onGenerateSimilar;
-  final VoidCallback? onUseAsInput;
-  final VoidCallback? onSave;
-  final VoidCallback? onShare;
-  final bool hasWatermark;
-  final bool isWatermarkRemoved;
-  final bool canRemoveWatermark;
-  final int removeWatermarkCostCredits;
-  final bool isRemovingWatermark;
-  final bool isGeneratingSimilar;
-  final String? watermarkMessage;
-  final VoidCallback? onRemoveWatermark;
-  final VoidCallback onUpgrade;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = AppLocalizations.of(context);
-    final colors = context.petMagicColors;
-    final message = watermarkMessage?.trim();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (message != null && message.isNotEmpty) ...[
-          DecoratedBox(
-            decoration: BoxDecoration(
-              color: colors.surfaceStrong.withValues(alpha: 0.78),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: colors.border.withValues(alpha: 0.75)),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              child: Row(
-                children: [
-                  Icon(
-                    isWatermarkRemoved
-                        ? Icons.verified_rounded
-                        : Icons.auto_awesome_motion_rounded,
-                    size: 18,
-                    color: colors.accent,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      isWatermarkRemoved
-                          ? text.generationStatusWatermarkRemoved
-                          : hasWatermark
-                          ? text.generationStatusWatermarkAddedFreePlan
-                          : message,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: colors.textSoft,
-                        height: 1.25,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-        ],
-        Row(
-          children: [
-            Expanded(
-              child: FilledButton.icon(
-                onPressed: isGeneratingSimilar ? null : onGenerateSimilar,
-                icon: const Icon(Icons.auto_awesome_rounded, size: 18),
-                label: Text(
-                  isGeneratingSimilar
-                      ? _similarLoadingLabel(text)
-                      : _similarActionLabel(text),
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: onUseAsInput,
-                icon: const Icon(Icons.add_photo_alternate_rounded, size: 18),
-                label: Text(_useAsInputLabel(text)),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: FilledButton.icon(
-                onPressed: onShare,
-                icon: const Icon(Icons.share_rounded, size: 18),
-                label: Text(
-                  hasWatermark
-                      ? text.generationStatusShareWithWatermark
-                      : text.supportChatShareAction,
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: onSave,
-                icon: const Icon(Icons.download_rounded, size: 18),
-                label: Text(
-                  isWatermarkRemoved
-                      ? text.generationStatusDownloadWithoutWatermark
-                      : hasWatermark
-                      ? text.generationStatusSaveWithWatermark
-                      : text.generationStatusDownloadAction,
-                ),
-              ),
-            ),
-          ],
-        ),
-        if (canRemoveWatermark) ...[
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: isRemovingWatermark ? null : onRemoveWatermark,
-                  icon: const Icon(Icons.cleaning_services_rounded, size: 18),
-                  label: Text(
-                    isRemovingWatermark
-                        ? text.generationStatusRemovingWatermark
-                        : text.generationStatusRemoveWatermark,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: onUpgrade,
-                  icon: const Icon(Icons.workspace_premium_rounded, size: 18),
-                  label: Text(text.generationStatusUpgradePremium),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-class _ResultInputActions extends StatelessWidget {
-  const _ResultInputActions({
-    required this.onCreateVideo,
-    required this.onUseAsInput,
-    required this.hasWatermark,
-    required this.isWatermarkRemoved,
-    this.watermarkMessage,
-  });
-
-  final VoidCallback? onCreateVideo;
-  final VoidCallback? onUseAsInput;
-  final bool hasWatermark;
-  final bool isWatermarkRemoved;
-  final String? watermarkMessage;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = AppLocalizations.of(context);
-    final colors = context.petMagicColors;
-    final message = watermarkMessage?.trim();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (message != null && message.isNotEmpty) ...[
-          DecoratedBox(
-            decoration: BoxDecoration(
-              color: colors.surfaceStrong.withValues(alpha: 0.78),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: colors.border.withValues(alpha: 0.75)),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              child: Row(
-                children: [
-                  Icon(
-                    isWatermarkRemoved
-                        ? Icons.verified_rounded
-                        : Icons.auto_awesome_motion_rounded,
-                    size: 18,
-                    color: colors.accent,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      isWatermarkRemoved
-                          ? text.generationStatusWatermarkRemoved
-                          : hasWatermark
-                          ? text.generationStatusWatermarkAddedFreePlan
-                          : message,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: colors.textSoft,
-                        height: 1.25,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-        ],
-        FilledButton.icon(
-          onPressed: onCreateVideo,
-          icon: const Icon(Icons.movie_creation_rounded, size: 18),
-          label: Text(text.generationStatusCreateVideoFromResultAction),
-        ),
-        const SizedBox(height: 8),
-        OutlinedButton.icon(
-          onPressed: onUseAsInput,
-          icon: const Icon(Icons.add_photo_alternate_rounded, size: 18),
-          label: Text(_useAsInputLabel(text)),
-        ),
-      ],
-    );
-  }
-}
-
 String _similarActionLabel(AppLocalizations text) =>
     text.generationStatusGenerateSimilarAction;
 
 String _similarLoadingLabel(AppLocalizations text) =>
     text.generationStatusGenerateSimilarLoading;
-
-String _useAsInputLabel(AppLocalizations text) =>
-    text.generationStatusUseAsInputAction;
 
 class _FailedActions extends StatelessWidget {
   const _FailedActions({
@@ -338,7 +97,52 @@ class _ActiveActions extends StatelessWidget {
       children: [
         FilledButton(
           onPressed: onContinue,
+          style: FilledButton.styleFrom(
+            minimumSize: const Size.fromHeight(56),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(17),
+            ),
+          ),
           child: Text(text.generationStatusContinueInAppAction),
+        ),
+      ],
+    );
+  }
+}
+
+class _ActiveSecondaryActions extends StatelessWidget {
+  const _ActiveSecondaryActions({
+    required this.onDetails,
+    required this.onSupport,
+  });
+
+  final VoidCallback onDetails;
+  final VoidCallback onSupport;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
+    return Wrap(
+      alignment: WrapAlignment.center,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        TextButton(
+          onPressed: onDetails,
+          style: TextButton.styleFrom(foregroundColor: colors.textMuted),
+          child: Text(text.generationStatusTechnicalDetailsAction),
+        ),
+        Container(
+          height: 22,
+          width: 1,
+          margin: const EdgeInsets.symmetric(horizontal: 2),
+          color: colors.border.withValues(alpha: 0.72),
+        ),
+        TextButton.icon(
+          onPressed: onSupport,
+          style: TextButton.styleFrom(foregroundColor: colors.textMuted),
+          icon: const Icon(Icons.headset_mic_outlined, size: 17),
+          label: Text(text.generationStatusSupportShortAction),
         ),
       ],
     );

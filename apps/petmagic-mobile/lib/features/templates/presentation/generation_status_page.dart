@@ -51,6 +51,7 @@ part 'generation_status_page_actions_sheet.part.dart';
 part 'generation_status_page_result_actions.part.dart';
 part 'generation_status_page_result_action_copy.part.dart';
 part 'generation_status_page_result_cards.part.dart';
+part 'generation_status_page_recommendations.part.dart';
 part 'generation_status_page_result_action_widgets.part.dart';
 part 'generation_status_page_result_details.part.dart';
 part 'generation_status_page_sections.dart';
@@ -167,7 +168,10 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
   String? _errorMessage;
   bool _isPollInFlight = false;
   bool _isPageActive = true;
+  CompatibleGenerationTemplates? _compatibleTemplates;
+  bool _isLoadingCompatibleTemplates = false;
   RequestCancellation? _activeLoadCancelToken;
+  RequestCancellation? _activeCompatibleTemplatesCancelToken;
   RequestCancellation? _activeMediaActionCancelToken;
   RequestCancellation? _activeGenerationCancelToken;
   RealtimeClient? _activeRealtimeClient;
@@ -219,6 +223,7 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
       _pauseRealtime();
       _stopPolling();
       _cancelActiveLoad();
+      _cancelActiveCompatibleTemplatesLoad();
       _cancelActiveLocalMediaDownloads();
       return;
     }
@@ -239,6 +244,7 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
     _isPageActive = false;
     _pauseRealtime();
     _stopPolling();
+    _cancelActiveCompatibleTemplatesLoad();
     _cancelActiveLocalMediaDownloads();
   }
 
@@ -251,6 +257,7 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
     _pauseRealtime();
     _stopPolling();
     _cancelActiveLoad();
+    _cancelActiveCompatibleTemplatesLoad();
     _cancelActiveMediaAction();
     _cancelActiveGenerationCancel();
     _cancelActiveLocalMediaDownloads();
@@ -263,6 +270,7 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
     _pauseRealtime();
     _stopPolling();
     _cancelActiveLoad();
+    _cancelActiveCompatibleTemplatesLoad();
     _cancelActiveMediaAction();
     _cancelActiveGenerationCancel();
     _cancelActiveLocalMediaDownloads();
@@ -315,11 +323,14 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
       _pauseRealtime();
       _stopPolling();
       _cancelActiveLoad();
+      _cancelActiveCompatibleTemplatesLoad();
       _cancelActiveMediaAction();
       _cancelActiveGenerationCancel();
       _cancelActiveLocalMediaDownloads();
       _setPageState(() {
         _generation = null;
+        _compatibleTemplates = null;
+        _isLoadingCompatibleTemplates = false;
         _isLoading = false;
         _isSubmittingFeedback = false;
         _isDeleting = false;

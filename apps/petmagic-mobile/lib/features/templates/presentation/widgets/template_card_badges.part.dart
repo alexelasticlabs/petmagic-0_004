@@ -237,7 +237,7 @@ class _TokenChip extends StatelessWidget {
             Color.fromRGBO(53, 41, 12, 0.52),
           ],
         ),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(11),
         border: Border.all(color: const Color.fromRGBO(255, 216, 123, 0.22)),
         boxShadow: [
           BoxShadow(
@@ -248,19 +248,19 @@ class _TokenChip extends StatelessWidget {
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             if (!isFree) ...[
-              const PawSparkIcon(size: 15),
-              const SizedBox(width: 5),
+              const PawSparkIcon(size: 13),
+              const SizedBox(width: 4),
             ],
             Text(
               isFree ? text.freeLabel : '$cost ${text.walletBalanceUnit}',
               style: textStyle?.copyWith(
                 color: Colors.white,
-                fontSize: 12,
+                fontSize: 11,
                 fontWeight: FontWeight.w700,
               ),
             ),

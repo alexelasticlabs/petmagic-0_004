@@ -134,6 +134,10 @@ void main() {
     expect(source, contains('_buildFeaturedTemplateGridEntry('));
     expect(source, contains('.read(templatesControllerProvider.notifier)'));
     expect(source, contains('.loadMore();'));
+    expect(source, contains('_scrollIdleVelocityResetDelay'));
+    expect(source, contains('updateScrollVelocity(0)'));
+    expect(source, contains('unawaited(PetMagicHaptics.medium())'));
+    expect(source, contains('await _refreshFeed(forceRefresh: true)'));
     expect(source, isNot(contains('_templatesController.loadMore()')));
     expect(source, isNot(contains('GridView.count(')));
     expect(source, isNot(contains('children: state.items.map')));
@@ -310,6 +314,14 @@ void main() {
     expect(source, contains('await controller.setVolume(0);'));
     expect(source, contains('await controller.setLooping(true);'));
     expect(source, contains('TemplateMediaCache.fetchThumbnailFile'));
+    expect(
+      mediaSource.indexOf('if (imageUrl != null)'),
+      lessThan(mediaSource.indexOf('if (showVideo)')),
+      reason:
+          'The thumbnail must stay mounted below VideoPlayer so playback grant '
+          'changes do not restart file lookup and image decoding.',
+    );
+    expect(mediaSource, isNot(contains('else if (imageUrl != null)')));
   });
 
   test('template media caches use bounded object counts and app TTL', () async {

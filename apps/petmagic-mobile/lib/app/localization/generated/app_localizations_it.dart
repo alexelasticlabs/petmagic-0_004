@@ -3565,6 +3565,26 @@ class AppLocalizationsIt extends AppLocalizations {
   String get generationStatusTitle => 'Stato generazione';
 
   @override
+  String get generationStatusActiveTitle => 'Creazione della magia';
+
+  @override
+  String get generationStatusActiveProgressTitle =>
+      'Stiamo creando la tua magia…';
+
+  @override
+  String get generationStatusPhotoReceived => 'Foto ricevuta';
+
+  @override
+  String get generationStatusCreatingImage => 'Stiamo creando la tua immagine';
+
+  @override
+  String get generationStatusBackgroundTitle =>
+      'La generazione continuerà in background';
+
+  @override
+  String get generationStatusTechnicalDetailsAction => 'Dettagli tecnici';
+
+  @override
   String get generationStatusCreatedLabel => 'Creato';
 
   @override
@@ -3613,23 +3633,25 @@ class AppLocalizationsIt extends AppLocalizations {
   String get generationStatusContactSupportAction => 'Contatta supporto';
 
   @override
-  String get generationStatusSupportShortAction => 'Support';
+  String get generationStatusSupportShortAction => 'Supporto';
 
   @override
-  String get generationStatusActionsTitle => 'Actions';
+  String get generationStatusActionsTitle => 'Azioni';
 
   @override
-  String get generationStatusActionsSubtitle => 'What would you like to do?';
+  String get generationStatusActionsSubtitle => 'Cosa desideri fare?';
 
   @override
   String get generationStatusRetryActionSubtitle =>
-      'Repeat the current generation';
+      'Ripeti la generazione corrente';
 
   @override
-  String get generationStatusPickAnotherPhotoSubtitle => 'Use a new image';
+  String get generationStatusPickAnotherPhotoSubtitle =>
+      'Usa una nuova immagine';
 
   @override
-  String get generationStatusContactSupportSubtitle => 'If the problem repeats';
+  String get generationStatusContactSupportSubtitle =>
+      'Se il problema si ripete';
 
   @override
   String get generationStatusOpenGalleryAction => 'Apri galleria';
@@ -3704,7 +3726,7 @@ class AppLocalizationsIt extends AppLocalizations {
   String get generationStatusFailedTitle => 'Impossibile creare il risultato';
 
   @override
-  String get generationStatusTechnicalError => 'Technical error';
+  String get generationStatusTechnicalError => 'Errore tecnico';
 
   @override
   String get generationStatusTokensRefundedHint =>
@@ -4387,6 +4409,20 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get generationStatusCompareAction => 'Confronta';
+
+  @override
+  String get generationStatusCompareWithOriginalAction =>
+      'Confronta con l\'originale';
+
+  @override
+  String get generationStatusContinueWithResultTitle =>
+      'Continua con questo risultato';
+
+  @override
+  String get generationStatusTryTemplateAction => 'Prova';
+
+  @override
+  String get generationStatusAllTemplatesAction => 'Tutti i modelli';
 
   @override
   String get generationStatusCompareBeforeLabel => 'Prima';

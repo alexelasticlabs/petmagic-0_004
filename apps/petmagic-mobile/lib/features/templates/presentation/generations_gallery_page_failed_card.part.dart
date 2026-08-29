@@ -1,7 +1,7 @@
 part of 'generations_gallery_page.dart';
 
 class _FailedCard extends ConsumerWidget {
-  const _FailedCard({required this.generation});
+  const _FailedCard({super.key, required this.generation});
 
   final TemplateGenerationResult generation;
 
@@ -99,8 +99,10 @@ class _FailedCard extends ConsumerWidget {
                                             _generationGalleryThumbnailCacheWidth,
                                         filterQuality: FilterQuality.medium,
                                         fadeInDuration: Duration.zero,
+                                        fadeOutDuration: Duration.zero,
                                         placeholderFadeInDuration:
                                             Duration.zero,
+                                        useOldImageOnUrlChange: true,
                                         placeholder: (context, url) =>
                                             _ThumbnailPlaceholder(
                                               generation: generation,

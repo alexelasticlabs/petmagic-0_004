@@ -4,25 +4,31 @@ mixin _WalletControllerLoading
     on _WalletControllerBase, _WalletControllerLifecycle {
   @override
   Future<void> load({bool refresh = false}) async {
-    final inFlight = _loadInFlight;
-    if (inFlight != null) {
-      await inFlight;
-      return;
-    }
-
-    final loadRequestCancellation = _startLoadRequestCancellation();
-    final operation = _performLoad(
-      refresh: refresh,
-      cancelToken: loadRequestCancellation,
-    );
-    _loadInFlight = operation;
-    try {
-      await operation;
-    } finally {
-      if (identical(_loadInFlight, operation)) {
-        _loadInFlight = null;
+    while (true) {
+      final inFlight = _loadInFlight;
+      if (inFlight != null) {
+        await inFlight;
+        if (!refresh) {
+          return;
+        }
+        continue;
       }
-      _clearActiveLoad(loadRequestCancellation);
+
+      final loadRequestCancellation = _startLoadRequestCancellation();
+      final operation = _performLoad(
+        refresh: refresh,
+        cancelToken: loadRequestCancellation,
+      );
+      _loadInFlight = operation;
+      try {
+        await operation;
+      } finally {
+        if (identical(_loadInFlight, operation)) {
+          _loadInFlight = null;
+        }
+        _clearActiveLoad(loadRequestCancellation);
+      }
+      return;
     }
   }
 
@@ -260,9 +266,21 @@ mixin _WalletControllerLoading
 
   @override
   Future<void> _syncWalletSnapshot({bool forceRefresh = false}) async {
-    if (_isWalletSyncInFlight ||
-        _loadInFlight != null ||
-        state.isLoadingMoreLedger) {
+    final loadInFlight = _loadInFlight;
+    if (loadInFlight != null) {
+      await loadInFlight;
+      if (forceRefresh && ref.mounted) {
+        await _syncWalletSnapshot(forceRefresh: true);
+      }
+      return;
+    }
+
+    if (_isWalletSyncInFlight) {
+      _walletSyncForceRefreshQueued |= forceRefresh;
+      return;
+    }
+
+    if (state.isLoadingMoreLedger) {
       return;
     }
     if (!forceRefresh &&
@@ -342,6 +360,10 @@ mixin _WalletControllerLoading
     } finally {
       _isWalletSyncInFlight = false;
       _clearActiveWalletSync(syncRequestCancellation);
+      if (_walletSyncForceRefreshQueued && ref.mounted) {
+        _walletSyncForceRefreshQueued = false;
+        unawaited(_syncWalletSnapshot(forceRefresh: true));
+      }
     }
   }
 }

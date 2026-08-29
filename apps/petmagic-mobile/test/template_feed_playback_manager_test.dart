@@ -126,6 +126,32 @@ void main() {
     );
   });
 
+  test('video preview grants recover when fast scrolling becomes idle', () {
+    final manager = TemplateFeedPlaybackManager()
+      ..configure(feedKind: TemplateFeedKind.videoOnly)
+      ..updateScrollVelocity(
+        TemplateFeedPlaybackManager.defaultFastScrollVelocityThreshold + 100,
+      )
+      ..updateCardVisibility(
+        cardId: 'card-idle-recovery',
+        templateId: 'template-idle-recovery',
+        isVideoTemplate: true,
+        hasAnimatedPreview: false,
+        visibleFraction: 1,
+      );
+
+    expect(manager.activeVideoControllersCount, 0);
+
+    manager.updateScrollVelocity(0);
+
+    expect(manager.currentVideoPreviewBudget, 3);
+    expect(manager.activeVideoControllersCount, 1);
+    expect(
+      manager.snapshotFor('card-idle-recovery').displayLevel,
+      TemplateFeedDisplayLevel.videoPreview,
+    );
+  });
+
   test(
     'data saver disables video preview while slow video feed stays light',
     () {

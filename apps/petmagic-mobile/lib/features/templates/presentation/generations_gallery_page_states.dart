@@ -319,41 +319,6 @@ class _OfflineCacheBanner extends ConsumerWidget {
   }
 }
 
-class _TypeBadge extends StatelessWidget {
-  const _TypeBadge({required this.generation});
-
-  final TemplateGenerationResult generation;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = AppLocalizations.of(context);
-    final colors = context.petMagicColors;
-    final isVideo = isVideoGeneration(generation);
-    final background = isVideo
-        ? colors.purple.withValues(alpha: 0.78)
-        : colors.blue.withValues(alpha: 0.78);
-    final foreground = colors.on(background);
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        child: Text(
-          isVideo ? text.videoLabel : text.imageLabel,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: foreground,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0.1,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _DurationBadge extends StatelessWidget {
   const _DurationBadge({required this.seconds});
 

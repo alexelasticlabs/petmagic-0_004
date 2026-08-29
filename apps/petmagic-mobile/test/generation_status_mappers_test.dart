@@ -188,6 +188,17 @@ void main() {
         ),
         text.generationStatusEtaStartsSoon,
       );
+      expect(
+        etaLabel(
+          text,
+          _generation(
+            status: TemplateGenerationStatus.queued,
+            queuePosition: 1,
+            estimatedWaitSeconds: 0,
+          ),
+        ),
+        text.generationStatusEtaStartsSoon,
+      );
     });
 
     test('photo failures are identified without changing generic retry', () {

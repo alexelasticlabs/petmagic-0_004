@@ -268,7 +268,11 @@ extension _TemplatesPageGenerationFlow on _TemplatesPageState {
     await ref
         .read(templateGenerationRepositoryProvider)
         .rememberActiveGeneration(generationId: generation.generationId);
-    ref.invalidate(walletControllerProvider);
+    unawaited(
+      ref
+          .read(walletControllerProvider.notifier)
+          .syncSnapshot(forceRefresh: true),
+    );
     if (!mounted) {
       return;
     }

@@ -1,212 +1,135 @@
 part of 'generation_status_page.dart';
 
 class _ActiveGenerationCard extends StatelessWidget {
-  const _ActiveGenerationCard({required this.generation});
+  const _ActiveGenerationCard({
+    required this.generation,
+    required this.isConnectionLost,
+  });
 
   final TemplateGenerationResult generation;
+  final bool isConnectionLost;
 
   @override
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
-    final progress = generation.effectiveProgressPercent.clamp(0, 100);
-    final progressValue = progress / 100;
-    final statusColor = generationStatusColor(colors, generation);
+    final serverProgress = generation.progressPercent?.clamp(0, 100).toInt();
+    final progressValue = serverProgress == null
+        ? _stageProgressValue(generation)
+        : serverProgress / 100;
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            colors.surfaceGlass.withValues(alpha: 0.98),
-            colors.surfaceStrong.withValues(alpha: 0.86),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: colors.border.withValues(alpha: 0.76)),
-        boxShadow: [
-          BoxShadow(
-            color: colors.shadow.withValues(alpha: 0.34),
-            blurRadius: 24,
-            offset: const Offset(0, 14),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Center(child: _ActivePreviewFrame(generation: generation)),
+        const SizedBox(height: 2),
+        Text(
+          generation.templateTitle ?? text.generationStatusResultTitle,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+            color: colors.textStrong,
+            fontWeight: FontWeight.w900,
+            height: 1.08,
           ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      colors.gold.withValues(alpha: 0.07),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
+        ),
+        const SizedBox(height: 10),
+        Center(
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            alignment: WrapAlignment.center,
+            children: [
+              _MetaPill(
+                icon: isVideoGeneration(generation)
+                    ? Icons.movie_creation_rounded
+                    : Icons.image_rounded,
+                label: typeLabel(text, generation),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _ActivePreviewFrame(generation: generation),
-                      const SizedBox(width: 13),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _StatusBadge(
-                              label: statusTitle(text, generation),
-                              icon: generationStatusIcon(generation),
-                              color: statusColor,
-                            ),
-                            const SizedBox(height: 10),
-                            Text(
-                              generation.templateTitle ??
-                                  text.generationStatusResultTitle,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.titleMedium
-                                  ?.copyWith(
-                                    color: colors.textStrong,
-                                    fontWeight: FontWeight.w900,
-                                    height: 1.12,
-                                  ),
-                            ),
-                            const SizedBox(height: 8),
-                            Wrap(
-                              spacing: 7,
-                              runSpacing: 7,
-                              children: [
-                                _MetaPill(
-                                  icon: isVideoGeneration(generation)
-                                      ? Icons.movie_creation_rounded
-                                      : Icons.image_rounded,
-                                  label: typeLabel(text, generation),
-                                ),
-                                _MetaPill(
-                                  icon: Icons.bolt_rounded,
-                                  label:
-                                      '${generation.tokenCost} ${text.walletBalanceUnit}',
-                                  color: colors.gold,
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 18),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        '$progress%',
-                        style: Theme.of(context).textTheme.headlineMedium
+              _MetaPill(
+                icon: Icons.bolt_rounded,
+                label: '${generation.tokenCost} ${text.walletBalanceUnit}',
+                color: colors.accent,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: colors.surfaceStrong.withValues(alpha: 0.68),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: colors.border.withValues(alpha: 0.7)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        text.generationStatusActiveProgressTitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleMedium
                             ?.copyWith(
                               color: colors.textStrong,
-                              fontWeight: FontWeight.w900,
-                              height: 1,
+                              fontWeight: FontWeight.w800,
                             ),
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.only(bottom: 3),
-                          child: Text(
-                            etaLabel(text, generation),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.right,
-                            style: Theme.of(context).textTheme.labelLarge
-                                ?.copyWith(
-                                  color: colors.textSoft,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                          ),
-                        ),
+                    ),
+                    if (serverProgress != null) ...[
+                      const SizedBox(width: 12),
+                      Text(
+                        '$serverProgress%',
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(
+                              color: colors.accent,
+                              fontWeight: FontWeight.w900,
+                            ),
                       ),
                     ],
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _GenerationProgressBar(value: progressValue),
+                const SizedBox(height: 10),
+                Text(
+                  etaLabel(text, generation),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: colors.textSoft,
+                    height: 1.3,
+                    fontWeight: FontWeight.w600,
                   ),
-                  const SizedBox(height: 10),
-                  _PremiumProgressBar(value: progressValue, color: statusColor),
-                  if (!generation.isTerminal &&
-                      isVideoGeneration(generation)) ...[
-                    const SizedBox(height: 12),
-                    Text(
-                      text.generationStatusQueuedVideoHint,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: colors.textSoft,
-                        height: 1.35,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                  if (_shouldShowPremiumPriorityHint(generation)) ...[
-                    const SizedBox(height: 10),
-                    Text(
-                      text.templateFlowGenerationWaitTooLongPremiumHint,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: colors.gold,
-                        height: 1.35,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 18),
-                  _StageTimeline(generation: generation),
-                  const SizedBox(height: 16),
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: colors.surfaceStrong.withValues(alpha: 0.56),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: colors.gold.withValues(alpha: 0.22),
-                      ),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Icon(
-                            Icons.cloud_done_outlined,
-                            color: colors.gold,
-                            size: 19,
-                          ),
-                          const SizedBox(width: 9),
-                          Expanded(
-                            child: Text(
-                              text.generationStatusBackgroundHint,
-                              style: Theme.of(context).textTheme.bodySmall
-                                  ?.copyWith(
-                                    color: colors.textSoft,
-                                    height: 1.35,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                            ),
-                          ),
-                        ],
-                      ),
+                ),
+                if (isVideoGeneration(generation)) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    text.generationStatusQueuedVideoHint,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: colors.textMuted,
+                      height: 1.3,
                     ),
                   ),
                 ],
-              ),
+                const SizedBox(height: 20),
+                _StageTimeline(generation: generation),
+                if (isConnectionLost) ...[
+                  const SizedBox(height: 16),
+                  _ConnectionLostHint(),
+                ],
+                const SizedBox(height: 16),
+                _BackgroundGenerationHint(),
+              ],
             ),
-          ],
+          ),
         ),
-      ),
+      ],
     );
   }
 }
@@ -222,78 +145,77 @@ class _ActivePreviewFrame extends StatelessWidget {
     final colors = context.petMagicColors;
     final previewUrl = _activePreviewUrl(generation);
     final localPreviewFile = _localMediaFile(generation.localPreviewPath);
-    const size = 104.0;
+    const size = 176.0;
 
     return SizedBox(
-      width: size,
-      height: size,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: colors.gold.withValues(alpha: 0.32)),
-          boxShadow: [
-            BoxShadow(
-              color: colors.shadow.withValues(alpha: 0.30),
-              blurRadius: 18,
-              offset: const Offset(0, 9),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(21),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              if (localPreviewFile != null)
-                Image.file(
-                  localPreviewFile,
-                  fit: BoxFit.cover,
-                  cacheWidth: 320,
-                  filterQuality: FilterQuality.medium,
-                )
-              else if (previewUrl != null)
-                CachedNetworkImage(
-                  imageUrl: previewUrl,
-                  cacheKey: persistentSafeGenerationMediaUrl(previewUrl),
-                  fit: BoxFit.cover,
-                  memCacheWidth: 320,
-                  maxWidthDiskCache: 320,
-                  filterQuality: FilterQuality.medium,
-                  errorWidget: (context, url, error) =>
-                      _ActivePreviewPlaceholder(label: text.imageLabel),
-                )
-              else
-                _ActivePreviewPlaceholder(label: typeLabel(text, generation)),
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                height: 46,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.transparent,
-                        Colors.black.withValues(alpha: 0.62),
-                      ],
+      width: 212,
+      height: 198,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          const _MagicSparkle(top: 12, left: 23, size: 14, opacity: 0.64),
+          const _MagicSparkle(top: 35, right: 8, size: 9, opacity: 0.42),
+          const _MagicSparkle(bottom: 24, left: 7, size: 10, opacity: 0.46),
+          const _MagicSparkle(bottom: 5, right: 25, size: 15, opacity: 0.56),
+          Center(
+            child: SizedBox(
+              width: size,
+              height: size,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: colors.accent.withValues(alpha: 0.74),
+                    width: 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: colors.accent.withValues(alpha: 0.20),
+                      blurRadius: 24,
+                      spreadRadius: 3,
                     ),
+                    BoxShadow(
+                      color: colors.shadow.withValues(alpha: 0.34),
+                      blurRadius: 18,
+                      offset: const Offset(0, 9),
+                    ),
+                  ],
+                ),
+                child: ClipOval(
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      if (localPreviewFile != null)
+                        Image.file(
+                          localPreviewFile,
+                          fit: BoxFit.cover,
+                          cacheWidth: 512,
+                          filterQuality: FilterQuality.medium,
+                        )
+                      else if (previewUrl != null)
+                        CachedNetworkImage(
+                          imageUrl: previewUrl,
+                          cacheKey: persistentSafeGenerationMediaUrl(
+                            previewUrl,
+                          ),
+                          fit: BoxFit.cover,
+                          memCacheWidth: 512,
+                          maxWidthDiskCache: 512,
+                          filterQuality: FilterQuality.medium,
+                          errorWidget: (context, url, error) =>
+                              _ActivePreviewPlaceholder(label: text.imageLabel),
+                        )
+                      else
+                        _ActivePreviewPlaceholder(
+                          label: typeLabel(text, generation),
+                        ),
+                    ],
                   ),
                 ),
               ),
-              Positioned(
-                left: 9,
-                bottom: 8,
-                child: Icon(
-                  Icons.auto_awesome_rounded,
-                  color: colors.gold,
-                  size: 18,
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -315,7 +237,7 @@ class _ActivePreviewPlaceholder extends StatelessWidget {
           colors: [
             colors.surfaceStrong,
             colors.surfaceStrong.withValues(alpha: 0.68),
-            colors.gold.withValues(alpha: 0.12),
+            colors.accent.withValues(alpha: 0.12),
           ],
         ),
       ),
@@ -323,7 +245,7 @@ class _ActivePreviewPlaceholder extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.pets_rounded, color: colors.gold, size: 28),
+            Icon(Icons.pets_rounded, color: colors.accent, size: 32),
             const SizedBox(height: 6),
             Text(
               label,
@@ -332,6 +254,110 @@ class _ActivePreviewPlaceholder extends StatelessWidget {
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
                 color: colors.textSoft,
                 fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MagicSparkle extends StatelessWidget {
+  const _MagicSparkle({
+    required this.size,
+    required this.opacity,
+    this.top,
+    this.right,
+    this.bottom,
+    this.left,
+  });
+
+  final double size;
+  final double opacity;
+  final double? top;
+  final double? right;
+  final double? bottom;
+  final double? left;
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      top: top,
+      right: right,
+      bottom: bottom,
+      left: left,
+      child: Icon(
+        Icons.auto_awesome_rounded,
+        color: context.petMagicColors.accent.withValues(alpha: opacity),
+        size: size,
+      ),
+    );
+  }
+}
+
+class _ConnectionLostHint extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    final text = AppLocalizations.of(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(Icons.cloud_off_outlined, color: colors.textMuted, size: 18),
+        const SizedBox(width: 9),
+        Expanded(
+          child: Text(
+            text.globalOfflineBannerMessage,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: colors.textMuted,
+              height: 1.3,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _BackgroundGenerationHint extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    final text = AppLocalizations.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.surface.withValues(alpha: 0.48),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colors.border.withValues(alpha: 0.58)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.cloud_done_outlined, color: colors.accent, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    text.generationStatusBackgroundTitle,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: colors.textStrong,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    text.generationStatusActiveInfoHint,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: colors.textSoft,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -421,16 +447,6 @@ class _QueuedCancelAction extends StatelessWidget {
       ),
     );
   }
-}
-
-bool _shouldShowPremiumPriorityHint(TemplateGenerationResult generation) {
-  if (generation.isTerminal) {
-    return false;
-  }
-
-  final tier = generation.tier?.trim().toLowerCase();
-  final plan = generation.userPlan.trim().toLowerCase();
-  return tier == 'free' || (tier == null && plan == 'free');
 }
 
 String? _activePreviewUrl(TemplateGenerationResult generation) {

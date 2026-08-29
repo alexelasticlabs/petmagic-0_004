@@ -83,6 +83,9 @@ class TemplatesPage extends ConsumerStatefulWidget {
 class _TemplatesPageState extends ConsumerState<TemplatesPage> {
   static const _refreshCooldown = Duration(seconds: 45);
   static const _gridCacheExtent = 400.0;
+  static const _scrollIdleVelocityResetDelay = Duration(milliseconds: 140);
+  static const _randomButtonSpacing = 24.0;
+  static const _randomButtonActiveGenerationSpacing = 72.0;
 
   final _scrollController = ScrollController();
   final _searchController = TextEditingController();
@@ -91,6 +94,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
   ProviderSubscription<TemplatesState>? _templatesSubscription;
   TemplatesRepository? _activeRandomTemplateRepository;
   Timer? _searchDebounce;
+  Timer? _scrollIdleTimer;
   DateTime? _lastRefreshAt;
   bool _disposed = false;
   bool _isRandomTemplateLoading = false;
@@ -147,6 +151,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
     _setStoredTemplatesScreenVisible(false);
     WidgetsBinding.instance.removeObserver(_lifecycleObserver);
     _cancelPendingSearchDebounce();
+    _scrollIdleTimer?.cancel();
     _cancelPendingRandomTemplateRequest(clearLoadingState: false);
     _scrollController.dispose();
     _searchController.dispose();

@@ -260,10 +260,7 @@ extension _GenerationStatusPageMediaActions on _GenerationStatusPageState {
       return;
     }
 
-    await _recordCompareAnalytics(generation, 'compare_clicked');
-    if (!mounted) {
-      return;
-    }
+    unawaited(_recordCompareAnalytics(generation, 'compare_clicked'));
 
     await Navigator.of(context).push(
       MaterialPageRoute<void>(

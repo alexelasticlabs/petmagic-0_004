@@ -214,6 +214,7 @@ abstract class _WalletControllerBase extends Notifier<WalletState> {
   RequestCancellation? _activeCheckoutRequestCancellation;
   RequestCancellation? _activeCheckoutVerificationRequestCancellation;
   bool _isWalletSyncInFlight = false;
+  bool _walletSyncForceRefreshQueued = false;
   bool _walletLifecycleStarted = false;
   bool _isWalletPageVisible = false;
   void Function()? _appLifecycleListener;

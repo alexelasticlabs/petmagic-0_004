@@ -3519,6 +3519,24 @@ class AppLocalizationsRu extends AppLocalizations {
   String get generationStatusTitle => 'Статус генерации';
 
   @override
+  String get generationStatusActiveTitle => 'Создание волшебства';
+
+  @override
+  String get generationStatusActiveProgressTitle => 'Создаём вашу магию…';
+
+  @override
+  String get generationStatusPhotoReceived => 'Фото получено';
+
+  @override
+  String get generationStatusCreatingImage => 'Создаём образ';
+
+  @override
+  String get generationStatusBackgroundTitle => 'Генерация продолжится в фоне';
+
+  @override
+  String get generationStatusTechnicalDetailsAction => 'Технические детали';
+
+  @override
   String get generationStatusCreatedLabel => 'Создано';
 
   @override
@@ -4336,6 +4354,20 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get generationStatusCompareAction => 'Сравнить';
+
+  @override
+  String get generationStatusCompareWithOriginalAction =>
+      'Сравнить с оригиналом';
+
+  @override
+  String get generationStatusContinueWithResultTitle =>
+      'Продолжить с этим результатом';
+
+  @override
+  String get generationStatusTryTemplateAction => 'Попробовать';
+
+  @override
+  String get generationStatusAllTemplatesAction => 'Все шаблоны';
 
   @override
   String get generationStatusCompareBeforeLabel => 'До';

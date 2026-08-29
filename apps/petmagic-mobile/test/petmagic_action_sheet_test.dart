@@ -20,6 +20,11 @@ void main() {
     final bottomSheet = find.byType(BottomSheet).last;
     expect(tester.getTopLeft(bottomSheet).dy, greaterThan(0));
     expect(
+      tester.getBottomRight(bottomSheet).dy,
+      tester.view.physicalSize.height / tester.view.devicePixelRatio,
+      reason: 'Modal sheets must attach to the bottom edge of the display.',
+    );
+    expect(
       tester.getSize(bottomSheet).height,
       lessThan(tester.view.physicalSize.height / tester.view.devicePixelRatio),
     );

@@ -6339,6 +6339,42 @@ abstract class AppLocalizations {
   /// **'Generation status'**
   String get generationStatusTitle;
 
+  /// No description provided for @generationStatusActiveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Creating magic'**
+  String get generationStatusActiveTitle;
+
+  /// No description provided for @generationStatusActiveProgressTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Creating your magic…'**
+  String get generationStatusActiveProgressTitle;
+
+  /// No description provided for @generationStatusPhotoReceived.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo received'**
+  String get generationStatusPhotoReceived;
+
+  /// No description provided for @generationStatusCreatingImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Creating your image'**
+  String get generationStatusCreatingImage;
+
+  /// No description provided for @generationStatusBackgroundTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Generation will continue in the background'**
+  String get generationStatusBackgroundTitle;
+
+  /// No description provided for @generationStatusTechnicalDetailsAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Technical details'**
+  String get generationStatusTechnicalDetailsAction;
+
   /// No description provided for @generationStatusCreatedLabel.
   ///
   /// In en, this message translates to:
@@ -7760,6 +7796,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Compare'**
   String get generationStatusCompareAction;
+
+  /// No description provided for @generationStatusCompareWithOriginalAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Compare with original'**
+  String get generationStatusCompareWithOriginalAction;
+
+  /// No description provided for @generationStatusContinueWithResultTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue with this result'**
+  String get generationStatusContinueWithResultTitle;
+
+  /// No description provided for @generationStatusTryTemplateAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Try'**
+  String get generationStatusTryTemplateAction;
+
+  /// No description provided for @generationStatusAllTemplatesAction.
+  ///
+  /// In en, this message translates to:
+  /// **'All templates'**
+  String get generationStatusAllTemplatesAction;
 
   /// No description provided for @generationStatusCompareBeforeLabel.
   ///

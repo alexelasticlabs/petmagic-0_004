@@ -11,7 +11,7 @@ File? _localMediaFile(String? path) {
 }
 
 class _ActiveCard extends ConsumerWidget {
-  const _ActiveCard({required this.generation});
+  const _ActiveCard({super.key, required this.generation});
 
   final TemplateGenerationResult generation;
 
@@ -73,7 +73,7 @@ class _ActiveCard extends ConsumerWidget {
                             child: localPreviewFile != null
                                 ? Image.file(
                                     localPreviewFile,
-                                    fit: BoxFit.cover,
+                                    fit: BoxFit.contain,
                                     cacheWidth:
                                         _generationGalleryThumbnailCacheWidth,
                                     filterQuality: FilterQuality.medium,
@@ -85,23 +85,22 @@ class _ActiveCard extends ConsumerWidget {
                                     cacheKey: persistentSafeGenerationMediaUrl(
                                       safePreviewImageUrl.toString(),
                                     ),
-                                    fit: BoxFit.cover,
+                                    fit: BoxFit.contain,
                                     memCacheWidth:
                                         _generationGalleryThumbnailCacheWidth,
                                     maxWidthDiskCache:
                                         _generationGalleryThumbnailCacheWidth,
                                     filterQuality: FilterQuality.medium,
+                                    fadeInDuration: Duration.zero,
+                                    fadeOutDuration: Duration.zero,
+                                    placeholderFadeInDuration: Duration.zero,
+                                    useOldImageOnUrlChange: true,
                                     errorWidget: (context, url, error) =>
                                         _ThumbnailPlaceholder(
                                           generation: generation,
                                         ),
                                   ),
                           ),
-                        ),
-                        Positioned(
-                          left: 6,
-                          top: 6,
-                          child: _TypeBadge(generation: generation),
                         ),
                       ],
                     ),
@@ -219,7 +218,11 @@ class _ActiveCard extends ConsumerWidget {
 }
 
 class _ReadyGridCard extends ConsumerWidget {
-  const _ReadyGridCard({required this.generation, required this.galleryState});
+  const _ReadyGridCard({
+    super.key,
+    required this.generation,
+    required this.galleryState,
+  });
 
   final TemplateGenerationResult generation;
   final _GenerationsGalleryPageState galleryState;
@@ -279,7 +282,7 @@ class _ReadyGridCard extends ConsumerWidget {
                           child: localPreviewFile != null
                               ? Image.file(
                                   localPreviewFile,
-                                  fit: BoxFit.cover,
+                                  fit: BoxFit.contain,
                                   cacheWidth:
                                       _generationGalleryThumbnailCacheWidth,
                                   filterQuality: FilterQuality.medium,
@@ -291,12 +294,16 @@ class _ReadyGridCard extends ConsumerWidget {
                                   cacheKey: persistentSafeGenerationMediaUrl(
                                     safePreviewImageUrl.toString(),
                                   ),
-                                  fit: BoxFit.cover,
+                                  fit: BoxFit.contain,
                                   memCacheWidth:
                                       _generationGalleryThumbnailCacheWidth,
                                   maxWidthDiskCache:
                                       _generationGalleryThumbnailCacheWidth,
                                   filterQuality: FilterQuality.medium,
+                                  fadeInDuration: Duration.zero,
+                                  fadeOutDuration: Duration.zero,
+                                  placeholderFadeInDuration: Duration.zero,
+                                  useOldImageOnUrlChange: true,
                                   errorWidget: (context, url, error) =>
                                       _ThumbnailPlaceholder(
                                         generation: generation,
@@ -304,16 +311,11 @@ class _ReadyGridCard extends ConsumerWidget {
                                 ),
                         ),
                       ),
-                      Positioned(
-                        left: 8,
-                        top: 8,
-                        child: _TypeBadge(generation: generation),
-                      ),
                       if (isVideoGeneration(generation) &&
                           generation.outputVideoDurationSeconds != null)
                         Positioned(
                           left: 8,
-                          top: 34,
+                          top: 8,
                           child: _DurationBadge(
                             seconds: generation.outputVideoDurationSeconds!,
                           ),

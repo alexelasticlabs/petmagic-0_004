@@ -162,6 +162,7 @@ void main() {
           'Bearer access-token',
         );
         expect(options.headers['X-Correlation-Id'], 'corr-1');
+        expect(options.headers['Idempotency-Key'], 'corr-1');
         expect(options.data, isA<FormData>());
 
         final formData = options.data as FormData;

@@ -120,6 +120,58 @@ extension _GenerationStatusPageLifecycle on _GenerationStatusPageState {
     _activeLoadCancelToken = null;
   }
 
+  void _cancelActiveCompatibleTemplatesLoad() {
+    final cancelToken = _activeCompatibleTemplatesCancelToken;
+    if (cancelToken != null && !cancelToken.isCancelled) {
+      cancelToken.cancel('generation_status_compatible_templates_cancelled');
+    }
+    _activeCompatibleTemplatesCancelToken = null;
+  }
+
+  Future<void> _fetchCompatibleTemplates(
+    TemplateGenerationResult generation,
+  ) async {
+    if (!generation.isCompleted ||
+        !mounted ||
+        !_canUsePrivateStatusApi ||
+        !ref.read(networkStatusControllerProvider).hasInternet ||
+        _compatibleTemplates?.resultId == generation.generationId ||
+        _isLoadingCompatibleTemplates) {
+      return;
+    }
+
+    _cancelActiveCompatibleTemplatesLoad();
+    final cancelToken = RequestCancellation();
+    _activeCompatibleTemplatesCancelToken = cancelToken;
+    _setPageState(() => _isLoadingCompatibleTemplates = true);
+    try {
+      final compatible = await ref
+          .read(templateGenerationRepositoryProvider)
+          .fetchCompatibleTemplates(
+            generation.generationId,
+            cancelToken: cancelToken,
+          );
+      if (!mounted ||
+          cancelToken.isCancelled ||
+          _generation?.generationId != generation.generationId) {
+        return;
+      }
+      _setPageState(() => _compatibleTemplates = compatible);
+    } on RequestCancelledException {
+      return;
+    } on Object {
+      // Recommendations are optional. Keep the completed result usable if
+      // their query is temporarily unavailable.
+    } finally {
+      if (identical(_activeCompatibleTemplatesCancelToken, cancelToken)) {
+        _activeCompatibleTemplatesCancelToken = null;
+        if (mounted) {
+          _setPageState(() => _isLoadingCompatibleTemplates = false);
+        }
+      }
+    }
+  }
+
   RequestCancellation? _startGenerationCancelRequest() {
     if (_activeGenerationCancelToken != null) {
       return null;
@@ -224,6 +276,10 @@ extension _GenerationStatusPageLifecycle on _GenerationStatusPageState {
       _generation = generation;
       _isLoading = false;
       _errorMessage = null;
+      if (previousGeneration?.generationId != generation.generationId ||
+          !generation.isCompleted) {
+        _compatibleTemplates = null;
+      }
     });
 
     if (generation.isUnread) {
@@ -237,6 +293,7 @@ extension _GenerationStatusPageLifecycle on _GenerationStatusPageState {
     if (generation.isCompleted) {
       unawaited(_materializeLocalMediaAndRefresh(generation));
       unawaited(_recordFeedbackPromptViewed(generation));
+      unawaited(_fetchCompatibleTemplates(generation));
     }
 
     if (generation.isTerminal) {

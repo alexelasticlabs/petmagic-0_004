@@ -306,6 +306,26 @@ void main() {
   );
 
   test(
+    'forced wallet refresh repeats after an earlier load completes',
+    () async {
+      final repository = _DelayedWalletRepository();
+      final container = _walletTestContainer(repository);
+      addTearDown(container.dispose);
+
+      final controller = container.read(walletControllerProvider.notifier);
+      final initialLoad = controller.load();
+      await repository.fetchWalletStarted.future;
+
+      final forcedRefresh = controller.load(refresh: true);
+      repository.completeFetchWallet();
+
+      await Future.wait([initialLoad, forcedRefresh]);
+
+      expect(repository.fetchWalletCalls, 2);
+    },
+  );
+
+  test(
     'stripe verification completes safely after provider disposal',
     () async {
       final repository = _DelayedWalletRepository();
@@ -1238,6 +1258,7 @@ class _DelayedWalletRepository extends _NoopWalletRepository {
       Completer<RequestCancellation>();
   final Completer<void> _verifyStripeCompleter = Completer<void>();
   RequestCancellation? fetchWalletCancelToken;
+  int fetchWalletCalls = 0;
   int verifyStripeCalls = 0;
   String? lastStripeReferenceId;
 
@@ -1255,6 +1276,7 @@ class _DelayedWalletRepository extends _NoopWalletRepository {
   Future<WalletStateModel> fetchWallet({
     RequestCancellation? cancelToken,
   }) async {
+    fetchWalletCalls++;
     fetchWalletCancelToken = cancelToken;
     if (!fetchWalletStarted.isCompleted) {
       fetchWalletStarted.complete();

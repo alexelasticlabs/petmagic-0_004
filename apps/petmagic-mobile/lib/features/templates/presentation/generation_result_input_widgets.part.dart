@@ -22,7 +22,7 @@ class _ParentPreviewCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             AspectRatio(
-              aspectRatio: 1,
+              aspectRatio: 2 / 3,
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(14),
                 child: mediaUrl == null
@@ -97,8 +97,9 @@ class _CompatibleTemplateTile extends StatelessWidget {
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: SizedBox.square(
-                  dimension: 74,
+                child: SizedBox(
+                  width: 74,
+                  height: 111,
                   child: safeThumb == null
                       ? ColoredBox(
                           color: colors.surfaceStrong,

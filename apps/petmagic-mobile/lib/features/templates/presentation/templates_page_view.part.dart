@@ -50,6 +50,11 @@ extension _TemplatesPageView on _TemplatesPageState {
     final titleStyle = Theme.of(context).textTheme.titleLarge;
     final subtitleStyle = Theme.of(context).textTheme.bodySmall;
     final bottomInset = petMagicScrollableBottomInset(context);
+    final hasActiveGeneration = ref.watch(
+      generationHistoryControllerProvider.select(
+        (state) => state.activeGeneration != null,
+      ),
+    );
     final templateOfTheDay = headerState.templateOfTheDay;
     final selectedPetId = widget.initialPetId;
     final selectedPetPhotoId = widget.initialPetPhotoId;
@@ -67,8 +72,8 @@ extension _TemplatesPageView on _TemplatesPageState {
         children: [
           RefreshIndicator.adaptive(
             onRefresh: () async {
-              await PetMagicHaptics.medium();
-              await controller.refresh();
+              unawaited(PetMagicHaptics.medium());
+              await _refreshFeed(forceRefresh: true);
             },
             color: colors.accent,
             child: CustomScrollView(
@@ -165,7 +170,12 @@ extension _TemplatesPageView on _TemplatesPageState {
           ),
           Positioned(
             right: 16,
-            bottom: petMagicBottomNavInset(context, extraSpacing: 24),
+            bottom: petMagicBottomNavInset(
+              context,
+              extraSpacing: hasActiveGeneration
+                  ? _TemplatesPageState._randomButtonActiveGenerationSpacing
+                  : _TemplatesPageState._randomButtonSpacing,
+            ),
             child: FloatingRandomTemplateButton(
               isLoading: _isRandomTemplateLoading,
               isEnabled: !headerState.isInitialLoading,

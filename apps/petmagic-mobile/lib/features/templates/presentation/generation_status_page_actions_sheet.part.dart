@@ -157,6 +157,49 @@ extension _GenerationStatusPageActionsSheet on _GenerationStatusPageState {
     );
   }
 
+  Future<void> _openGenerationDetailsSheet(
+    TemplateGenerationResult generation,
+  ) {
+    final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
+    return showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: colors.surface,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: colors.border.withValues(alpha: 0.8)),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    text.generationStatusTechnicalDetailsAction,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: colors.textStrong,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _GenerationDetailsList(generation: generation),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _openFailedActionsSheet(TemplateGenerationResult generation) {
     final screenHeight = MediaQuery.sizeOf(context).height;
     return showPetMagicModalBottomSheet<void>(
@@ -201,6 +244,67 @@ extension _GenerationStatusPageActionsSheet on _GenerationStatusPageState {
       _isMediaActionInFlight = true;
     }
     return cancelToken;
+  }
+}
+
+class _GenerationDetailsList extends StatelessWidget {
+  const _GenerationDetailsList({required this.generation});
+
+  final TemplateGenerationResult generation;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
+    final rows = [
+      (
+        text.templateFlowTemplateLabel,
+        generation.templateTitle ?? text.generationStatusUntitledFallback,
+      ),
+      (
+        text.generationStatusStartedLabel,
+        formatGenerationDateTime(
+          generation.createdAtUtc,
+          Localizations.localeOf(context),
+        ),
+      ),
+      (text.generationStatusTypeLabel, typeLabel(text, generation)),
+      (
+        text.templateFlowCostLabel,
+        '${generation.tokenCost} ${text.walletBalanceUnit}',
+      ),
+    ];
+    return Column(
+      children: [
+        for (final row in rows)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    row.$1,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: colors.textMuted,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    row.$2,
+                    textAlign: TextAlign.right,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: colors.textStrong,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
   }
 }
 

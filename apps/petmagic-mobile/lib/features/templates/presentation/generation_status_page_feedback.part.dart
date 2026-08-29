@@ -20,41 +20,39 @@ class _FeedbackCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
-    return _Panel(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              color: colors.textStrong,
-              fontWeight: FontWeight.w800,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+            color: colors.textStrong,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _RatingButton(
+              label: excellentLabel,
+              emoji: '😍',
+              onTap: isSubmitting ? null : () => onRatingSelected(3),
             ),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              _RatingButton(
-                label: excellentLabel,
-                icon: Icons.favorite_rounded,
-                onTap: isSubmitting ? null : () => onRatingSelected(3),
-              ),
-              const SizedBox(width: 8),
-              _RatingButton(
-                label: okayLabel,
-                icon: Icons.thumb_up_alt_rounded,
-                onTap: isSubmitting ? null : () => onRatingSelected(2),
-              ),
-              const SizedBox(width: 8),
-              _RatingButton(
-                label: badLabel,
-                icon: Icons.sentiment_dissatisfied_rounded,
-                onTap: isSubmitting ? null : () => onRatingSelected(1),
-              ),
-            ],
-          ),
-        ],
-      ),
+            _RatingButton(
+              label: okayLabel,
+              emoji: '🙂',
+              onTap: isSubmitting ? null : () => onRatingSelected(2),
+            ),
+            _RatingButton(
+              label: badLabel,
+              emoji: '😕',
+              onTap: isSubmitting ? null : () => onRatingSelected(1),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
@@ -90,46 +88,26 @@ class _FeedbackSubmittedCard extends StatelessWidget {
 class _RatingButton extends StatelessWidget {
   const _RatingButton({
     required this.label,
-    required this.icon,
+    required this.emoji,
     required this.onTap,
   });
 
   final String label;
-  final IconData icon;
+  final String emoji;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
-    return Expanded(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: colors.surfaceGlass,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: colors.border),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
-            child: Column(
-              children: [
-                Icon(icon, color: colors.accent, size: 20),
-                const SizedBox(height: 4),
-                Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: colors.textStrong,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+    return ActionChip(
+      onPressed: onTap,
+      avatar: Text(emoji),
+      label: Text(label),
+      side: BorderSide(color: colors.border.withValues(alpha: 0.8)),
+      backgroundColor: colors.surfaceGlass,
+      labelStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
+        color: colors.textStrong,
+        fontWeight: FontWeight.w700,
       ),
     );
   }

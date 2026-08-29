@@ -88,6 +88,11 @@ extension _GenerationStatusPageResultActions on _GenerationStatusPageState {
       final next = await ref
           .read(templateGenerationRepositoryProvider)
           .generateSimilar(sourceGenerationId: generation.generationId);
+      unawaited(
+        ref
+            .read(walletControllerProvider.notifier)
+            .syncSnapshot(forceRefresh: true),
+      );
 
       if (!mounted) {
         return;
@@ -202,18 +207,21 @@ extension _GenerationStatusPageResultActions on _GenerationStatusPageState {
   }
 
   Future<void> _openUseResultFlow(
-    TemplateGenerationResult generation,
-    bool createVideo,
-  ) async {
+    TemplateGenerationResult generation, {
+    String? selectedTemplateId,
+  }) async {
     try {
       await ref
           .read(templateGenerationRepositoryProvider)
           .recordAnalyticsEvent(
             templateId: generation.templateId,
-            eventType: createVideo
-                ? 'create_video_clicked'
-                : 'use_as_input_clicked',
+            eventType: selectedTemplateId == null
+                ? 'use_as_input_clicked'
+                : 'result_recommendation_clicked',
             generationId: generation.generationId,
+            metadata: selectedTemplateId == null
+                ? const <String, Object?>{}
+                : {'selectedTemplateId': selectedTemplateId},
           );
     } on Object {
       // Best-effort analytics must not block navigation.
@@ -223,7 +231,10 @@ extension _GenerationStatusPageResultActions on _GenerationStatusPageState {
       return;
     }
     context.appNavigator.push(
-      GenerationResultInputDestination(generation.generationId),
+      GenerationResultInputDestination(
+        generation.generationId,
+        selectedTemplateId: selectedTemplateId,
+      ),
     );
   }
 
@@ -333,6 +344,12 @@ extension _GenerationStatusPageResultActions on _GenerationStatusPageState {
       if (!mounted) {
         return;
       }
+
+      unawaited(
+        ref
+            .read(walletControllerProvider.notifier)
+            .syncSnapshot(forceRefresh: true),
+      );
 
       _showInfo(
         result.watermarkRemoved

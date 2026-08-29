@@ -35,6 +35,7 @@ class _RandomTemplateSheetContent extends StatelessWidget {
 
     return SafeArea(
       top: false,
+      bottom: false,
       child: Padding(
         padding: EdgeInsets.only(bottom: bottomInset),
         child: ClipRRect(
@@ -51,7 +52,12 @@ class _RandomTemplateSheetContent extends StatelessWidget {
               top: false,
               bottom: false,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                padding: EdgeInsets.fromLTRB(
+                  20,
+                  12,
+                  20,
+                  20 + MediaQuery.viewPaddingOf(context).bottom,
+                ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [

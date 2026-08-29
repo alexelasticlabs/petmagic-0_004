@@ -106,7 +106,7 @@ class _ResultCardState extends State<_ResultCard> {
     final safeMediaUrl = safeMediaUri?.toString() ?? '';
     final localOutputFile = _localMediaFile(widget.generation.localOutputPath);
     final isVideo = isVideoGeneration(widget.generation);
-    final aspectRatio = _aspectRatio ?? (isVideo ? 9.0 / 16.0 : 3.0 / 4.0);
+    final aspectRatio = _aspectRatio ?? (isVideo ? 9.0 / 16.0 : 2.0 / 3.0);
     final borderRadius = BorderRadius.circular(22);
     return AnimatedSize(
       duration: const Duration(milliseconds: 300),
@@ -115,7 +115,6 @@ class _ResultCardState extends State<_ResultCard> {
         decoration: BoxDecoration(
           color: colors.surfaceStrong,
           borderRadius: borderRadius,
-          border: Border.all(color: colors.border.withValues(alpha: 0.7)),
         ),
         child: ClipRRect(
           borderRadius: borderRadius,

@@ -22,7 +22,7 @@ String etaLabel(AppLocalizations text, TemplateGenerationResult generation) {
     final position = generation.queuePosition;
     final waitSeconds = generation.estimatedWaitSeconds;
     if (position != null &&
-        position > 0 &&
+        position > 1 &&
         waitSeconds != null &&
         waitSeconds > 0) {
       return text.generationStatusEtaEstimated(
@@ -39,8 +39,12 @@ String etaLabel(AppLocalizations text, TemplateGenerationResult generation) {
       );
     }
 
-    if (position != null && position > 0) {
+    if (position != null && position > 1) {
       return text.generationStatusQueuePosition(position);
+    }
+
+    if (position == 1) {
+      return text.generationStatusEtaStartsSoon;
     }
   }
 

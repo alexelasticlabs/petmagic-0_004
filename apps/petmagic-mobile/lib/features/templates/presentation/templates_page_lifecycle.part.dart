@@ -5,6 +5,20 @@ extension _TemplatesPageLifecycle on _TemplatesPageState {
     if (!_scrollController.hasClients) return;
     final position = _scrollController.position;
     final now = DateTime.now();
+    _scrollIdleTimer?.cancel();
+    _scrollIdleTimer = Timer(
+      _TemplatesPageState._scrollIdleVelocityResetDelay,
+      () {
+        _scrollIdleTimer = null;
+        if (_disposed || !mounted || !context.mounted) {
+          return;
+        }
+
+        _lastScrollSampleAt = null;
+        _lastScrollSampleOffset = null;
+        ref.read(templateFeedPlaybackManagerProvider).updateScrollVelocity(0);
+      },
+    );
     final previousAt = _lastScrollSampleAt;
     final previousOffset = _lastScrollSampleOffset;
     if (previousAt != null && previousOffset != null) {

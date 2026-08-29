@@ -27,13 +27,18 @@ part 'generation_result_input_page_chrome.part.dart';
 part 'generation_result_input_widgets.part.dart';
 
 class GenerationResultInputPage extends ConsumerStatefulWidget {
-  const GenerationResultInputPage({required this.generationId, super.key});
+  const GenerationResultInputPage({
+    required this.generationId,
+    this.selectedTemplateId,
+    super.key,
+  });
 
   static const routePrefix = '/generation-results';
   static String routeFor(String generationId) =>
       '$routePrefix/${Uri.encodeComponent(generationId)}/use-input';
 
   final String generationId;
+  final String? selectedTemplateId;
 
   @override
   ConsumerState<GenerationResultInputPage> createState() =>
@@ -55,6 +60,7 @@ class _GenerationResultInputPageState
   String? _error;
   RequestCancellation? _cancelToken;
   RequestCancellation? _startCancelToken;
+  bool _hasOpenedSelectedTemplate = false;
 
   @override
   void initState() {
@@ -111,6 +117,7 @@ class _GenerationResultInputPageState
         _compatible = results[1] as CompatibleGenerationTemplates;
         _isLoading = false;
       });
+      _openSelectedTemplateIfNeeded();
     } on RequestCancelledException {
       return;
     } on Object {
@@ -160,6 +167,35 @@ class _GenerationResultInputPageState
           };
         })
         .toList(growable: false);
+  }
+
+  void _openSelectedTemplateIfNeeded() {
+    final selectedTemplateId = widget.selectedTemplateId?.trim();
+    if (_hasOpenedSelectedTemplate ||
+        selectedTemplateId == null ||
+        selectedTemplateId.isEmpty) {
+      return;
+    }
+
+    CompatibleGenerationTemplate? template;
+    for (final candidate
+        in _compatible?.templates ?? const <CompatibleGenerationTemplate>[]) {
+      if (candidate.id == selectedTemplateId) {
+        template = candidate;
+        break;
+      }
+    }
+    if (template == null || !mounted) {
+      return;
+    }
+
+    _hasOpenedSelectedTemplate = true;
+    final selectedTemplate = template;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        unawaited(_start(selectedTemplate));
+      }
+    });
   }
 
   @override
@@ -332,6 +368,11 @@ class _GenerationResultInputPageState
         templateId: template.id,
         expectedTemplateVersion: template.version,
         cancelToken: startCancelToken,
+      );
+      unawaited(
+        ref
+            .read(walletControllerProvider.notifier)
+            .syncSnapshot(forceRefresh: true),
       );
       if (!mounted || startCancelToken.isCancelled) {
         return;

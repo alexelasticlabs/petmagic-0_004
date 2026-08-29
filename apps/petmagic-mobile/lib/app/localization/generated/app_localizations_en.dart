@@ -3512,6 +3512,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String get generationStatusTitle => 'Generation status';
 
   @override
+  String get generationStatusActiveTitle => 'Creating magic';
+
+  @override
+  String get generationStatusActiveProgressTitle => 'Creating your magic…';
+
+  @override
+  String get generationStatusPhotoReceived => 'Photo received';
+
+  @override
+  String get generationStatusCreatingImage => 'Creating your image';
+
+  @override
+  String get generationStatusBackgroundTitle =>
+      'Generation will continue in the background';
+
+  @override
+  String get generationStatusTechnicalDetailsAction => 'Technical details';
+
+  @override
   String get generationStatusCreatedLabel => 'Created';
 
   @override
@@ -4319,6 +4338,20 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get generationStatusCompareAction => 'Compare';
+
+  @override
+  String get generationStatusCompareWithOriginalAction =>
+      'Compare with original';
+
+  @override
+  String get generationStatusContinueWithResultTitle =>
+      'Continue with this result';
+
+  @override
+  String get generationStatusTryTemplateAction => 'Try';
+
+  @override
+  String get generationStatusAllTemplatesAction => 'All templates';
 
   @override
   String get generationStatusCompareBeforeLabel => 'Before';

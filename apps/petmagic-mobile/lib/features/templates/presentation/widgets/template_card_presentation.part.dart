@@ -220,7 +220,7 @@ class TemplateCardCta extends StatelessWidget {
         : colors.on(colors.accent);
     return PetMagicInteractiveSurface(
       onTap: onPressed,
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(19),
       scaleDown: 0.98,
       child: DecoratedBox(
         decoration: BoxDecoration(
@@ -249,7 +249,7 @@ class TemplateCardCta extends StatelessWidget {
               : const LinearGradient(
                   colors: [Color(0xFF168A62), Color(0xFF15956A)],
                 ),
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(19),
           border: Border.all(
             color: usePremiumStyle
                 ? const Color(0xFFF9E8B6).withValues(alpha: 0.68)
@@ -265,7 +265,7 @@ class TemplateCardCta extends StatelessWidget {
           ],
         ),
         child: ConstrainedBox(
-          constraints: const BoxConstraints.tightFor(height: 44),
+          constraints: const BoxConstraints.tightFor(height: 38),
           child: Stack(
             alignment: Alignment.center,
             children: [
@@ -284,7 +284,7 @@ class TemplateCardCta extends StatelessWidget {
                 ),
               ),
               Positioned(
-                right: 12,
+                right: 10,
                 child: Container(
                   width: usePremiumStyle ? 20 : null,
                   height: usePremiumStyle ? 20 : null,

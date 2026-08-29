@@ -97,20 +97,44 @@ class _CompareActionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
-    return _Panel(
-      child: OutlinedButton.icon(
+    return Center(
+      child: TextButton.icon(
         onPressed: onTap,
-        icon: const Icon(Icons.compare_rounded),
+        icon: const Icon(Icons.compare_rounded, size: 18),
         label: Text(label),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: colors.textStrong,
-          side: BorderSide(color: colors.border.withValues(alpha: 0.9)),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        style: TextButton.styleFrom(
+          foregroundColor: colors.textSoft,
           textStyle: Theme.of(
             context,
-          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+          ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
         ),
       ),
+    );
+  }
+}
+
+class _TechnicalDetailsAction extends StatelessWidget {
+  const _TechnicalDetailsAction({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
+    return Column(
+      children: [
+        Divider(color: colors.border.withValues(alpha: 0.62)),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: onTap,
+            icon: const Icon(Icons.tune_rounded, size: 17),
+            label: Text(text.generationStatusTechnicalDetailsAction),
+            style: TextButton.styleFrom(foregroundColor: colors.textMuted),
+          ),
+        ),
+      ],
     );
   }
 }

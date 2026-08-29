@@ -3,8 +3,6 @@ import 'package:flutter/widgets.dart';
 const _bottomNavHeight = 42.0;
 const _bottomNavOuterGap = 10.0;
 const _bottomNavContentInsetExtra = 18.0;
-const _bottomSheetBottomGap = 14.0;
-
 const kPetMagicBottomContentInsetRelaxed = _bottomNavContentInsetExtra;
 const kPetMagicBottomContentInsetCompact = _bottomNavOuterGap;
 
@@ -24,12 +22,10 @@ double petMagicScrollableBottomInset(
 double petMagicBottomSheetOffset(BuildContext context) {
   final viewMediaQuery = MediaQueryData.fromView(View.of(context));
   final keyboardInset = viewMediaQuery.viewInsets.bottom;
-  if (keyboardInset > 0) return keyboardInset + _bottomSheetBottomGap;
-
-  return viewMediaQuery.viewPadding.bottom +
-      _bottomNavHeight +
-      _bottomNavOuterGap +
-      _bottomSheetBottomGap;
+  // Modal sheets cover the shell navigation, so reserving the navigation
+  // height here leaves a visible gap below every panel. Only move a sheet
+  // when the software keyboard is actually present.
+  return keyboardInset;
 }
 
 class PetMagicShellScope extends InheritedWidget {

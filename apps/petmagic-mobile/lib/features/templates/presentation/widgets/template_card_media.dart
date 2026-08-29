@@ -60,21 +60,11 @@ class TemplateCardMedia extends StatelessWidget {
     return Stack(
       fit: StackFit.expand,
       children: [
-        if (showVideo)
-          AnimatedOpacity(
-            opacity: 1,
-            duration: const Duration(milliseconds: 240),
-            curve: Curves.easeOut,
-            child: FittedBox(
-              fit: BoxFit.cover,
-              child: SizedBox(
-                width: controller!.value.size.width,
-                height: controller!.value.size.height,
-                child: VideoPlayer(controller!),
-              ),
-            ),
-          )
-        else if (imageUrl != null)
+        // Keep the thumbnail subtree mounted while video playback starts and
+        // stops. Replacing it with VideoPlayer used to restart the async file
+        // lookup and image decode every time a playback grant moved between
+        // cards, which produced a visible blank/skeleton flash while scrolling.
+        if (imageUrl != null)
           _TemplateImageWithFallback(
             key: ValueKey(
               'template-image-${template.templateId}'
@@ -94,6 +84,15 @@ class TemplateCardMedia extends StatelessWidget {
           )
         else
           const TemplateMediaSkeletonPlaceholder(),
+        if (showVideo)
+          FittedBox(
+            fit: BoxFit.cover,
+            child: SizedBox(
+              width: controller!.value.size.width,
+              height: controller!.value.size.height,
+              child: VideoPlayer(controller!),
+            ),
+          ),
       ],
     );
   }
@@ -269,7 +268,10 @@ class TemplateMediaErrorPlaceholder extends StatelessWidget {
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final detailsReserve = constraints.maxHeight < 250 ? 118.0 : 132.0;
+          // Keep media feedback above the overlaid title, metadata and CTA.
+          // The compact card layout needs a slightly larger content reserve
+          // than the previous title-only presentation.
+          final detailsReserve = constraints.maxHeight < 250 ? 130.0 : 156.0;
           final mediaHeight = (constraints.maxHeight - detailsReserve).clamp(
             76.0,
             constraints.maxHeight,

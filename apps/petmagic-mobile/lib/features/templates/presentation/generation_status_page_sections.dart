@@ -219,3 +219,28 @@ class _StatusHero extends StatelessWidget {
     );
   }
 }
+
+class _CompletedStatus extends StatelessWidget {
+  const _CompletedStatus({required this.generation});
+
+  final TemplateGenerationResult generation;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    final text = AppLocalizations.of(context);
+    return Row(
+      children: [
+        Icon(Icons.check_circle_rounded, color: colors.accent, size: 20),
+        const SizedBox(width: 8),
+        Text(
+          statusTitle(text, generation),
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+            color: colors.accent,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ],
+    );
+  }
+}

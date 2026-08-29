@@ -37,6 +37,7 @@ final class GenerationRemoteDataSource {
     RequestCancellation? cancelToken,
     required bool retryTransientFailures,
   }) async {
+    final normalizedCorrelationId = correlationId?.trim();
     final prepared = await _sourceUploadPreparer.prepare(
       sourceImage,
       cancelToken: cancelToken,
@@ -57,6 +58,11 @@ final class GenerationRemoteDataSource {
           options: authenticatedMultipartRequestOptions(
             session.accessToken,
             correlationId: correlationId,
+            extraHeaders:
+                normalizedCorrelationId == null ||
+                    normalizedCorrelationId.isEmpty
+                ? null
+                : {'Idempotency-Key': normalizedCorrelationId},
           ),
           cancelToken: cancelToken.toDioCancelToken(),
         ),

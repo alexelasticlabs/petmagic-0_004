@@ -1,27 +1,24 @@
 part of 'petmagic_shell.dart';
 
 class _ActiveGenerationBannerSlot extends ConsumerWidget {
-  const _ActiveGenerationBannerSlot({
-    required this.location,
-    required this.dismissedGenerationId,
-    required this.onDismiss,
-  });
+  const _ActiveGenerationBannerSlot({required this.location});
 
   final String location;
-  final String? dismissedGenerationId;
-  final ValueChanged<String> onDismiss;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final activeGeneration = ref.watch(
+    final activeGenerations = ref.watch(
       generationHistoryControllerProvider.select(
-        (state) => state.activeGeneration,
+        (state) => (
+          generation: state.activeGeneration,
+          count: state.activeGenerationCount,
+        ),
       ),
     );
+    final activeGeneration = activeGenerations.generation;
 
     if (activeGeneration == null ||
         activeGeneration.isTerminal ||
-        dismissedGenerationId == activeGeneration.generationId ||
         location == GenerationsGalleryPage.routePath ||
         location.startsWith(GenerationStatusPage.routePrefix)) {
       return const SizedBox.shrink();
@@ -29,7 +26,7 @@ class _ActiveGenerationBannerSlot extends ConsumerWidget {
 
     return _ActiveGenerationBanner(
       generation: activeGeneration,
-      onDismiss: () => onDismiss(activeGeneration.generationId),
+      activeGenerationCount: activeGenerations.count,
     );
   }
 }
@@ -37,11 +34,11 @@ class _ActiveGenerationBannerSlot extends ConsumerWidget {
 class _ActiveGenerationBanner extends StatelessWidget {
   const _ActiveGenerationBanner({
     required this.generation,
-    required this.onDismiss,
+    required this.activeGenerationCount,
   });
 
   final TemplateGenerationResult generation;
-  final VoidCallback onDismiss;
+  final int activeGenerationCount;
 
   @override
   Widget build(BuildContext context) {
@@ -66,9 +63,7 @@ class _ActiveGenerationBanner extends StatelessWidget {
         child: PressableScale(
           borderRadius: BorderRadius.circular(16),
           haptic: PressableScaleHaptic.selection,
-          onTap: () => context.push(
-            GenerationStatusPage.routeFor(generation.generationId),
-          ),
+          onTap: () => context.go(GenerationsGalleryPage.routePath),
           child: DecoratedBox(
             decoration: BoxDecoration(
               color: colors.surfaceGlass.withValues(alpha: 0.92),
@@ -146,7 +141,8 @@ class _ActiveGenerationBanner extends StatelessWidget {
                             ),
                             const SizedBox(height: 1),
                             Text(
-                              text.templateFlowStepCreateMagic,
+                              '${text.generationStatusSectionActive}: '
+                              '$activeGenerationCount',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: Theme.of(context).textTheme.labelSmall
@@ -179,18 +175,6 @@ class _ActiveGenerationBanner extends StatelessWidget {
                         style: Theme.of(context).textTheme.titleSmall?.copyWith(
                           color: colors.accent,
                           fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      IconButton(
-                        visualDensity: VisualDensity.compact,
-                        constraints: const BoxConstraints(
-                          minWidth: 32,
-                          minHeight: 32,
-                        ),
-                        onPressed: onDismiss,
-                        icon: Icon(
-                          Icons.keyboard_arrow_up_rounded,
-                          color: colors.textMuted,
                         ),
                       ),
                     ],

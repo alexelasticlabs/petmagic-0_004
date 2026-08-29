@@ -30,6 +30,10 @@ extension _GenerationStatusPageView on _GenerationStatusPageState {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final generation = _generation;
+    final isActiveGeneration = generation != null && !generation.isTerminal;
+    final isConnectionLost = !ref
+        .watch(networkStatusControllerProvider)
+        .hasInternet;
     final bottomInset = petMagicBottomNavInset(
       context,
       extraSpacing: kPetMagicBottomContentInsetRelaxed,
@@ -59,13 +63,14 @@ extension _GenerationStatusPageView on _GenerationStatusPageState {
               padding: EdgeInsets.fromLTRB(18, 12, 18, bottomInset),
               children: [
                 _Header(
-                  title:
-                      generation?.templateTitle ?? text.generationStatusTitle,
-                  subtitle: generation == null
+                  title: isActiveGeneration
+                      ? text.generationStatusActiveTitle
+                      : generation?.templateTitle ?? text.generationStatusTitle,
+                  subtitle: generation == null || isActiveGeneration
                       ? null
                       : '${typeLabel(text, generation)} • ${generation.tokenCost} ${text.walletBalanceUnit}',
                   onBack: _handleBackNavigation,
-                  onMenu: generation == null
+                  onMenu: generation == null || isActiveGeneration
                       ? null
                       : () => _openActionsSheet(generation),
                 ),
@@ -79,8 +84,8 @@ extension _GenerationStatusPageView on _GenerationStatusPageState {
                   )
                 else if (generation != null) ...[
                   if (generation.isCompleted) ...[
-                    _StatusHero(generation: generation),
-                    const SizedBox(height: 14),
+                    _CompletedStatus(generation: generation),
+                    const SizedBox(height: 12),
                     _ResultCard(
                       generation: generation,
                       onOpenViewer: () => _openFullscreenPreview(generation),
@@ -89,93 +94,26 @@ extension _GenerationStatusPageView on _GenerationStatusPageState {
                     if (!isVideoGeneration(generation) &&
                         generation.canCompareBeforeAfter) ...[
                       _CompareActionCard(
-                        label: text.generationStatusCompareAction,
+                        label: text.generationStatusCompareWithOriginalAction,
                         onTap: () => unawaited(_openCompareViewer(generation)),
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 14),
                     ],
-                    if (!isVideoGeneration(generation))
-                      _ResultInputActions(
-                        onCreateVideo:
-                            (generation.outputUrl?.trim().isNotEmpty ?? false)
-                            ? () => unawaited(
-                                _openUseResultFlow(generation, true),
-                              )
-                            : null,
-                        onUseAsInput:
-                            (generation.outputUrl?.trim().isNotEmpty ?? false)
-                            ? () => unawaited(
-                                _openUseResultFlow(generation, false),
-                              )
-                            : null,
-                        hasWatermark: generation.hasWatermark,
-                        isWatermarkRemoved: generation.isWatermarkRemoved,
-                        watermarkMessage: generation.watermarkMessage,
-                      )
-                    else
-                      _ReadyActionsRow(
-                        onGenerateSimilar: _canGenerateSimilar(generation)
-                            ? () => unawaited(_generateSimilar(generation))
-                            : null,
-                        onUseAsInput:
-                            !isVideoGeneration(generation) &&
-                                (generation.outputUrl?.trim().isNotEmpty ??
-                                    false)
-                            ? () => unawaited(
-                                _openUseResultFlow(generation, false),
-                              )
-                            : null,
-                        onSave: _isMediaActionInFlight
-                            ? null
-                            : () => unawaited(_saveToGallery(generation)),
-                        onShare: _isMediaActionInFlight
-                            ? null
-                            : () => unawaited(_shareResult(generation)),
-                        hasWatermark: generation.hasWatermark,
-                        isWatermarkRemoved: generation.isWatermarkRemoved,
-                        canRemoveWatermark: generation.canRemoveWatermark,
-                        watermarkMessage: generation.watermarkMessage,
-                        removeWatermarkCostCredits:
-                            generation.removeWatermarkCostCredits,
-                        isRemovingWatermark: _isRemovingWatermark,
-                        onRemoveWatermark: generation.canRemoveWatermark
-                            ? () => unawaited(
-                                _showRemoveWatermarkSheet(generation),
-                              )
-                            : null,
-                        onUpgrade: () => context.appNavigator.push(
-                          const PremiumDestination(),
-                        ),
-                        isGeneratingSimilar: _isGeneratingSimilar,
-                      ),
-                    const SizedBox(height: 10),
-                    _DetailsCard(
-                      title: text.generationStatusDetailsTitle,
-                      rows: [
-                        (
-                          text.templateFlowTemplateLabel,
-                          generation.templateTitle ??
-                              text.generationStatusUntitledFallback,
-                        ),
-                        (
-                          text.generationStatusCreatedLabel,
-                          formatGenerationDateTime(
-                            generation.completedAtUtc ??
-                                generation.updatedAtUtc,
-                            Localizations.localeOf(context),
+                    if ((_compatibleTemplates?.templates ?? const [])
+                        .isNotEmpty) ...[
+                      _ContinueWithResultSection(
+                        templates: _compatibleTemplates!.templates,
+                        onTemplateSelected: (template) => unawaited(
+                          _openUseResultFlow(
+                            generation,
+                            selectedTemplateId: template.id,
                           ),
                         ),
-                        (
-                          text.generationStatusTypeLabel,
-                          typeLabel(text, generation),
-                        ),
-                        (
-                          text.templateFlowCostLabel,
-                          '${generation.tokenCost} ${text.walletBalanceUnit}',
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
+                        onShowAll: () =>
+                            unawaited(_openUseResultFlow(generation)),
+                      ),
+                      const SizedBox(height: 14),
+                    ],
                     if (_hasSubmittedFeedback)
                       _FeedbackSubmittedCard(
                         message: text.generationStatusFeedbackThanksMessage,
@@ -189,6 +127,10 @@ extension _GenerationStatusPageView on _GenerationStatusPageState {
                         badLabel: text.generationStatusFeedbackBad,
                         onRatingSelected: _handleRatingSelected,
                       ),
+                    const SizedBox(height: 8),
+                    _TechnicalDetailsAction(
+                      onTap: () => _openGenerationDetailsSheet(generation),
+                    ),
                   ] else if (generation.isFailed) ...[
                     _FailureCard(generation: generation),
                     const SizedBox(height: 22),
@@ -249,9 +191,10 @@ extension _GenerationStatusPageView on _GenerationStatusPageState {
                       ],
                     ),
                   ] else ...[
-                    _StatusHero(generation: generation),
-                    const SizedBox(height: 14),
-                    _ActiveGenerationCard(generation: generation),
+                    _ActiveGenerationCard(
+                      generation: generation,
+                      isConnectionLost: isConnectionLost,
+                    ),
                     const SizedBox(height: 14),
                     if (generation.canCancelQueued) ...[
                       _QueuedCancelAction(
@@ -268,31 +211,12 @@ extension _GenerationStatusPageView on _GenerationStatusPageState {
                       onContinue: () =>
                           context.appNavigator.go(const CreationsDestination()),
                     ),
-                    const SizedBox(height: 14),
-                    _DetailsCard(
-                      title: text.generationStatusDetailsTitle,
-                      rows: [
-                        (
-                          text.templateFlowTemplateLabel,
-                          generation.templateTitle ??
-                              text.generationStatusUntitledFallback,
-                        ),
-                        (
-                          text.generationStatusStartedLabel,
-                          formatGenerationDateTime(
-                            generation.createdAtUtc,
-                            Localizations.localeOf(context),
-                          ),
-                        ),
-                        (
-                          text.generationStatusTypeLabel,
-                          typeLabel(text, generation),
-                        ),
-                        (
-                          text.templateFlowCostLabel,
-                          '${generation.tokenCost} ${text.walletBalanceUnit}',
-                        ),
-                      ],
+                    const SizedBox(height: 10),
+                    _ActiveSecondaryActions(
+                      onDetails: () => _openGenerationDetailsSheet(generation),
+                      onSupport: () => context.appNavigator.push(
+                        const SupportChatDestination(),
+                      ),
                     ),
                   ],
                 ],

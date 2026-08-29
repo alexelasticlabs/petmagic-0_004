@@ -1,9 +1,11 @@
 import 'dart:io';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
+import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 import 'package:petmagic_mobile/features/templates/application/generation_history_controller.dart';
 import 'package:petmagic_mobile/shared/files/media_share_save.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
@@ -127,6 +129,36 @@ void main() {
 
     expect(find.text('Hidden Ready'), findsNothing);
   });
+
+  testWidgets(
+    'active preview keeps full image stable across signed URL refresh',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final active = sampleGalleryItems().first.copyWith(
+        sourceImageAsset: const TemplateAsset(
+          url: 'https://cdn.petmagic.test/source.jpg?signature=first',
+          fileName: 'source.jpg',
+          contentType: 'image/jpeg',
+        ),
+      );
+      final harness = GalleryHarness(items: [active]);
+      addTearDown(harness.router.dispose);
+
+      await tester.pumpWidget(harness.app(disableAnimations: true));
+      await tester.pumpAndSettle();
+
+      final preview = tester.widget<CachedNetworkImage>(
+        find.byType(CachedNetworkImage),
+      );
+      expect(preview.fit, BoxFit.contain);
+      expect(preview.useOldImageOnUrlChange, isTrue);
+      expect(preview.fadeInDuration, Duration.zero);
+      expect(preview.fadeOutDuration, Duration.zero);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('renders load-more footer and calls controller loadMore', (
     tester,
@@ -774,26 +806,6 @@ void main() {
     expect(chromeSource, isNot(contains('const Color(0xFF735018)')));
     expect(chromeSource, isNot(contains('const Color(0xFFFFD776)')));
     expect(chromeSource, isNot(contains('const Color(0xFF2D3B54)')));
-  });
-
-  test('gallery type badge foreground is derived from badge tone', () {
-    final actionsSource = File(
-      'lib/features/templates/presentation/generations_gallery_page_states.dart',
-    ).readAsStringSync();
-
-    expect(
-      actionsSource,
-      contains('final foreground = colors.on(background);'),
-    );
-    expect(actionsSource, contains('color: foreground'));
-    expect(
-      actionsSource,
-      isNot(
-        contains(
-          'color: Colors.white,\n            fontWeight: FontWeight.w800',
-        ),
-      ),
-    );
   });
 
   testWidgets('ready card save action saves safe media URL', (tester) async {

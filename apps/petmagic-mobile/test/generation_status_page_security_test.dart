@@ -98,6 +98,28 @@ void main() {
     expect(feedbackSource, contains('class _NegativeFeedbackSheet'));
   });
 
+  test('completed result prioritizes real media and 2:3 recommendations', () {
+    final viewSource = File(
+      'lib/features/templates/presentation/generation_status_page_view.part.dart',
+    ).readAsStringSync();
+    final recommendationsSource = File(
+      'lib/features/templates/presentation/generation_status_page_recommendations.part.dart',
+    ).readAsStringSync();
+    final resultCardSource = File(
+      'lib/features/templates/presentation/generation_status_page_result_cards.part.dart',
+    ).readAsStringSync();
+
+    expect(viewSource, contains('_CompletedStatus(generation: generation)'));
+    expect(viewSource, contains('_ContinueWithResultSection('));
+    expect(viewSource, isNot(contains('_ResultInputActions(')));
+    expect(viewSource, isNot(contains('_ReadyActionsRow(')));
+    expect(recommendationsSource, contains('aspectRatio: 2 / 3'));
+    expect(recommendationsSource, contains('fit: BoxFit.cover'));
+    expect(recommendationsSource, isNot(contains('SizedBox.square')));
+    expect(resultCardSource, contains('setState(() => _aspectRatio = w / h)'));
+    expect(resultCardSource, contains('fit: BoxFit.cover'));
+  });
+
   test('generation status compare viewer stays in a dedicated part file', () {
     final pageSource = generationStatusPageSource;
     final sectionsSource = File(
@@ -292,7 +314,7 @@ void main() {
   );
 
   testWidgets(
-    'active generation status exposes gallery continuation without cancel',
+    'active generation status exposes direct gallery continuation without cancel',
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(390, 900));
       addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -360,15 +382,6 @@ void main() {
 
       expect(find.text(text.generationStatusBackgroundHint), findsOneWidget);
       expect(find.text('Cancel generation'), findsNothing);
-
-      await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
-      await tester.pumpAndSettle();
-
-      expect(find.text(text.generationStatusOpenGalleryAction), findsOneWidget);
-      expect(find.text('Cancel generation'), findsNothing);
-
-      await tester.tapAt(const Offset(8, 8));
-      await tester.pumpAndSettle();
 
       await tester.scrollUntilVisible(
         find.text(text.generationStatusContinueInAppAction),
@@ -628,7 +641,7 @@ void main() {
       );
 
       expect(realtimeClient.connectCalls, 1);
-      expect(find.text(text.generationStatusStageQueued), findsWidgets);
+      expect(find.text(text.generationStatusActiveTitle), findsOneWidget);
 
       realtimeClient.emitGenerationStatus({
         'generationId': 'generation-1',
@@ -944,7 +957,10 @@ void main() {
   test('generation status failed retry and sheet keep pet context helper', () {
     final source = generationStatusLibrarySource;
     final buildBody = methodBody(source, 'Widget _buildPage');
-    final sheetBody = methodBody(source, 'Future<void> _openActionsSheet');
+    final failedSheetBody = methodBody(
+      source,
+      'Future<void> _openFailedActionsSheet',
+    );
     final retryBody = methodBody(source, 'void _retrySoon');
 
     expect(buildBody, contains('onRetry: () => _retrySoon(generation)'));
@@ -955,7 +971,7 @@ void main() {
       greaterThanOrEqualTo(1),
     );
     expect(
-      sheetBody,
+      failedSheetBody,
       contains('_templatesDestinationForGeneration(generation)'),
     );
     expect(
@@ -1065,7 +1081,17 @@ void main() {
     );
     expect(
       pageSource,
-      contains("_recordCompareAnalytics(generation, 'compare_clicked')"),
+      contains(
+        "unawaited(_recordCompareAnalytics(generation, 'compare_clicked'))",
+      ),
+    );
+    expect(
+      methodBody(pageSource, 'Future<void> _openCompareViewer'),
+      isNot(
+        contains(
+          "await _recordCompareAnalytics(generation, 'compare_clicked')",
+        ),
+      ),
     );
     expect(compareSource, contains('class _BeforeAfterCompareViewer'));
   });
@@ -1274,7 +1300,7 @@ void main() {
       );
 
       await tester.pumpAndSettle();
-      expect(find.text('Compare'), findsOneWidget);
+      expect(find.text('Compare with original'), findsOneWidget);
 
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pumpAndSettle();
@@ -1313,7 +1339,7 @@ void main() {
       );
 
       await tester.pumpAndSettle();
-      expect(find.text('Compare'), findsNothing);
+      expect(find.text('Compare with original'), findsNothing);
     },
   );
 

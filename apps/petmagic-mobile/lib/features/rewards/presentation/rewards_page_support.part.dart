@@ -15,6 +15,7 @@ Future<void> _showRewardsReferralHowItWorksSheet(
 
       return SafeArea(
         top: false,
+        bottom: false,
         child: Padding(
           padding: EdgeInsets.fromLTRB(12, 0, 12, bottomInset),
           child: DecoratedBox(
@@ -108,12 +109,13 @@ Future<void> _showRewardsHistorySheet(
       final colors = sheetContext.petMagicColors;
       final localeTag = Localizations.localeOf(sheetContext).toLanguageTag();
       final useScrollableList = items.length > 9;
+      final contentBottomInset = MediaQuery.viewPaddingOf(sheetContext).bottom;
       final ledgerList = ListView.separated(
         shrinkWrap: !useScrollableList,
         physics: useScrollableList
             ? null
             : const NeverScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(14, 2, 14, 18),
+        padding: EdgeInsets.fromLTRB(14, 2, 14, 18 + contentBottomInset),
         itemCount: items.length,
         separatorBuilder: (_, separatorIndex) => const SizedBox(height: 8),
         itemBuilder: (context, index) {

@@ -102,11 +102,9 @@ bool _safeNullableMediaUrlEquals(String? left, String? right) {
   if (left == null || right == null) {
     return false;
   }
-  final leftUri = parseSafeGenerationMediaUri(left);
-  final rightUri = parseSafeGenerationMediaUri(right);
-  return leftUri != null &&
-      rightUri != null &&
-      leftUri.toString() == rightUri.toString();
+  final leftUri = persistentSafeGenerationMediaUrl(left);
+  final rightUri = persistentSafeGenerationMediaUrl(right);
+  return leftUri != null && rightUri != null && leftUri == rightUri;
 }
 
 // Generation history application cache orchestration.

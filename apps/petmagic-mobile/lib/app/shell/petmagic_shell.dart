@@ -49,8 +49,6 @@ class PetMagicShell extends ConsumerStatefulWidget {
 }
 
 class _PetMagicShellState extends ConsumerState<PetMagicShell> {
-  String? _dismissedGenerationId;
-
   @override
   Widget build(BuildContext context) {
     final hasKeyboard = MediaQuery.viewInsetsOf(context).bottom > 0;
@@ -75,14 +73,7 @@ class _PetMagicShellState extends ConsumerState<PetMagicShell> {
               child: navigationShell ?? widget.child!,
             ),
             if (showBottomNav) const _BottomNavBackdrop(),
-            if (showBottomNav)
-              _ActiveGenerationBannerSlot(
-                location: location,
-                dismissedGenerationId: _dismissedGenerationId,
-                onDismiss: (generationId) {
-                  setState(() => _dismissedGenerationId = generationId);
-                },
-              ),
+            if (showBottomNav) _ActiveGenerationBannerSlot(location: location),
             if (showBottomNav)
               _FloatingBottomNav(
                 currentIndex: currentIndex,

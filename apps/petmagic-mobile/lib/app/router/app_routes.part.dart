@@ -241,6 +241,7 @@ List<RouteBase> _buildAppRoutes(Ref ref) {
         state: state,
         child: GenerationResultInputPage(
           generationId: state.pathParameters['generationId'] ?? '',
+          selectedTemplateId: state.uri.queryParameters['template'],
         ),
       ),
     ),

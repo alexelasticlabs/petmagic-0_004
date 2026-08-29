@@ -44,6 +44,7 @@ mixin _WalletControllerLifecycle on _WalletControllerBase {
     _cancelActiveCheckoutVerification();
     _loadInFlight = null;
     _isWalletSyncInFlight = false;
+    _walletSyncForceRefreshQueued = false;
     _updateStateIfMounted(
       (state) => state.copyWith(
         isLoading: false,

@@ -16,7 +16,10 @@ extension on _GenerationsGalleryPageState {
       sliver: SliverList.separated(
         itemCount: items.length,
         separatorBuilder: (context, index) => const SizedBox(height: 10),
-        itemBuilder: (context, index) => _ActiveCard(generation: items[index]),
+        itemBuilder: (context, index) => _ActiveCard(
+          key: ValueKey(items[index].generationId),
+          generation: items[index],
+        ),
       ),
     );
   }
@@ -27,7 +30,10 @@ extension on _GenerationsGalleryPageState {
       sliver: SliverList.separated(
         itemCount: items.length,
         separatorBuilder: (context, index) => const SizedBox(height: 10),
-        itemBuilder: (context, index) => _FailedCard(generation: items[index]),
+        itemBuilder: (context, index) => _FailedCard(
+          key: ValueKey(items[index].generationId),
+          generation: items[index],
+        ),
       ),
     );
   }
@@ -52,6 +58,7 @@ extension on _GenerationsGalleryPageState {
               childAspectRatio: 0.82,
             ),
             itemBuilder: (context, index) => _ReadyGridCard(
+              key: ValueKey(visibleItems[index].generationId),
               generation: visibleItems[index],
               galleryState: this,
             ),

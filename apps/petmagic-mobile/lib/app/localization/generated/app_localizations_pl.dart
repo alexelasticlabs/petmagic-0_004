@@ -3543,6 +3543,25 @@ class AppLocalizationsPl extends AppLocalizations {
   String get generationStatusTitle => 'Status generowania';
 
   @override
+  String get generationStatusActiveTitle => 'Tworzenie magii';
+
+  @override
+  String get generationStatusActiveProgressTitle => 'Tworzymy Twoją magię…';
+
+  @override
+  String get generationStatusPhotoReceived => 'Zdjęcie otrzymane';
+
+  @override
+  String get generationStatusCreatingImage => 'Tworzymy Twój obraz';
+
+  @override
+  String get generationStatusBackgroundTitle =>
+      'Generowanie będzie kontynuowane w tle';
+
+  @override
+  String get generationStatusTechnicalDetailsAction => 'Szczegóły techniczne';
+
+  @override
   String get generationStatusCreatedLabel => 'Utworzono';
 
   @override
@@ -3592,23 +3611,24 @@ class AppLocalizationsPl extends AppLocalizations {
       'Skontaktuj się ze wsparciem';
 
   @override
-  String get generationStatusSupportShortAction => 'Support';
+  String get generationStatusSupportShortAction => 'Wsparcie';
 
   @override
-  String get generationStatusActionsTitle => 'Actions';
+  String get generationStatusActionsTitle => 'Działania';
 
   @override
-  String get generationStatusActionsSubtitle => 'What would you like to do?';
+  String get generationStatusActionsSubtitle => 'Co chcesz zrobić?';
 
   @override
   String get generationStatusRetryActionSubtitle =>
-      'Repeat the current generation';
+      'Powtórz bieżące generowanie';
 
   @override
-  String get generationStatusPickAnotherPhotoSubtitle => 'Use a new image';
+  String get generationStatusPickAnotherPhotoSubtitle => 'Użyj nowego obrazu';
 
   @override
-  String get generationStatusContactSupportSubtitle => 'If the problem repeats';
+  String get generationStatusContactSupportSubtitle =>
+      'Jeśli problem się powtarza';
 
   @override
   String get generationStatusOpenGalleryAction => 'Otwórz galerię';
@@ -3682,7 +3702,7 @@ class AppLocalizationsPl extends AppLocalizations {
   String get generationStatusFailedTitle => 'Nie udało się utworzyć wyniku';
 
   @override
-  String get generationStatusTechnicalError => 'Technical error';
+  String get generationStatusTechnicalError => 'Błąd techniczny';
 
   @override
   String get generationStatusTokensRefundedHint =>
@@ -4358,6 +4378,20 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get generationStatusCompareAction => 'Porównaj';
+
+  @override
+  String get generationStatusCompareWithOriginalAction =>
+      'Porównaj z oryginałem';
+
+  @override
+  String get generationStatusContinueWithResultTitle =>
+      'Kontynuuj z tym wynikiem';
+
+  @override
+  String get generationStatusTryTemplateAction => 'Wypróbuj';
+
+  @override
+  String get generationStatusAllTemplatesAction => 'Wszystkie szablony';
 
   @override
   String get generationStatusCompareBeforeLabel => 'Przed';

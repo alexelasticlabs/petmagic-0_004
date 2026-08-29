@@ -44,6 +44,7 @@ void main() {
                   'tags': ['portrait', 'video'],
                   'isPremium': true,
                   'access': 'premium',
+                  'tokenCost': 17,
                   'thumbnailUrl': 'https://cdn.petmagic.test/thumb.jpg',
                   'media': {
                     'thumbnailUrl': 'https://cdn.petmagic.test/thumb.jpg',
@@ -99,6 +100,7 @@ void main() {
       final item = response.items.single;
       expect(item.templateId, 'template-video-1');
       expect(item.templateType, 'Video');
+      expect(item.tokenCost, 17);
       expect(item.category, 'Portrait');
       expect(item.thumbnailUrl, 'https://cdn.petmagic.test/thumb.jpg');
       expect(
@@ -119,6 +121,7 @@ void main() {
       expect(item.updatedAtUtc, isNull);
       final domainItem = item.toDomain();
       expect(domainItem.templateType, TemplateType.video);
+      expect(domainItem.tokenCost, 17);
       expect(domainItem.feedLoopLowUrl, 'https://cdn.petmagic.test/low.mp4');
       expect(
         domainItem.feedLoopMediumUrl,

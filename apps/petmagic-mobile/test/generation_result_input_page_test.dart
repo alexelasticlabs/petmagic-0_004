@@ -76,6 +76,33 @@ void main() {
   });
 
   testWidgets(
+    'opens the existing confirmation flow for a selected result recommendation',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final repository = _ResultInputRepository();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            templateGenerationRepositoryProvider.overrideWithValue(repository),
+            walletControllerProvider.overrideWith(_FundedWalletController.new),
+          ],
+          child: const _ResultInputTestApp(
+            generationId: 'parent/1?source=ready',
+            selectedTemplateId: 'template/with?reserved=id',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Magic motion'), findsWidgets);
+      expect(find.text('Start'), findsOneWidget);
+      expect(repository.startCalls, 0);
+    },
+  );
+
+  testWidgets(
     'result-input page stays offline without loading and retries on reconnect',
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(390, 900));
@@ -237,9 +264,13 @@ void main() {
 }
 
 class _ResultInputTestApp extends StatelessWidget {
-  const _ResultInputTestApp({required this.generationId});
+  const _ResultInputTestApp({
+    required this.generationId,
+    this.selectedTemplateId,
+  });
 
   final String generationId;
+  final String? selectedTemplateId;
 
   @override
   Widget build(BuildContext context) {
@@ -253,7 +284,10 @@ class _ResultInputTestApp extends StatelessWidget {
         GlobalCupertinoLocalizations.delegate,
       ],
       supportedLocales: AppLocalizations.supportedLocales,
-      home: GenerationResultInputPage(generationId: generationId),
+      home: GenerationResultInputPage(
+        generationId: generationId,
+        selectedTemplateId: selectedTemplateId,
+      ),
     );
   }
 }

@@ -10,6 +10,7 @@ import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/features/startup/presentation/guest_welcome_page.dart';
 import 'package:petmagic_mobile/features/startup/presentation/widgets/startup_chrome.dart';
 import 'package:petmagic_mobile/features/templates/application/generation_history_controller.dart';
+import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/app/shell/petmagic_shell.dart';
 import 'package:petmagic_mobile/shared/notifications/petmagic_notification_center.dart';
 import 'package:petmagic_mobile/shared/widgets/network_status_banner.dart';
@@ -146,6 +147,39 @@ void main() {
     expect(find.byType(BackdropFilter), findsAtLeastNWidgets(1));
     debugDefaultTargetPlatformOverride = null;
   });
+
+  testWidgets(
+    'active-generation banner stays visible and shows the current count',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            generationHistoryControllerProvider.overrideWith(
+              _ActiveGenerationHistoryController.new,
+            ),
+          ],
+          child: MaterialApp(
+            locale: const Locale('ru'),
+            theme: AppTheme.dark(),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: const PetMagicShell(
+              location: '/templates',
+              child: SizedBox.expand(),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('В процессе: 2'), findsOneWidget);
+      expect(find.text('Magic Portrait'), findsOneWidget);
+      expect(find.byIcon(Icons.keyboard_arrow_up_rounded), findsNothing);
+    },
+  );
 
   testWidgets(
     'android startup backdrop avoids expensive blur filters on phone',
@@ -399,6 +433,43 @@ class _OfflineNetworkStatusController extends NetworkStatusController {
 class _IdleGenerationHistoryController extends GenerationHistoryController {
   @override
   GenerationHistoryState build() => const GenerationHistoryState();
+}
+
+class _ActiveGenerationHistoryController extends GenerationHistoryController {
+  @override
+  GenerationHistoryState build() {
+    final now = DateTime.utc(2026, 8, 29);
+    return GenerationHistoryState(
+      items: [
+        TemplateGenerationResult(
+          generationId: 'generation-1',
+          userId: 'user-1',
+          templateId: 'template-1',
+          status: TemplateGenerationStatus.processing,
+          tokenCost: 6,
+          attemptCount: 1,
+          createdAtUtc: now,
+          updatedAtUtc: now,
+          userMediaExpired: false,
+          templateTitle: 'Magic Portrait',
+          progressPercent: 10,
+        ),
+        TemplateGenerationResult(
+          generationId: 'generation-2',
+          userId: 'user-1',
+          templateId: 'template-2',
+          status: TemplateGenerationStatus.queued,
+          tokenCost: 6,
+          attemptCount: 1,
+          createdAtUtc: now,
+          updatedAtUtc: now,
+          userMediaExpired: false,
+          templateTitle: 'Second portrait',
+          progressPercent: 0,
+        ),
+      ],
+    );
+  }
 }
 
 BoxDecoration _containerDecoration(WidgetTester tester, double radius) {

@@ -83,6 +83,7 @@ class FakeGenerationStatusTemplateGenerationRepository
   final List<GenerationStatusAnalyticsCall> analyticsCalls = [];
   final List<String> removeWatermarkCalls = [];
   int fetchGenerationCalls = 0;
+  int fetchCompatibleTemplatesCalls = 0;
   int fetchDownloadCalls = 0;
   int fetchShareCalls = 0;
   int cancelGenerationCalls = 0;
@@ -95,6 +96,19 @@ class FakeGenerationStatusTemplateGenerationRepository
   }) async {
     fetchGenerationCalls++;
     return generation;
+  }
+
+  @override
+  Future<CompatibleGenerationTemplates> fetchCompatibleTemplates(
+    String resultId, {
+    RequestCancellation? cancelToken,
+  }) async {
+    fetchCompatibleTemplatesCalls++;
+    return CompatibleGenerationTemplates(
+      resultId: resultId,
+      inputMediaType: TemplateType.image,
+      templates: const [],
+    );
   }
 
   @override

@@ -433,7 +433,10 @@ void main() {
         tester.element(find.byType(GenerationStatusPage)),
       );
 
-      expect(find.text(text.generationStatusWatermarkAddedFreePlan), findsOne);
+      expect(
+        find.text(text.generationStatusWatermarkAddedFreePlan),
+        findsNothing,
+      );
 
       await tester.tap(find.byIcon(Icons.more_vert_rounded));
       await tester.pumpAndSettle();
