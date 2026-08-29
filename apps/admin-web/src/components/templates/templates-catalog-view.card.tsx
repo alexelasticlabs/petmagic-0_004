@@ -87,12 +87,6 @@ export function TemplateCatalogCard({
   );
   const actionItems: AdminActionMenuItem[] = [
     {
-      id: "open",
-      label: text.editTemplate,
-      href: `${templateBasePath}/editor?templateId=${encodeURIComponent(template.templateId)}`,
-      disabled: isBusy,
-    },
-    {
       id: "analytics",
       label: copy.analyticsAction,
       href: `${templateBasePath}/analytics/${encodeURIComponent(template.templateId)}`,
@@ -100,7 +94,7 @@ export function TemplateCatalogCard({
     },
     {
       id: "test",
-      label: copy.previewInAppAction,
+      label: copy.testAction,
       href: `${templateBasePath}/test/${encodeURIComponent(template.templateId)}`,
       disabled: isBusy,
     },
@@ -190,22 +184,6 @@ export function TemplateCatalogCard({
             ? text.templateKindVideoBadge
             : text.templateKindImageBadge}
         </span>
-        <AdminStatusBadge
-          className={`${styles.cardStatusBadge} ${styles.cardStatusOverlay}`}
-          color={statusColors[template.status]}
-        >
-          {getTemplateStatusLabel(template.status, locale)}
-        </AdminStatusBadge>
-        {template.templateType === "Video" ? (
-          <>
-            <PlayCircleIcon className={styles.cardPlayOverlay} />
-            <span className={styles.cardDurationOverlay}>
-              {formatDuration(
-                template.previewAsset?.durationSeconds ?? template.referenceVideoDurationSeconds
-              )}
-            </span>
-          </>
-        ) : null}
       </div>
       <div className={styles.cardBody}>
         <div className={styles.cardTitleRow}>
@@ -221,6 +199,17 @@ export function TemplateCatalogCard({
           </span>
           {template.isQaOnly ? <span className={styles.qaOnlyPill}>{copy.qaOnlyLabel}</span> : null}
         </div>
+        <div className={styles.cardFooter}>
+          <span className={styles.cardTimestamp}>
+            {copy.updatedShort} {formatDate(template.updatedAtUtc, locale)}
+          </span>
+          <AdminStatusBadge
+            className={styles.cardStatusBadge}
+            color={statusColors[template.status]}
+          >
+            {getTemplateStatusLabel(template.status, locale)}
+          </AdminStatusBadge>
+        </div>
         <div className={styles.cardMetrics}>
           {getTemplateCardMetrics(template, analytics, locale, copy).map((metric) => (
             <div
@@ -229,6 +218,7 @@ export function TemplateCatalogCard({
               title={metric.label}
             >
               {METRIC_ICONS[metric.tone]}
+              <span className={styles.cardMetricLabel}>{metric.label}</span>
               <strong>{metric.value}</strong>
             </div>
           ))}

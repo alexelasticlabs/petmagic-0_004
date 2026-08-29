@@ -52,7 +52,6 @@ import {
   isAdminSystemStatusExpired,
   loadDashboardViewModel,
   type DashboardActivityType,
-  type DashboardAttentionItem,
   type DashboardDataSource,
   type DashboardStatIcon,
   type DashboardViewModel,
@@ -86,7 +85,6 @@ const DASHBOARD_ACTIVITY_SOURCES = [
   "purchases",
   "supportConversations",
 ] as const satisfies readonly DashboardDataSource[];
-const DASHBOARD_ATTENTION_PREVIEW_MAX = 4;
 
 type DashboardSectionNoticeProps = {
   title: string;
@@ -118,43 +116,6 @@ function DashboardSectionNotice({
       </div>
       {action ? <div className={styles.sectionNoticeAction}>{action}</div> : null}
     </div>
-  );
-}
-
-function DashboardAttentionList({
-  items,
-  openLabel,
-}: {
-  items: readonly DashboardAttentionItem[];
-  openLabel: string;
-}) {
-  return (
-    <ul className={styles.attentionList}>
-      {items.map((item) => (
-        <li key={item.key} className={styles.attentionItem}>
-          <span
-            className={`${styles.attentionIndicator} ${
-              item.tone === "danger"
-                ? styles.attentionIndicatorDanger
-                : styles.attentionIndicatorWarning
-            }`}
-            aria-hidden="true"
-          />
-          <div className={styles.attentionItemCopy}>
-            <strong className={styles.attentionItemTitle}>{item.label}</strong>
-            <span className={styles.attentionItemDescription}>{item.description}</span>
-          </div>
-          <strong className={styles.attentionValue}>{item.value}</strong>
-          <Link
-            href={item.href}
-            className={styles.attentionLink}
-            aria-label={`${openLabel}: ${item.label}`}
-          >
-            {openLabel}
-          </Link>
-        </li>
-      ))}
-    </ul>
   );
 }
 
@@ -280,22 +241,6 @@ export function DashboardView({ locale }: DashboardViewProps) {
     );
   }
 
-  const dangerAttentionItems = viewModel.attentionSection.items.filter(
-    (item) => item.tone === "danger"
-  );
-  const warningAttentionItems = viewModel.attentionSection.items.filter(
-    (item) => item.tone === "warning"
-  );
-  const visibleWarningCapacity = Math.max(
-    0,
-    DASHBOARD_ATTENTION_PREVIEW_MAX - dangerAttentionItems.length
-  );
-  const visibleAttentionItems = [
-    ...dangerAttentionItems,
-    ...warningAttentionItems.slice(0, visibleWarningCapacity),
-  ];
-  const additionalAttentionItems = warningAttentionItems.slice(visibleWarningCapacity);
-
   return (
     <AdminPage className={styles.dashboard}>
       <AdminContextBar
@@ -356,21 +301,32 @@ export function DashboardView({ locale }: DashboardViewProps) {
           />
         ) : null}
         {viewModel.attentionSection.items.length > 0 ? (
-          <>
-            <DashboardAttentionList
-              items={visibleAttentionItems}
-              openLabel={viewModel.attentionSection.openLabel}
-            />
-            {additionalAttentionItems.length > 0 ? (
-              <details className={styles.attentionOverflow}>
-                <summary>{copy.attentionSection.showMore(additionalAttentionItems.length)}</summary>
-                <DashboardAttentionList
-                  items={additionalAttentionItems}
-                  openLabel={viewModel.attentionSection.openLabel}
+          <ul className={styles.attentionList}>
+            {viewModel.attentionSection.items.map((item) => (
+              <li key={item.key} className={styles.attentionItem}>
+                <span
+                  className={`${styles.attentionIndicator} ${
+                    item.tone === "danger"
+                      ? styles.attentionIndicatorDanger
+                      : styles.attentionIndicatorWarning
+                  }`}
+                  aria-hidden="true"
                 />
-              </details>
-            ) : null}
-          </>
+                <div className={styles.attentionItemCopy}>
+                  <strong className={styles.attentionItemTitle}>{item.label}</strong>
+                  <span className={styles.attentionItemDescription}>{item.description}</span>
+                </div>
+                <strong className={styles.attentionValue}>{item.value}</strong>
+                <Link
+                  href={item.href}
+                  className={styles.attentionLink}
+                  aria-label={`${viewModel.attentionSection.openLabel}: ${item.label}`}
+                >
+                  {viewModel.attentionSection.openLabel}
+                </Link>
+              </li>
+            ))}
+          </ul>
         ) : viewModel.attentionSection.state === "allClear" && !systemStatusExpired ? (
           <DashboardSectionNotice
             tone="success"

@@ -6,45 +6,6 @@
   gap: clamp(0.78rem, 0.68rem + 0.24vw, 0.92rem);
 }
 
-.pageHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-}
-.pageHeader h1 {
-  margin: 0;
-  color: var(--text-strong);
-  font-family: var(--font-heading), sans-serif;
-  font-size: 1.45rem;
-}
-.pageHeader p {
-  margin: 0.22rem 0 0;
-  color: var(--text-muted);
-  font-size: 0.82rem;
-}
-.workspaceTabs {
-  display: flex;
-  gap: 1rem;
-  border-bottom: 1px solid var(--border-soft);
-}
-.workspaceTabs a,
-.workspaceTabs span {
-  padding: 0.4rem 0.05rem 0.55rem;
-  color: var(--text-muted);
-  font-size: 0.8rem;
-  font-weight: 650;
-  text-decoration: none;
-}
-.workspaceTabs a[aria-current="page"] {
-  color: var(--accent-strong);
-  border-bottom: 2px solid var(--accent);
-}
-.workspaceTabs span {
-  opacity: 0.52;
-  cursor: not-allowed;
-}
-
 .summaryGrid {
   grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
   gap: 0;
@@ -99,11 +60,8 @@
   font-size: 0.78rem;
 }
 
-.summaryGrid > button {
+.summaryGrid > div {
   min-width: 0;
-  text-align: left;
-  font: inherit;
-  cursor: pointer;
   padding: 0.48rem 0.68rem;
   border: 0;
   border-left: 1px solid var(--border-soft);
@@ -111,31 +69,19 @@
   background: transparent;
 }
 
-.summaryGrid > button:first-child {
+.summaryGrid > div:first-child {
   border-left: 0;
 }
 
-.summaryGrid > button:hover {
+.summaryGrid > div:hover {
   background: var(--surface-hover);
   box-shadow: none;
   transform: none;
 }
-.summaryGrid > button span {
-  display: block;
-  color: var(--text-muted);
-  font-size: 0.7rem;
-  font-weight: 600;
-}
-.summaryGrid > button strong {
-  display: block;
-  margin-top: 0.14rem;
-  color: var(--text-strong);
-  font-size: 1.08rem;
-}
 
 .filtersBar {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(17rem, 1.55fr) minmax(10.5rem, 0.8fr) auto;
   gap: 0.58rem;
   align-items: end;
   padding: 0;
@@ -144,36 +90,6 @@
   background: transparent;
   box-shadow: none;
   margin-bottom: 0.7rem;
-}
-.searchField {
-  flex: 1 1 18rem;
-}
-.quickFilterChips {
-  display: flex;
-  flex: 2 1 28rem;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-  align-items: end;
-}
-.quickFilterChips button {
-  min-height: 2.25rem;
-  padding: 0.35rem 0.62rem;
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-sm);
-  background: var(--surface-2);
-  color: var(--text-soft);
-  font: inherit;
-  font-size: 0.76rem;
-  cursor: pointer;
-}
-.quickFilterChips button:hover,
-.quickFilterChips .quickFilterActive {
-  border-color: var(--border-accent);
-  background: var(--primary-soft-bg);
-  color: var(--accent-strong);
-}
-.sortCompact {
-  width: 10rem;
 }
 
 .searchField,
@@ -394,13 +310,6 @@
 .tableWrap {
   overflow-x: auto;
 }
-.userRow {
-  height: 60px;
-  cursor: pointer;
-}
-.userRow:hover td {
-  background: var(--surface-hover);
-}
 
 .tableUserHeader,
 .selectionIdentityRow {
@@ -440,11 +349,8 @@
   display: flex;
   align-items: center;
   gap: 0.58rem;
-  border: 0;
-  background: transparent;
-  text-align: left;
-  font: inherit;
-  cursor: pointer;
+  color: inherit;
+  text-decoration: none;
 }
 
 .identityCell:hover .userAnchor {
@@ -559,155 +465,8 @@
 }
 
 .actionsCell {
-  min-width: 3rem;
+  min-width: 19rem;
   text-align: right;
-}
-.rowMenuButton {
-  display: grid;
-  width: 2rem;
-  height: 2rem;
-  place-items: center;
-  padding: 0;
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-}
-.rowMenuButton:hover {
-  background: var(--surface-3);
-  color: var(--text-strong);
-}
-.rowMenuButton svg,
-.balanceValue svg {
-  width: 0.95rem;
-  height: 0.95rem;
-}
-.compactStatus {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.34rem;
-  color: var(--text-soft);
-  font-size: 0.76rem;
-}
-.compactStatus::before {
-  content: "";
-  width: 0.38rem;
-  height: 0.38rem;
-  border-radius: 50%;
-  background: var(--success);
-}
-.compactStatus[data-status="blocked"]::before {
-  background: var(--danger);
-}
-.compactStatus[data-status="unconfirmed"]::before {
-  background: var(--warning);
-}
-.premiumPlan {
-  color: var(--magenta);
-  font-size: 0.78rem;
-  font-weight: 650;
-}
-.premiumPlan::before {
-  content: "✦";
-  margin-right: 0.25rem;
-}
-.freePlan {
-  color: var(--text-soft);
-  font-size: 0.78rem;
-}
-.balanceValue {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  color: var(--text-soft);
-  font-size: 0.76rem;
-}
-.balanceValue svg {
-  color: var(--success);
-}
-.userDrawer {
-  position: fixed;
-  z-index: 40;
-  top: 0;
-  right: 0;
-  display: grid;
-  align-content: start;
-  gap: 1rem;
-  width: min(25rem, 100vw);
-  height: 100dvh;
-  padding: 1rem;
-  overflow: auto;
-  border-left: 1px solid var(--border-soft);
-  background: var(--surface-raised);
-  box-shadow: var(--shadow-strong);
-}
-.drawerHeader {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.6rem;
-  padding-bottom: 0.8rem;
-  border-bottom: 1px solid var(--border-soft);
-}
-.drawerHeader div {
-  display: grid;
-  gap: 0.2rem;
-  min-width: 0;
-}
-.drawerHeader strong {
-  color: var(--text-strong);
-}
-.drawerHeader span {
-  color: var(--text-muted);
-  font-size: 0.78rem;
-  overflow-wrap: anywhere;
-}
-.drawerFacts {
-  display: grid;
-  gap: 0.62rem;
-}
-.drawerFacts span {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  color: var(--text-muted);
-  font-size: 0.75rem;
-}
-.drawerFacts b {
-  max-width: 60%;
-  color: var(--text-strong);
-  text-align: right;
-  overflow-wrap: anywhere;
-}
-.drawerActions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.45rem;
-}
-.drawerActions > * {
-  text-decoration: none;
-  justify-content: center;
-}
-.drawerActions > :last-child {
-  grid-column: 1/-1;
-}
-.drawerLinks {
-  display: grid;
-  border-top: 1px solid var(--border-soft);
-}
-.drawerLinks a {
-  padding: 0.65rem 0;
-  border-bottom: 1px solid var(--border-soft);
-  color: var(--text-soft);
-  font-size: 0.82rem;
-  text-decoration: none;
-}
-.drawerLinks a:hover {
-  color: var(--accent-strong);
-}
-.drawerDanger {
-  justify-self: start;
-  text-decoration: none;
 }
 
 .quickActions {

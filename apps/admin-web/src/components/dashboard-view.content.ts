@@ -58,7 +58,6 @@ export type DashboardCopy = {
     title: string;
     description: string;
     openLabel: string;
-    showMore: (count: number) => string;
     allClearTitle: string;
     allClearDescription: string;
     partialTitle: string;
@@ -234,7 +233,6 @@ const dashboardCopy: Record<Locale, DashboardCopy> = {
       title: "Требует внимания",
       description: "Открытые операционные сигналы по последней загрузке",
       openLabel: "Открыть",
-      showMore: (count) => `Показать ещё: ${count}`,
       allClearTitle: "Открытых сигналов нет",
       allClearDescription:
         "Все источники блока доступны: непрочитанных и неназначенных обращений, ошибок и очереди модерации нет.",
@@ -459,7 +457,6 @@ const dashboardCopy: Record<Locale, DashboardCopy> = {
       title: "Needs attention",
       description: "Open operational signals from the last load",
       openLabel: "Open",
-      showMore: (count) => `Show ${count} more`,
       allClearTitle: "No open signals",
       allClearDescription:
         "All attention sources are available, with no unread or unassigned support, failures, or moderation backlog.",

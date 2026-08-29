@@ -28,7 +28,7 @@ describe("templates catalog visual contract", () => {
 
     expect(catalogSource).toContain("className={`${adminTableStyles.table} ${styles.listTable}`}");
     expect(catalogSource).toContain("className={styles.listStatusBadge}");
-    expect(catalogSource).toContain("cardStatusOverlay");
+    expect(catalogSource).toContain("className={styles.cardStatusBadge}");
     expect(cssSource).toContain(".listTable {");
     expect(cssSource).toContain(".listStatusBadge {");
     expect(cssSource).toContain(".cardStatusBadge {");

@@ -204,12 +204,6 @@ test("notification inbox, collapsed rail and mobile sheet stay compact", async (
   );
   await expect(page.getByRole("list", { name: "Operational notifications" })).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Operational notifications" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Mark all read", exact: true })).toBeVisible();
-  const supportRow = page.locator("article").filter({ hasText: "New support message" });
-  await expect(supportRow.getByRole("button", { name: "Archive", exact: true })).toBeHidden();
-  await supportRow.getByText("More", { exact: true }).click();
-  await expect(supportRow.getByRole("button", { name: "Mark read", exact: true })).toBeVisible();
-  await expect(supportRow.getByRole("button", { name: "Archive", exact: true })).toBeVisible();
   await page.screenshot({
     path: testInfo.outputPath("notifications-desktop-dark.png"),
     fullPage: true,

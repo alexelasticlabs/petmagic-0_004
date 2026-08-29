@@ -97,7 +97,7 @@ describe("users admin action hardening", () => {
     const filtersSource = readFileSync(usersFiltersPath, "utf8");
     const chromeSource = readFileSync(usersChromePath, "utf8");
 
-    expect(filtersSource.match(/resetUsersPage\(\);/g)?.length ?? 0).toBeGreaterThanOrEqual(11);
+    expect(filtersSource.match(/resetUsersPage\(\);/g) ?? []).toHaveLength(11);
     expect(filtersSource).toContain("setStatusFilter(value as StatusFilter);");
     expect(filtersSource).toContain("const hasResettableControls =");
     expect(filtersSource).toContain("const activeFilters: Array<{");

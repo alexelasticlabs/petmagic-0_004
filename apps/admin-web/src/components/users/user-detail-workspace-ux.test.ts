@@ -34,7 +34,7 @@ describe("user detail workspace UX", () => {
     expect(source).toContain('searchParams.get("action") === "adjust-balance"');
     expect(source).toContain('onClick={() => selectTab("wallet", "adjust-balance")}');
     expect(source).toContain('onClick={() => selectTab("support")}');
-    expect(source).toContain('onClick={() => selectTab("access")}');
+    expect(source).not.toContain('onClick={() => selectTab("access")}');
     expect(source).toContain("autoFocusAdjustment={shouldFocusWalletAdjustment}");
     expect(source).toContain("function dismissWalletAdjustmentIntent()");
     expect(source).toContain('key={shouldFocusWalletAdjustment ? "wallet-adjustment" : "wallet"}');

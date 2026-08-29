@@ -11,7 +11,7 @@ import {
   TemplatesIcon,
   VideoIcon,
 } from "@/components/admin/admin-icons";
-import { AdminCard, AdminContextBar } from "@/components/admin/admin-primitives";
+import { AdminCard, AdminContextBar, AdminMetricStrip } from "@/components/admin/admin-primitives";
 import type { TemplatesCatalogViewText } from "@/components/templates/templates-catalog-view.content";
 import styles from "@/components/templates/templates-catalog.module.css";
 import type { AdminTemplateCatalogSummary, TemplateType } from "@/lib/api-client";
@@ -23,11 +23,6 @@ type TemplatesCatalogWorkspaceHeaderProps = {
   locale: Locale;
   summary: AdminTemplateCatalogSummary | null;
   templateType?: TemplateType;
-  onShowAll?: () => void;
-  onShowActive?: () => void;
-  onShowDrafts?: () => void;
-  onShowMissingPreview?: () => void;
-  onShowQaOnly?: () => void;
 };
 
 type TemplatesCatalogRailProps = {
@@ -61,11 +56,6 @@ export function TemplatesCatalogWorkspaceHeader({
   locale,
   summary,
   templateType,
-  onShowAll,
-  onShowActive,
-  onShowDrafts,
-  onShowMissingPreview,
-  onShowQaOnly,
 }: TemplatesCatalogWorkspaceHeaderProps) {
   const categoriesPath = `/${locale}/templates/categories`;
   const editorType = templateType === "Image" ? "image" : "video";
@@ -141,25 +131,31 @@ export function TemplatesCatalogWorkspaceHeader({
         })}
       </nav>
 
-      <div className={styles.catalogMetricStrip} aria-label={copy.typesLabel}>
-        {[
-          [copy.totalMetric, summary?.totalTemplates, onShowAll],
-          [copy.activeMetric, summary?.activeTemplates, onShowActive],
-          [copy.draftsMetric, summary?.draftTemplates, onShowDrafts],
-          [copy.missingPreviewMetric, summary?.missingPreviewTemplates, onShowMissingPreview],
-          [copy.qaOnlyMetric, summary?.qaOnlyTemplates, onShowQaOnly],
-        ].map(([label, value, onClick]) => (
-          <button
-            key={label as string}
-            type="button"
-            disabled={!onClick}
-            onClick={onClick as (() => void) | undefined}
-          >
-            <span>{label as string}</span>
-            <strong>{formatMetric(value as number | undefined, locale)}</strong>
-          </button>
-        ))}
-      </div>
+      <AdminMetricStrip
+        className={styles.catalogMetricStrip}
+        items={[
+          {
+            label: copy.totalMetric,
+            value: formatMetric(summary?.totalTemplates, locale),
+          },
+          {
+            label: copy.activeMetric,
+            value: formatMetric(summary?.activeTemplates, locale),
+          },
+          {
+            label: copy.draftsMetric,
+            value: formatMetric(summary?.draftTemplates, locale),
+          },
+          {
+            label: copy.missingPreviewMetric,
+            value: formatMetric(summary?.missingPreviewTemplates, locale),
+          },
+          {
+            label: copy.qaOnlyMetric,
+            value: formatMetric(summary?.qaOnlyTemplates, locale),
+          },
+        ]}
+      />
     </>
   );
 }

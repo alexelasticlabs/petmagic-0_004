@@ -45,8 +45,9 @@ describe("users management visual contract", () => {
     expect(usersSource).toContain('unconfirmed: "var(--warning)"');
     expect(usersSource).toContain('premium: "var(--success)"');
     expect(usersSource).toContain('free: "var(--text-muted)"');
-    expect(usersSource).toContain("data-status={status}");
-    expect(usersSource).toContain("compactStatus");
+    expect(usersSource).toContain("color={accountStatusColors[status]}");
+    expect(usersSource).toContain("premiumStatusColors.premium");
+    expect(usersSource).toContain("premiumStatusColors.free");
     expect(detailSource).toContain("function getPurchaseStatusColor(status: string): string");
     expect(detailSource).toContain(
       'return status.toLowerCase() === "succeeded" ? "var(--success)" : "var(--warning)"'
@@ -67,7 +68,7 @@ describe("users management visual contract", () => {
     expect(pageSource).toContain("const [rangeDays, setRangeDays] = useState<RangeDays>(30);");
     expect(pageSource).not.toContain("UsersManagementHero");
     expect(chromeSource).not.toContain("AdminPageHero");
-    expect(chromeSource).toContain("applyQuickFilter");
+    expect(chromeSource).toContain("<AdminMetricStrip");
     expect(chromeSource).toContain("className={styles.summaryGrid}");
     expect(chromeSource).toContain("className={styles.summaryHeader}");
     expect(chromeSource).toContain("className={styles.summaryTitle}");
@@ -93,12 +94,17 @@ describe("users management visual contract", () => {
     const usersSource = readUsersManagementPageLibrarySource();
     const tableSource = readFileSync(usersTablePath, "utf8");
 
-    expect(tableSource).toContain("<th>{ui.filterStatus}</th>");
+    expect(tableSource).toContain("<span>{ui.userColumn}</span>");
+    expect(tableSource).toContain("<th>{ui.accountAndAccess}</th>");
     expect(tableSource).toContain("<th>{ui.plan}</th>");
-    expect(tableSource).toContain("<th>{ui.balance}</th>");
+    expect(tableSource).toContain("<th>{ui.registeredAt}</th>");
+    expect(tableSource).toContain("<th>{ui.quickActions}</th>");
     expect(tableSource).toContain("data-label={ui.quickActions}");
-    expect(tableSource).toContain("onOpenUser(user)");
-    expect(tableSource).toContain("MoreHorizontalIcon");
+    expect(tableSource).toContain("data-label={ui.registeredAt}");
+    expect(tableSource).toContain("href={`/${locale}/users/${encodeURIComponent(user.userId)}`}");
+    expect(tableSource).toContain("?tab=wallet");
+    expect(tableSource).toContain("?tab=support");
+    expect(tableSource).toContain('role="group"');
 
     for (const legacyRegistryConcern of [
       "ActivityFilter",
@@ -187,7 +193,7 @@ describe("users management visual contract", () => {
     expect(usersSource).toContain("title={ui.nextPageLabel}");
     expect(usersSource).toContain("className={`${styles.pageIcon} ${styles.pageIconPrevious}`}");
     expect(usersSource).toContain("className={`${styles.pageIcon} ${styles.pageIconNext}`}");
-    expect(usersSource).toContain("className={styles.rowMenuButton}");
+    expect(usersSource).toContain("className={styles.identityArrow}");
     expect(tableSource).toContain(
       "const shouldShowPagination = totalPages > 1 || currentPage > 1;"
     );

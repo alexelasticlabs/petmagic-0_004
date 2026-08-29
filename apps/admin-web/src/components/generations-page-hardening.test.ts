@@ -12,7 +12,7 @@ const generationsStylesPath = fileURLToPath(
 );
 
 describe("generations page hardening", () => {
-  it("exposes the stable authenticated route marker used by the deployment smoke gate", () => {
+  it("exposes the stable authenticated route marker used by the Render postdeploy gate", () => {
     const source = readGenerationsPageLibrarySource();
 
     expect(source.match(/data-admin-route="generations"/g) ?? []).toHaveLength(2);

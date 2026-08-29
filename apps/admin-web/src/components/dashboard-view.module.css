@@ -171,26 +171,6 @@
   list-style: none;
 }
 
-.attentionOverflow {
-  min-width: 0;
-  border-top: 1px solid var(--border-soft);
-}
-
-.attentionOverflow summary {
-  min-height: 2.5rem;
-  display: inline-flex;
-  align-items: center;
-  color: var(--info);
-  cursor: pointer;
-  font-size: 0.78rem;
-  font-weight: 700;
-}
-
-.attentionOverflow summary:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--brand) 64%, transparent);
-  outline-offset: 2px;
-}
-
 .attentionItem {
   min-width: 0;
   display: grid;
@@ -734,10 +714,6 @@
   .attentionLink {
     grid-column: 2 / 4;
     justify-self: start;
-  }
-
-  .attentionOverflow summary {
-    width: 100%;
   }
 
   .sectionNotice {

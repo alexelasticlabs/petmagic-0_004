@@ -130,49 +130,11 @@
   align-items: flex-start;
   justify-content: flex-start;
   flex-wrap: wrap;
-  gap: 0.9rem;
-  padding: 0.9rem 1rem;
+  gap: 1.25rem;
+  padding: 1.18rem 1.25rem;
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-lg);
   background: var(--surface-1);
-}
-
-.profileMasthead .quickActions {
-  margin-left: auto;
-  justify-content: flex-end;
-}
-.profileKpis {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 0.5rem;
-}
-.profileKpis button {
-  min-width: 0;
-  display: grid;
-  gap: 0.15rem;
-  padding: 0.7rem 0.75rem;
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-sm);
-  background: var(--surface-2);
-  color: var(--text-strong);
-  font: inherit;
-  font-size: 1.05rem;
-  font-weight: 700;
-  text-align: left;
-  cursor: pointer;
-}
-.profileKpis button:hover {
-  border-color: var(--border-accent);
-  background: var(--surface-hover);
-  color: var(--accent-strong);
-}
-.profileKpis span {
-  overflow: hidden;
-  color: var(--text-muted);
-  font-size: 0.68rem;
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .profilePrimary {
@@ -218,9 +180,10 @@
 .overviewWorkspace {
   display: grid;
   gap: 1.1rem;
-  padding: 0;
-  border: 0;
-  background: transparent;
+  padding: 1.12rem 1.2rem 1.2rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
+  background: var(--surface-1);
 }
 
 .workspaceHeader {
@@ -323,7 +286,7 @@
 }
 
 .activityEmptyState {
-  min-height: 5rem;
+  min-height: 10rem;
   align-content: center;
 }
 
@@ -931,9 +894,6 @@
 }
 
 @media (max-width: 900px) {
-  .profileKpis {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
   .profileMasthead {
     align-items: stretch;
     flex-direction: column;
@@ -945,14 +905,6 @@
 }
 
 @media (max-width: 640px) {
-  .profileKpis {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .profileMasthead .quickActions {
-    width: 100%;
-    margin-left: 0;
-    justify-content: flex-start;
-  }
   .errorActions > *,
   .quickActions > * {
     width: 100%;

@@ -98,20 +98,6 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
   const premiumUsersValue = formatMetricCount(userMetrics?.premiumUsers);
   const blockedUsersValue = formatMetricCount(userMetrics?.blockedUsers);
   const newUsersValue = formatMetricCount(getNewUsersCountForRange(userMetrics, rangeDays));
-  const applyQuickFilter = useCallback(
-    (filter: "all" | "active" | "premium" | "attention" | "new") => {
-      setSearch("");
-      setRoleFilter("all");
-      setPremiumFilter(filter === "premium" ? "premium" : "all");
-      setStatusFilter(
-        filter === "active" ? "active" : filter === "attention" ? "unconfirmed" : "all"
-      );
-      setSortMode(filter === "new" ? "created_desc" : "created_desc");
-      if (filter === "new") setRangeDays(7);
-      resetUsersPage();
-    },
-    [resetUsersPage]
-  );
 
   if (!canManageRoles) {
     return (
@@ -133,7 +119,6 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
     <AdminPage className={styles.page}>
       <UsersManagementPageWorkspace
         activeUsersValue={activeUsersValue}
-        applyQuickFilter={applyQuickFilter}
         blockedUsersValue={blockedUsersValue}
         currentPage={currentPage}
         error={error}

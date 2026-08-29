@@ -21,7 +21,6 @@ import type {
 } from "@/components/users-management-page.types";
 import { UsersManagementUsersFilters } from "@/components/users-management-users-card.filters";
 import { UsersManagementUsersTable } from "@/components/users-management-users-card.table";
-import { UsersManagementUserDrawer } from "@/components/users-management-user-drawer";
 import { adminQueryKeys } from "@/lib/admin-query-keys";
 import { updateAdminUrlState } from "@/lib/admin-url-state";
 import { useAuthSession, type UserListItem } from "@/lib/api-client";
@@ -133,7 +132,6 @@ export function UsersManagementUsersCard({
     selectionStorageKey ? readPersistedSelection(selectionStorageKey) : new Map()
   );
   const [bulkEmailDialogOpen, setBulkEmailDialogOpen] = useState(false);
-  const [drawerUser, setDrawerUser] = useState<UserListItem | null>(null);
   const [bulkEmailToast, setBulkEmailToast] = useState<{
     type: "success" | "error";
     message: string;
@@ -304,7 +302,6 @@ export function UsersManagementUsersCard({
           ui={ui}
           onTogglePageSelection={togglePageSelection}
           onToggleUserSelection={toggleUserSelection}
-          onOpenUser={setDrawerUser}
         />
       ) : null}
 
@@ -317,6 +314,22 @@ export function UsersManagementUsersCard({
           selectedUserIdList.length,
           selectedUsers.size
         )}
+        items={selectedUserList.map((item) => ({
+          id: item.id,
+          label: item.label,
+          eligible: item.eligible,
+          eligibilityLabel: item.eligible
+            ? ui.bulkEmail.selectionEligible
+            : ui.bulkEmail.selectionIneligible,
+          removeLabel: ui.bulkEmail.selectionRemove,
+        }))}
+        onRemove={(userId) =>
+          setSelectedUsers((current) => {
+            const next = new Map(current);
+            next.delete(userId);
+            return next;
+          })
+        }
         onClear={() => setSelectedUsers(new Map())}
       >
         <Button
@@ -356,11 +369,6 @@ export function UsersManagementUsersCard({
       {bulkEmailToast ? (
         <Toast message={bulkEmailToast.message} type={bulkEmailToast.type} />
       ) : null}
-      <UsersManagementUserDrawer
-        locale={locale}
-        user={drawerUser}
-        onClose={() => setDrawerUser(null)}
-      />
     </AdminCard>
   );
 }
