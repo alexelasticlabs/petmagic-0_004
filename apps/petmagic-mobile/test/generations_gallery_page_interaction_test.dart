@@ -529,9 +529,7 @@ void main() {
     await tester.tap(failedChip, warnIfMissed: false);
     await tester.pumpAndSettle();
 
-    await tester.tap(
-      find.text(text.generationStatusSupportShortAction).first,
-    );
+    await tester.tap(find.text(text.generationStatusSupportShortAction).first);
     await tester.pumpAndSettle();
     expect(find.text('support-route'), findsOneWidget);
     expect(find.text('support-generation:g-failed-1'), findsOneWidget);
