@@ -48,7 +48,7 @@ public sealed partial class TemplatesServiceTests
         Assert.Equal(
             options.SupportedLocalizationLocales.Order(StringComparer.OrdinalIgnoreCase),
             queued.Select(message => ReadTargetLocale(message.PayloadJson)).Order(StringComparer.OrdinalIgnoreCase));
-        Assert.All(queued, message => Assert.Contains(templateId.ToString("N"), message.DeduplicationKey, StringComparison.Ordinal));
+        Assert.All(queued, message => Assert.Contains(templateId.ToString("D"), message.DeduplicationKey, StringComparison.Ordinal));
     }
 
     [Fact]

@@ -82,6 +82,7 @@ public sealed partial class TemplatesServiceTests
     private static async Task<Guid> CreateActiveImageTemplateAsync(ITemplatesService service, string title, string category, string[] tags)
     {
         var slug = title.ToLowerInvariant().Replace(' ', '-');
+        var media = CreateCompletePublicMediaSet(slug, $"{slug}.jpg", "image/jpeg");
         var created = await service.CreateImageAsync(
             new CreateImageTemplateCommand(
                 title,
@@ -91,11 +92,16 @@ public sealed partial class TemplatesServiceTests
                 false,
                 20,
                 TemplatePromoBadgeMode.New.ToString(),
-                CreatePreviewAsset($"https://cdn.example.com/{slug}.jpg", $"{slug}.jpg", "image/jpeg"),
+                media.Preview,
                 "openai/gpt-image-2/edit",
                 "Keep the same pet.",
                 TemplateStatus.Active.ToString(),
-                PetPhotoRequirements: ["One pet"]),
+                PetPhotoRequirements: ["One pet"],
+                ThumbnailAsset: media.Thumbnail,
+                AnimatedPreviewAsset: media.AnimatedPreview,
+                FeedLoopLowAsset: media.FeedLoopLow,
+                FeedLoopMediumAsset: media.FeedLoopMedium,
+                DetailPreviewAsset: media.DetailPreview),
             CancellationToken.None);
 
         Assert.True(created.IsSuccess, created.Error.Code);
@@ -105,6 +111,7 @@ public sealed partial class TemplatesServiceTests
     private static async Task<Guid> CreateActiveVideoTemplateAsync(ITemplatesService service, string title, string category, string[] tags)
     {
         var slug = title.ToLowerInvariant().Replace(' ', '-');
+        var media = CreateCompletePublicMediaSet(slug, $"{slug}.mp4", "video/mp4");
         var created = await service.CreateVideoAsync(
             new CreateVideoTemplateCommand(
                 title,
@@ -115,7 +122,7 @@ public sealed partial class TemplatesServiceTests
                 30,
                 TemplatePromoBadgeMode.New.ToString(),
                 string.Empty,
-                CreatePreviewAsset($"https://cdn.example.com/{slug}.mp4", $"{slug}.mp4", "video/mp4"),
+                media.Preview,
                 CreateReferenceAsset(8.0),
                 "openai/gpt-image-2/edit",
                 "Keep the same pet.",
@@ -123,7 +130,12 @@ public sealed partial class TemplatesServiceTests
                 "Smooth cinematic motion.",
                 true,
                 TemplateStatus.Active.ToString(),
-                PetPhotoRequirements: ["One pet"]),
+                PetPhotoRequirements: ["One pet"],
+                ThumbnailAsset: media.Thumbnail,
+                AnimatedPreviewAsset: media.AnimatedPreview,
+                FeedLoopLowAsset: media.FeedLoopLow,
+                FeedLoopMediumAsset: media.FeedLoopMedium,
+                DetailPreviewAsset: media.DetailPreview),
             CancellationToken.None);
 
         Assert.True(created.IsSuccess, created.Error.Code);
@@ -608,6 +620,26 @@ public sealed partial class TemplatesServiceTests
         string contentType = "video/mp4")
     {
         return new TemplateAssetCommand(url, fileName, contentType, 2048, 5.0);
+    }
+
+    private static (
+        TemplateAssetCommand Preview,
+        TemplateAssetCommand Thumbnail,
+        TemplateAssetCommand AnimatedPreview,
+        TemplateAssetCommand FeedLoopLow,
+        TemplateAssetCommand FeedLoopMedium,
+        TemplateAssetCommand DetailPreview) CreateCompletePublicMediaSet(
+            string slug,
+            string previewFileName,
+            string previewContentType)
+    {
+        return (
+            CreatePreviewAsset($"https://cdn.example.com/{previewFileName}", previewFileName, previewContentType),
+            CreatePreviewAsset($"https://cdn.example.com/{slug}-thumbnail.jpg", $"{slug}-thumbnail.jpg", "image/jpeg"),
+            CreatePreviewAsset($"https://cdn.example.com/{slug}-animated.mp4", $"{slug}-animated.mp4", "video/mp4"),
+            CreatePreviewAsset($"https://cdn.example.com/{slug}-feed-low.mp4", $"{slug}-feed-low.mp4", "video/mp4"),
+            CreatePreviewAsset($"https://cdn.example.com/{slug}-feed-medium.mp4", $"{slug}-feed-medium.mp4", "video/mp4"),
+            CreatePreviewAsset($"https://cdn.example.com/{slug}-detail.jpg", $"{slug}-detail.jpg", "image/jpeg"));
     }
 
     private static TemplateAssetCommand CreateReferenceAsset(double? durationSeconds, string url = "https://cdn.example.com/reference.mp4")

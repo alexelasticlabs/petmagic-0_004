@@ -39,6 +39,47 @@ public sealed class DatabaseIndexModelTests
     }
 
     [Fact]
+    public void RefreshSessionAuthenticationProviderIndex_ShouldUsePostgresSafeNameAndRenameMigration()
+    {
+        using var dbContext = new IdentityDbContext(
+            new DbContextOptionsBuilder<IdentityDbContext>()
+                .UseNpgsql("Host=localhost;Database=petmagic_migration_discovery;Username=postgres;Password=unused")
+                .Options);
+
+        var index = Assert.Single(
+            dbContext.Model.FindEntityType(typeof(RefreshTokenSession))!.GetIndexes(),
+            candidate => candidate.Properties.Select(property => property.Name).SequenceEqual(
+                ["UserId", "AuthenticationProvider", "CreatedAtUtc"]));
+        Assert.Equal(
+            "IX_refresh_token_sessions_UserId_AuthProvider_CreatedAtUtc",
+            index.GetDatabaseName());
+        Assert.True(index.GetDatabaseName()!.Length <= PostgresIdentifierMaxLength);
+
+        var migrationId = "20260829211500_RenameRefreshSessionAuthenticationProviderIndex";
+        Assert.Contains(migrationId, dbContext.GetService<IMigrationsAssembly>().Migrations.Keys);
+
+        var migration = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "Identity",
+            "PetMagic.Modules.Identity.Infrastructure",
+            "Data",
+            "Migrations",
+            $"{migrationId}.cs"));
+        Assert.Contains(
+            "IX_refresh_token_sessions_UserId_AuthenticationProvider_Created",
+            migration,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "IX_refresh_token_sessions_UserId_AuthProvider_CreatedAtUtc",
+            migration,
+            StringComparison.Ordinal);
+        Assert.Contains("to_regclass", migration, StringComparison.Ordinal);
+        Assert.Contains("ALTER INDEX public.", migration, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void AdminEmailBroadcastMigration_ShouldBeDiscoverableAndBackfillExistingAuditRequests()
     {
         using var dbContext = new IdentityDbContext(

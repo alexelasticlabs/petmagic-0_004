@@ -104,7 +104,8 @@ public sealed partial class TemplatesServiceTests
                 "fal-ai/kling-video/v3/pro/motion-control",
                 "funny dance",
                 true,
-                TemplateStatus.Active.ToString()),
+                TemplateStatus.Active.ToString(),
+                PetPhotoRequirements: ["One pet"]),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -451,7 +452,8 @@ public sealed partial class TemplatesServiceTests
                 CreatePreviewAsset("https://cdn.example.com/portrait-active.jpg", "portrait-active.jpg", "image/jpeg"),
                 "openai/gpt-image-2/edit",
                 "Keep the same pet.",
-                TemplateStatus.Active.ToString()),
+                TemplateStatus.Active.ToString(),
+                PetPhotoRequirements: ["One pet"]),
             CancellationToken.None);
         var draftImage = await service.CreateImageAsync(
             new CreateImageTemplateCommand(
@@ -497,7 +499,8 @@ public sealed partial class TemplatesServiceTests
                 "fal-ai/kling-video/v3/pro/motion-control",
                 "funny dance",
                 true,
-                TemplateStatus.Active.ToString()),
+                TemplateStatus.Active.ToString(),
+                PetPhotoRequirements: ["One pet"]),
             CancellationToken.None);
         var seasonal = await service.CreateImageAsync(
             new CreateImageTemplateCommand(
@@ -511,7 +514,8 @@ public sealed partial class TemplatesServiceTests
                 CreatePreviewAsset("https://cdn.example.com/seasonal.jpg", "seasonal.jpg", "image/jpeg"),
                 "openai/gpt-image-2/edit",
                 "Keep the same pet.",
-                TemplateStatus.Active.ToString()),
+                TemplateStatus.Active.ToString(),
+                PetPhotoRequirements: ["One pet"]),
             CancellationToken.None);
 
         Assert.True(activeImage.IsSuccess);
@@ -617,7 +621,8 @@ public sealed partial class TemplatesServiceTests
                 "keep pet",
                 "fal-ai/kling-video/v3/standard/motion-control",
                 "dance",
-                true),
+                true,
+                PetPhotoRequirements: ["One pet"]),
             CancellationToken.None);
 
         Assert.True(created.IsSuccess);
@@ -964,7 +969,8 @@ public sealed partial class TemplatesServiceTests
                 "keep pet",
                 "fal-ai/kling-video/v3/standard/motion-control",
                 "dance",
-                true),
+                true,
+                PetPhotoRequirements: ["One pet"]),
             CancellationToken.None);
 
         Assert.True(created.IsSuccess);
@@ -987,7 +993,8 @@ public sealed partial class TemplatesServiceTests
                 "fal-ai/kling-video/v3/standard/motion-control",
                 "dance",
                 true,
-                TemplateStatus.Active.ToString()),
+                TemplateStatus.Active.ToString(),
+                PetPhotoRequirements: ["One pet"]),
             CancellationToken.None);
 
         Assert.True(updated.IsFailure);
@@ -1106,7 +1113,8 @@ public sealed partial class TemplatesServiceTests
                 CreatePreviewAsset("https://cdn.example.com/cozy-premium.jpg", "cozy-premium.jpg", "image/jpeg"),
                 "openai/gpt-image-2/edit",
                 "Keep the same pet.",
-                TemplateStatus.Active.ToString()),
+                TemplateStatus.Active.ToString(),
+                PetPhotoRequirements: ["One pet"]),
             CancellationToken.None);
 
         Assert.True(premiumTemplate.IsSuccess);
@@ -1369,7 +1377,8 @@ public sealed partial class TemplatesServiceTests
                 CreatePreviewAsset("https://cdn.example.com/portrait.jpg", "portrait.jpg", "image/jpeg"),
                 "openai/gpt-image-2/edit",
                 "Keep the same pet.",
-                TemplateStatus.Active.ToString()),
+                TemplateStatus.Active.ToString(),
+                PetPhotoRequirements: ["One pet"]),
             CancellationToken.None);
 
         Assert.True(created.IsSuccess);
@@ -1417,7 +1426,8 @@ public sealed partial class TemplatesServiceTests
                 CreatePreviewAsset("https://cdn.example.com/portrait.jpg", "portrait.jpg", "image/jpeg"),
                 "openai/gpt-image-2/edit",
                 "Keep the same pet.",
-                TemplateStatus.Active.ToString()),
+                TemplateStatus.Active.ToString(),
+                PetPhotoRequirements: ["One pet"]),
             CancellationToken.None);
 
         Assert.True(created.IsSuccess);

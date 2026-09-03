@@ -42,7 +42,8 @@ public sealed partial class TemplatesServiceTests
                 "fal-ai/kling-video/v3/pro/motion-control",
                 "dance",
                 true,
-                TemplateStatus.Active.ToString()),
+                TemplateStatus.Active.ToString(),
+                PetPhotoRequirements: ["One pet"]),
             CancellationToken.None);
 
         Assert.True(created.IsSuccess);
@@ -2297,7 +2298,7 @@ public sealed partial class TemplatesServiceTests
                 "cinematic motion",
                 true,
                 TemplateStatus.Active.ToString(),
-                null,
+                ["One pet"],
                 supportsGenerationResultInput,
                 requiredInputMediaType,
                 recommendedAfterImageGeneration),

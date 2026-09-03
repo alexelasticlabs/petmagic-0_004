@@ -123,7 +123,8 @@ public sealed partial class TemplatesApiIntegrationTests
                     null),
                 "openai/gpt-image-2/edit",
                 "Keep the same pet.",
-                TemplateStatus.Active.ToString()),
+                TemplateStatus.Active.ToString(),
+                PetPhotoRequirements: ["One pet with a clearly visible face"]),
             CancellationToken.None);
         Assert.True(created.IsSuccess, created.Error.Code);
 

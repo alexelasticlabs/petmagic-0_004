@@ -197,7 +197,8 @@ public sealed partial class TemplatesApiIntegrationTests
                 "fal-ai/kling-video/v3/pro/motion-control",
                 "Smooth cinematic motion.",
                 true,
-                TemplateStatus.Active.ToString()),
+                TemplateStatus.Active.ToString(),
+                PetPhotoRequirements: ["One pet with a clearly visible face"]),
             CancellationToken.None);
 
         Assert.True(created.IsSuccess);

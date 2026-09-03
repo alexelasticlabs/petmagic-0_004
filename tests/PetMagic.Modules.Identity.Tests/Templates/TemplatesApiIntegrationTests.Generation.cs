@@ -658,7 +658,8 @@ public sealed partial class TemplatesApiIntegrationTests
                 "fal-ai/kling-video/v3/pro/motion-control",
                 "Funny dance.",
                 true,
-                TemplateStatus.Active.ToString()));
+                TemplateStatus.Active.ToString(),
+                PetPhotoRequirements: ["One pet with a clearly visible face"]));
 
         var queued = await UploadGenerationSourceAsync(
             application.Client,
@@ -698,7 +699,7 @@ public sealed partial class TemplatesApiIntegrationTests
         Assert.Equal(generation.GenerationId, fetched.GenerationId);
         Assert.Equal("Completed", fetched.Status);
         Assert.Equal(generation.OutputUrl, fetched.OutputUrl);
-        Assert.EndsWith($"generation-{generation.GenerationId:N}-result-preview.jpg", fetched.ResultPreviewUrl, StringComparison.OrdinalIgnoreCase);
+        Assert.EndsWith($"generation-{generation.GenerationId:N}-watermarked-result-preview.jpg", fetched.ResultPreviewUrl, StringComparison.OrdinalIgnoreCase);
 
         var gallery = await GetFromJsonAsync<GalleryPageResponse>(
             application.Client,
@@ -735,7 +736,8 @@ public sealed partial class TemplatesApiIntegrationTests
                 new TemplateAssetCommand(previewAsset.Url, previewAsset.FileName, previewAsset.ContentType, previewAsset.FileSizeBytes, previewAsset.DurationSeconds),
                 "openai/gpt-image-2/edit",
                 "Keep the same pet.",
-                TemplateStatus.Active.ToString()));
+                TemplateStatus.Active.ToString(),
+                PetPhotoRequirements: ["One pet with a clearly visible face"]));
 
         var queued = await UploadGenerationSourceAsync(
             application.Client,
@@ -893,24 +895,25 @@ public sealed partial class TemplatesApiIntegrationTests
         AssertPrivateMediaJsonHeaders(shareResponse);
         var share = await ReadJsonAsync<GalleryShareResponse>(shareResponse);
 
-        var removeWatermarkPath = $"/api/templates/generations/{generation.GenerationId}/remove-watermark";
-        using var unlockResponse = await application.Client.PostAsJsonAsync(
-            removeWatermarkPath,
-            new { paymentMethod = "credit" });
-        await EnsureSuccessStatusCodeAsync(unlockResponse, removeWatermarkPath);
-        AssertPrivateMediaJsonHeaders(unlockResponse);
-        var unlock = await ReadJsonAsync<RemoveGenerationWatermarkResponse>(unlockResponse);
+        var watermarkedMediaUrl = fetched.OutputUrl;
+        Assert.NotNull(watermarkedMediaUrl);
+
+        var watermarkedPublicSharePath = $"/api/templates/generations/share/{Uri.EscapeDataString(share.ShareToken)}";
+        using var watermarkedPublicShareResponse = await application.Client.GetAsync(watermarkedPublicSharePath);
+        await EnsureSuccessStatusCodeAsync(watermarkedPublicShareResponse, watermarkedPublicSharePath);
+        AssertPrivateMediaJsonHeaders(watermarkedPublicShareResponse);
+        var watermarkedPublicShare = await ReadJsonAsync<PublicGalleryShareResponse>(watermarkedPublicShareResponse);
 
         Assert.Equal(generation.GenerationId, fetched.GenerationId);
         Assert.Equal("Completed", fetched.Status);
-        Assert.Equal(generation.OutputUrl, fetched.OutputUrl);
+        Assert.Equal(generation.OutputUrl, watermarkedMediaUrl);
         Assert.Equal(fetched.OutputUrl, fetched.MediaUrl);
         Assert.Equal(fetched.OutputUrl, fetchedJson.RootElement.GetProperty("outputUrl").GetString());
         Assert.Equal(fetched.OutputUrl, fetchedJson.RootElement.GetProperty("mediaUrl").GetString());
-        Assert.Equal(generation.OutputUrl, download.SignedMediaUrl);
-        Assert.Equal(generation.OutputUrl, download.MediaUrl);
-        Assert.Equal(generation.OutputUrl, share.SignedMediaUrl);
-        Assert.Equal(generation.OutputUrl, share.MediaUrl);
+        Assert.Equal(watermarkedMediaUrl, download.SignedMediaUrl);
+        Assert.Equal(watermarkedMediaUrl, download.MediaUrl);
+        Assert.Equal(watermarkedMediaUrl, share.SignedMediaUrl);
+        Assert.Equal(watermarkedMediaUrl, share.MediaUrl);
         Assert.NotEmpty(share.ShareToken);
         Assert.StartsWith("http://localhost:5000/share/generation/", share.ShareUrl);
         Assert.DoesNotContain("cdn.example.com", share.ShareUrl, StringComparison.OrdinalIgnoreCase);
@@ -919,22 +922,44 @@ public sealed partial class TemplatesApiIntegrationTests
         Assert.Equal("image/png", download.ContentType);
         Assert.Equal("image/png", share.ContentType);
         Assert.Equal(GalleryMediaState.resultReady.ToString(), share.MediaState);
-        Assert.False(download.HasWatermark);
-        Assert.False(share.HasWatermark);
+        Assert.True(download.HasWatermark);
+        Assert.True(share.HasWatermark);
+        Assert.Equal(share.ShareToken, watermarkedPublicShare.ShareToken);
+        Assert.Equal(watermarkedMediaUrl, watermarkedPublicShare.MediaUrl);
+        Assert.True(watermarkedPublicShare.HasWatermark);
 
-        var publicSharePath = $"/api/templates/generations/share/{Uri.EscapeDataString(share.ShareToken)}";
+        var removeWatermarkPath = $"/api/templates/generations/{generation.GenerationId}/remove-watermark";
+        using var unlockResponse = await application.Client.PostAsJsonAsync(
+            removeWatermarkPath,
+            new { paymentMethod = "credit" });
+        await EnsureSuccessStatusCodeAsync(unlockResponse, removeWatermarkPath);
+        AssertPrivateMediaJsonHeaders(unlockResponse);
+        var unlock = await ReadJsonAsync<RemoveGenerationWatermarkResponse>(unlockResponse);
+
+        using var cleanDownloadResponse = await application.Client.GetAsync(downloadPath);
+        await EnsureSuccessStatusCodeAsync(cleanDownloadResponse, downloadPath);
+        AssertPrivateMediaJsonHeaders(cleanDownloadResponse);
+        var cleanDownload = await ReadJsonAsync<GalleryDownloadResponse>(cleanDownloadResponse);
+
+        using var cleanShareResponse = await application.Client.PostAsJsonAsync(sharePath, new { });
+        await EnsureSuccessStatusCodeAsync(cleanShareResponse, sharePath);
+        AssertPrivateMediaJsonHeaders(cleanShareResponse);
+        var cleanShare = await ReadJsonAsync<GalleryShareResponse>(cleanShareResponse);
+
+        var publicSharePath = $"/api/templates/generations/share/{Uri.EscapeDataString(cleanShare.ShareToken)}";
         using var publicShareResponse = await application.Client.GetAsync(publicSharePath);
         await EnsureSuccessStatusCodeAsync(publicShareResponse, publicSharePath);
         AssertPrivateMediaJsonHeaders(publicShareResponse);
         var publicShare = await ReadJsonAsync<PublicGalleryShareResponse>(publicShareResponse);
-        Assert.Equal(share.ShareToken, publicShare.ShareToken);
+        Assert.Equal(cleanShare.ShareToken, publicShare.ShareToken);
         Assert.Equal(GalleryMediaState.resultReady.ToString(), publicShare.MediaState);
-        Assert.Equal(generation.OutputUrl, publicShare.MediaUrl);
+        Assert.Equal(unlock.MediaUrl, publicShare.MediaUrl);
+        Assert.False(publicShare.HasWatermark);
         Assert.Null(publicShare.ReasonCode);
-        using var publicPage = await application.Client.GetAsync($"/share/generation/{Uri.EscapeDataString(share.ShareToken)}");
+        using var publicPage = await application.Client.GetAsync($"/share/generation/{Uri.EscapeDataString(cleanShare.ShareToken)}");
         publicPage.EnsureSuccessStatusCode();
         var publicPageBody = await publicPage.Content.ReadAsStringAsync();
-        Assert.Contains(generation.OutputUrl!, publicPageBody, StringComparison.Ordinal);
+        Assert.Contains(unlock.MediaUrl!, publicPageBody, StringComparison.Ordinal);
         Assert.DoesNotContain(TestUserId.ToString(), publicPageBody, StringComparison.OrdinalIgnoreCase);
         Assert.Equal("no-store", publicPage.Headers.CacheControl?.ToString());
         Assert.Contains(publicPage.Headers.Pragma, value => string.Equals(value.Name, "no-cache", StringComparison.OrdinalIgnoreCase));
@@ -955,7 +980,10 @@ public sealed partial class TemplatesApiIntegrationTests
         using var invalidShare = await application.Client.GetAsync("/api/templates/generations/share/not-a-token");
         Assert.Equal(HttpStatusCode.NotFound, invalidShare.StatusCode);
         Assert.True(unlock.WatermarkRemoved);
-        Assert.Equal(generation.OutputUrl, unlock.MediaUrl);
+        Assert.Equal(unlock.MediaUrl, cleanDownload.MediaUrl);
+        Assert.Equal(unlock.MediaUrl, cleanShare.MediaUrl);
+        Assert.False(cleanDownload.HasWatermark);
+        Assert.False(cleanShare.HasWatermark);
     }
 
     [Theory]
@@ -1093,7 +1121,8 @@ public sealed partial class TemplatesApiIntegrationTests
                 "fal-ai/kling-video/v3/standard/motion-control",
                 "Dance prompt.",
                 true,
-                TemplateStatus.Active.ToString()));
+                TemplateStatus.Active.ToString(),
+                PetPhotoRequirements: ["One pet with a clearly visible face"]));
 
         var queued = await UploadGenerationSourceAsync(
             application.Client,
@@ -1141,7 +1170,8 @@ public sealed partial class TemplatesApiIntegrationTests
                     previewAsset.DurationSeconds),
                 "openai/gpt-image-2/edit",
                 "Keep the same pet.",
-                TemplateStatus.Active.ToString()));
+                TemplateStatus.Active.ToString(),
+                PetPhotoRequirements: ["One pet with a clearly visible face"]));
 
         using var response = await UploadGenerationSourceWithClaimsAsync(
             application.Client,
@@ -1185,7 +1215,8 @@ public sealed partial class TemplatesApiIntegrationTests
                     previewAsset.DurationSeconds),
                 "openai/gpt-image-2/edit",
                 "Keep the same pet.",
-                TemplateStatus.Active.ToString()));
+                TemplateStatus.Active.ToString(),
+                PetPhotoRequirements: ["One pet with a clearly visible face"]));
 
         using var response = await UploadGenerationSourceWithClaimsAsync(
             application.Client,

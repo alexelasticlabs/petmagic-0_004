@@ -73,7 +73,9 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
             entity.Property(x => x.RevokedAtUtc).IsConcurrencyToken();
             entity.HasIndex(x => x.TokenHash).IsUnique();
             entity.HasIndex(x => x.UserId);
-            entity.HasIndex(x => new { x.UserId, x.AuthenticationProvider, x.CreatedAtUtc });
+            entity
+                .HasIndex(x => new { x.UserId, x.AuthenticationProvider, x.CreatedAtUtc })
+                .HasDatabaseName("IX_refresh_token_sessions_UserId_AuthProvider_CreatedAtUtc");
         });
 
         builder.Entity<ExternalAuthProvider>(entity =>

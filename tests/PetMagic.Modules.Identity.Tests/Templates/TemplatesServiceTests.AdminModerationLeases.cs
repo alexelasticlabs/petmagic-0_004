@@ -108,10 +108,17 @@ public sealed partial class TemplatesServiceTests
             ],
             auditLog.Entries.Select(entry => entry.Action).ToArray());
         Assert.All(auditLog.Entries, entry => Assert.NotNull(entry.EventId));
-        Assert.Equal(3, await dbContext.PushOutboxMessages.CountAsync());
-        Assert.All(
-            await dbContext.PushOutboxMessages.ToListAsync(),
-            message => Assert.Equal(PushOutboxStatus.Sent, message.Status));
+        var auditMessages = await dbContext.PushOutboxMessages
+            .Where(message => message.Kind == TemplateAdminAuditOutbox.Kind)
+            .ToArrayAsync();
+        Assert.Equal(
+            auditLog.Entries
+                .Select(entry => $"templates_admin_audit:{entry.EventId!.Value:D}")
+                .Order(StringComparer.Ordinal),
+            auditMessages
+                .Select(message => message.DeduplicationKey)
+                .Order(StringComparer.Ordinal));
+        Assert.All(auditMessages, message => Assert.Equal(PushOutboxStatus.Sent, message.Status));
     }
 
     [Fact]
@@ -256,7 +263,8 @@ public sealed partial class TemplatesServiceTests
             CancellationToken.None);
 
         Assert.True(result.IsSuccess, result.Error.Code);
-        var outbox = await dbContext.PushOutboxMessages.SingleAsync();
+        var outbox = await dbContext.PushOutboxMessages.SingleAsync(
+            message => message.Kind == TemplateAdminAuditOutbox.Kind);
         Assert.Equal(TemplateAdminAuditOutbox.Kind, outbox.Kind);
         Assert.Equal(PushOutboxStatus.Queued, outbox.Status);
         var persisted = await dbContext.TemplateAnalyticsEvents.AsNoTracking().SingleAsync(item => item.Id == eventId);

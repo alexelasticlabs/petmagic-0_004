@@ -70,6 +70,15 @@ public sealed class BackendEnvironmentContractTests
     }
 
     [Fact]
+    public void StagingEnvExample_ShouldKeepR2PublicUrlFailClosedUntilConfigured()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var envExampleValues = ReadEnvExampleValues(Path.Combine(repositoryRoot, ".env.staging.local.example"));
+
+        Assert.Equal("__REQUIRED__", envExampleValues["R2_PUBLIC_URL"]);
+    }
+
+    [Fact]
     public void EnvExample_ShouldExposeBackendBillingAndStoreKeysThatBackendReads()
     {
         var repositoryRoot = FindRepositoryRoot();

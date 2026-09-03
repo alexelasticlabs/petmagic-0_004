@@ -28,7 +28,8 @@ public sealed partial class TemplatesServiceTests
                 TemplatePromoBadgeMode.Auto.ToString(),
                 CreatePreviewAsset("https://cdn.example.com/portrait.jpg", "portrait.jpg", "image/jpeg"),
                 "openai/gpt-image-2/edit",
-                "Keep the same pet."),
+                "Keep the same pet.",
+                PetPhotoRequirements: ["One pet"]),
             CancellationToken.None);
 
         var draftVideo = await service.CreateVideoAsync(
@@ -155,7 +156,8 @@ public sealed partial class TemplatesServiceTests
                 CreatePreviewAsset("https://cdn.example.com/legacy-detail.jpg", "legacy-detail.jpg", "image/jpeg"),
                 "openai/gpt-image-2/edit",
                 "Keep the same pet.",
-                TemplateStatus.Active.ToString()),
+                TemplateStatus.Active.ToString(),
+                PetPhotoRequirements: ["One pet"]),
             CancellationToken.None);
 
         Assert.True(created.IsSuccess);
@@ -319,7 +321,8 @@ public sealed partial class TemplatesServiceTests
                 CreatePreviewAsset("https://cdn.example.com/stable-old-renamed.jpg", "stable-old-renamed.jpg", "image/jpeg"),
                 "openai/gpt-image-2/edit",
                 "Keep the same pet.",
-                TemplateStatus.Active.ToString()),
+                TemplateStatus.Active.ToString(),
+                PetPhotoRequirements: ["One pet"]),
             CancellationToken.None);
 
         var after = await service.ListPublicFeedAsync(
@@ -354,7 +357,8 @@ public sealed partial class TemplatesServiceTests
                 TemplatePromoBadgeMode.New.ToString(),
                 CreatePreviewAsset("https://cdn.example.com/publish-once.jpg", "publish-once.jpg", "image/jpeg"),
                 "openai/gpt-image-2/edit",
-                "Keep the same pet."),
+                "Keep the same pet.",
+                PetPhotoRequirements: ["One pet"]),
             CancellationToken.None);
 
         Assert.True(created.IsSuccess);
@@ -379,7 +383,8 @@ public sealed partial class TemplatesServiceTests
                 CreatePreviewAsset("https://cdn.example.com/publish-once-updated.jpg", "publish-once-updated.jpg", "image/jpeg"),
                 "openai/gpt-image-2/edit",
                 "Keep the same pet.",
-                TemplateStatus.Active.ToString()),
+                TemplateStatus.Active.ToString(),
+                PetPhotoRequirements: ["One pet"]),
             CancellationToken.None);
 
         Assert.True(updated.IsSuccess);
@@ -535,7 +540,8 @@ public sealed partial class TemplatesServiceTests
                 CreatePreviewAsset("https://cdn.example.com/description-search.jpg", "description-search.jpg", "image/jpeg"),
                 "openai/gpt-image-2/edit",
                 "Keep the same pet.",
-                TemplateStatus.Active.ToString()),
+                TemplateStatus.Active.ToString(),
+                PetPhotoRequirements: ["One pet"]),
             CancellationToken.None);
         var requirementsMatch = await service.CreateImageAsync(
             new CreateImageTemplateCommand(
@@ -810,7 +816,8 @@ public sealed partial class TemplatesServiceTests
                 CreatePreviewAsset("https://cdn.example.com/premium-portrait.jpg", "premium-portrait.jpg", "image/jpeg"),
                 "openai/gpt-image-2/edit",
                 "Keep the same pet.",
-                TemplateStatus.Active.ToString()),
+                TemplateStatus.Active.ToString(),
+                PetPhotoRequirements: ["One pet"]),
             CancellationToken.None);
 
         Assert.True(premiumTemplate.IsSuccess);

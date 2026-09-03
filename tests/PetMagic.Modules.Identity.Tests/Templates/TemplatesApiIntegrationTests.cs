@@ -82,12 +82,7 @@ public sealed partial class TemplatesApiIntegrationTests
     private static async Task<AdminTemplateResponse> CreateActiveImageTemplateAsync(HttpClient client, string title, string category, string[] tags)
     {
         var slug = title.ToLowerInvariant().Replace(' ', '-');
-        var previewAsset = await UploadMediaAsync(
-            client,
-            $"{slug}.jpg",
-            "image/jpeg",
-            TemplateAssetKind.Preview,
-            Encoding.UTF8.GetBytes($"{slug}-image-content"));
+        var media = await UploadCompletePublicMediaSetAsync(client, slug);
 
         return await PostAsJsonAsync<AdminTemplateResponse>(
             client,
@@ -100,10 +95,43 @@ public sealed partial class TemplatesApiIntegrationTests
                 false,
                 20,
                 TemplatePromoBadgeMode.New.ToString(),
-                new TemplateAssetCommand(previewAsset.Url, previewAsset.FileName, previewAsset.ContentType, previewAsset.FileSizeBytes, previewAsset.DurationSeconds),
+                media.Preview,
                 "openai/gpt-image-2/edit",
                 "Keep the same pet.",
-                TemplateStatus.Active.ToString()));
+                TemplateStatus.Active.ToString(),
+                PetPhotoRequirements: ["One pet with a clearly visible face"],
+                ThumbnailAsset: media.Thumbnail,
+                AnimatedPreviewAsset: media.AnimatedPreview,
+                FeedLoopLowAsset: media.FeedLoopLow,
+                FeedLoopMediumAsset: media.FeedLoopMedium,
+                DetailPreviewAsset: media.DetailPreview));
+    }
+
+    private static async Task<(
+        TemplateAssetCommand Preview,
+        TemplateAssetCommand Thumbnail,
+        TemplateAssetCommand AnimatedPreview,
+        TemplateAssetCommand FeedLoopLow,
+        TemplateAssetCommand FeedLoopMedium,
+        TemplateAssetCommand DetailPreview)> UploadCompletePublicMediaSetAsync(HttpClient client, string slug)
+    {
+        var preview = await UploadMediaAsync(client, $"{slug}.jpg", "image/jpeg", TemplateAssetKind.Preview, Encoding.UTF8.GetBytes($"{slug}-preview"));
+        var thumbnail = await UploadMediaAsync(client, $"{slug}-thumbnail.jpg", "image/jpeg", TemplateAssetKind.Thumbnail, Encoding.UTF8.GetBytes($"{slug}-thumbnail"));
+        var animatedPreview = await UploadMediaAsync(client, $"{slug}-animated.mp4", "video/mp4", TemplateAssetKind.AnimatedPreview, Encoding.UTF8.GetBytes($"{slug}-animated"));
+        var feedLoopLow = await UploadMediaAsync(client, $"{slug}-feed-low.mp4", "video/mp4", TemplateAssetKind.FeedLoopLow, Encoding.UTF8.GetBytes($"{slug}-feed-low"));
+        var feedLoopMedium = await UploadMediaAsync(client, $"{slug}-feed-medium.mp4", "video/mp4", TemplateAssetKind.FeedLoopMedium, Encoding.UTF8.GetBytes($"{slug}-feed-medium"));
+        var detailPreview = await UploadMediaAsync(client, $"{slug}-detail.jpg", "image/jpeg", TemplateAssetKind.DetailPreview, Encoding.UTF8.GetBytes($"{slug}-detail"));
+
+        return (
+            ToCommand(preview),
+            ToCommand(thumbnail),
+            ToCommand(animatedPreview),
+            ToCommand(feedLoopLow),
+            ToCommand(feedLoopMedium),
+            ToCommand(detailPreview));
+
+        static TemplateAssetCommand ToCommand(TemplateAssetResponse asset) =>
+            new(asset.Url, asset.FileName, asset.ContentType, asset.FileSizeBytes, asset.DurationSeconds);
     }
 
     private static async Task<TemplateGenerationResponse> UploadGenerationSourceAsync(

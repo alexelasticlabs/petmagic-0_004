@@ -77,7 +77,8 @@ public sealed partial class TemplatesServiceTests
                 "fal-ai/kling-video/v3/pro/motion-control",
                 "motion prompt",
                 true,
-                TemplateStatus.Active.ToString()),
+                TemplateStatus.Active.ToString(),
+                PetPhotoRequirements: ["One pet"]),
             CancellationToken.None);
 
         Assert.True(createdVideo.IsSuccess);

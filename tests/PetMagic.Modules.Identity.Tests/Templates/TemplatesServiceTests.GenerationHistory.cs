@@ -1272,7 +1272,8 @@ public sealed partial class TemplatesServiceTests
                 CreatePreviewAsset("https://cdn.example.com/portrait.jpg", "portrait.jpg", "image/jpeg"),
                 "openai/gpt-image-2/edit",
                 "keep pet",
-                TemplateStatus.Active.ToString()),
+                TemplateStatus.Active.ToString(),
+                PetPhotoRequirements: ["One pet"]),
             CancellationToken.None);
 
         Assert.True(created.IsSuccess);

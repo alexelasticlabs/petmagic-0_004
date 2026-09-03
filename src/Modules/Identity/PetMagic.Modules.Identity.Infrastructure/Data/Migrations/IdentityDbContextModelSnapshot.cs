@@ -791,7 +791,8 @@ namespace PetMagic.Modules.Identity.Infrastructure.Data.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.HasIndex("UserId", "AuthenticationProvider", "CreatedAtUtc");
+                    b.HasIndex("UserId", "AuthenticationProvider", "CreatedAtUtc")
+                        .HasDatabaseName("IX_refresh_token_sessions_UserId_AuthProvider_CreatedAtUtc");
 
                     b.ToTable("refresh_token_sessions", (string)null);
                 });

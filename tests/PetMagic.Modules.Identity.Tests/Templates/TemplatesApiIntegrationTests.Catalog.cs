@@ -59,7 +59,8 @@ public sealed partial class TemplatesApiIntegrationTests
                 "fal-ai/kling-video/v3/pro/motion-control",
                 "Funny dance.",
                 true,
-                TemplateStatus.Draft.ToString()));
+                TemplateStatus.Draft.ToString(),
+                PetPhotoRequirements: ["One pet with a clearly visible face"]));
 
         Assert.Equal("Draft", created.Status);
         Assert.Equal(8.75, created.ReferenceVideoDurationSeconds);
@@ -359,7 +360,8 @@ public sealed partial class TemplatesApiIntegrationTests
                 new TemplateAssetCommand(previewAsset.Url, previewAsset.FileName, previewAsset.ContentType, previewAsset.FileSizeBytes, previewAsset.DurationSeconds),
                 "openai/gpt-image-2/edit",
                 "Keep the same pet.",
-                TemplateStatus.Active.ToString()));
+                TemplateStatus.Active.ToString(),
+                PetPhotoRequirements: ["One pet with a clearly visible face"]));
 
         Assert.Equal("Active", created.Status);
 
@@ -694,6 +696,7 @@ public sealed partial class TemplatesApiIntegrationTests
                 "openai/gpt-image-2/edit",
                 "__petmagic_fake_fail__",
                 TemplateStatus.Active.ToString(),
+                PetPhotoRequirements: ["One pet with a clearly visible face"],
                 IsQaOnly: true));
 
         application.Client.DefaultRequestHeaders.Authorization = null;
@@ -1129,7 +1132,8 @@ public sealed partial class TemplatesApiIntegrationTests
                 "fal-ai/kling-video/v3/pro/motion-control",
                 "Gentle loop.",
                 false,
-                TemplateStatus.Active.ToString()));
+                TemplateStatus.Active.ToString(),
+                PetPhotoRequirements: ["One pet with a clearly visible face"]));
 
         application.Client.DefaultRequestHeaders.Authorization = null;
 
@@ -1538,12 +1542,7 @@ public sealed partial class TemplatesApiIntegrationTests
         string[] tags)
     {
         var slug = title.ToLowerInvariant().Replace(' ', '-');
-        var previewAsset = await UploadMediaAsync(
-            client,
-            $"{slug}.jpg",
-            "image/jpeg",
-            TemplateAssetKind.Preview,
-            Encoding.UTF8.GetBytes($"{slug}-image-content"));
+        var media = await UploadCompletePublicMediaSetAsync(client, slug);
 
         return await PostAsJsonAsync<AdminTemplateResponse>(
             client,
@@ -1556,15 +1555,16 @@ public sealed partial class TemplatesApiIntegrationTests
                 true,
                 20,
                 TemplatePromoBadgeMode.New.ToString(),
-                new TemplateAssetCommand(
-                    previewAsset.Url,
-                    previewAsset.FileName,
-                    previewAsset.ContentType,
-                    previewAsset.FileSizeBytes,
-                    previewAsset.DurationSeconds),
+                media.Preview,
                 "openai/gpt-image-2/edit",
                 "Keep the same pet.",
-                TemplateStatus.Active.ToString()));
+                TemplateStatus.Active.ToString(),
+                PetPhotoRequirements: ["One pet with a clearly visible face"],
+                ThumbnailAsset: media.Thumbnail,
+                AnimatedPreviewAsset: media.AnimatedPreview,
+                FeedLoopLowAsset: media.FeedLoopLow,
+                FeedLoopMediumAsset: media.FeedLoopMedium,
+                DetailPreviewAsset: media.DetailPreview));
     }
 
     [Fact]
@@ -1657,7 +1657,8 @@ public sealed partial class TemplatesApiIntegrationTests
                 "fal-ai/kling-video/v3/standard/motion-control",
                 "Dance prompt.",
                 true,
-                TemplateStatus.Active.ToString()));
+                TemplateStatus.Active.ToString(),
+                PetPhotoRequirements: ["One pet with a clearly visible face"]));
 
         var body = await response.Content.ReadAsStringAsync();
 
@@ -1703,7 +1704,8 @@ public sealed partial class TemplatesApiIntegrationTests
                 "fal-ai/kling-video/v3/pro/motion-control",
                 "Feedback dance.",
                 true,
-                TemplateStatus.Active.ToString()));
+                TemplateStatus.Active.ToString(),
+                PetPhotoRequirements: ["One pet with a clearly visible face"]));
 
         using var postResponse = await application.Client.PostAsJsonAsync(
             $"/api/templates/{created.TemplateId}/analytics/events",
@@ -1761,7 +1763,8 @@ public sealed partial class TemplatesApiIntegrationTests
                     previewAsset.DurationSeconds),
                 "openai/gpt-image-2/edit",
                 "Keep the pet centered.",
-                TemplateStatus.Active.ToString()));
+                TemplateStatus.Active.ToString(),
+                PetPhotoRequirements: ["One pet with a clearly visible face"]));
 
         var oversizedValue = new string('x', 240);
         using var postResponse = await application.Client.PostAsJsonAsync(
