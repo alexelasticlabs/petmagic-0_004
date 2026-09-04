@@ -12,7 +12,7 @@ import { formatPrice, getImageModelPrice, getMotionModelPrice } from "@/lib/mode
 import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 const referenceMotionAccept = ".mp4,video/mp4,application/mp4";
-const TEMPLATE_REFERENCE_MOTION_MAX_BYTES = 128 * 1024 * 1024;
+const TEMPLATE_REFERENCE_MOTION_MAX_BYTES = 100 * 1024 * 1024;
 const promptMaxLength = 1000;
 
 type TemplateReferenceAssetSectionProps = {

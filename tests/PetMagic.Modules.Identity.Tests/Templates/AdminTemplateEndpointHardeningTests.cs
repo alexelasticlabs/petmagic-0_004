@@ -750,7 +750,7 @@ public sealed class AdminTemplateEndpointHardeningTests
             "private static async Task<Dictionary<string, string[]>> ValidateSourceImageAsync");
         var mediaUploadBody = ExtractMethodBody(
             source,
-            "internal static async Task<Results<Ok<TemplateAssetResponse>, ValidationProblem, ProblemHttpResult>> UploadMediaAsync");
+            "internal static async Task<Results<Ok<TemplateMediaUploadResponse>, ValidationProblem, ProblemHttpResult>> UploadMediaAsync");
         var sourceTooLargeIndex = sourceValidationBody.IndexOf("templates.source_image_too_large", StringComparison.Ordinal);
         var sourceSniffIndex = sourceValidationBody.IndexOf("TemplateUploadSniffer.DetectContentTypeAsync", StringComparison.Ordinal);
         var mediaTooLargeIndex = mediaUploadBody.IndexOf("templates.file_too_large", StringComparison.Ordinal);

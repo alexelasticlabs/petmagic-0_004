@@ -1,3 +1,4 @@
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -43,6 +44,56 @@ public sealed class TemplateMediaCleanupProcessorTests
         Assert.Contains("http://localhost:5000/templates-media/temp-preview.jpg", mediaStorage.DeletedUrls);
         Assert.Equal(TemplateMediaLifecycleState.Deleted, record.LifecycleState);
         Assert.NotNull(record.DeletedAtUtc);
+    }
+
+    [Fact]
+    public async Task CleanupNextExpiredTemporaryUploadAsync_ShouldRepairRecord_WhenLiveTemplateReferencesNormalizedUrl()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        await using var dbContext = await CreateSqliteDbContextAsync(connection);
+        const string url = "http://localhost:5000/templates-media/live-preview.jpg";
+        var template = CreateReadyTemplate();
+        template.Assets =
+        [
+            new TemplateAsset
+            {
+                Id = Guid.NewGuid(),
+                TemplateId = template.Id,
+                AssetKind = TemplateAssetKind.Preview,
+                Url = $"  {url}  ",
+                FileName = "live-preview.jpg",
+                ContentType = "image/jpeg"
+            }
+        ];
+        dbContext.TemplateItems.Add(template);
+        dbContext.TemplateMediaRecords.Add(new TemplateMediaRecord
+        {
+            Id = Guid.NewGuid(),
+            Url = url,
+            FileName = "live-preview.jpg",
+            ContentType = "image/jpeg",
+            FileSizeBytes = 1024,
+            Role = TemplateMediaRole.PreviewAsset,
+            LifecycleState = TemplateMediaLifecycleState.Temporary,
+            UploadedAtUtc = DateTime.UtcNow.AddHours(-2),
+            ExpiresAtUtc = DateTime.UtcNow.AddMinutes(-5)
+        });
+        await dbContext.SaveChangesAsync();
+
+        var mediaStorage = new TrackingMediaStorage();
+        var processor = CreateProcessor(dbContext, mediaStorage: mediaStorage);
+
+        var processed = await processor.CleanupNextExpiredTemporaryUploadAsync(CancellationToken.None);
+
+        var record = await dbContext.TemplateMediaRecords.SingleAsync();
+        Assert.True(processed);
+        Assert.Empty(mediaStorage.DeletedUrls);
+        Assert.Equal(TemplateMediaLifecycleState.AttachedToTemplate, record.LifecycleState);
+        Assert.Equal(template.Id, record.TemplateId);
+        Assert.Null(record.ExpiresAtUtc);
+        Assert.NotNull(record.AttachedAtUtc);
+        Assert.False(record.IsDeleted);
     }
 
     [Fact]
@@ -324,6 +375,16 @@ public sealed class TemplateMediaCleanupProcessorTests
             .Options;
 
         return new TemplatesDbContext(options);
+    }
+
+    private static async Task<TemplatesDbContext> CreateSqliteDbContextAsync(SqliteConnection connection)
+    {
+        var options = new DbContextOptionsBuilder<TemplatesDbContext>()
+            .UseSqlite(connection)
+            .Options;
+        var dbContext = new TemplatesDbContext(options);
+        await dbContext.Database.EnsureCreatedAsync();
+        return dbContext;
     }
 
     private static TemplateMediaCleanupProcessor CreateProcessor(

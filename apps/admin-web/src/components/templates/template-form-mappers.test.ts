@@ -1,6 +1,15 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const apiClientMocks = vi.hoisted(() => ({
+  createImageTemplate: vi.fn(),
+  createVideoTemplate: vi.fn(),
+  updateImageTemplate: vi.fn(),
+  updateVideoTemplate: vi.fn(),
+}));
+
+vi.mock("@/lib/api-client", () => apiClientMocks);
 
 import {
   TEMPLATE_CATEGORY_MAX_LENGTH,
@@ -20,6 +29,8 @@ import {
   normalizeTemplateIntegerInput,
   parseNumber,
   parseOptionalDecimal,
+  saveImageTemplateFromForm,
+  saveVideoTemplateFromForm,
 } from "@/components/templates/template-form-mappers";
 import type { AdminTemplate } from "@/lib/api-client";
 
@@ -32,6 +43,10 @@ const editorControllerPath = fileURLToPath(
 );
 const formMappersPath = fileURLToPath(new URL("./template-form-mappers.ts", import.meta.url));
 const editorStylesPath = fileURLToPath(new URL("./template-editor.module.css", import.meta.url));
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
 
 describe("template form numeric hardening", () => {
   it("normalizes token cost to bounded digits only", () => {
@@ -319,6 +334,11 @@ describe("template media asset payload hardening", () => {
     expect(formFromTemplate.referenceUrl).toContain("X-Amz-Signature=reference-secret");
     expect(formFromTemplate.previewUrlSource).toBe("persisted");
     expect(formFromTemplate.referenceUrlSource).toBe("persisted");
+    expect(formFromTemplate.thumbnailAsset?.url).toContain("thumbnail-secret");
+    expect(formFromTemplate.animatedPreviewAsset?.url).toContain("animated-secret");
+    expect(formFromTemplate.feedLoopLowAsset?.url).toContain("feed-low-secret");
+    expect(formFromTemplate.feedLoopMediumAsset?.url).toContain("feed-medium-secret");
+    expect(formFromTemplate.detailPreviewAsset?.url).toContain("detail-secret");
   });
 
   it("keeps persisted template media out of save payload asset objects", () => {
@@ -335,12 +355,127 @@ describe("template media asset payload hardening", () => {
     expect(source).toContain("...(keepReferenceMotionAsset ? { keepReferenceMotionAsset } : {})");
     expect(source).toContain("const previewAsset = buildTemplateAsset(");
     expect(source).toContain("previewAsset,");
-    expect(source).toContain("thumbnailAsset: previewAsset");
-    expect(source).toContain("feedLoopLowAsset: previewAsset");
-    expect(source).toContain("detailPreviewAsset: previewAsset");
+    expect(source).toContain(
+      "buildUploadedTemplateAsset(form.previewUrlSource, form.thumbnailAsset)"
+    );
+    expect(source).toContain("form.animatedPreviewAsset");
+    expect(source).toContain(
+      "buildUploadedTemplateAsset(form.previewUrlSource, form.feedLoopLowAsset)"
+    );
+    expect(source).toContain("form.feedLoopMediumAsset");
+    expect(source).toContain(
+      "buildUploadedTemplateAsset(form.previewUrlSource, form.detailPreviewAsset)"
+    );
+    expect(source).toContain("?? previewAsset");
     expect(source).toContain("referenceMotionAsset: buildTemplateAsset(");
     expect(source).toContain("url: url.trim()");
     expect(source).toContain("isQaOnly: form.isQaOnly");
+  });
+
+  it("sends optimized preview variants on create and update", async () => {
+    apiClientMocks.createImageTemplate.mockResolvedValue(createTemplate());
+    apiClientMocks.updateVideoTemplate.mockResolvedValue(createTemplate());
+    const form = {
+      ...createInitialTemplateForm("Image"),
+      previewUrl: "https://cdn.example.com/preview.webp",
+      previewUrlSource: "uploaded" as const,
+      previewFileName: "preview.webp",
+      previewContentType: "image/webp",
+      previewFileSizeBytes: "500000",
+      thumbnailAsset: createAsset("thumbnail.webp", "image/webp", 48_000),
+      animatedPreviewAsset: createAsset("animated.webp", "image/webp", 180_000, 3),
+      feedLoopLowAsset: createAsset("feed-low.mp4", "video/mp4", 620_000, 6),
+      feedLoopMediumAsset: createAsset("feed-medium.mp4", "video/mp4", 1_200_000, 6),
+      detailPreviewAsset: createAsset("detail.webp", "image/webp", 420_000),
+    };
+
+    await saveImageTemplateFromForm(undefined, form, "Draft");
+
+    expect(apiClientMocks.createImageTemplate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        previewAsset: expect.objectContaining({ url: "https://cdn.example.com/preview.webp" }),
+        thumbnailAsset: expect.objectContaining({
+          url: "https://cdn.example.com/thumbnail.webp",
+        }),
+        animatedPreviewAsset: expect.objectContaining({
+          url: "https://cdn.example.com/animated.webp",
+        }),
+        feedLoopLowAsset: expect.objectContaining({
+          url: "https://cdn.example.com/feed-low.mp4",
+        }),
+        feedLoopMediumAsset: expect.objectContaining({
+          url: "https://cdn.example.com/feed-medium.mp4",
+        }),
+        detailPreviewAsset: expect.objectContaining({
+          url: "https://cdn.example.com/detail.webp",
+        }),
+      })
+    );
+
+    await saveVideoTemplateFromForm("template-1", form, "Draft");
+
+    expect(apiClientMocks.updateVideoTemplate).toHaveBeenCalledWith(
+      "template-1",
+      expect.objectContaining({
+        thumbnailAsset: expect.objectContaining({
+          url: "https://cdn.example.com/thumbnail.webp",
+        }),
+        animatedPreviewAsset: expect.objectContaining({
+          url: "https://cdn.example.com/animated.webp",
+        }),
+        feedLoopLowAsset: expect.objectContaining({
+          url: "https://cdn.example.com/feed-low.mp4",
+        }),
+        feedLoopMediumAsset: expect.objectContaining({
+          url: "https://cdn.example.com/feed-medium.mp4",
+        }),
+        detailPreviewAsset: expect.objectContaining({
+          url: "https://cdn.example.com/detail.webp",
+        }),
+      })
+    );
+  });
+
+  it("keeps the legacy preview fallback when upload variants are absent", async () => {
+    apiClientMocks.createVideoTemplate.mockResolvedValue(createTemplate());
+    const form = {
+      ...createInitialTemplateForm("Video"),
+      previewUrl: "https://cdn.example.com/legacy-preview.mp4",
+      previewUrlSource: "uploaded" as const,
+      previewFileName: "legacy-preview.mp4",
+      previewContentType: "video/mp4",
+      previewFileSizeBytes: "800000",
+      previewDurationSeconds: "6",
+    };
+
+    await saveVideoTemplateFromForm(undefined, form, "Draft");
+
+    const payload = apiClientMocks.createVideoTemplate.mock.calls[0]?.[0];
+    expect(payload.thumbnailAsset).toEqual(payload.previewAsset);
+    expect(payload.feedLoopLowAsset).toEqual(payload.previewAsset);
+    expect(payload.detailPreviewAsset).toEqual(payload.previewAsset);
+    expect(payload.animatedPreviewAsset).toBeUndefined();
+    expect(payload.feedLoopMediumAsset).toBeUndefined();
+  });
+
+  it("keeps existing preview variants server-side on an unchanged edit", async () => {
+    apiClientMocks.updateVideoTemplate.mockResolvedValue(createTemplate());
+    const form = createFormFromTemplate(createTemplate());
+
+    await saveVideoTemplateFromForm("template-1", form, "Draft");
+
+    expect(apiClientMocks.updateVideoTemplate).toHaveBeenCalledWith(
+      "template-1",
+      expect.objectContaining({
+        keepPreviewAsset: true,
+        previewAsset: undefined,
+        thumbnailAsset: undefined,
+        animatedPreviewAsset: undefined,
+        feedLoopLowAsset: undefined,
+        feedLoopMediumAsset: undefined,
+        detailPreviewAsset: undefined,
+      })
+    );
   });
 });
 
@@ -367,6 +502,30 @@ function createTemplate(): AdminTemplate {
       contentType: "image/jpeg",
       fileSizeBytes: 100,
     },
+    thumbnailAsset: createAsset(
+      "thumbnail.webp?X-Amz-Signature=thumbnail-secret",
+      "image/webp",
+      40
+    ),
+    animatedPreviewAsset: createAsset(
+      "animated.webp?X-Amz-Signature=animated-secret",
+      "image/webp",
+      80,
+      3
+    ),
+    feedLoopLowAsset: createAsset(
+      "feed-low.mp4?X-Amz-Signature=feed-low-secret",
+      "video/mp4",
+      120,
+      3
+    ),
+    feedLoopMediumAsset: createAsset(
+      "feed-medium.mp4?X-Amz-Signature=feed-medium-secret",
+      "video/mp4",
+      240,
+      3
+    ),
+    detailPreviewAsset: createAsset("detail.webp?X-Amz-Signature=detail-secret", "image/webp", 90),
     referenceMotionAsset: {
       url: "https://cdn.example.com/reference.mp4?X-Amz-Signature=reference-secret",
       fileName: "reference.mp4",
@@ -384,5 +543,20 @@ function createTemplate(): AdminTemplate {
     keepOriginalSound: true,
     createdAtUtc: "2026-06-07T00:00:00Z",
     updatedAtUtc: "2026-06-07T00:00:00Z",
+  };
+}
+
+function createAsset(
+  fileName: string,
+  contentType: string,
+  fileSizeBytes: number,
+  durationSeconds?: number
+) {
+  return {
+    url: `https://cdn.example.com/${fileName}`,
+    fileName,
+    contentType,
+    fileSizeBytes,
+    durationSeconds,
   };
 }

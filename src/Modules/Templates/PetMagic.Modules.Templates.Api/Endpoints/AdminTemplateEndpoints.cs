@@ -19,6 +19,8 @@ public static partial class AdminTemplateEndpoints
 {
     private const double PreviewMinDurationSeconds = 0.5;
     private const double PreviewMaxDurationSeconds = 18.0;
+    private const int MediaCleanupTimeoutSeconds = 10;
+    private const string AmbiguousStorageKeyMetadataName = "ambiguousStorageKey";
     private const int RecentGenerationsDefaultTake = 25;
     private const int RecentGenerationsMaxTake = 250;
     private const int MaxAdminTemplateSmallJsonRequestBodyBytes = 16 * 1024;

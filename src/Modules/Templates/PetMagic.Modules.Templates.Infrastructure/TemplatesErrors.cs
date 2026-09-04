@@ -37,6 +37,11 @@ internal static class TemplatesErrors
     public static readonly Error SourceMediaUnavailable = new("templates.source_media_unavailable", "Source media is unavailable.");
     public static readonly Error MediaStorageFailed = new("templates.media_storage_failed", "Media upload could not be stored.");
     public static readonly Error MediaMetadataFailed = new("templates.media_metadata_failed", "Media metadata could not be determined.");
+    public static readonly Error MediaMetadataInvalid = new("templates.media_metadata_invalid", "Video metadata is invalid.");
+    public static readonly Error MediaMetadataTimedOut = new("templates.media_metadata_timed_out", "Video metadata probe timed out.");
+    public static readonly Error PreviewOptimizationInvalid = new("templates.preview_optimization_invalid", "Template preview media is invalid or unsupported.");
+    public static readonly Error PreviewOptimizationFailed = new("templates.preview_optimization_failed", "Template preview could not be optimized.");
+    public static readonly Error PreviewOptimizationTimedOut = new("templates.preview_optimization_timed_out", "Template preview optimization timed out.");
     public static readonly Error AiProviderUnavailable = new("templates.ai_provider_unavailable", "AI provider is not configured.");
     public static readonly Error AiProviderFailed = new("templates.ai_provider_failed", "AI provider request failed.");
     public static readonly Error AiProviderTransientFailure = new("templates.ai_provider_transient", "AI provider is temporarily unavailable. The generation will be retried.");

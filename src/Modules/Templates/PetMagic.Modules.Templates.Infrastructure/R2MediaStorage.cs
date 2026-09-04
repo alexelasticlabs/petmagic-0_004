@@ -17,6 +17,10 @@ internal sealed class R2MediaStorage(
     IAmazonS3 s3Client,
     ILogger<R2MediaStorage>? logger = null) : IMediaStorage
 {
+    private const string ImmutableCacheControl = "public,max-age=31536000,immutable";
+    private const int AmbiguousStoreCleanupTimeoutSeconds = 10;
+    private const string AmbiguousStorageKeyMetadataName = "ambiguousStorageKey";
+
     public async Task<Result<StoredMediaResponse>> StoreAsync(MediaUploadCommand asset, CancellationToken cancellationToken)
     {
         var contentLength = asset.Content?.LongLength ?? asset.ContentLengthBytes ?? 0;
@@ -38,6 +42,8 @@ internal sealed class R2MediaStorage(
         }
 
         var storageKey = BuildObjectKey(extension, preferredStorageKey);
+        var putAttempted = false;
+        var canDeleteAmbiguousStore = IsGuaranteedNewObjectKey(preferredStorageKey);
 
         try
         {
@@ -77,6 +83,12 @@ internal sealed class R2MediaStorage(
                 DisableDefaultChecksumValidation = true
             };
 
+            if (preferredStorageKey?.StartsWith("template-previews/", StringComparison.Ordinal) == true)
+            {
+                request.Headers.CacheControl = ImmutableCacheControl;
+            }
+
+            putAttempted = true;
             await s3Client.PutObjectAsync(request, cancellationToken);
 
             return Result.Success(new StoredMediaResponse(
@@ -98,7 +110,19 @@ internal sealed class R2MediaStorage(
                 !string.IsNullOrWhiteSpace(preferredStorageKey),
                 SafeLogValues.ExceptionType(exception));
             TemplateMediaTempFiles.TryDeleteIfOwned(tempPath, logger);
-            return Result.Failure<StoredMediaResponse>(TemplatesErrors.MediaStorageFailed);
+            var cleanupSucceeded = !putAttempted
+                || !canDeleteAmbiguousStore
+                || await TryCleanupAmbiguousStoreAsync(storageKey);
+            var error = cleanupSucceeded
+                ? TemplatesErrors.MediaStorageFailed
+                : TemplatesErrors.MediaStorageFailed with
+                {
+                    Metadata = new Dictionary<string, object?>
+                    {
+                        [AmbiguousStorageKeyMetadataName] = storageKey
+                    }
+                };
+            return Result.Failure<StoredMediaResponse>(error);
         }
     }
 
@@ -182,6 +206,42 @@ internal sealed class R2MediaStorage(
             : extension;
 
         return $"{prefix}/{now:yyyy}/{now:MM}/{Guid.NewGuid():N}{safeExtension}";
+    }
+
+    private async Task<bool> TryCleanupAmbiguousStoreAsync(string storageKey)
+    {
+        using var cleanupSource = new CancellationTokenSource(
+            TimeSpan.FromSeconds(AmbiguousStoreCleanupTimeoutSeconds));
+        try
+        {
+            await s3Client.DeleteObjectAsync(
+                options.R2.BucketName,
+                storageKey,
+                cleanupSource.Token);
+            return true;
+        }
+        catch (Exception exception)
+        {
+            logger?.LogWarning(
+                "R2 ambiguous media store cleanup failed. Operation={Operation} StorageKeyHash={StorageKeyHash} ExceptionType={ExceptionType}",
+                "cleanup_ambiguous_store",
+                SafeLogValues.StableHash(storageKey),
+                SafeLogValues.ExceptionType(exception));
+            return false;
+        }
+    }
+
+    private static bool IsGuaranteedNewObjectKey(string? preferredStorageKey)
+    {
+        if (string.IsNullOrWhiteSpace(preferredStorageKey))
+        {
+            return true;
+        }
+
+        var segments = preferredStorageKey.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        return segments.Length == 3
+            && string.Equals(segments[0], "template-previews", StringComparison.Ordinal)
+            && Guid.TryParseExact(segments[1], "N", out _);
     }
 
     private static bool TryResolvePreferredStorageKey(string? preferredStorageKey, string extension, out string? normalized)

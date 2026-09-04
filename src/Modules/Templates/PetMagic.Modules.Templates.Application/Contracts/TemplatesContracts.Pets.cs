@@ -88,3 +88,25 @@ public sealed record TemplateAssetResponse(
     string ContentType,
     long? FileSizeBytes,
     double? DurationSeconds);
+
+public sealed record TemplateMediaUploadResponse(
+    string Url,
+    string FileName,
+    string ContentType,
+    long? FileSizeBytes,
+    double? DurationSeconds,
+    TemplateAssetResponse? ThumbnailAsset = null,
+    TemplateAssetResponse? AnimatedPreviewAsset = null,
+    TemplateAssetResponse? FeedLoopLowAsset = null,
+    TemplateAssetResponse? FeedLoopMediumAsset = null,
+    TemplateAssetResponse? DetailPreviewAsset = null,
+    bool WasOptimized = false);
+
+public sealed record TemplatePreviewOptimizationResult(
+    StoredMediaResponse PrimaryAsset,
+    StoredMediaResponse? ThumbnailAsset,
+    StoredMediaResponse? AnimatedPreviewAsset,
+    StoredMediaResponse? FeedLoopLowAsset,
+    StoredMediaResponse? FeedLoopMediumAsset,
+    StoredMediaResponse? DetailPreviewAsset,
+    bool WasOptimized);

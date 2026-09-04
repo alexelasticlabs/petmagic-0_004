@@ -404,11 +404,13 @@ export const ruDictionary: Dictionary = {
   uploadAction: "Загрузить",
   uploadingMedia: "Загрузка файла...",
   mediaUploadHint:
-    "После загрузки URL, имя файла, тип, размер и длительность медиа заполняются автоматически.",
+    "Превью сжимается автоматически; URL, имя файла, тип, размер и длительность заполняются по оптимизированному файлу.",
+  previewAssetAnimationHint:
+    "Анимированные GIF, WebP и PNG (APNG) преобразуются в статичную обложку; для движения используйте MP4, MOV или WebM.",
   previewAssetVideoBadge: "Видео превью",
   previewAssetCoverBadge: "Обложка",
-  previewAssetFileTooLarge: "Файл слишком большой. Максимальный размер превью - 32 МБ.",
-  previewAssetFileTypeError: "Можно загрузить только файл image/* или video/*.",
+  previewAssetFileTooLarge: "Файл слишком большой. Максимальный размер превью - 25 МБ.",
+  previewAssetFileTypeError: "Поддерживаются JPEG, PNG, WebP, GIF, MP4, MOV и WebM.",
   templateTestActionsAdminOnly: "Тестовые генерации шаблонов доступны только администраторам.",
   templateTestInFlightMessage:
     "Дождитесь завершения текущей тестовой генерации перед заменой фото.",
@@ -432,7 +434,7 @@ export const ruDictionary: Dictionary = {
     "Для референсного движения поддерживается только MP4, чтобы длительность и ориентация персонажа рассчитывались надежно.",
   referenceMotionSourceBadge: "Источник движения",
   referenceMotionFileTooLarge:
-    "Файл слишком большой. Максимальный размер референсного видео - 128 МБ.",
+    "Файл слишком большой. Максимальный размер референсного видео - 100 МБ.",
   referenceMotionFileTypeError: "Поддерживаются только видеофайлы MP4.",
   mediaDropzoneHint: "Кликните по области или перетащите файл сюда.",
   selectedFileLabel: "Выбранный файл",

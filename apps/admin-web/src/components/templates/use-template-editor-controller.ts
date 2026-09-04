@@ -27,6 +27,7 @@ import {
   type AdminTemplate,
   type TemplateAsset,
   type TemplateAssetKind,
+  type TemplateMediaUploadResponse,
   type TemplateStatus,
   type TemplateType,
 } from "@/lib/api-client";
@@ -139,15 +140,8 @@ export function useTemplateEditorController({
   });
 
   const uploadTemplateMediaMutation = useMutation({
-    mutationFn: ({
-      assetKind,
-      file,
-      durationSeconds,
-    }: {
-      assetKind: TemplateAssetKind;
-      file: File;
-      durationSeconds?: number;
-    }) => uploadTemplateMedia(file, assetKind, { durationSeconds }),
+    mutationFn: ({ assetKind, file }: { assetKind: TemplateAssetKind; file: File }) =>
+      uploadTemplateMedia(file, assetKind),
     onSuccess: (asset, { assetKind }) => {
       setForm((current) => applyUploadedAssetToForm(current, assetKind, asset));
 
@@ -359,11 +353,7 @@ export function useTemplateEditorController({
   ): Promise<TemplateFormState> {
     setUploadingKind(assetKind);
     try {
-      const durationSeconds =
-        assetKind === "Preview" && file.type.startsWith("video/")
-          ? await readVideoDurationSeconds(file)
-          : undefined;
-      const asset = await uploadTemplateMedia(file, assetKind, { durationSeconds });
+      const asset = await uploadTemplateMedia(file, assetKind);
       const nextForm = applyUploadedAssetToForm(currentForm, assetKind, asset);
       setForm(nextForm);
 
@@ -408,11 +398,7 @@ export function useTemplateEditorController({
 
     setUploadingKind(assetKind);
     try {
-      const durationSeconds =
-        assetKind === "Preview" && file.type.startsWith("video/")
-          ? await readVideoDurationSeconds(file)
-          : undefined;
-      await uploadTemplateMediaMutation.mutateAsync({ assetKind, file, durationSeconds });
+      await uploadTemplateMediaMutation.mutateAsync({ assetKind, file });
     } catch (error) {
       const message = resolveUploadErrorMessage(error, text.errorSavingTemplate);
       setToast({ type: "error", message });
@@ -497,7 +483,7 @@ function resolveUploadErrorMessage(error: unknown, fallback: string): string {
 function applyUploadedAssetToForm(
   form: TemplateFormState,
   assetKind: TemplateAssetKind,
-  asset: TemplateAsset
+  asset: TemplateMediaUploadResponse
 ): TemplateFormState {
   return assetKind === "Preview"
     ? {
@@ -508,6 +494,11 @@ function applyUploadedAssetToForm(
         previewContentType: asset.contentType,
         previewFileSizeBytes: asset.fileSizeBytes?.toString() ?? "",
         previewDurationSeconds: asset.durationSeconds?.toString() ?? "",
+        thumbnailAsset: cloneTemplateAsset(asset.thumbnailAsset),
+        animatedPreviewAsset: cloneTemplateAsset(asset.animatedPreviewAsset),
+        feedLoopLowAsset: cloneTemplateAsset(asset.feedLoopLowAsset),
+        feedLoopMediumAsset: cloneTemplateAsset(asset.feedLoopMediumAsset),
+        detailPreviewAsset: cloneTemplateAsset(asset.detailPreviewAsset),
       }
     : {
         ...form,
@@ -520,49 +511,8 @@ function applyUploadedAssetToForm(
       };
 }
 
-async function readVideoDurationSeconds(file: File): Promise<number | undefined> {
-  const objectUrl = URL.createObjectURL(file);
-  const video = document.createElement("video");
-  try {
-    const duration = await new Promise<number | undefined>((resolve) => {
-      let settled = false;
-      const timeoutId = window.setTimeout(() => {
-        if (settled) {
-          return;
-        }
-
-        settled = true;
-        resolve(undefined);
-      }, 5000);
-
-      const finalize = (value: number | undefined) => {
-        if (settled) {
-          return;
-        }
-
-        settled = true;
-        window.clearTimeout(timeoutId);
-        resolve(value);
-      };
-
-      video.preload = "metadata";
-      video.src = objectUrl;
-      video.onloadedmetadata = () => {
-        const value =
-          Number.isFinite(video.duration) && video.duration > 0 ? video.duration : undefined;
-        finalize(value);
-      };
-      video.onerror = () => finalize(undefined);
-    });
-
-    return duration;
-  } finally {
-    video.onloadedmetadata = null;
-    video.onerror = null;
-    video.removeAttribute("src");
-    video.load();
-    URL.revokeObjectURL(objectUrl);
-  }
+function cloneTemplateAsset(asset: TemplateAsset | null | undefined): TemplateAsset | null {
+  return asset ? { ...asset } : null;
 }
 
 function getTemplateCatalogPath(locale: Locale, templateType: TemplateType) {

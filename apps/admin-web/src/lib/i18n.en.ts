@@ -399,11 +399,13 @@ export const enDictionary: Dictionary = {
   uploadAction: "Upload",
   uploadingMedia: "Uploading file...",
   mediaUploadHint:
-    "After upload, media URL, file name, type, size, and duration are filled automatically.",
+    "The preview is compressed automatically; URL, file name, type, size, and duration are filled from the optimized asset.",
+  previewAssetAnimationHint:
+    "Animated GIF, WebP, and PNG (APNG) files become a static cover; use MP4, MOV, or WebM to keep motion.",
   previewAssetVideoBadge: "Video preview",
   previewAssetCoverBadge: "Cover asset",
-  previewAssetFileTooLarge: "File is too large. The maximum preview size is 32 MB.",
-  previewAssetFileTypeError: "Only image/* or video/* files are supported.",
+  previewAssetFileTooLarge: "File is too large. The maximum preview size is 25 MB.",
+  previewAssetFileTypeError: "JPEG, PNG, WebP, GIF, MP4, MOV, and WebM are supported.",
   templateTestActionsAdminOnly: "Template test generations are available to Admin only.",
   templateTestInFlightMessage:
     "Wait for the current template test generation to finish before replacing the photo.",
@@ -425,7 +427,7 @@ export const enDictionary: Dictionary = {
   referenceMotionUploadHint:
     "Reference motion supports MP4 only so duration and character orientation can be calculated reliably.",
   referenceMotionSourceBadge: "Motion source",
-  referenceMotionFileTooLarge: "File is too large. The maximum reference motion size is 128 MB.",
+  referenceMotionFileTooLarge: "File is too large. The maximum reference motion size is 100 MB.",
   referenceMotionFileTypeError: "Only MP4 video files are supported.",
   mediaDropzoneHint: "Click the area or drag a file here.",
   selectedFileLabel: "Selected file",

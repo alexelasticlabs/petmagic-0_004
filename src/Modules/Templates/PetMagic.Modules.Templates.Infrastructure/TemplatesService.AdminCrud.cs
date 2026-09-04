@@ -86,7 +86,7 @@ internal sealed partial class TemplatesService
 
         dbContext.TemplateItems.Add(template);
         await TemplateLocalizationOutbox.EnqueueForTemplateAsync(dbContext, template, options, cancellationToken);
-        await ClaimTemplateAssetsAfterUpdateAsync(
+        await StageTemplateAssetClaimsAsync(
             template.Id,
             cancellationToken,
             PreviewAssetsForLifecycle(
@@ -233,6 +233,17 @@ internal sealed partial class TemplatesService
 
         await StampCatalogUpsertAsync(template, now, cancellationToken);
 
+        await StageTemplateAssetClaimsAsync(
+            template.Id,
+            cancellationToken,
+            PreviewAssetsForLifecycle(
+                effectivePreviewAsset,
+                effectiveThumbnailAsset,
+                effectiveAnimatedPreviewAsset,
+                effectiveFeedLoopLowAsset,
+                effectiveFeedLoopMediumAsset,
+                effectiveDetailPreviewAsset));
+
         try
         {
             await dbContext.SaveChangesAsync(cancellationToken);
@@ -251,16 +262,6 @@ internal sealed partial class TemplatesService
                 : Result.Success(recovered);
         }
 
-        await ClaimTemplateAssetsAfterUpdateAsync(
-            template.Id,
-            cancellationToken,
-            PreviewAssetsForLifecycle(
-                effectivePreviewAsset,
-                effectiveThumbnailAsset,
-                effectiveAnimatedPreviewAsset,
-                effectiveFeedLoopLowAsset,
-                effectiveFeedLoopMediumAsset,
-                effectiveDetailPreviewAsset));
         await PublishTemplateInvalidatedAsync(
             template,
             "updated",
@@ -355,7 +356,7 @@ internal sealed partial class TemplatesService
 
         dbContext.TemplateItems.Add(template);
         await TemplateLocalizationOutbox.EnqueueForTemplateAsync(dbContext, template, options, cancellationToken);
-        await ClaimTemplateAssetsAfterUpdateAsync(
+        await StageTemplateAssetClaimsAsync(
             template.Id,
             cancellationToken,
             PreviewAssetsForLifecycle(
@@ -517,6 +518,21 @@ internal sealed partial class TemplatesService
 
         await StampCatalogUpsertAsync(template, now, cancellationToken);
 
+        await StageTemplateAssetClaimsAsync(
+            template.Id,
+            cancellationToken,
+            PreviewAssetsForLifecycle(
+                effectivePreviewAsset,
+                effectiveThumbnailAsset,
+                effectiveAnimatedPreviewAsset,
+                effectiveFeedLoopLowAsset,
+                effectiveFeedLoopMediumAsset,
+                effectiveDetailPreviewAsset));
+        await StageTemplateAssetClaimsAsync(
+            template.Id,
+            cancellationToken,
+            (effectiveReferenceMotionAsset, TemplateMediaRole.ReferenceMotionAsset));
+
         try
         {
             await dbContext.SaveChangesAsync(cancellationToken);
@@ -535,20 +551,6 @@ internal sealed partial class TemplatesService
                 : Result.Success(recovered);
         }
 
-        await ClaimTemplateAssetsAfterUpdateAsync(
-            template.Id,
-            cancellationToken,
-            PreviewAssetsForLifecycle(
-                effectivePreviewAsset,
-                effectiveThumbnailAsset,
-                effectiveAnimatedPreviewAsset,
-                effectiveFeedLoopLowAsset,
-                effectiveFeedLoopMediumAsset,
-                effectiveDetailPreviewAsset));
-        await ClaimTemplateAssetsAfterUpdateAsync(
-            template.Id,
-            cancellationToken,
-            (effectiveReferenceMotionAsset, TemplateMediaRole.ReferenceMotionAsset));
         await PublishTemplateInvalidatedAsync(
             template,
             "updated",
@@ -614,7 +616,7 @@ internal sealed partial class TemplatesService
         }
 
         var assetUrls = CollectObsoleteAssetUrls(template.Assets.Select(asset => asset.Url));
-        var cleanupResult = await DeleteTemplateAssetsAsync(assetUrls, cancellationToken);
+        var cleanupResult = await DeleteTemplateAssetsAsync(assetUrls, template.Id, cancellationToken);
         if (cleanupResult.IsFailure)
         {
             return cleanupResult;
@@ -635,41 +637,14 @@ internal sealed partial class TemplatesService
         return Result.Success();
     }
 
-    private async Task ClaimTemplateAssetsAfterUpdateAsync(
+    private async Task StageTemplateAssetClaimsAsync(
         Guid templateId,
         CancellationToken cancellationToken,
         params (TemplateAssetCommand? Asset, TemplateMediaRole Role)[] assets)
     {
-        var claimableAssets = assets
-            .Where(asset => asset.Asset is not null)
-            .ToArray();
-        if (claimableAssets.Length == 0)
+        foreach (var (asset, role) in assets)
         {
-            return;
-        }
-
-        const int maxAttempts = 3;
-        for (var attempt = 1; attempt <= maxAttempts; attempt++)
-        {
-            try
-            {
-                foreach (var (asset, role) in claimableAssets)
-                {
-                    await mediaLifecycleService.ClaimTemplateAssetAsync(templateId, asset, role, cancellationToken);
-                }
-
-                await dbContext.SaveChangesAsync(cancellationToken);
-                return;
-            }
-            catch (DbUpdateConcurrencyException) when (attempt < maxAttempts)
-            {
-                dbContext.ChangeTracker.Clear();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                dbContext.ChangeTracker.Clear();
-                return;
-            }
+            await mediaLifecycleService.ClaimTemplateAssetAsync(templateId, asset, role, cancellationToken);
         }
     }
 

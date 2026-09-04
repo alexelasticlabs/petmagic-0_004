@@ -9,7 +9,38 @@ import { Button } from "@/components/ui/button";
 import type { Dictionary } from "@/lib/i18n";
 import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
-const TEMPLATE_PREVIEW_ASSET_MAX_BYTES = 32 * 1024 * 1024;
+const templatePreviewAccept = [
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".webp",
+  ".gif",
+  ".mp4",
+  ".mov",
+  ".webm",
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+  "video/mp4",
+  "application/mp4",
+  "video/quicktime",
+  "video/webm",
+].join(",");
+const supportedPreviewContentTypes = new Set([
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+  "video/mp4",
+  "application/mp4",
+  "video/quicktime",
+  "video/webm",
+]);
+const supportedPreviewFileNamePattern = /\.(?:jpe?g|png|webp|gif|mp4|mov|webm)$/i;
+const TEMPLATE_PREVIEW_ASSET_MAX_BYTES = 25 * 1024 * 1024;
 
 type TemplatePreviewAssetSectionProps = {
   text: Dictionary;
@@ -72,7 +103,7 @@ export function TemplatePreviewAssetSection({
       return;
     }
 
-    if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) {
+    if (!isSupportedPreviewFile(file)) {
       setSelectionError(getPreviewSelectionError(text, "type"));
       return;
     }
@@ -107,7 +138,7 @@ export function TemplatePreviewAssetSection({
         ref={fileInputRef}
         className={assetStyles.filePickerInput}
         type="file"
-        accept="image/*,video/*"
+        accept={templatePreviewAccept}
         onChange={(event) => handlePreviewFileSelection(event.target.files?.[0] ?? null)}
       />
       <div
@@ -244,6 +275,11 @@ export function TemplatePreviewAssetSection({
                   previewContentType: "",
                   previewFileSizeBytes: "",
                   previewDurationSeconds: "",
+                  thumbnailAsset: null,
+                  animatedPreviewAsset: null,
+                  feedLoopLowAsset: null,
+                  feedLoopMediumAsset: null,
+                  detailPreviewAsset: null,
                 }));
               }}
             >
@@ -254,10 +290,25 @@ export function TemplatePreviewAssetSection({
             <p className={assetStyles.assetSelectionError}>{selectionError}</p>
           ) : null}
         </div>
-        <p className={styles.muted}>{text.mediaUploadHint}</p>
+        <p className={styles.muted}>
+          {text.mediaUploadHint} {text.previewAssetAnimationHint}
+        </p>
       </div>
     </div>
   );
+}
+
+function isSupportedPreviewFile(file: File): boolean {
+  const normalizedType = file.type.split(";", 1)[0].trim().toLowerCase();
+  if (supportedPreviewContentTypes.has(normalizedType)) {
+    return true;
+  }
+
+  if (normalizedType && normalizedType !== "application/octet-stream") {
+    return false;
+  }
+
+  return supportedPreviewFileNamePattern.test(file.name);
 }
 
 function getPreviewSelectionError(text: Dictionary, reason: "size" | "type"): string {

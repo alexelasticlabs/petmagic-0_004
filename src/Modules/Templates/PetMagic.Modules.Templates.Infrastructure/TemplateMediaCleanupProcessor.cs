@@ -38,6 +38,33 @@ internal sealed class TemplateMediaCleanupProcessor(
             return false;
         }
 
+        var normalizedUrl = record.Url.Trim();
+        var liveAsset = await dbContext.TemplateAssets
+            .AsNoTracking()
+            .Where(asset => asset.Template.DeletedAtUtc == null && asset.Url.Trim() == normalizedUrl)
+            .OrderBy(asset => asset.TemplateId)
+            .ThenBy(asset => asset.AssetKind)
+            .Select(asset => new { asset.TemplateId, asset.AssetKind })
+            .FirstOrDefaultAsync(cancellationToken);
+        if (liveAsset is not null)
+        {
+            record.LifecycleState = TemplateMediaLifecycleState.AttachedToTemplate;
+            record.IsDeleted = false;
+            record.TemplateId = liveAsset.TemplateId;
+            record.GenerationJobId = null;
+            record.ExpiresAtUtc = null;
+            record.AttachedAtUtc ??= now;
+            record.DeletedAtUtc = null;
+            record.LastCleanupAttemptAtUtc = null;
+            record.FailureCode = null;
+            record.FailureMessage = null;
+            record.Role = liveAsset.AssetKind == TemplateAssetKind.ReferenceMotion
+                ? TemplateMediaRole.ReferenceMotionAsset
+                : TemplateMediaRole.PreviewAsset;
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+
         var deleteResult = await mediaStorage.DeleteAsync(record.Url, cancellationToken);
         if (deleteResult.IsFailure)
         {

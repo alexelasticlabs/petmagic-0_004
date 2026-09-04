@@ -383,6 +383,7 @@ export type Dictionary = {
   uploadAction: string;
   uploadingMedia: string;
   mediaUploadHint: string;
+  previewAssetAnimationHint: string;
   previewAssetVideoBadge: string;
   previewAssetCoverBadge: string;
   previewAssetFileTooLarge: string;

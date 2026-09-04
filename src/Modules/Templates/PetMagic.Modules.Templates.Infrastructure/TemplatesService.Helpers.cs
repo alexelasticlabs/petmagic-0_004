@@ -560,6 +560,11 @@ internal sealed partial class TemplatesService
     {
         foreach (var assetUrl in assetUrls)
         {
+            if (await IsAssetUrlReferencedByLiveTemplateAsync(assetUrl, excludedTemplateId: null, cancellationToken))
+            {
+                continue;
+            }
+
             var deleteResult = await mediaStorage.DeleteAsync(assetUrl, cancellationToken);
             if (deleteResult.IsFailure)
             {
@@ -573,10 +578,18 @@ internal sealed partial class TemplatesService
         await mediaLifecycleService.SaveChangesAsync(cancellationToken);
     }
 
-    private async Task<Result> DeleteTemplateAssetsAsync(string[] assetUrls, CancellationToken cancellationToken)
+    private async Task<Result> DeleteTemplateAssetsAsync(
+        string[] assetUrls,
+        Guid deletedTemplateId,
+        CancellationToken cancellationToken)
     {
         foreach (var assetUrl in assetUrls)
         {
+            if (await IsAssetUrlReferencedByLiveTemplateAsync(assetUrl, deletedTemplateId, cancellationToken))
+            {
+                continue;
+            }
+
             var deleteResult = await mediaStorage.DeleteAsync(assetUrl, cancellationToken);
             if (deleteResult.IsFailure)
             {
@@ -596,7 +609,28 @@ internal sealed partial class TemplatesService
         return [.. assetUrls
             .Where(assetUrl => !string.IsNullOrWhiteSpace(assetUrl))
             .Cast<string>()
+            .Select(NormalizeAssetUrl)
             .Distinct(StringComparer.OrdinalIgnoreCase)];
+    }
+
+    private Task<bool> IsAssetUrlReferencedByLiveTemplateAsync(
+        string assetUrl,
+        Guid? excludedTemplateId,
+        CancellationToken cancellationToken)
+    {
+        var normalizedUrl = NormalizeAssetUrl(assetUrl);
+        return dbContext.TemplateAssets
+            .AsNoTracking()
+            .AnyAsync(
+                asset => asset.Template.DeletedAtUtc == null
+                    && (!excludedTemplateId.HasValue || asset.TemplateId != excludedTemplateId.Value)
+                    && asset.Url.Trim() == normalizedUrl,
+                cancellationToken);
+    }
+
+    private static string NormalizeAssetUrl(string assetUrl)
+    {
+        return assetUrl.Trim();
     }
 
     private static TemplateAssetCommand? ResolveEffectiveTemplateAsset(
@@ -694,12 +728,13 @@ internal sealed partial class TemplatesService
             template.Assets.Add(existing);
         }
 
+        var normalizedAssetUrl = NormalizeAssetUrl(asset.Url);
         var obsoleteUrl = !string.IsNullOrWhiteSpace(existing.Url)
-            && !string.Equals(existing.Url, asset.Url, StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(NormalizeAssetUrl(existing.Url), normalizedAssetUrl, StringComparison.OrdinalIgnoreCase)
                 ? existing.Url
                 : null;
 
-        existing.Url = asset.Url;
+        existing.Url = normalizedAssetUrl;
         existing.FileName = NormalizeAssetText(asset.FileName, TemplateAssetFileNameMaxLength, "asset");
         existing.ContentType = NormalizeAssetText(asset.ContentType, TemplateAssetContentTypeMaxLength, "application/octet-stream");
         existing.FileSizeBytes = NormalizeFileSizeBytes(asset.FileSizeBytes);

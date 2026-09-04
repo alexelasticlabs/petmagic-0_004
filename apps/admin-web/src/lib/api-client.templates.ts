@@ -51,8 +51,8 @@ import type {
   AdminTemplatesAnalyticsOverview,
   AdminTemplatesAnalyticsQuery,
   ImageTemplatePayload,
-  TemplateAsset,
   TemplateAssetKind,
+  TemplateMediaUploadResponse,
   TemplateCategoryPayload,
   TemplateOfTheDayAutoPickPayload,
   TemplateOfTheDayPayload,
@@ -1003,7 +1003,7 @@ export async function uploadTemplateMedia(
   options?: {
     durationSeconds?: number;
   }
-): Promise<TemplateAsset> {
+): Promise<TemplateMediaUploadResponse> {
   const formData = new FormData();
   formData.append("file", file);
   formData.append("assetKind", assetKind);
@@ -1015,14 +1015,14 @@ export async function uploadTemplateMedia(
     formData.append("durationSeconds", options.durationSeconds.toString());
   }
 
-  return apiRequest<TemplateAsset>(
+  return apiRequest<TemplateMediaUploadResponse>(
     "/api/admin/templates/media/upload",
     {
       method: "POST",
       body: formData,
     },
     {
-      timeoutMs: 120_000,
+      timeoutMs: 360_000,
     }
   );
 }

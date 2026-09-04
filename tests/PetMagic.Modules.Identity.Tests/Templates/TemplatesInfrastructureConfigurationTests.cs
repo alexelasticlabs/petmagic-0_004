@@ -27,6 +27,9 @@ public sealed class TemplatesInfrastructureConfigurationTests
         var imagePreprocessor = provider.GetRequiredService<IImagePreprocessor>();
         var videoMotionGenerator = provider.GetRequiredService<IVideoMotionGenerator>();
         var generatedMediaImporter = provider.GetRequiredService<IGeneratedMediaImporter>();
+        var previewOptimizer = provider.GetRequiredService<ITemplatePreviewOptimizer>();
+        var videoDurationProbe = provider.GetRequiredService<IVideoDurationProbe>();
+        var videoDimensionsProbe = provider.GetRequiredService<IVideoDimensionsProbe>();
         var callbackService = provider.GetRequiredService<ITemplateGenerationProviderCallbackService>();
         var hostedServices = provider.GetServices<IHostedService>();
 
@@ -100,6 +103,28 @@ public sealed class TemplatesInfrastructureConfigurationTests
         Assert.Equal(24, options.MetadataTempRetentionHours);
         Assert.True(options.CleanupExpiredGenerationMediaWhileRefundPending);
         Assert.Equal(250 * 1024 * 1024, options.GeneratedVideoMaxFileSizeBytes);
+        Assert.Equal("ffprobe", options.FfprobePath);
+        Assert.Equal(10, options.MediaMetadataProbeTimeoutSeconds);
+        Assert.True(options.PreviewOptimization.Enabled);
+        Assert.Equal(1, options.PreviewOptimization.MaxConcurrentOptimizations);
+        Assert.Equal(2, options.PreviewOptimization.FfmpegThreads);
+        Assert.Equal(90, options.PreviewOptimization.TimeoutSeconds);
+        Assert.Equal(10, options.PreviewOptimization.CleanupTimeoutSeconds);
+        Assert.Equal(640, options.PreviewOptimization.ThumbnailMaxDimension);
+        Assert.Equal(78, options.PreviewOptimization.ThumbnailWebpQuality);
+        Assert.Equal(1600, options.PreviewOptimization.DetailImageMaxDimension);
+        Assert.Equal(84, options.PreviewOptimization.DetailImageWebpQuality);
+        Assert.Equal(720, options.PreviewOptimization.FeedVideoMaxDimension);
+        Assert.Equal(27, options.PreviewOptimization.FeedVideoCrf);
+        Assert.Equal(900, options.PreviewOptimization.FeedVideoMaxBitrateKbps);
+        Assert.Equal(1280, options.PreviewOptimization.DetailVideoMaxDimension);
+        Assert.Equal(23, options.PreviewOptimization.DetailVideoCrf);
+        Assert.Equal(2500, options.PreviewOptimization.DetailVideoMaxBitrateKbps);
+        Assert.Equal(96, options.PreviewOptimization.DetailVideoAudioBitrateKbps);
+        Assert.Equal(8_192, options.PreviewOptimization.MaxVideoDimension);
+        Assert.Equal(20_000_000, options.PreviewOptimization.MaxVideoPixelCount);
+        Assert.Same(videoDurationProbe, videoDimensionsProbe);
+        Assert.Equal("TemplatePreviewOptimizer", previewOptimizer.GetType().Name);
         Assert.Equal("LocalFileMediaStorage", mediaStorage.GetType().Name);
         Assert.Equal("FakeImagePreprocessor", imagePreprocessor.GetType().Name);
         Assert.Equal("FakeVideoMotionGenerator", videoMotionGenerator.GetType().Name);
@@ -125,6 +150,87 @@ public sealed class TemplatesInfrastructureConfigurationTests
         var options = provider.GetRequiredService<TemplatesOptions>();
 
         Assert.True(options.LocalizationBackfillEnabled);
+    }
+
+    [Fact]
+    public void AddTemplatesInfrastructure_ShouldParseBoundedPreviewOptimizationOptions()
+    {
+        var services = CreateServices();
+        var configuration = CreateConfiguration(new Dictionary<string, string?>
+        {
+            ["Templates:PreviewOptimization:Enabled"] = "false",
+            ["Templates:PreviewOptimization:MaxConcurrentOptimizations"] = "2",
+            ["Templates:PreviewOptimization:FfmpegThreads"] = "3",
+            ["Templates:PreviewOptimization:TimeoutSeconds"] = "120",
+            ["Templates:PreviewOptimization:CleanupTimeoutSeconds"] = "12",
+            ["Templates:PreviewOptimization:ThumbnailMaxDimension"] = "800",
+            ["Templates:PreviewOptimization:ThumbnailWebpQuality"] = "81",
+            ["Templates:PreviewOptimization:FeedVideoMaxBitrateKbps"] = "1200",
+            ["Templates:PreviewOptimization:DetailVideoMaxBitrateKbps"] = "3200",
+            ["Templates:PreviewOptimization:MaxImagePixelCount"] = "75000000",
+            ["Templates:PreviewOptimization:MaxVideoDimension"] = "6000",
+            ["Templates:PreviewOptimization:MaxVideoPixelCount"] = "15000000",
+            ["Templates:FfprobePath"] = "custom-ffprobe",
+            ["Templates:MediaMetadataProbeTimeoutSeconds"] = "14"
+        });
+
+        services.AddTemplatesInfrastructure(configuration);
+
+        using var provider = services.BuildServiceProvider();
+        var preview = provider.GetRequiredService<TemplatesOptions>().PreviewOptimization;
+
+        Assert.False(preview.Enabled);
+        Assert.Equal(2, preview.MaxConcurrentOptimizations);
+        Assert.Equal(3, preview.FfmpegThreads);
+        Assert.Equal(120, preview.TimeoutSeconds);
+        Assert.Equal(12, preview.CleanupTimeoutSeconds);
+        Assert.Equal(800, preview.ThumbnailMaxDimension);
+        Assert.Equal(81, preview.ThumbnailWebpQuality);
+        Assert.Equal(1200, preview.FeedVideoMaxBitrateKbps);
+        Assert.Equal(3200, preview.DetailVideoMaxBitrateKbps);
+        Assert.Equal(75_000_000, preview.MaxImagePixelCount);
+        Assert.Equal(6000, preview.MaxVideoDimension);
+        Assert.Equal(15_000_000, preview.MaxVideoPixelCount);
+        var options = provider.GetRequiredService<TemplatesOptions>();
+        Assert.Equal("custom-ffprobe", options.FfprobePath);
+        Assert.Equal(14, options.MediaMetadataProbeTimeoutSeconds);
+    }
+
+    [Fact]
+    public void AddTemplatesInfrastructure_ShouldFallBackForUnsafePreviewOptimizationOptions()
+    {
+        var services = CreateServices();
+        var configuration = CreateConfiguration(new Dictionary<string, string?>
+        {
+            ["Templates:PreviewOptimization:TimeoutSeconds"] = "99999",
+            ["Templates:PreviewOptimization:MaxConcurrentOptimizations"] = "999",
+            ["Templates:PreviewOptimization:FfmpegThreads"] = "999",
+            ["Templates:PreviewOptimization:CleanupTimeoutSeconds"] = "999",
+            ["Templates:PreviewOptimization:ThumbnailMaxDimension"] = "1",
+            ["Templates:PreviewOptimization:FeedVideoCrf"] = "99",
+            ["Templates:PreviewOptimization:FeedVideoMaxBitrateKbps"] = "999999",
+            ["Templates:PreviewOptimization:MaxImagePixelCount"] = "999999999999",
+            ["Templates:PreviewOptimization:MaxVideoDimension"] = "999999",
+            ["Templates:PreviewOptimization:MaxVideoPixelCount"] = "999999999999",
+            ["Templates:MediaMetadataProbeTimeoutSeconds"] = "999"
+        });
+
+        services.AddTemplatesInfrastructure(configuration);
+
+        using var provider = services.BuildServiceProvider();
+        var preview = provider.GetRequiredService<TemplatesOptions>().PreviewOptimization;
+
+        Assert.Equal(90, preview.TimeoutSeconds);
+        Assert.Equal(1, preview.MaxConcurrentOptimizations);
+        Assert.Equal(2, preview.FfmpegThreads);
+        Assert.Equal(10, preview.CleanupTimeoutSeconds);
+        Assert.Equal(640, preview.ThumbnailMaxDimension);
+        Assert.Equal(27, preview.FeedVideoCrf);
+        Assert.Equal(900, preview.FeedVideoMaxBitrateKbps);
+        Assert.Equal(50_000_000, preview.MaxImagePixelCount);
+        Assert.Equal(8_192, preview.MaxVideoDimension);
+        Assert.Equal(20_000_000, preview.MaxVideoPixelCount);
+        Assert.Equal(10, provider.GetRequiredService<TemplatesOptions>().MediaMetadataProbeTimeoutSeconds);
     }
 
     [Fact]
@@ -566,9 +672,11 @@ public sealed class TemplatesInfrastructureConfigurationTests
         foreach (var relativePath in new[]
         {
             Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "FileMediaMetadataReader.cs"),
+            Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "FfprobeVideoDurationProbe.cs"),
             Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "HttpGeneratedMediaImporter.cs"),
             Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "ImagePreviewGenerator.cs"),
             Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "VideoThumbnailGenerator.cs"),
+            Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "TemplatePreviewOptimizer.cs"),
             Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "TemplateWatermarkRenderer.cs"),
             Path.Combine("src", "Modules", "Templates", "PetMagic.Modules.Templates.Infrastructure", "TemplateMediaTempFiles.cs")
         })
@@ -594,6 +702,8 @@ public sealed class TemplatesInfrastructureConfigurationTests
         static bool sourceFileNeedsProcessDrainContract(string path)
         {
             return path.EndsWith("VideoThumbnailGenerator.cs", StringComparison.Ordinal)
+                || path.EndsWith("FfprobeVideoDurationProbe.cs", StringComparison.Ordinal)
+                || path.EndsWith("TemplatePreviewOptimizer.cs", StringComparison.Ordinal)
                 || path.EndsWith("TemplateWatermarkRenderer.cs", StringComparison.Ordinal);
         }
     }

@@ -58,6 +58,7 @@ public static partial class AdminTemplateEndpoints
             "ACTIVE_GENERATION_LIMIT_REACHED" => StatusCodes.Status429TooManyRequests,
             "templates.media_storage_failed"
                 or "templates.media_metadata_failed"
+                or "templates.preview_optimization_failed"
                 or "templates.generated_media_import_failed"
                 or "templates.ai_provider_unavailable"
                 or "templates.ai_provider_failed"
@@ -67,6 +68,10 @@ public static partial class AdminTemplateEndpoints
                 or "PROVIDER_CAPACITY_UNAVAILABLE"
                 or "GENERATION_QUEUE_OVERLOADED"
                 or "GENERATION_WAIT_TOO_LONG" => StatusCodes.Status503ServiceUnavailable,
+            "templates.media_metadata_timed_out"
+                or "templates.preview_optimization_timed_out" => StatusCodes.Status504GatewayTimeout,
+            "templates.media_metadata_invalid"
+                or "templates.preview_optimization_invalid" => StatusCodes.Status422UnprocessableEntity,
             "templates.watermark_not_ready" => StatusCodes.Status202Accepted,
             _ => StatusCodes.Status400BadRequest,
         };

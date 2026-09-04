@@ -687,6 +687,180 @@ public sealed partial class TemplatesServiceTests
     }
 
     [Fact]
+    public async Task UpdateImageAsync_ShouldNotDeleteSharedUrl_WhenAnotherAssetKindStillReferencesIt()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        await using var dbContext = await CreateSqliteDbContextAsync(connection);
+        var storage = new RecordingMediaStorage();
+        var service = CreateService(dbContext, storage);
+        const string sharedUrl = "http://localhost:5000/templates-media/2026/05/shared-preview.jpg";
+        var sharedAsset = CreatePreviewAsset(sharedUrl, "shared-preview.jpg", "image/jpeg");
+
+        var created = await service.CreateImageAsync(
+            new CreateImageTemplateCommand(
+                "Portrait",
+                "Cozy portrait",
+                "Portrait",
+                ["cozy"],
+                false,
+                20,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                sharedAsset,
+                "openai/gpt-image-2/edit",
+                "Keep the same pet.",
+                ThumbnailAsset: sharedAsset),
+            CancellationToken.None);
+
+        Assert.True(created.IsSuccess);
+
+        var updated = await service.UpdateImageAsync(
+            new UpdateImageTemplateCommand(
+                created.Value.TemplateId,
+                "Portrait",
+                "Cozy portrait",
+                "Portrait",
+                ["cozy"],
+                false,
+                20,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                sharedAsset,
+                "openai/gpt-image-2/edit",
+                "Keep the same pet.",
+                ThumbnailAsset: CreatePreviewAsset(
+                    "http://localhost:5000/templates-media/2026/05/new-thumbnail.jpg",
+                    "new-thumbnail.jpg",
+                    "image/jpeg")),
+            CancellationToken.None);
+
+        Assert.True(updated.IsSuccess);
+        Assert.DoesNotContain(sharedUrl, storage.DeletedUrls);
+        var persisted = await dbContext.TemplateItems
+            .Include(template => template.Assets)
+            .SingleAsync(template => template.Id == created.Value.TemplateId);
+        Assert.Equal(sharedUrl, persisted.Assets.Single(asset => asset.AssetKind == TemplateAssetKind.Preview).Url);
+        Assert.Equal(sharedUrl, persisted.Assets.Single(asset => asset.AssetKind == TemplateAssetKind.FeedLoopLow).Url);
+        Assert.Equal(sharedUrl, persisted.Assets.Single(asset => asset.AssetKind == TemplateAssetKind.DetailPreview).Url);
+        var sharedRecord = await dbContext.TemplateMediaRecords.SingleAsync(record => record.Url == sharedUrl);
+        Assert.Equal(TemplateMediaLifecycleState.AttachedToTemplate, sharedRecord.LifecycleState);
+        Assert.Equal(created.Value.TemplateId, sharedRecord.TemplateId);
+    }
+
+    [Fact]
+    public async Task UpdateImageAsync_ShouldRollbackAssetAndClaim_WhenMediaClaimHitsTerminalConcurrencyConflict()
+    {
+        var concurrency = new AlwaysMediaClaimConcurrencyInterceptor();
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        await using var dbContext = await CreateSqliteDbContextAsync(connection, concurrency);
+        var storage = new RecordingMediaStorage();
+        var service = CreateService(dbContext, storage);
+        const string oldUrl = "http://localhost:5000/templates-media/2026/05/atomic-old.jpg";
+        const string newUrl = "http://localhost:5000/templates-media/2026/05/atomic-new.jpg";
+
+        var created = await service.CreateImageAsync(
+            new CreateImageTemplateCommand(
+                "Portrait",
+                "Cozy portrait",
+                "Portrait",
+                ["cozy"],
+                false,
+                20,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                CreatePreviewAsset(oldUrl, "atomic-old.jpg", "image/jpeg"),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet."),
+            CancellationToken.None);
+        Assert.True(created.IsSuccess);
+        concurrency.Enabled = true;
+
+        var updated = await service.UpdateImageAsync(
+            new UpdateImageTemplateCommand(
+                created.Value.TemplateId,
+                "Portrait updated",
+                "Cozy portrait",
+                "Portrait",
+                ["cozy"],
+                false,
+                20,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                CreatePreviewAsset(newUrl, "atomic-new.jpg", "image/jpeg"),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet."),
+            CancellationToken.None);
+
+        Assert.True(updated.IsFailure);
+        Assert.Equal("templates.update_conflict", updated.Error.Code);
+        Assert.Equal(2, concurrency.ThrowCount);
+        Assert.Empty(storage.DeletedUrls);
+        dbContext.ChangeTracker.Clear();
+        var persisted = await dbContext.TemplateItems
+            .Include(template => template.Assets)
+            .SingleAsync(template => template.Id == created.Value.TemplateId);
+        Assert.Equal("Portrait", persisted.Title);
+        Assert.All(persisted.Assets, asset => Assert.Equal(oldUrl, asset.Url));
+        Assert.DoesNotContain(await dbContext.TemplateMediaRecords.ToListAsync(), record => record.Url == newUrl);
+        var oldRecord = await dbContext.TemplateMediaRecords.SingleAsync(record => record.Url == oldUrl);
+        Assert.Equal(TemplateMediaLifecycleState.AttachedToTemplate, oldRecord.LifecycleState);
+    }
+
+    [Fact]
+    public async Task UpdateImageAsync_ShouldRollbackAssetAndClaim_WhenClaimSaveIsCancelled()
+    {
+        var cancellation = new CancelMediaClaimSaveInterceptor();
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        await using var dbContext = await CreateSqliteDbContextAsync(connection, cancellation);
+        var storage = new RecordingMediaStorage();
+        var service = CreateService(dbContext, storage);
+        const string oldUrl = "http://localhost:5000/templates-media/2026/05/cancel-old.jpg";
+        const string newUrl = "http://localhost:5000/templates-media/2026/05/cancel-new.jpg";
+
+        var created = await service.CreateImageAsync(
+            new CreateImageTemplateCommand(
+                "Portrait",
+                "Cozy portrait",
+                "Portrait",
+                ["cozy"],
+                false,
+                20,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                CreatePreviewAsset(oldUrl, "cancel-old.jpg", "image/jpeg"),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet."),
+            CancellationToken.None);
+        Assert.True(created.IsSuccess);
+        cancellation.Enabled = true;
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() => service.UpdateImageAsync(
+            new UpdateImageTemplateCommand(
+                created.Value.TemplateId,
+                "Portrait updated",
+                "Cozy portrait",
+                "Portrait",
+                ["cozy"],
+                false,
+                20,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                CreatePreviewAsset(newUrl, "cancel-new.jpg", "image/jpeg"),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet."),
+            CancellationToken.None));
+
+        Assert.Equal(1, cancellation.ThrowCount);
+        Assert.Empty(storage.DeletedUrls);
+        dbContext.ChangeTracker.Clear();
+        var persisted = await dbContext.TemplateItems
+            .Include(template => template.Assets)
+            .SingleAsync(template => template.Id == created.Value.TemplateId);
+        Assert.Equal("Portrait", persisted.Title);
+        Assert.All(persisted.Assets, asset => Assert.Equal(oldUrl, asset.Url));
+        Assert.DoesNotContain(await dbContext.TemplateMediaRecords.ToListAsync(), record => record.Url == newUrl);
+        var oldRecord = await dbContext.TemplateMediaRecords.SingleAsync(record => record.Url == oldUrl);
+        Assert.Equal(TemplateMediaLifecycleState.AttachedToTemplate, oldRecord.LifecycleState);
+    }
+
+    [Fact]
     public async Task UpdateImageAsync_ShouldKeepExistingPreview_WhenKeepPreviewAssetIsRequested()
     {
         await using var dbContext = CreateDbContext();
@@ -1090,6 +1264,49 @@ public sealed partial class TemplatesServiceTests
     }
 
     [Fact]
+    public async Task DeleteAsync_ShouldKeepSharedUrl_WhenAnotherLiveTemplateReferencesIt()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        await using var dbContext = await CreateSqliteDbContextAsync(connection);
+        var storage = new RecordingMediaStorage();
+        var service = CreateService(dbContext, storage);
+        const string sharedUrl = "http://localhost:5000/templates-media/2026/05/shared-between-templates.jpg";
+        var sharedAsset = CreatePreviewAsset(sharedUrl, "shared-between-templates.jpg", "image/jpeg");
+
+        async Task<Guid> CreateTemplateAsync(string title)
+        {
+            var result = await service.CreateImageAsync(
+                new CreateImageTemplateCommand(
+                    title,
+                    "Cozy portrait",
+                    "Portrait",
+                    ["cozy"],
+                    false,
+                    20,
+                    TemplatePromoBadgeMode.Auto.ToString(),
+                    sharedAsset,
+                    "openai/gpt-image-2/edit",
+                    "Keep the same pet."),
+                CancellationToken.None);
+            Assert.True(result.IsSuccess);
+            return result.Value.TemplateId;
+        }
+
+        var deletedTemplateId = await CreateTemplateAsync("First portrait");
+        var liveTemplateId = await CreateTemplateAsync("Second portrait");
+
+        var deleted = await service.DeleteAsync(deletedTemplateId, CancellationToken.None);
+
+        Assert.True(deleted.IsSuccess);
+        Assert.DoesNotContain(sharedUrl, storage.DeletedUrls);
+        var mediaRecord = await dbContext.TemplateMediaRecords.SingleAsync(record => record.Url == sharedUrl);
+        Assert.Equal(TemplateMediaLifecycleState.AttachedToTemplate, mediaRecord.LifecycleState);
+        Assert.Equal(liveTemplateId, mediaRecord.TemplateId);
+        Assert.Null((await dbContext.TemplateItems.SingleAsync(template => template.Id == liveTemplateId)).DeletedAtUtc);
+    }
+
+    [Fact]
     public async Task ListPublicCatalogAsync_ShouldApplyTagAndPremiumFiltersForPagedClients()
     {
         await using var dbContext = CreateDbContext();
@@ -1446,6 +1663,54 @@ public sealed partial class TemplatesServiceTests
         Assert.Empty(changes.Value.DeletedIds);
         Assert.Equal(0, changes.Value.FromVersion);
         Assert.Equal(25, changes.Value.ToVersion);
+    }
+
+    private sealed class AlwaysMediaClaimConcurrencyInterceptor : SaveChangesInterceptor
+    {
+        public bool Enabled { get; set; }
+
+        public int ThrowCount { get; private set; }
+
+        public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
+            DbContextEventData eventData,
+            InterceptionResult<int> result,
+            CancellationToken cancellationToken = default)
+        {
+            var hasMediaClaim = eventData.Context?.ChangeTracker
+                .Entries<TemplateMediaRecord>()
+                .Any(entry => entry.State is EntityState.Added or EntityState.Modified) == true;
+            if (!Enabled || !hasMediaClaim)
+            {
+                return base.SavingChangesAsync(eventData, result, cancellationToken);
+            }
+
+            ThrowCount++;
+            throw new DbUpdateConcurrencyException("Simulated terminal media claim concurrency conflict.");
+        }
+    }
+
+    private sealed class CancelMediaClaimSaveInterceptor : SaveChangesInterceptor
+    {
+        public bool Enabled { get; set; }
+
+        public int ThrowCount { get; private set; }
+
+        public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
+            DbContextEventData eventData,
+            InterceptionResult<int> result,
+            CancellationToken cancellationToken = default)
+        {
+            var hasMediaClaim = eventData.Context?.ChangeTracker
+                .Entries<TemplateMediaRecord>()
+                .Any(entry => entry.State is EntityState.Added or EntityState.Modified) == true;
+            if (!Enabled || !hasMediaClaim)
+            {
+                return base.SavingChangesAsync(eventData, result, cancellationToken);
+            }
+
+            ThrowCount++;
+            throw new OperationCanceledException("Simulated cancellation while saving a media claim.");
+        }
     }
 
 

@@ -135,14 +135,23 @@ internal sealed class TemplateMediaLifecycleService(
 
     private Task<TemplateMediaRecord?> FindByUrlAsync(string url, CancellationToken cancellationToken)
     {
+        var normalizedUrl = NormalizeAssetUrl(url);
+        var tracked = dbContext.TemplateMediaRecords.Local.FirstOrDefault(
+            x => string.Equals(NormalizeAssetUrl(x.Url), normalizedUrl, StringComparison.Ordinal));
+        if (tracked is not null)
+        {
+            return Task.FromResult<TemplateMediaRecord?>(tracked);
+        }
+
         return dbContext.TemplateMediaRecords
-            .FirstOrDefaultAsync(x => x.Url == url, cancellationToken);
+            .FirstOrDefaultAsync(x => x.Url.Trim() == normalizedUrl, cancellationToken);
     }
 
     private void ApplyAssetMetadata(TemplateMediaRecord record, TemplateAssetCommand asset, TemplateMediaRole role)
     {
-        record.Url = asset.Url;
-        record.StoragePath = ResolveManagedStoragePath(asset.Url) ?? asset.Url;
+        var normalizedUrl = NormalizeAssetUrl(asset.Url);
+        record.Url = normalizedUrl;
+        record.StoragePath = ResolveManagedStoragePath(normalizedUrl) ?? normalizedUrl;
         record.FileName = NormalizeAssetText(asset.FileName, FileNameMaxLength, "asset");
         record.ContentType = NormalizeAssetText(asset.ContentType, ContentTypeMaxLength, "application/octet-stream");
         record.FileSizeBytes = asset.FileSizeBytes is > 0 ? asset.FileSizeBytes : null;
@@ -157,6 +166,11 @@ internal sealed class TemplateMediaLifecycleService(
     {
         var normalized = string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
         return normalized.Length <= maxLength ? normalized : normalized[..maxLength];
+    }
+
+    private static string NormalizeAssetUrl(string url)
+    {
+        return url.Trim();
     }
 
     private string? ResolveManagedStoragePath(string assetUrl)

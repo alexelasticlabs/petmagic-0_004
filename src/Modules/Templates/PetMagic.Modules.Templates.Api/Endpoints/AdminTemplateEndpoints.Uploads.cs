@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Security.Claims;
 
 using FluentValidation;
@@ -9,6 +8,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 
+using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Domain.Enums;
@@ -91,7 +91,7 @@ public static partial class AdminTemplateEndpoints
     }
 
 
-    internal static async Task<Results<Ok<TemplateAssetResponse>, ValidationProblem, ProblemHttpResult>> UploadMediaAsync(
+    internal static async Task<Results<Ok<TemplateMediaUploadResponse>, ValidationProblem, ProblemHttpResult>> UploadMediaAsync(
 
         [FromForm] IFormFile? file,
 
@@ -104,6 +104,8 @@ public static partial class AdminTemplateEndpoints
         [FromServices] ITemplateMediaUploadPolicy uploadPolicy,
 
         [FromServices] IMediaMetadataReader metadataReader,
+
+        [FromServices] ITemplatePreviewOptimizer previewOptimizer,
 
         CancellationToken cancellationToken,
 
@@ -167,7 +169,9 @@ public static partial class AdminTemplateEndpoints
 
         if (detectedContentType is null
 
-            || !TemplateUploadSniffer.MatchesDeclaredContentType(detectedContentType, declaredContentType)
+            || (!TemplateUploadSniffer.MatchesDeclaredContentType(detectedContentType, declaredContentType)
+
+                && !IsPreviewIsoBmffMimeEquivalent(kind, detectedContentType, declaredContentType))
 
             || !IsAllowedUpload(file.FileName, kind, detectedContentType))
 
@@ -205,7 +209,77 @@ public static partial class AdminTemplateEndpoints
 
         {
 
+            if (TryGetAmbiguousStorageKey(storeResult.Error, out var ambiguousStorageKey))
+
+            {
+
+                await CleanupStoredUploadAsync(
+
+                    new StoredMediaResponse(
+
+                        ambiguousStorageKey,
+
+                        ambiguousStorageKey,
+
+                        Path.GetFileName(file.FileName),
+
+                        detectedContentType,
+
+                        file.Length,
+
+                        null),
+
+                    null,
+
+                    MapMediaRole(kind),
+
+                    mediaStorage,
+
+                    mediaLifecycleService);
+
+            }
+
+
+            cancellationToken.ThrowIfCancellationRequested();
+
             return ToAdminTemplateProblem(storeResult.Error);
+
+        }
+
+
+        try
+
+        {
+
+            await mediaLifecycleService.RegisterTemporaryUploadAsync(
+
+                ToAssetCommand(storeResult.Value, null),
+
+                MapMediaRole(kind),
+
+                cancellationToken);
+
+            await mediaLifecycleService.SaveChangesAsync(cancellationToken);
+
+        }
+
+        catch
+
+        {
+
+            await CleanupStoredUploadAsync(
+
+                storeResult.Value,
+
+                null,
+
+                MapMediaRole(kind),
+
+                mediaStorage,
+
+                mediaLifecycleService);
+
+            throw;
 
         }
 
@@ -216,9 +290,6 @@ public static partial class AdminTemplateEndpoints
 
             : storeResult.Value.ContentType;
 
-        var providedDuration = ParseOptionalDuration(durationSeconds);
-
-
         double? duration = null;
 
         if (storedContentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase)
@@ -227,29 +298,59 @@ public static partial class AdminTemplateEndpoints
 
         {
 
-            var durationResult = await metadataReader.GetVideoDurationSecondsAsync(storeResult.Value, cancellationToken);
+            Result<double?> durationResult;
+
+            try
+
+            {
+
+                durationResult = await metadataReader.GetVideoDurationSecondsAsync(
+
+                    storeResult.Value,
+
+                    retainLocalPathOnSuccess: kind == TemplateAssetKind.Preview,
+
+                    cancellationToken: cancellationToken);
+
+            }
+
+            catch (OperationCanceledException)
+
+            {
+
+                await CleanupStoredUploadAsync(
+
+                    storeResult.Value,
+
+                    null,
+
+                    MapMediaRole(kind),
+
+                    mediaStorage,
+
+                    mediaLifecycleService);
+
+                throw;
+
+            }
 
             if (durationResult.IsFailure)
 
             {
 
-                if (providedDuration.HasValue && providedDuration.Value > 0)
+                await CleanupStoredUploadAsync(
 
-                {
+                    storeResult.Value,
 
-                    duration = providedDuration.Value;
+                    null,
 
-                }
+                    MapMediaRole(kind),
 
-                else
+                    mediaStorage,
 
-                {
+                    mediaLifecycleService);
 
-                    await mediaStorage.DeleteAsync(storeResult.Value.Url, CancellationToken.None);
-
-                    return ToAdminTemplateProblem(durationResult.Error);
-
-                }
+                return ToAdminTemplateProblem(durationResult.Error);
 
             }
 
@@ -262,15 +363,6 @@ public static partial class AdminTemplateEndpoints
             }
 
 
-            if ((!duration.HasValue || duration.Value <= 0) && providedDuration.HasValue && providedDuration.Value > 0)
-
-            {
-
-                duration = providedDuration.Value;
-
-            }
-
-
             if (kind == TemplateAssetKind.Preview)
 
             {
@@ -279,7 +371,19 @@ public static partial class AdminTemplateEndpoints
 
                 {
 
-                    await mediaStorage.DeleteAsync(storeResult.Value.Url, CancellationToken.None);
+                    metadataReader.ReleaseRetainedLocalPath(storeResult.Value);
+
+                    await CleanupStoredUploadAsync(
+
+                        storeResult.Value,
+
+                        duration,
+
+                        MapMediaRole(kind),
+
+                        mediaStorage,
+
+                        mediaLifecycleService);
 
                     return TypedResults.ValidationProblem(new Dictionary<string, string[]>
 
@@ -296,7 +400,19 @@ public static partial class AdminTemplateEndpoints
 
                 {
 
-                    await mediaStorage.DeleteAsync(storeResult.Value.Url, CancellationToken.None);
+                    metadataReader.ReleaseRetainedLocalPath(storeResult.Value);
+
+                    await CleanupStoredUploadAsync(
+
+                        storeResult.Value,
+
+                        duration,
+
+                        MapMediaRole(kind),
+
+                        mediaStorage,
+
+                        mediaLifecycleService);
 
                     return TypedResults.ValidationProblem(new Dictionary<string, string[]>
 
@@ -313,47 +429,250 @@ public static partial class AdminTemplateEndpoints
         }
 
 
-        await mediaLifecycleService.RegisterTemporaryUploadAsync(
+        if (kind != TemplateAssetKind.Preview)
 
-            new TemplateAssetCommand(
+        {
 
-                storeResult.Value.Url,
+            return TypedResults.Ok(ToUploadResponse(storeResult.Value, duration));
 
-                storeResult.Value.FileName,
-
-                storeResult.Value.ContentType,
-
-                storeResult.Value.FileSizeBytes,
-
-                duration),
-
-            MapMediaRole(kind),
-
-            cancellationToken);
-
-        await mediaLifecycleService.SaveChangesAsync(cancellationToken);
+        }
 
 
-        return TypedResults.Ok(new TemplateAssetResponse(
+        Result<TemplatePreviewOptimizationResult> optimizationResult;
 
-            storeResult.Value.Url,
+        try
 
-            storeResult.Value.FileName,
+        {
 
-            storeResult.Value.ContentType,
+            optimizationResult = await previewOptimizer.OptimizeAsync(
 
-            storeResult.Value.FileSizeBytes,
+                storeResult.Value,
 
-            duration));
+                duration,
+
+                cancellationToken);
+
+        }
+
+        catch (OperationCanceledException)
+
+        {
+
+            await CleanupStoredUploadAsync(
+
+                storeResult.Value,
+
+                duration,
+
+                TemplateMediaRole.PreviewAsset,
+
+                mediaStorage,
+
+                mediaLifecycleService);
+
+            throw;
+
+        }
+
+        finally
+
+        {
+
+            metadataReader.ReleaseRetainedLocalPath(storeResult.Value);
+
+        }
+
+
+        if (optimizationResult.IsFailure)
+
+        {
+
+            await CleanupStoredUploadAsync(
+
+                storeResult.Value,
+
+                duration,
+
+                TemplateMediaRole.PreviewAsset,
+
+                mediaStorage,
+
+                mediaLifecycleService);
+
+            return ToAdminTemplateProblem(optimizationResult.Error);
+
+        }
+
+
+        var optimized = optimizationResult.Value;
+
+        if (optimized.WasOptimized)
+
+        {
+
+            var optimizedAssets = new[]
+
+            {
+
+                optimized.PrimaryAsset,
+
+                optimized.ThumbnailAsset,
+
+                optimized.AnimatedPreviewAsset,
+
+                optimized.FeedLoopLowAsset,
+
+                optimized.FeedLoopMediumAsset,
+
+                optimized.DetailPreviewAsset
+
+            }
+
+                .Where(asset => asset is not null)
+
+                .DistinctBy(asset => asset!.Url.Trim());
+
+
+            var distinctOptimizedAssets = optimizedAssets.ToArray();
+
+
+            try
+
+            {
+
+                foreach (var asset in distinctOptimizedAssets)
+
+                {
+
+                    await mediaLifecycleService.RegisterTemporaryUploadAsync(
+
+                        ToAssetCommand(asset!, duration),
+
+                        TemplateMediaRole.PreviewAsset,
+
+                        cancellationToken);
+
+                }
+
+
+                await mediaLifecycleService.SaveChangesAsync(cancellationToken);
+
+            }
+
+            catch
+
+            {
+
+                await RollbackOptimizedPreviewAsync(
+
+                    distinctOptimizedAssets,
+
+                    duration,
+
+                    mediaStorage,
+
+                    mediaLifecycleService);
+
+                await CleanupStoredUploadAsync(
+
+                    storeResult.Value,
+
+                    duration,
+
+                    TemplateMediaRole.PreviewAsset,
+
+                    mediaStorage,
+
+                    mediaLifecycleService);
+
+                throw;
+
+            }
+
+
+            await CleanupStoredUploadAsync(
+
+                storeResult.Value,
+
+                duration,
+
+                TemplateMediaRole.PreviewAsset,
+
+                mediaStorage,
+
+                mediaLifecycleService);
+
+        }
+
+
+        return TypedResults.Ok(ToUploadResponse(optimized, duration));
 
     }
 
 
-    private static double? ParseOptionalDuration(string? rawValue)
+    private static TemplateMediaUploadResponse ToUploadResponse(
+
+        TemplatePreviewOptimizationResult optimized,
+
+        double? duration)
 
     {
 
-        if (string.IsNullOrWhiteSpace(rawValue))
+        var primary = ToAssetResponse(optimized.PrimaryAsset, duration)!;
+
+        return new TemplateMediaUploadResponse(
+
+            primary.Url,
+
+            primary.FileName,
+
+            primary.ContentType,
+
+            primary.FileSizeBytes,
+
+            primary.DurationSeconds,
+
+            ToAssetResponse(optimized.ThumbnailAsset, duration),
+
+            ToAssetResponse(optimized.AnimatedPreviewAsset, duration),
+
+            ToAssetResponse(optimized.FeedLoopLowAsset, duration),
+
+            ToAssetResponse(optimized.FeedLoopMediumAsset, duration),
+
+            ToAssetResponse(optimized.DetailPreviewAsset, duration),
+
+            optimized.WasOptimized);
+
+    }
+
+
+    private static TemplateMediaUploadResponse ToUploadResponse(StoredMediaResponse stored, double? duration)
+
+    {
+
+        var asset = ToAssetResponse(stored, duration)!;
+
+        return new TemplateMediaUploadResponse(
+
+            asset.Url,
+
+            asset.FileName,
+
+            asset.ContentType,
+
+            asset.FileSizeBytes,
+
+            asset.DurationSeconds);
+
+    }
+
+
+    private static TemplateAssetResponse? ToAssetResponse(StoredMediaResponse? stored, double? duration)
+
+    {
+
+        if (stored is null)
 
         {
 
@@ -362,16 +681,248 @@ public static partial class AdminTemplateEndpoints
         }
 
 
-        if (!double.TryParse(rawValue, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed))
+        return new TemplateAssetResponse(
+
+            stored.Url,
+
+            stored.FileName,
+
+            stored.ContentType,
+
+            stored.FileSizeBytes,
+
+            IsStoredVideo(stored) ? duration : null);
+
+    }
+
+
+    private static TemplateAssetCommand ToAssetCommand(StoredMediaResponse stored, double? duration)
+
+    {
+
+        return new TemplateAssetCommand(
+
+            stored.Url,
+
+            stored.FileName,
+
+            stored.ContentType,
+
+            stored.FileSizeBytes,
+
+            IsStoredVideo(stored) ? duration : null);
+
+    }
+
+
+    private static bool IsStoredVideo(StoredMediaResponse stored)
+
+    {
+
+        return stored.ContentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase)
+
+            || string.Equals(stored.ContentType, "application/mp4", StringComparison.OrdinalIgnoreCase);
+
+    }
+
+
+    private static async Task CleanupStoredUploadAsync(
+
+        StoredMediaResponse original,
+
+        double? duration,
+
+        TemplateMediaRole role,
+
+        IMediaStorage mediaStorage,
+
+        ITemplateMediaLifecycleService mediaLifecycleService)
+
+    {
+
+        Result deleteResult;
+
+        using var deleteSource = new CancellationTokenSource(TimeSpan.FromSeconds(MediaCleanupTimeoutSeconds));
+
+        try
 
         {
 
-            return null;
+            deleteResult = await mediaStorage.DeleteAsync(original.Url, deleteSource.Token);
+
+        }
+
+        catch
+
+        {
+
+            deleteResult = Result.Failure(new Error(
+
+                "templates.media_storage_failed",
+
+                "Original template preview cleanup failed."));
+
+        }
+
+        try
+
+        {
+
+            using var auditSource = new CancellationTokenSource(TimeSpan.FromSeconds(MediaCleanupTimeoutSeconds));
+
+            await mediaLifecycleService.RegisterTemporaryUploadAsync(
+
+                ToAssetCommand(original, duration),
+
+                role,
+
+                auditSource.Token);
+
+            if (deleteResult.IsSuccess)
+
+            {
+
+                await mediaLifecycleService.MarkDeletedAsync(original.Url, auditSource.Token);
+
+            }
+
+            else
+
+            {
+
+                await mediaLifecycleService.MarkCleanupFailureAsync(
+
+                    original.Url,
+
+                    deleteResult.Error.Code,
+
+                    "Original template preview cleanup failed.",
+
+                    auditSource.Token);
+
+            }
+
+
+            await mediaLifecycleService.SaveChangesAsync(auditSource.Token);
+
+        }
+
+        catch
+
+        {
+
+            // Cleanup remains best effort so the original upload outcome stays authoritative.
+
+        }
+
+    }
+
+
+    private static async Task RollbackOptimizedPreviewAsync(
+
+        IEnumerable<StoredMediaResponse?> assets,
+
+        double? duration,
+
+        IMediaStorage mediaStorage,
+
+        ITemplateMediaLifecycleService mediaLifecycleService)
+
+    {
+
+        var cleanupResults = new List<(StoredMediaResponse Asset, Result DeleteResult)>();
+
+        using var deleteSource = new CancellationTokenSource(TimeSpan.FromSeconds(MediaCleanupTimeoutSeconds));
+
+        foreach (var asset in assets.Where(asset => asset is not null).Reverse())
+
+        {
+
+            Result deleteResult;
+
+            try
+
+            {
+
+                deleteResult = await mediaStorage.DeleteAsync(asset!.Url, deleteSource.Token);
+
+            }
+
+            catch
+
+            {
+
+                deleteResult = Result.Failure(new Error(
+
+                    "templates.media_storage_failed",
+
+                    "Optimized template preview cleanup failed."));
+
+            }
+
+
+            cleanupResults.Add((asset!, deleteResult));
 
         }
 
 
-        return parsed;
+        try
+
+        {
+
+            using var auditSource = new CancellationTokenSource(TimeSpan.FromSeconds(MediaCleanupTimeoutSeconds));
+
+            foreach (var (asset, deleteResult) in cleanupResults)
+
+            {
+
+                await mediaLifecycleService.RegisterTemporaryUploadAsync(
+
+                    ToAssetCommand(asset, duration),
+
+                    TemplateMediaRole.PreviewAsset,
+
+                    auditSource.Token);
+
+
+                if (deleteResult.IsSuccess)
+
+                {
+
+                    await mediaLifecycleService.MarkDeletedAsync(asset.Url, auditSource.Token);
+
+                }
+
+                else
+
+                {
+
+                    await mediaLifecycleService.MarkCleanupFailureAsync(
+
+                        asset.Url,
+
+                        deleteResult.Error.Code,
+
+                        "Optimized template preview cleanup failed.",
+
+                        auditSource.Token);
+
+                }
+
+            }
+
+
+            await mediaLifecycleService.SaveChangesAsync(auditSource.Token);
+
+        }
+
+        catch
+
+        {
+
+            // The original lifecycle failure remains authoritative; cleanup is best effort.
+
+        }
 
     }
 
@@ -412,6 +963,98 @@ public static partial class AdminTemplateEndpoints
         return IsAllowedImageUpload(normalizedContentType)
 
             || IsAllowedVideoUpload(normalizedContentType);
+
+    }
+
+
+    private static bool IsPreviewIsoBmffMimeEquivalent(
+
+        TemplateAssetKind assetKind,
+
+        string detectedContentType,
+
+        string declaredContentType)
+
+    {
+
+        if (assetKind != TemplateAssetKind.Preview)
+
+        {
+
+            return false;
+
+        }
+
+
+        var normalizedDeclared = TemplateUploadSniffer.NormalizeContentType(declaredContentType);
+
+        return (string.Equals(detectedContentType, "video/mp4", StringComparison.OrdinalIgnoreCase)
+
+                && string.Equals(normalizedDeclared, "video/quicktime", StringComparison.OrdinalIgnoreCase))
+
+            || (string.Equals(detectedContentType, "video/quicktime", StringComparison.OrdinalIgnoreCase)
+
+                && (string.Equals(normalizedDeclared, "video/mp4", StringComparison.OrdinalIgnoreCase)
+
+                    || string.Equals(normalizedDeclared, "application/mp4", StringComparison.OrdinalIgnoreCase)));
+
+    }
+
+
+    private static bool TryGetAmbiguousStorageKey(Error error, out string storageKey)
+
+    {
+
+        storageKey = string.Empty;
+
+        if (error.Metadata?.TryGetValue(AmbiguousStorageKeyMetadataName, out var value) != true
+
+            || value is not string candidate)
+
+        {
+
+            return false;
+
+        }
+
+
+        var normalized = candidate.Trim().Replace('\\', '/').Trim('/');
+
+        if (normalized.Length == 0
+
+            || normalized.Length > 1024
+
+            || normalized.Contains("://", StringComparison.Ordinal)
+
+            || Path.IsPathRooted(normalized))
+
+        {
+
+            return false;
+
+        }
+
+
+        var segments = normalized.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        if (segments.Length < 2
+
+            || segments.Any(segment => segment is "." or ".."
+
+                || segment.Any(character => !(char.IsAsciiLetterOrDigit(character)
+
+                    || character is '-' or '_' or '.'))))
+
+        {
+
+            return false;
+
+        }
+
+
+        storageKey = string.Join('/', segments);
+
+        return true;
 
     }
 

@@ -8,4 +8,16 @@ public interface IMediaMetadataReader
     Task<Result<double?>> GetVideoDurationSecondsAsync(TemplateAssetCommand asset, CancellationToken cancellationToken);
 
     Task<Result<double?>> GetVideoDurationSecondsAsync(StoredMediaResponse storedMedia, CancellationToken cancellationToken);
+
+    Task<Result<double?>> GetVideoDurationSecondsAsync(
+        StoredMediaResponse storedMedia,
+        bool retainLocalPathOnSuccess,
+        CancellationToken cancellationToken)
+    {
+        return GetVideoDurationSecondsAsync(storedMedia, cancellationToken);
+    }
+
+    void ReleaseRetainedLocalPath(StoredMediaResponse storedMedia)
+    {
+    }
 }

@@ -1,5 +1,9 @@
 using System.Reflection;
 
+using Amazon.Runtime;
+using Amazon.S3;
+using Amazon.S3.Model;
+
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Infrastructure;
 using PetMagic.Modules.Templates.Infrastructure.Options;
@@ -8,6 +12,84 @@ namespace PetMagic.Modules.Identity.Tests.Templates;
 
 public sealed class R2MediaStorageKeyResolutionTests
 {
+    [Theory]
+    [InlineData("template-previews/batch/thumbnail.jpg", "public,max-age=31536000,immutable")]
+    [InlineData("generated/shared-preview.jpg", null)]
+    public async Task StoreAsync_ShouldScopeImmutableCacheControlToTemplatePreviewDerivatives(
+        string preferredStorageKey,
+        string? expectedCacheControl)
+    {
+        using var client = new RecordingAmazonS3Client();
+        var storage = CreateStorage(client);
+
+        var result = await storage.StoreAsync(
+            new MediaUploadCommand(
+                "preview.jpg",
+                "image/jpeg",
+                [0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10],
+                null,
+                6,
+                preferredStorageKey),
+            CancellationToken.None);
+
+        try
+        {
+            Assert.True(result.IsSuccess);
+            Assert.NotNull(client.LastPutObjectRequest);
+            Assert.Equal(expectedCacheControl, client.LastPutObjectRequest!.Headers.CacheControl);
+        }
+        finally
+        {
+            if (result.IsSuccess)
+            {
+                TemplateMediaTempFiles.TryDeleteIfOwned(result.Value.LocalPath);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task StoreAsync_ShouldExposeManagedKey_WhenAmbiguousPutCleanupFails()
+    {
+        using var client = new RecordingAmazonS3Client(failPut: true, failDelete: true);
+        var storage = CreateStorage(client);
+
+        var result = await storage.StoreAsync(
+            new MediaUploadCommand(
+                "preview.jpg",
+                "image/jpeg",
+                [0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10],
+                null,
+                6),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("templates.media_storage_failed", result.Error.Code);
+        Assert.NotNull(client.LastDeleteObjectKey);
+        Assert.Equal(client.LastDeleteObjectKey, result.Error.Metadata?["ambiguousStorageKey"]);
+        Assert.StartsWith("templates-media/", client.LastDeleteObjectKey, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task StoreAsync_ShouldNotDeleteOverwriteablePreferredKey_WhenPutFails()
+    {
+        using var client = new RecordingAmazonS3Client(failPut: true, failDelete: true);
+        var storage = CreateStorage(client);
+
+        var result = await storage.StoreAsync(
+            new MediaUploadCommand(
+                "preview.jpg",
+                "image/jpeg",
+                [0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10],
+                null,
+                6,
+                "generated/shared-preview.jpg"),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Null(client.LastDeleteObjectKey);
+        Assert.Null(result.Error.Metadata);
+    }
+
     [Theory]
     [InlineData(
         "templates-media/2026/06/result.png",
@@ -161,7 +243,7 @@ public sealed class R2MediaStorageKeyResolutionTests
         Assert.Equal(expected, matches);
     }
 
-    private static R2MediaStorage CreateStorage()
+    private static R2MediaStorage CreateStorage(IAmazonS3? s3Client = null)
     {
         var options = new TemplatesOptions
         {
@@ -186,7 +268,7 @@ public sealed class R2MediaStorageKeyResolutionTests
             }
         };
 
-        return new R2MediaStorage(options, null!);
+        return new R2MediaStorage(options, s3Client!);
     }
 
     private static string? InvokeTryResolveManagedKey(
@@ -212,5 +294,47 @@ public sealed class R2MediaStorageKeyResolutionTests
 
         Assert.NotNull(method);
         return (bool)method!.Invoke(storage, [detectedContentType, declaredContentType])!;
+    }
+
+    private sealed class RecordingAmazonS3Client(
+        bool failPut = false,
+        bool failDelete = false) : AmazonS3Client(
+            new BasicAWSCredentials("test-access", "test-secret"),
+            new AmazonS3Config
+            {
+                ServiceURL = "http://127.0.0.1",
+                ForcePathStyle = true
+            })
+    {
+        public PutObjectRequest? LastPutObjectRequest { get; private set; }
+
+        public string? LastDeleteObjectKey { get; private set; }
+
+        public override Task<PutObjectResponse> PutObjectAsync(
+            PutObjectRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            LastPutObjectRequest = request;
+            if (failPut)
+            {
+                throw new AmazonS3Exception("Simulated ambiguous put failure.");
+            }
+
+            return Task.FromResult(new PutObjectResponse());
+        }
+
+        public override Task<DeleteObjectResponse> DeleteObjectAsync(
+            string bucketName,
+            string key,
+            CancellationToken cancellationToken = default)
+        {
+            LastDeleteObjectKey = key;
+            if (failDelete)
+            {
+                throw new AmazonS3Exception("Simulated ambiguous delete failure.");
+            }
+
+            return Task.FromResult(new DeleteObjectResponse());
+        }
     }
 }

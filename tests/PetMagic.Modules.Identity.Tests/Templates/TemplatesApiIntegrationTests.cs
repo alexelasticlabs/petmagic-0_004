@@ -357,6 +357,7 @@ public sealed partial class TemplatesApiIntegrationTests
             builder.Services.AddSingleton<IImageGenerator, TestImageGenerator>();
             builder.Services.AddSingleton<IImagePreviewGenerator>(new TestImagePreviewGenerator(mediaStorage));
             builder.Services.AddSingleton<IVideoThumbnailGenerator>(new TestVideoThumbnailGenerator(mediaStorage));
+            builder.Services.AddSingleton<ITemplatePreviewOptimizer, PassthroughTemplatePreviewOptimizer>();
             builder.Services.AddSingleton<IVideoMotionGenerator, TestVideoMotionGenerator>();
             builder.Services.AddSingleton<IGeneratedMediaImporter>(new TestGeneratedMediaImporter(mediaStorage, failGeneratedMediaImport));
             builder.Services.AddSingleton<ITemplateGenerationBilling>(billing);
@@ -573,6 +574,24 @@ public sealed partial class TemplatesApiIntegrationTests
                 cancellationToken);
 
             return result.IsSuccess ? result.Value : null;
+        }
+    }
+
+    private sealed class PassthroughTemplatePreviewOptimizer : ITemplatePreviewOptimizer
+    {
+        public Task<Result<TemplatePreviewOptimizationResult>> OptimizeAsync(
+            StoredMediaResponse original,
+            double? durationSeconds,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Result.Success(new TemplatePreviewOptimizationResult(
+                original,
+                null,
+                null,
+                null,
+                null,
+                null,
+                false)));
         }
     }
 

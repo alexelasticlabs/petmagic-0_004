@@ -1,3 +1,5 @@
+import type { TemplateAssetInput } from "@/lib/api-client";
+
 import type { Dispatch, SetStateAction } from "react";
 
 export type TemplateFormState = {
@@ -19,6 +21,11 @@ export type TemplateFormState = {
   previewContentType: string;
   previewFileSizeBytes: string;
   previewDurationSeconds: string;
+  thumbnailAsset: TemplateAssetInput | null;
+  animatedPreviewAsset: TemplateAssetInput | null;
+  feedLoopLowAsset: TemplateAssetInput | null;
+  feedLoopMediumAsset: TemplateAssetInput | null;
+  detailPreviewAsset: TemplateAssetInput | null;
   musicDescription: string;
   referenceUrl: string;
   referenceUrlSource: "none" | "persisted" | "uploaded";

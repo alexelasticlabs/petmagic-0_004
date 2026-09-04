@@ -34,6 +34,10 @@ public sealed class TemplatesOptions
 
     public long ReferenceMotionMaxFileSizeBytes { get; init; } = 100 * 1024 * 1024;
 
+    public string FfprobePath { get; init; } = "ffprobe";
+
+    public int MediaMetadataProbeTimeoutSeconds { get; init; } = 10;
+
     public bool SeedSampleTemplates { get; init; }
 
     public bool QaFixturesEnabled { get; init; }
@@ -213,6 +217,8 @@ public sealed class TemplatesOptions
     public FirebasePushOptions FirebasePush { get; init; } = new();
 
     public TemplateWatermarkOptions Watermark { get; init; } = new();
+
+    public TemplatePreviewOptimizationOptions PreviewOptimization { get; init; } = new();
 }
 
 public static class TemplateStorageProviders
@@ -317,4 +323,47 @@ public sealed class TemplateWatermarkOptions
     public string PreviewVideoFrameUrl { get; init; } = string.Empty;
 
     public string FfmpegPath { get; init; } = "ffmpeg";
+}
+
+public sealed class TemplatePreviewOptimizationOptions
+{
+    public bool Enabled { get; init; } = true;
+
+    public int MaxConcurrentOptimizations { get; init; } = 1;
+
+    public int FfmpegThreads { get; init; } = 2;
+
+    public int TimeoutSeconds { get; init; } = 90;
+
+    public int CleanupTimeoutSeconds { get; init; } = 10;
+
+    public int ThumbnailMaxDimension { get; init; } = 640;
+
+    public int ThumbnailWebpQuality { get; init; } = 78;
+
+    public int DetailImageMaxDimension { get; init; } = 1600;
+
+    public int DetailImageWebpQuality { get; init; } = 84;
+
+    public int FeedVideoMaxDimension { get; init; } = 720;
+
+    public int FeedVideoCrf { get; init; } = 27;
+
+    public int FeedVideoMaxBitrateKbps { get; init; } = 900;
+
+    public int DetailVideoMaxDimension { get; init; } = 1280;
+
+    public int DetailVideoCrf { get; init; } = 23;
+
+    public int DetailVideoMaxBitrateKbps { get; init; } = 2500;
+
+    public int DetailVideoAudioBitrateKbps { get; init; } = 96;
+
+    public int MaxImageDimension { get; init; } = 12000;
+
+    public long MaxImagePixelCount { get; init; } = 50_000_000;
+
+    public int MaxVideoDimension { get; init; } = 8_192;
+
+    public long MaxVideoPixelCount { get; init; } = 20_000_000;
 }

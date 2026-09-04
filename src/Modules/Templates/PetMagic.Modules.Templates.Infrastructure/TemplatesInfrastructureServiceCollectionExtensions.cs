@@ -36,6 +36,7 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         var falSection = section.GetSection("Fal");
         var firebasePushSection = section.GetSection("FirebasePush");
         var watermarkSection = section.GetSection("Watermark");
+        var previewOptimizationSection = section.GetSection("PreviewOptimization");
         var configuredStorageProvider = ReadValue(section, "StorageProvider", "TEMPLATES_STORAGE_PROVIDER");
         var configuredAiProvider = ReadValue(section, "AiProvider", "TEMPLATES_AI_PROVIDER");
         var mediaReadUrlSigningOptions = new TemplateMediaReadUrlSigningOptions
@@ -88,6 +89,8 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
             LocalizationBackfillEnabled = ParseBool(section["LocalizationBackfillEnabled"], false),
             PreviewMaxFileSizeBytes = ParseLong(section["PreviewMaxFileSizeBytes"], 25 * 1024 * 1024),
             ReferenceMotionMaxFileSizeBytes = ParseLong(section["ReferenceMotionMaxFileSizeBytes"], 100 * 1024 * 1024),
+            FfprobePath = string.IsNullOrWhiteSpace(section["FfprobePath"]) ? "ffprobe" : section["FfprobePath"]!.Trim(),
+            MediaMetadataProbeTimeoutSeconds = ParseBoundedInt(section["MediaMetadataProbeTimeoutSeconds"], 10, 2, 30),
             SeedSampleTemplates = ParseBool(section["SeedSampleTemplates"], false),
             QaFixturesEnabled = ParseBool(ReadValue(section, "QaFixturesEnabled", "PETMAGIC_QA_FIXTURES_ENABLED"), false),
             GenerationWorkerEnabled = ParseBool(section["GenerationWorkerEnabled"], true),
@@ -221,6 +224,29 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
                 PreviewImageUrl = watermarkSection["PreviewImageUrl"] ?? string.Empty,
                 PreviewVideoFrameUrl = watermarkSection["PreviewVideoFrameUrl"] ?? string.Empty,
                 FfmpegPath = watermarkSection["FfmpegPath"] ?? "ffmpeg"
+            },
+            PreviewOptimization = new TemplatePreviewOptimizationOptions
+            {
+                Enabled = ParseBool(previewOptimizationSection["Enabled"], true),
+                MaxConcurrentOptimizations = ParseBoundedInt(previewOptimizationSection["MaxConcurrentOptimizations"], 1, 1, 4),
+                FfmpegThreads = ParseBoundedInt(previewOptimizationSection["FfmpegThreads"], 2, 1, 8),
+                TimeoutSeconds = ParseBoundedInt(previewOptimizationSection["TimeoutSeconds"], 90, 10, 300),
+                CleanupTimeoutSeconds = ParseBoundedInt(previewOptimizationSection["CleanupTimeoutSeconds"], 10, 1, 30),
+                ThumbnailMaxDimension = ParseBoundedInt(previewOptimizationSection["ThumbnailMaxDimension"], 640, 128, 2048),
+                ThumbnailWebpQuality = ParseBoundedInt(previewOptimizationSection["ThumbnailWebpQuality"], 78, 1, 100),
+                DetailImageMaxDimension = ParseBoundedInt(previewOptimizationSection["DetailImageMaxDimension"], 1600, 320, 4096),
+                DetailImageWebpQuality = ParseBoundedInt(previewOptimizationSection["DetailImageWebpQuality"], 84, 1, 100),
+                FeedVideoMaxDimension = ParseBoundedInt(previewOptimizationSection["FeedVideoMaxDimension"], 720, 240, 1920),
+                FeedVideoCrf = ParseBoundedInt(previewOptimizationSection["FeedVideoCrf"], 27, 0, 51),
+                FeedVideoMaxBitrateKbps = ParseBoundedInt(previewOptimizationSection["FeedVideoMaxBitrateKbps"], 900, 128, 10_000),
+                DetailVideoMaxDimension = ParseBoundedInt(previewOptimizationSection["DetailVideoMaxDimension"], 1280, 320, 4096),
+                DetailVideoCrf = ParseBoundedInt(previewOptimizationSection["DetailVideoCrf"], 23, 0, 51),
+                DetailVideoMaxBitrateKbps = ParseBoundedInt(previewOptimizationSection["DetailVideoMaxBitrateKbps"], 2500, 256, 20_000),
+                DetailVideoAudioBitrateKbps = ParseBoundedInt(previewOptimizationSection["DetailVideoAudioBitrateKbps"], 96, 32, 320),
+                MaxImageDimension = ParseBoundedInt(previewOptimizationSection["MaxImageDimension"], 12000, 1_000, 30_000),
+                MaxImagePixelCount = ParseBoundedLong(previewOptimizationSection["MaxImagePixelCount"], 50_000_000, 1_000_000, 200_000_000),
+                MaxVideoDimension = ParseBoundedInt(previewOptimizationSection["MaxVideoDimension"], 8_192, 1_000, 16_384),
+                MaxVideoPixelCount = ParseBoundedLong(previewOptimizationSection["MaxVideoPixelCount"], 20_000_000, 1_000_000, 100_000_000)
             }
         };
 
@@ -255,6 +281,11 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
                 StringComparison.Ordinal),
             options.GenerationSchedulerV2Enabled);
         services.AddSingleton<ITemplateMediaUploadPolicy, ConfiguredTemplateMediaUploadPolicy>();
+        services.AddSingleton<FfprobeVideoDurationProbe>();
+        services.AddSingleton<IVideoDurationProbe>(serviceProvider =>
+            serviceProvider.GetRequiredService<FfprobeVideoDurationProbe>());
+        services.AddSingleton<IVideoDimensionsProbe>(serviceProvider =>
+            serviceProvider.GetRequiredService<FfprobeVideoDurationProbe>());
         services.AddSingleton<IMediaMetadataReader, FileMediaMetadataReader>();
         services.AddSingleton<ITemplateWatermarkRenderer, TemplateWatermarkRenderer>();
         AddMediaStorage(services, options);
@@ -301,6 +332,8 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         services.AddScoped<ITemplateGenerationQaFixtureService, TemplateGenerationQaFixtureService>();
         services.AddScoped<IImagePreviewGenerator, ImagePreviewGenerator>();
         services.AddScoped<IVideoThumbnailGenerator, VideoThumbnailGenerator>();
+        services.AddSingleton<TemplatePreviewOptimizationGate>();
+        services.AddScoped<ITemplatePreviewOptimizer, TemplatePreviewOptimizer>();
         services.AddScoped<TemplateMediaCleanupProcessor>();
         AddGenerationProviderPipelineServices(services, options);
         services.AddScoped<ITemplateGenerationProviderCallbackService, TemplateGenerationProviderCallbackService>();
@@ -878,6 +911,16 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
     private static int ParsePositiveInt(string? raw, int fallback)
     {
         return int.TryParse(raw, out var parsed) && parsed > 0 ? parsed : fallback;
+    }
+
+    private static int ParseBoundedInt(string? raw, int fallback, int min, int max)
+    {
+        return int.TryParse(raw, out var parsed) && parsed >= min && parsed <= max ? parsed : fallback;
+    }
+
+    private static long ParseBoundedLong(string? raw, long fallback, long min, long max)
+    {
+        return long.TryParse(raw, out var parsed) && parsed >= min && parsed <= max ? parsed : fallback;
     }
 
     private static double ParseDouble(string? raw, double fallback, double min, double max)

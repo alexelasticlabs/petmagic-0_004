@@ -3,6 +3,7 @@ using System.Buffers.Binary;
 using Microsoft.Extensions.Logging;
 
 using PetMagic.BuildingBlocks.Observability;
+using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Infrastructure;
 
@@ -14,7 +15,7 @@ public sealed class FileMediaMetadataReaderTests
     public async Task GetVideoDurationSecondsAsync_ShouldReadMp4Version0Duration()
     {
         var filePath = CreateTempFile(BuildMp4WithMovieHeader(timescale: 1000, duration: 7250, version: 0));
-        var reader = new FileMediaMetadataReader();
+        var reader = new FileMediaMetadataReader(new UnexpectedVideoDurationProbe());
 
         try
         {
@@ -35,7 +36,7 @@ public sealed class FileMediaMetadataReaderTests
     public async Task GetVideoDurationSecondsAsync_ShouldReadMp4Version1Duration()
     {
         var filePath = CreateTempFile(BuildMp4WithMovieHeader(timescale: 48000, duration: 360000, version: 1));
-        var reader = new FileMediaMetadataReader();
+        var reader = new FileMediaMetadataReader(new UnexpectedVideoDurationProbe());
 
         try
         {
@@ -53,23 +54,127 @@ public sealed class FileMediaMetadataReaderTests
     }
 
     [Fact]
+    public async Task GetVideoDurationSecondsAsync_ShouldRetainOwnedLocalPath_UntilExplicitRelease()
+    {
+        var filePath = await TemplateMediaTempFiles.WriteAsync(
+            BuildMp4WithMovieHeader(timescale: 1000, duration: 7250, version: 0),
+            ".mp4",
+            CancellationToken.None);
+        var storedMedia = new StoredMediaResponse(
+            "https://cdn.example.com/video.mp4",
+            "templates/video.mp4",
+            "video.mp4",
+            "video/mp4",
+            null,
+            filePath);
+        var reader = new FileMediaMetadataReader(new UnexpectedVideoDurationProbe());
+
+        try
+        {
+            var result = await reader.GetVideoDurationSecondsAsync(
+                storedMedia,
+                retainLocalPathOnSuccess: true,
+                cancellationToken: CancellationToken.None);
+
+            Assert.True(result.IsSuccess);
+            Assert.Equal(7.25, result.Value);
+            Assert.True(File.Exists(filePath));
+
+            reader.ReleaseRetainedLocalPath(storedMedia);
+            Assert.False(File.Exists(filePath));
+        }
+        finally
+        {
+            TemplateMediaTempFiles.TryDeleteIfOwned(filePath);
+        }
+    }
+
+    [Fact]
+    public async Task GetVideoDurationSecondsAsync_ShouldReleaseOwnedLocalPath_ByDefault()
+    {
+        var filePath = await TemplateMediaTempFiles.WriteAsync(
+            BuildMp4WithMovieHeader(timescale: 1000, duration: 7250, version: 0),
+            ".mp4",
+            CancellationToken.None);
+        var reader = new FileMediaMetadataReader(new UnexpectedVideoDurationProbe());
+
+        var result = await reader.GetVideoDurationSecondsAsync(
+            new StoredMediaResponse(
+                "https://cdn.example.com/video.mp4",
+                "templates/video.mp4",
+                "video.mp4",
+                "video/mp4",
+                null,
+                filePath),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(7.25, result.Value);
+        Assert.False(File.Exists(filePath));
+    }
+
+    [Fact]
+    public async Task GetVideoDurationSecondsAsync_ShouldReleaseOwnedLocalPath_WhenRetainedProbeFails()
+    {
+        var filePath = await TemplateMediaTempFiles.WriteAsync([1, 2, 3, 4], ".mp4", CancellationToken.None);
+        var reader = new FileMediaMetadataReader(
+            new FailingVideoDurationProbe(TemplatesErrors.MediaMetadataInvalid));
+
+        var result = await reader.GetVideoDurationSecondsAsync(
+            new StoredMediaResponse(
+                "https://cdn.example.com/bad.mp4",
+                "templates/bad.mp4",
+                "bad.mp4",
+                "video/mp4",
+                null,
+                filePath),
+            retainLocalPathOnSuccess: true,
+            cancellationToken: CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("templates.media_metadata_invalid", result.Error.Code);
+        Assert.False(File.Exists(filePath));
+    }
+
+    [Fact]
+    public async Task GetVideoDurationSecondsAsync_ShouldReleaseOwnedLocalPath_WhenRetainedProbeIsCancelled()
+    {
+        var filePath = await TemplateMediaTempFiles.WriteAsync([0x1A, 0x45, 0xDF, 0xA3, 0x93], ".webm", CancellationToken.None);
+        var reader = new FileMediaMetadataReader(new CancelingVideoDurationProbe());
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            reader.GetVideoDurationSecondsAsync(
+                new StoredMediaResponse(
+                    "https://cdn.example.com/video.webm",
+                    "templates/video.webm",
+                    "video.webm",
+                    "video/webm",
+                    null,
+                    filePath),
+                retainLocalPathOnSuccess: true,
+                cancellationToken: CancellationToken.None));
+
+        Assert.False(File.Exists(filePath));
+    }
+
+    [Fact]
     public async Task GetVideoDurationSecondsAsync_ShouldReturnNull_WhenFileDoesNotExist()
     {
-        var reader = new FileMediaMetadataReader();
+        var reader = new FileMediaMetadataReader(new UnexpectedVideoDurationProbe());
 
         var result = await reader.GetVideoDurationSecondsAsync(
             new StoredMediaResponse("https://cdn.example.com/missing.mp4", "templates/missing.mp4", "missing.mp4", "video/mp4", null, Path.Combine(Path.GetTempPath(), $"missing-{Guid.NewGuid():N}.mp4")),
             CancellationToken.None);
 
-        Assert.True(result.IsSuccess);
-        Assert.Null(result.Value);
+        Assert.True(result.IsFailure);
+        Assert.Equal("templates.media_metadata_failed", result.Error.Code);
     }
 
     [Fact]
-    public async Task GetVideoDurationSecondsAsync_ShouldReturnNull_ForNonMp4Video()
+    public async Task GetVideoDurationSecondsAsync_ShouldProbeServerSide_ForNonMp4Video()
     {
         var filePath = CreateTempFile([0x1A, 0x45, 0xDF, 0xA3, 0x93], ".webm");
-        var reader = new FileMediaMetadataReader();
+        var reader = new FileMediaMetadataReader(new FixedVideoDurationProbe(7.25));
 
         try
         {
@@ -78,7 +183,7 @@ public sealed class FileMediaMetadataReaderTests
                 CancellationToken.None);
 
             Assert.True(result.IsSuccess);
-            Assert.Null(result.Value);
+            Assert.Equal(7.25, result.Value);
         }
         finally
         {
@@ -91,7 +196,9 @@ public sealed class FileMediaMetadataReaderTests
     {
         var filePath = CreateTempFile([1, 2, 3, 4, 5, 6, 7, 8]);
         var logger = new CapturingLogger<FileMediaMetadataReader>();
-        var reader = new FileMediaMetadataReader(logger);
+        var reader = new FileMediaMetadataReader(
+            new FailingVideoDurationProbe(TemplatesErrors.MediaMetadataInvalid),
+            logger);
 
         try
         {
@@ -100,15 +207,7 @@ public sealed class FileMediaMetadataReaderTests
                 CancellationToken.None);
 
             Assert.True(result.IsFailure);
-            Assert.Equal("templates.media_metadata_failed", result.Error.Code);
-            Assert.Contains(
-                logger.Entries,
-                entry => entry.Level == LogLevel.Warning
-                    && entry.Message.Contains("Template media metadata read failed.", StringComparison.Ordinal)
-                    && Equals(entry.Properties["Operation"], "read_mp4_duration")
-                    && !entry.Properties.ContainsKey("FileName")
-                    && Equals(entry.Properties["FileNameHash"], SafeLogValues.StableHash("bad.mp4"))
-                    && Equals(entry.Properties["ContentType"], "video/mp4"));
+            Assert.Equal("templates.media_metadata_invalid", result.Error.Code);
         }
         finally
         {
@@ -120,7 +219,7 @@ public sealed class FileMediaMetadataReaderTests
     public async Task GetVideoDurationSecondsAsync_ShouldRespectHostFileLockSemantics_ForOwnedTempFile()
     {
         var logger = new CapturingLogger<FileMediaMetadataReader>();
-        var reader = new FileMediaMetadataReader(logger);
+        var reader = new FileMediaMetadataReader(new UnexpectedVideoDurationProbe(), logger);
         var filePath = await TemplateMediaTempFiles.WriteAsync([1, 2, 3, 4], ".mp4", CancellationToken.None);
         await using var lockStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.None);
 
@@ -165,11 +264,117 @@ public sealed class FileMediaMetadataReaderTests
         }
     }
 
+    [Theory]
+    [InlineData("{\"streams\":[{\"duration\":\"7.251\"}],\"format\":{\"duration\":\"9\"}}", 7.251)]
+    [InlineData("{\"streams\":[{}],\"format\":{\"duration\":\"8.5\"}}", 8.5)]
+    public void TryParseDuration_ShouldUseVideoStreamThenFormatFallback(string json, double expected)
+    {
+        Assert.True(FfprobeVideoDurationProbe.TryParseDuration(json, out var duration));
+        Assert.Equal(expected, duration);
+    }
+
+    [Theory]
+    [InlineData("{}")]
+    [InlineData("{\"streams\":[]}")]
+    [InlineData("{\"streams\":[{\"duration\":\"N/A\"}],\"format\":{\"duration\":\"NaN\"}}")]
+    [InlineData("{\"streams\":[{\"duration\":0}],\"format\":{\"duration\":-1}}")]
+    [InlineData("not-json")]
+    public void TryParseDuration_ShouldRejectMissingNonFiniteOrNonPositiveDurations(string json)
+    {
+        Assert.False(FfprobeVideoDurationProbe.TryParseDuration(json, out _));
+    }
+
+    [Fact]
+    public void TryParseDimensions_ShouldReadNormalSquarePixelVideo()
+    {
+        const string json = """
+            {"streams":[{"width":3840,"height":2160,"sample_aspect_ratio":"1:1"}]}
+            """;
+
+        Assert.True(FfprobeVideoDurationProbe.TryParseDimensions(json, out var dimensions));
+        Assert.Equal(3840, dimensions.Width);
+        Assert.Equal(2160, dimensions.Height);
+        Assert.Equal(3840, dimensions.DisplayWidth);
+        Assert.Equal(2160, dimensions.DisplayHeight);
+        Assert.Equal(0, dimensions.RotationDegrees);
+        Assert.Equal(1, dimensions.SampleAspectRatio);
+    }
+
+    [Fact]
+    public void TryParseDimensions_ShouldApplyRotationAndSampleAspectRatio_ToDisplayBounds()
+    {
+        const string json = """
+            {
+              "streams": [
+                {
+                  "width": 1920,
+                  "height": 1080,
+                  "sample_aspect_ratio": "4:3",
+                  "tags": {"rotate": "180"},
+                  "side_data_list": [{"rotation": -90}]
+                }
+              ]
+            }
+            """;
+
+        Assert.True(FfprobeVideoDurationProbe.TryParseDimensions(json, out var dimensions));
+        Assert.Equal(1920, dimensions.Width);
+        Assert.Equal(1080, dimensions.Height);
+        Assert.Equal(1080, dimensions.DisplayWidth);
+        Assert.Equal(2560, dimensions.DisplayHeight);
+        Assert.Equal(270, dimensions.RotationDegrees);
+        Assert.Equal(4d / 3d, dimensions.SampleAspectRatio);
+    }
+
+    [Theory]
+    [InlineData("{}")]
+    [InlineData("{\"streams\":[]}")]
+    [InlineData("{\"streams\":[{\"width\":0,\"height\":1080}]}")]
+    [InlineData("{\"streams\":[{\"width\":1920,\"height\":1080,\"sample_aspect_ratio\":\"not-a-ratio\"}]}")]
+    [InlineData("{\"streams\":[{\"width\":1920,\"height\":1080,\"side_data_list\":[{\"rotation\":\"NaN\"}]}]}")]
+    public void TryParseDimensions_ShouldRejectMalformedMetadata(string json)
+    {
+        Assert.False(FfprobeVideoDurationProbe.TryParseDimensions(json, out _));
+    }
+
+    [Fact]
+    public void FfprobeDurationProfile_ShouldBeBoundedAndUseDiscreteArguments()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Infrastructure",
+            "FfprobeVideoDurationProbe.cs"));
+
+        Assert.Contains("ArgumentList.Add(argument)", source, StringComparison.Ordinal);
+        Assert.Contains("\"-select_streams\", \"v:0\"", source, StringComparison.Ordinal);
+        Assert.Contains("\"stream=duration:format=duration\"", source, StringComparison.Ordinal);
+        Assert.Contains("stream=width,height,sample_aspect_ratio", source, StringComparison.Ordinal);
+        Assert.Contains("stream_tags=rotate:stream_side_data=rotation", source, StringComparison.Ordinal);
+        Assert.Contains("CreateLinkedTokenSource", source, StringComparison.Ordinal);
+        Assert.Contains("Kill(entireProcessTree: true)", source, StringComparison.Ordinal);
+        Assert.Contains("ProcessOutputDrainer.CountAsync", source, StringComparison.Ordinal);
+        Assert.Contains("UseShellExecute = false", source, StringComparison.Ordinal);
+    }
+
     private static string CreateTempFile(byte[] content, string extension = ".mp4")
     {
         var filePath = Path.Combine(Path.GetTempPath(), $"petmagic-media-{Guid.NewGuid():N}{extension}");
         File.WriteAllBytes(filePath, content);
         return filePath;
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "PetMagic.slnx")))
+        {
+            directory = directory.Parent;
+        }
+
+        return directory?.FullName ?? throw new DirectoryNotFoundException("Repository root was not found.");
     }
 
     private static byte[] BuildMp4WithMovieHeader(uint timescale, ulong duration, byte version)
@@ -257,4 +462,36 @@ public sealed class FileMediaMetadataReaderTests
         LogLevel Level,
         string Message,
         IReadOnlyDictionary<string, object?> Properties);
+
+    private sealed class FixedVideoDurationProbe(double durationSeconds) : IVideoDurationProbe
+    {
+        public Task<Result<double?>> ProbeAsync(
+            StoredMediaResponse storedMedia,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(Result.Success<double?>(durationSeconds));
+    }
+
+    private sealed class FailingVideoDurationProbe(Error error) : IVideoDurationProbe
+    {
+        public Task<Result<double?>> ProbeAsync(
+            StoredMediaResponse storedMedia,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(Result.Failure<double?>(error));
+    }
+
+    private sealed class UnexpectedVideoDurationProbe : IVideoDurationProbe
+    {
+        public Task<Result<double?>> ProbeAsync(
+            StoredMediaResponse storedMedia,
+            CancellationToken cancellationToken) =>
+            throw new Xunit.Sdk.XunitException("The server-side probe should not be called.");
+    }
+
+    private sealed class CancelingVideoDurationProbe : IVideoDurationProbe
+    {
+        public Task<Result<double?>> ProbeAsync(
+            StoredMediaResponse storedMedia,
+            CancellationToken cancellationToken) =>
+            Task.FromCanceled<Result<double?>>(new CancellationToken(canceled: true));
+    }
 }

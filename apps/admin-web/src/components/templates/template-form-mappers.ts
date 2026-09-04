@@ -80,6 +80,11 @@ export function createInitialTemplateForm(templateType: TemplateType): TemplateF
     previewContentType: templateType === "Video" ? "video/mp4" : "image/jpeg",
     previewFileSizeBytes: "",
     previewDurationSeconds: "",
+    thumbnailAsset: null,
+    animatedPreviewAsset: null,
+    feedLoopLowAsset: null,
+    feedLoopMediumAsset: null,
+    detailPreviewAsset: null,
     musicDescription: "",
     referenceUrl: "",
     referenceUrlSource: "none",
@@ -119,6 +124,11 @@ export function createFormFromTemplate(template: AdminTemplate): TemplateFormSta
       (template.templateType === "Video" ? "video/mp4" : "image/jpeg"),
     previewFileSizeBytes: template.previewAsset?.fileSizeBytes?.toString() ?? "",
     previewDurationSeconds: template.previewAsset?.durationSeconds?.toString() ?? "",
+    thumbnailAsset: cloneTemplateAsset(template.thumbnailAsset),
+    animatedPreviewAsset: cloneTemplateAsset(template.animatedPreviewAsset),
+    feedLoopLowAsset: cloneTemplateAsset(template.feedLoopLowAsset),
+    feedLoopMediumAsset: cloneTemplateAsset(template.feedLoopMediumAsset),
+    detailPreviewAsset: cloneTemplateAsset(template.detailPreviewAsset),
     musicDescription: template.musicDescription ?? "",
     referenceUrl: template.referenceMotionAsset?.url ?? "",
     referenceUrlSource: template.referenceMotionAsset?.url ? "persisted" : "none",
@@ -150,6 +160,20 @@ export async function saveImageTemplateFromForm(
     form.previewFileSizeBytes,
     form.previewDurationSeconds
   );
+  const thumbnailAsset =
+    buildUploadedTemplateAsset(form.previewUrlSource, form.thumbnailAsset) ?? previewAsset;
+  const animatedPreviewAsset = buildUploadedTemplateAsset(
+    form.previewUrlSource,
+    form.animatedPreviewAsset
+  );
+  const feedLoopLowAsset =
+    buildUploadedTemplateAsset(form.previewUrlSource, form.feedLoopLowAsset) ?? previewAsset;
+  const feedLoopMediumAsset = buildUploadedTemplateAsset(
+    form.previewUrlSource,
+    form.feedLoopMediumAsset
+  );
+  const detailPreviewAsset =
+    buildUploadedTemplateAsset(form.previewUrlSource, form.detailPreviewAsset) ?? previewAsset;
   const payload: ImageTemplatePayload = {
     title: normalizeTemplateText(form.title, TEMPLATE_TITLE_MAX_LENGTH),
     shortDescription: normalizeTemplateText(
@@ -166,9 +190,11 @@ export async function saveImageTemplateFromForm(
     tokenCost: parseNumber(form.tokenCost),
     previewAsset,
     ...(keepPreviewAsset ? { keepPreviewAsset } : {}),
-    thumbnailAsset: previewAsset,
-    feedLoopLowAsset: previewAsset,
-    detailPreviewAsset: previewAsset,
+    thumbnailAsset,
+    animatedPreviewAsset,
+    feedLoopLowAsset,
+    feedLoopMediumAsset,
+    detailPreviewAsset,
     imageModel: normalizeTemplateText(form.imageModel, TEMPLATE_MODEL_MAX_LENGTH),
     imagePrompt: normalizeTemplateText(form.imagePrompt, TEMPLATE_PROMPT_MAX_LENGTH),
     supportsGenerationResultInput: form.supportsGenerationResultInput,
@@ -194,6 +220,20 @@ export async function saveVideoTemplateFromForm(
     form.previewFileSizeBytes,
     form.previewDurationSeconds
   );
+  const thumbnailAsset =
+    buildUploadedTemplateAsset(form.previewUrlSource, form.thumbnailAsset) ?? previewAsset;
+  const animatedPreviewAsset = buildUploadedTemplateAsset(
+    form.previewUrlSource,
+    form.animatedPreviewAsset
+  );
+  const feedLoopLowAsset =
+    buildUploadedTemplateAsset(form.previewUrlSource, form.feedLoopLowAsset) ?? previewAsset;
+  const feedLoopMediumAsset = buildUploadedTemplateAsset(
+    form.previewUrlSource,
+    form.feedLoopMediumAsset
+  );
+  const detailPreviewAsset =
+    buildUploadedTemplateAsset(form.previewUrlSource, form.detailPreviewAsset) ?? previewAsset;
   const payload: VideoTemplatePayload = {
     title: normalizeTemplateText(form.title, TEMPLATE_TITLE_MAX_LENGTH),
     shortDescription: normalizeTemplateText(
@@ -214,9 +254,11 @@ export async function saveVideoTemplateFromForm(
     ),
     previewAsset,
     ...(keepPreviewAsset ? { keepPreviewAsset } : {}),
-    thumbnailAsset: previewAsset,
-    feedLoopLowAsset: previewAsset,
-    detailPreviewAsset: previewAsset,
+    thumbnailAsset,
+    animatedPreviewAsset,
+    feedLoopLowAsset,
+    feedLoopMediumAsset,
+    detailPreviewAsset,
     referenceMotionAsset: buildTemplateAsset(
       form.referenceUrlSource,
       form.referenceUrl,
@@ -294,6 +336,56 @@ function buildTemplateAsset(
     fileSizeBytes: size,
     durationSeconds: duration,
   };
+}
+
+function buildUploadedTemplateAsset(
+  source: TemplateFormState["previewUrlSource"],
+  asset: TemplateAssetInput | null
+): TemplateAssetInput | undefined {
+  if (source !== "uploaded" || !asset) {
+    return undefined;
+  }
+
+  return normalizeTemplateAssetInput(asset);
+}
+
+function normalizeTemplateAssetInput(
+  asset: TemplateAssetInput | null | undefined
+): TemplateAssetInput | undefined {
+  if (!asset) {
+    return undefined;
+  }
+
+  const url = asset.url.trim();
+  if (!url) {
+    return undefined;
+  }
+
+  const fileSizeBytes =
+    typeof asset.fileSizeBytes === "number" &&
+    Number.isSafeInteger(asset.fileSizeBytes) &&
+    asset.fileSizeBytes > 0
+      ? asset.fileSizeBytes
+      : undefined;
+  const durationSeconds = parseOptionalDecimal(asset.durationSeconds?.toString());
+
+  return {
+    url,
+    fileName:
+      normalizeTemplateText(asset.fileName, TEMPLATE_ASSET_METADATA_MAX_LENGTH) ||
+      normalizeTemplateText(inferFileName(url), TEMPLATE_ASSET_METADATA_MAX_LENGTH),
+    contentType:
+      normalizeTemplateText(asset.contentType, TEMPLATE_ASSET_CONTENT_TYPE_MAX_LENGTH) ||
+      normalizeTemplateText(inferContentType(url), TEMPLATE_ASSET_CONTENT_TYPE_MAX_LENGTH),
+    fileSizeBytes,
+    durationSeconds,
+  };
+}
+
+function cloneTemplateAsset(
+  asset: TemplateAssetInput | null | undefined
+): TemplateAssetInput | null {
+  return asset ? { ...asset } : null;
 }
 
 function normalizeTags(raw: string): string[] {

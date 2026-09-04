@@ -414,15 +414,29 @@ describe("template test media actions", () => {
     expect(source).not.toContain("fileName: file.name");
   });
 
-  it("cleans template editor video metadata probes without retaining blob URLs", () => {
+  it("defers preview duration detection to the authoritative server upload path", () => {
     const source = readFileSync(templateEditorControllerPath, "utf8");
 
-    expect(source).toContain("const objectUrl = URL.createObjectURL(file);");
-    expect(source).toContain('video.removeAttribute("src");');
-    expect(source).toContain("video.onloadedmetadata = null;");
-    expect(source).toContain("video.onerror = null;");
-    expect(source).toContain("video.load();");
-    expect(source).toContain("URL.revokeObjectURL(objectUrl);");
+    expect(source).not.toContain("readVideoDurationSeconds");
+    expect(source).not.toContain("URL.createObjectURL(file)");
+    expect(source).toContain("uploadTemplateMedia(file, assetKind)");
+    expect(source).not.toContain("uploadTemplateMedia(file, assetKind, { durationSeconds })");
+  });
+
+  it("keeps server-generated preview variants in the template form after upload", () => {
+    const source = readFileSync(templateEditorControllerPath, "utf8");
+
+    expect(source).toContain("asset: TemplateMediaUploadResponse");
+    expect(source).toContain("thumbnailAsset: cloneTemplateAsset(asset.thumbnailAsset)");
+    expect(source).toContain(
+      "animatedPreviewAsset: cloneTemplateAsset(asset.animatedPreviewAsset)"
+    );
+    expect(source).toContain("feedLoopLowAsset: cloneTemplateAsset(asset.feedLoopLowAsset)");
+    expect(source).toContain("feedLoopMediumAsset: cloneTemplateAsset(asset.feedLoopMediumAsset)");
+    expect(source).toContain("detailPreviewAsset: cloneTemplateAsset(asset.detailPreviewAsset)");
+    expect(source).toContain(
+      "function cloneTemplateAsset(asset: TemplateAsset | null | undefined)"
+    );
   });
 
   it("keeps template editor save and upload actions admin-only at the handler layer", () => {
@@ -524,10 +538,15 @@ describe("template test media actions", () => {
     expect(editorSource).toContain(
       "<TemplateReferenceAssetSection\n                    text={text}"
     );
-    expect(previewSource).toContain("const TEMPLATE_PREVIEW_ASSET_MAX_BYTES = 32 * 1024 * 1024;");
+    expect(previewSource).toContain("const TEMPLATE_PREVIEW_ASSET_MAX_BYTES = 25 * 1024 * 1024;");
     expect(sectionsSource).toContain(
-      "const TEMPLATE_REFERENCE_MOTION_MAX_BYTES = 128 * 1024 * 1024;"
+      "const TEMPLATE_REFERENCE_MOTION_MAX_BYTES = 100 * 1024 * 1024;"
     );
+    expect(previewSource).toContain("const supportedPreviewContentTypes = new Set([");
+    expect(previewSource).toContain("const supportedPreviewFileNamePattern =");
+    expect(previewSource).toContain("if (!isSupportedPreviewFile(file))");
+    expect(previewSource).toContain("accept={templatePreviewAccept}");
+    expect(previewSource).toContain('normalizedType !== "application/octet-stream"');
     expect(previewSource).toContain("const [selectionError, setSelectionError]");
     expect(sectionsSource).toContain("const [selectionError, setSelectionError]");
     expect(previewSource).toContain('setSelectionError(getPreviewSelectionError(text, "type"));');
@@ -547,11 +566,11 @@ describe("template test media actions", () => {
     expect(sectionsSource).toContain("return text.referenceMotionFileTypeError;");
     expect(previewSource).not.toContain(">Video preview<");
     expect(previewSource).not.toContain(">Cover asset<");
-    expect(previewSource).not.toContain("File is too large. The maximum preview size is 32 MB.");
+    expect(previewSource).not.toContain("File is too large. The maximum preview size is 25 MB.");
     expect(previewSource).not.toContain("Only image/* or video/* files are supported.");
     expect(sectionsSource).not.toContain(">Motion source<");
     expect(sectionsSource).not.toContain(
-      "File is too large. The maximum reference motion size is 128 MB."
+      "File is too large. The maximum reference motion size is 100 MB."
     );
     expect(sectionsSource).not.toContain("Only MP4 video files are supported.");
     expect(previewSource.indexOf("file.size > TEMPLATE_PREVIEW_ASSET_MAX_BYTES")).toBeLessThan(
@@ -560,6 +579,11 @@ describe("template test media actions", () => {
     expect(sectionsSource.indexOf("file.size > TEMPLATE_REFERENCE_MOTION_MAX_BYTES")).toBeLessThan(
       sectionsSource.indexOf("setReferenceFile(file)")
     );
+    expect(previewSource).toContain("thumbnailAsset: null");
+    expect(previewSource).toContain("animatedPreviewAsset: null");
+    expect(previewSource).toContain("feedLoopLowAsset: null");
+    expect(previewSource).toContain("feedLoopMediumAsset: null");
+    expect(previewSource).toContain("detailPreviewAsset: null");
     expect(stylesSource).toContain(".assetSelectionError");
   });
 });

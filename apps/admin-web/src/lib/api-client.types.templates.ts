@@ -58,6 +58,20 @@ export type TemplateAsset = {
   durationSeconds?: number;
 };
 
+export type TemplateMediaUploadResponse = TemplateAsset & {
+  thumbnailAsset?: TemplateAsset | null;
+
+  animatedPreviewAsset?: TemplateAsset | null;
+
+  feedLoopLowAsset?: TemplateAsset | null;
+
+  feedLoopMediumAsset?: TemplateAsset | null;
+
+  detailPreviewAsset?: TemplateAsset | null;
+
+  wasOptimized?: boolean;
+};
+
 export type TemplateAssetKind = "Preview" | "ReferenceMotion";
 
 export type AdminTemplateListItem = {
@@ -89,15 +103,15 @@ export type AdminTemplateListItem = {
 
   previewAsset?: TemplateAsset;
 
-  thumbnailAsset?: TemplateAsset;
+  thumbnailAsset?: TemplateAsset | null;
 
-  animatedPreviewAsset?: TemplateAsset;
+  animatedPreviewAsset?: TemplateAsset | null;
 
-  feedLoopLowAsset?: TemplateAsset;
+  feedLoopLowAsset?: TemplateAsset | null;
 
-  feedLoopMediumAsset?: TemplateAsset;
+  feedLoopMediumAsset?: TemplateAsset | null;
 
-  detailPreviewAsset?: TemplateAsset;
+  detailPreviewAsset?: TemplateAsset | null;
 
   musicDescription?: string;
 
@@ -325,15 +339,15 @@ export type AdminTemplate = {
 
   previewAsset?: TemplateAsset;
 
-  thumbnailAsset?: TemplateAsset;
+  thumbnailAsset?: TemplateAsset | null;
 
-  animatedPreviewAsset?: TemplateAsset;
+  animatedPreviewAsset?: TemplateAsset | null;
 
-  feedLoopLowAsset?: TemplateAsset;
+  feedLoopLowAsset?: TemplateAsset | null;
 
-  feedLoopMediumAsset?: TemplateAsset;
+  feedLoopMediumAsset?: TemplateAsset | null;
 
-  detailPreviewAsset?: TemplateAsset;
+  detailPreviewAsset?: TemplateAsset | null;
 
   musicDescription?: string;
 
