@@ -42,11 +42,11 @@ describe("templates catalog visual contract", () => {
     const letterSpacingRules = cssSource.match(/letter-spacing:\s*[^;]+;/g) ?? [];
 
     expect(letterSpacingRules.every((rule) => rule === "letter-spacing: 0;")).toBe(true);
-    expect(cssSource).toContain(
-      "grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr));"
-    );
-    expect(cssSource).toContain("grid-template-columns: minmax(8rem, 0.82fr) minmax(0, 1.18fr);");
-    expect(cssSource).toContain("aspect-ratio: 2 / 3;");
+    expect(cssSource).toContain("grid-template-columns: repeat(3, minmax(0, 1fr));");
+    expect(cssSource).toContain("grid-template-columns: minmax(0, 43%) minmax(0, 57%);");
+    expect(cssSource).toContain("grid-template-rows: minmax(17.25rem, auto) auto;");
+    expect(cssSource).toContain("grid-column: 1 / -1;");
+    expect(cssSource).toContain("grid-template-columns: repeat(2, minmax(0, 1fr));");
     expect(cssSource).toContain("border-right: 1px solid var(--border-soft);");
     expect(cssSource).toContain("@media (max-width: 560px)");
     expect(cssSource).toContain("aspect-ratio: 16 / 9;");
@@ -65,13 +65,12 @@ describe("templates catalog visual contract", () => {
     expect(catalogSource).not.toContain('{">"}');
   });
 
-  it("keeps catalog segmented controls accessible and locked during refreshes", () => {
+  it("keeps catalog controls accessible and locked during refreshes", () => {
     const catalogSource = readTemplatesCatalogViewLibrarySource();
     const cssSource = readFileSync(catalogCssPath, "utf8");
 
-    expect(catalogSource).toContain('role="group" aria-label={copy.archiveTabsLabel}');
-    expect(catalogSource).toContain('aria-pressed={archiveFilter === "active"}');
-    expect(catalogSource).toContain('aria-pressed={archiveFilter === "archived"}');
+    expect(catalogSource).toContain("aria-pressed={showingArchived}");
+    expect(catalogSource).toContain('showingArchived={archiveFilter === "archived"}');
     expect(catalogSource).toContain('role="group" aria-label={copy.viewToggleLabel}');
     expect(catalogSource).toContain('aria-pressed={viewMode === "cards"}');
     expect(catalogSource).toContain('aria-pressed={viewMode === "list"}');

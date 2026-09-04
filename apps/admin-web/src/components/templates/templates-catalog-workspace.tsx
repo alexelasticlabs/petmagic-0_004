@@ -18,9 +18,13 @@ import type { AdminTemplateCatalogSummary, TemplateType } from "@/lib/api-client
 import type { Locale } from "@/lib/i18n";
 
 type TemplatesCatalogWorkspaceHeaderProps = {
+  archiveDisabled?: boolean;
+  canBrowseTemplates: boolean;
   canManageTemplates: boolean;
   copy: TemplatesCatalogViewText;
   locale: Locale;
+  onToggleArchive?: () => void;
+  showingArchived?: boolean;
   templateType?: TemplateType;
 };
 
@@ -50,12 +54,15 @@ function getTemplateTypePath(locale: Locale, templateType?: TemplateType) {
 }
 
 export function TemplatesCatalogWorkspaceHeader({
+  archiveDisabled = false,
+  canBrowseTemplates,
   canManageTemplates,
   copy,
   locale,
+  onToggleArchive,
+  showingArchived = false,
   templateType,
 }: TemplatesCatalogWorkspaceHeaderProps) {
-  const categoriesPath = `/${locale}/templates/categories`;
   const editorType = templateType === "Image" ? "image" : "video";
   const typeTabs = [
     { href: getTemplateTypePath(locale), label: copy.allTypes, type: undefined },
@@ -69,11 +76,16 @@ export function TemplatesCatalogWorkspaceHeader({
         className={styles.catalogHero}
         actions={
           <div className={styles.catalogActions}>
-            {canManageTemplates ? (
-              <Link href={categoriesPath} className={styles.secondaryLink}>
-                <TemplatesIcon className={styles.linkIcon} />
-                <span>{copy.categoriesAction}</span>
-              </Link>
+            {canBrowseTemplates && onToggleArchive ? (
+              <button
+                type="button"
+                className={styles.secondaryLink}
+                aria-pressed={showingArchived}
+                disabled={archiveDisabled}
+                onClick={onToggleArchive}
+              >
+                <span>{showingArchived ? copy.allTemplates : copy.archivedTemplates}</span>
+              </button>
             ) : null}
             {canManageTemplates && templateType ? (
               <Link

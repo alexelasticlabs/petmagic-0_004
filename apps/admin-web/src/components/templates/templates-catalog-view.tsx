@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { CaretDownIcon } from "@/components/admin/admin-icons";
+import { CaretDownIcon, RefreshIcon } from "@/components/admin/admin-icons";
 import {
   AdminFilterBar,
   AdminPage,
@@ -399,6 +399,16 @@ export function TemplatesCatalogView({
     resetCatalogContext();
   }
 
+  function toggleArchiveFilter() {
+    if (isCatalogInteractionLocked) {
+      return;
+    }
+
+    setArchiveFilter((current) => (current === "active" ? "archived" : "active"));
+    setStatusFilter("all");
+    resetCatalogContext();
+  }
+
   function showDraftTemplates() {
     if (isCatalogInteractionLocked) {
       return;
@@ -505,6 +515,7 @@ export function TemplatesCatalogView({
     return (
       <AdminPage className={styles.catalogPage}>
         <TemplatesCatalogWorkspaceHeader
+          canBrowseTemplates={false}
           canManageTemplates={false}
           copy={copy}
           locale={locale}
@@ -527,40 +538,15 @@ export function TemplatesCatalogView({
   return (
     <AdminPage className={styles.catalogPage}>
       <TemplatesCatalogWorkspaceHeader
+        archiveDisabled={isCatalogInteractionLocked}
+        canBrowseTemplates={canViewTemplates}
         canManageTemplates={canManageTemplates}
         copy={copy}
         locale={locale}
+        onToggleArchive={toggleArchiveFilter}
+        showingArchived={archiveFilter === "archived"}
         templateType={templateType}
       />
-
-      <div className={styles.tabRow} role="group" aria-label={copy.archiveTabsLabel}>
-        <button
-          type="button"
-          className={archiveFilter === "active" ? styles.tabActive : styles.tab}
-          aria-pressed={archiveFilter === "active"}
-          disabled={isCatalogInteractionLocked}
-          onClick={() => {
-            setArchiveFilter("active");
-            setStatusFilter("all");
-            resetCatalogContext();
-          }}
-        >
-          {copy.allTemplates}
-        </button>
-        <button
-          type="button"
-          className={archiveFilter === "archived" ? styles.tabActive : styles.tab}
-          aria-pressed={archiveFilter === "archived"}
-          disabled={isCatalogInteractionLocked}
-          onClick={() => {
-            setArchiveFilter("archived");
-            setStatusFilter("all");
-            resetCatalogContext();
-          }}
-        >
-          {copy.archivedTemplates}
-        </button>
-      </div>
 
       {error ? (
         <AdminStateCard
@@ -641,10 +627,13 @@ export function TemplatesCatalogView({
                 <Button
                   type="button"
                   variant="secondary"
+                  className={styles.resetButton}
                   disabled={!hasCatalogFilters || isCatalogInteractionLocked}
                   onClick={resetCatalogFilters}
+                  title={copy.resetFilters}
                 >
-                  {copy.resetFilters}
+                  <RefreshIcon className={styles.resetButtonIcon} aria-hidden="true" />
+                  <span className={styles.resetButtonLabel}>{copy.resetFilters}</span>
                 </Button>
                 <div className={styles.viewToggle} role="group" aria-label={copy.viewToggleLabel}>
                   <button

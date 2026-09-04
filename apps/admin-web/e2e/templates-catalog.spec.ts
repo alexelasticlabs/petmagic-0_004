@@ -1,5 +1,14 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 
+import {
+  expectBoxContains,
+  expectBoxesNotToIntersect,
+  expectBoxInsideViewportHorizontally,
+  expectNoHorizontalDocumentOverflow,
+  expectNoHorizontalElementOverflow,
+  expectNonZeroBoundingBox,
+  expectVisibleColumnCount,
+} from "./ui-layout/layout-assertions";
 import type { AdminTemplateGenerationControl } from "../src/lib/api-client.types";
 
 const apiOrigin = "https://api.petmagic.test";
@@ -563,12 +572,14 @@ async function installStrictCatalogMocks(page: Page, state: CatalogApiState) {
     }
 
     if (url.pathname === "/api/admin/templates/analytics" && method === "GET") {
-      validateQueryKeys(url, ["templateIds", "sort", "take"], state);
+      validateQueryKeys(url, ["templateIds", "templateType", "sort", "take"], state);
       const templateIds = url.searchParams.getAll("templateIds");
+      const templateType = url.searchParams.get("templateType");
       if (
         templateIds.length === 0 ||
         templateIds.length > 100 ||
         new Set(templateIds).size !== templateIds.length ||
+        (templateType !== null && templateType !== "Video" && templateType !== "Image") ||
         url.searchParams.get("sort") !== "updated" ||
         url.searchParams.get("take") !== String(templateIds.length)
       ) {
@@ -598,8 +609,9 @@ async function installStrictCatalogMocks(page: Page, state: CatalogApiState) {
         ],
         state
       );
+      const type = url.searchParams.get("type");
       if (
-        url.searchParams.has("type") ||
+        (type !== null && type !== "Video" && type !== "Image") ||
         url.searchParams.get("status") !== "not_archived" ||
         url.searchParams.get("sort") !== "newest" ||
         url.searchParams.get("skip") !== "0" ||
@@ -634,6 +646,172 @@ async function chooseCatalogSelectOption(page: Page, label: string, option: stri
   await expect(trigger).toHaveAttribute("aria-expanded", "false");
 }
 
+async function expectCatalogCardGeometry(page: Page, expectedCount: number) {
+  const cards = page.locator("#admin-main article");
+  await expect(cards).toHaveCount(expectedCount);
+
+  const geometry = await cards.evaluateAll((elements) =>
+    elements.map((card) => {
+      const [media, body, actions] = Array.from(card.children) as HTMLElement[];
+      if (!media || !body || !actions) {
+        throw new Error("Template card anatomy is incomplete.");
+      }
+
+      const cardRect = card.getBoundingClientRect();
+      const mediaRect = media.getBoundingClientRect();
+      const bodyRect = body.getBoundingClientRect();
+      const actionsRect = actions.getBoundingClientRect();
+      const actionRects = Array.from(actions.children).map((action) =>
+        action.getBoundingClientRect()
+      );
+
+      return {
+        card: {
+          left: cardRect.left,
+          right: cardRect.right,
+          top: cardRect.top,
+          width: cardRect.width,
+        },
+        media: {
+          left: mediaRect.left,
+          right: mediaRect.right,
+          bottom: mediaRect.bottom,
+          width: mediaRect.width,
+        },
+        body: { left: bodyRect.left, right: bodyRect.right, bottom: bodyRect.bottom },
+        actions: {
+          left: actionsRect.left,
+          right: actionsRect.right,
+          top: actionsRect.top,
+          width: actionsRect.width,
+        },
+        actionRects: actionRects.map((rect) => ({ left: rect.left, right: rect.right })),
+      };
+    })
+  );
+
+  for (const item of geometry) {
+    expect(item.card.width).toBeGreaterThanOrEqual(300);
+    expect(item.media.left).toBeGreaterThanOrEqual(item.card.left - 1);
+    expect(item.media.right).toBeLessThanOrEqual(item.body.left + 1);
+    expect(item.body.right).toBeLessThanOrEqual(item.card.right + 1);
+    expect(item.media.width / item.card.width).toBeGreaterThan(0.39);
+    expect(item.media.width / item.card.width).toBeLessThan(0.46);
+    expect(item.actions.left).toBeGreaterThanOrEqual(item.card.left - 1);
+    expect(item.actions.right).toBeLessThanOrEqual(item.card.right + 1);
+    expect(item.actions.top).toBeGreaterThanOrEqual(item.media.bottom - 1);
+    expect(item.actions.top).toBeGreaterThanOrEqual(item.body.bottom - 1);
+    expect(item.actions.width / item.card.width).toBeGreaterThan(0.99);
+    for (const action of item.actionRects) {
+      expect(action.left).toBeGreaterThanOrEqual(item.actions.left - 1);
+      expect(action.right).toBeLessThanOrEqual(item.actions.right + 1);
+    }
+  }
+
+  if (geometry.length >= 3) {
+    expect(Math.abs(geometry[0].card.top - geometry[1].card.top)).toBeLessThanOrEqual(1);
+    expect(Math.abs(geometry[1].card.top - geometry[2].card.top)).toBeLessThanOrEqual(1);
+    expect(geometry[0].card.left).toBeLessThan(geometry[1].card.left);
+    expect(geometry[1].card.left).toBeLessThan(geometry[2].card.left);
+  }
+}
+
+async function expectTemplatesDesktopLayout(page: Page) {
+  const viewport = page.viewportSize();
+  expect(viewport).toEqual({ width: 1536, height: 1024 });
+  if (!viewport) {
+    throw new Error("Desktop viewport is unavailable.");
+  }
+
+  await expectNoHorizontalDocumentOverflow(page);
+
+  const main = page.locator("#admin-main");
+  const sidebar = page.locator("#admin-sidebar");
+  const catalogCards = main.locator("article");
+  const catalogGrid = catalogCards.first().locator("..");
+  const rightRail = main.getByRole("complementary", {
+    name: "Контроль публикации",
+    exact: true,
+  });
+  const catalogWorkspace = rightRail.locator("..");
+  const [sidebarBox, mainBox, workspaceBox, gridBox, railBox] = await Promise.all([
+    expectNonZeroBoundingBox(sidebar, "admin sidebar"),
+    expectNonZeroBoundingBox(main, "admin workspace"),
+    expectNonZeroBoundingBox(catalogWorkspace, "templates workspace"),
+    expectNonZeroBoundingBox(catalogGrid, "template grid"),
+    expectNonZeroBoundingBox(rightRail, "templates right rail"),
+  ]);
+
+  expectBoxInsideViewportHorizontally(sidebarBox, viewport, "admin sidebar");
+  expectBoxInsideViewportHorizontally(mainBox, viewport, "admin workspace");
+  expectBoxInsideViewportHorizontally(railBox, viewport, "templates right rail");
+  expect(sidebarBox.width, "expanded desktop sidebar width").toBeGreaterThanOrEqual(230);
+  expect(sidebarBox.width, "expanded desktop sidebar width").toBeLessThanOrEqual(250);
+  expect(mainBox.x, "admin workspace starts after sidebar").toBeGreaterThanOrEqual(
+    sidebarBox.x + sidebarBox.width - 1
+  );
+  expectBoxContains(workspaceBox, gridBox, "template grid within workspace");
+  expectBoxContains(workspaceBox, railBox, "right rail within workspace");
+  expectBoxesNotToIntersect(gridBox, railBox, "template grid and right rail");
+  await expectNoHorizontalElementOverflow(catalogGrid, "template grid");
+  await expectNoHorizontalElementOverflow(rightRail, "templates right rail");
+  await expectVisibleColumnCount(catalogCards, 3);
+  await expectCatalogCardGeometry(page, 3);
+}
+
+test("Templates structural layout at 1536x1024", async ({ page }, testInfo) => {
+  test.setTimeout(60_000);
+  const authViolations: string[] = [];
+  const apiState: CatalogApiState = {
+    catalogRequests: [],
+    contractViolations: [],
+    unexpectedRequests: [],
+  };
+  const runtimeErrors: string[] = [];
+
+  await page.setViewportSize({ width: 1536, height: 1024 });
+  await installStrictAuthMocks(page, authViolations);
+  await loginAsAdmin(page);
+  await installStrictCatalogMocks(page, apiState);
+
+  page.on("pageerror", (error) => runtimeErrors.push(`pageerror: ${error.message}`));
+  page.on("requestfailed", (request) => {
+    const errorText = request.failure()?.errorText;
+    if (errorText && errorText !== "net::ERR_ABORTED") {
+      runtimeErrors.push(`requestfailed: ${request.url()} (${errorText})`);
+    }
+  });
+  page.on("console", (message) => {
+    if (message.type() === "error") {
+      const sourceUrl = message.location().url;
+      runtimeErrors.push(`console: ${message.text()}${sourceUrl ? ` (${sourceUrl})` : ""}`);
+    }
+  });
+
+  await page.goto("/ru/templates");
+  const main = page.locator("#admin-main");
+  await expect(page).toHaveURL(/\/ru\/templates$/);
+  await expect(
+    page.getByRole("banner").getByRole("heading", { name: "Шаблоны", exact: true })
+  ).toBeVisible();
+  await expect(
+    main.getByRole("heading", { name: "Golden Studio Portrait", exact: true })
+  ).toBeVisible();
+
+  await expectTemplatesDesktopLayout(page);
+  await page.screenshot({
+    path: testInfo.outputPath("templates-current-1536x1024.png"),
+  });
+
+  await expect(page.locator("nextjs-portal")).toHaveCount(0);
+  await expect(page.getByText("Unhandled Runtime Error", { exact: false })).toHaveCount(0);
+  await expect(page.getByText("Application error", { exact: false })).toHaveCount(0);
+  expect(authViolations).toEqual([]);
+  expect(apiState.contractViolations).toEqual([]);
+  expect(apiState.unexpectedRequests).toEqual([]);
+  expect(runtimeErrors).toEqual([]);
+});
+
 test("unified templates catalog supports publishing filters and responsive cards/list workflow", async ({
   page,
 }, testInfo) => {
@@ -646,7 +824,7 @@ test("unified templates catalog supports publishing filters and responsive cards
   };
   const runtimeErrors: string[] = [];
 
-  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.setViewportSize({ width: 1536, height: 1024 });
   await installStrictAuthMocks(page, authViolations);
   await loginAsAdmin(page);
   await installStrictCatalogMocks(page, apiState);
@@ -713,6 +891,7 @@ test("unified templates catalog supports publishing filters and responsive cards
     scrollWidth: document.documentElement.scrollWidth,
   }));
   expect(desktopDimensions.scrollWidth).toBeLessThanOrEqual(desktopDimensions.clientWidth);
+  await expectTemplatesDesktopLayout(page);
 
   const featuredCard = main.locator("article").filter({ hasText: "Golden Studio Portrait" });
   await expect(featuredCard).toBeVisible();
@@ -721,7 +900,7 @@ test("unified templates catalog supports publishing filters and responsive cards
   const featuredCardWidth = await featuredCard.evaluate(
     (element) => element.getBoundingClientRect().width
   );
-  expect(featuredCardWidth).toBeGreaterThanOrEqual(288);
+  expect(featuredCardWidth).toBeGreaterThanOrEqual(300);
 
   const actionsButton = featuredCard.getByRole("button", { name: "Действия", exact: true });
   await actionsButton.click();
@@ -757,8 +936,33 @@ test("unified templates catalog supports publishing filters and responsive cards
 
   await page.screenshot({
     path: testInfo.outputPath("templates-catalog-desktop.png"),
-    fullPage: true,
   });
+
+  await page.goto("/ru/templates/video");
+  await expect(page).toHaveURL(/\/ru\/templates\/video$/);
+  await expect(
+    main.getByRole("heading", { name: "Preview Needed Motion", exact: true })
+  ).toBeVisible();
+  await expectCatalogCardGeometry(page, 1);
+  await page.screenshot({
+    path: testInfo.outputPath("templates-video-desktop.png"),
+  });
+
+  await page.goto("/ru/templates/image");
+  await expect(page).toHaveURL(/\/ru\/templates\/image$/);
+  await expect(
+    main.getByRole("heading", { name: "Golden Studio Portrait", exact: true })
+  ).toBeVisible();
+  await expectCatalogCardGeometry(page, 2);
+  await page.screenshot({
+    path: testInfo.outputPath("templates-image-desktop.png"),
+  });
+
+  await page.goto("/ru/templates");
+  await expect(page).toHaveURL(/\/ru\/templates$/);
+  await expect(
+    main.getByRole("heading", { name: "Golden Studio Portrait", exact: true })
+  ).toBeVisible();
 
   const readinessSelect = main.getByRole("button", { name: "Готовность", exact: true });
   await chooseCatalogSelectOption(page, "Готовность", "Без превью");

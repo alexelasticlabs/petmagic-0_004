@@ -63,7 +63,8 @@ describe("templates catalog actions", () => {
     expect(source).toContain("function assertCanManageTemplates(): boolean");
     expect(source).toContain("setActionError(copy.templateActionsAdminOnly)");
     expect(source).toContain("{canManageTemplates ? (");
-    expect(source).toContain("<Link href={categoriesPath} className={styles.secondaryLink}>");
+    expect(source).toContain("aria-pressed={showingArchived}");
+    expect(source).toContain("onClick={onToggleArchive}");
     expect(source).toContain("if (!assertCanManageTemplates()) {\n      return false;");
     expect(source).toContain("if (!assertCanManageTemplates()) {\n      return;");
     expect(source).toContain("const [templatePendingArchiveId, setTemplatePendingArchiveId]");
@@ -159,8 +160,8 @@ describe("templates catalog actions", () => {
     expect(source).toContain("onClick={() => resetCatalogContext(Math.max(1, currentPage - 1))}");
     expect(source).toContain("onClick={() => resetCatalogContext(pageNumber)}");
     expect(source).toContain("onClick={() => resetCatalogContext(currentPage + 1)}");
-    expect(source).toContain('aria-pressed={archiveFilter === "active"}');
-    expect(source).toContain('aria-pressed={archiveFilter === "archived"}');
+    expect(source).toContain('showingArchived={archiveFilter === "archived"}');
+    expect(source).toContain("onToggleArchive={toggleArchiveFilter}");
     expect(source).toContain('aria-pressed={viewMode === "cards"}');
     expect(source).toContain('aria-pressed={viewMode === "list"}');
     expect(source).toContain("const TEMPLATE_CATALOG_SEARCH_MAX_LENGTH = 120;");
@@ -181,9 +182,7 @@ describe("templates catalog actions", () => {
     );
     expect(source).toContain("<AdminActionMenu");
     expect(source).toContain("className={styles.cardActionMenu}");
-    expect(styles).toContain(
-      "grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr))"
-    );
+    expect(styles).toContain("grid-template-columns: repeat(3, minmax(0, 1fr))");
     expect(styles).toContain("overflow: visible;");
     expect(styles).toContain('.cardActionMenu [role="menu"]');
     expect(source).toContain("className={`${styles.tablePrimaryAction}");

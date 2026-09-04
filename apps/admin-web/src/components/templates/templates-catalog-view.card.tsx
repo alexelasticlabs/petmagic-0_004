@@ -223,57 +223,57 @@ export function TemplateCatalogCard({
             </div>
           ))}
         </div>
-        <div className={styles.cardActions}>
-          <Link
-            href={
-              canManageTemplates
-                ? `${templateBasePath}/editor?templateId=${encodeURIComponent(template.templateId)}`
-                : `${templateBasePath}/analytics/${encodeURIComponent(template.templateId)}`
+      </div>
+      <div className={styles.cardActions}>
+        <Link
+          href={
+            canManageTemplates
+              ? `${templateBasePath}/editor?templateId=${encodeURIComponent(template.templateId)}`
+              : `${templateBasePath}/analytics/${encodeURIComponent(template.templateId)}`
+          }
+          className={`ui-button ui-button--primary ui-button--sm${
+            isBusy ? ` ${styles.cardActionIconButtonDisabled}` : ""
+          }`}
+          aria-label={`${
+            canManageTemplates ? text.editTemplate : copy.analyticsAction
+          }: ${safeTemplateTitle}`}
+          aria-disabled={isBusy}
+          tabIndex={isBusy ? -1 : undefined}
+          onClick={(event) => {
+            if (isBusy) {
+              event.preventDefault();
             }
-            className={`ui-button ui-button--primary ui-button--sm${
-              isBusy ? ` ${styles.cardActionIconButtonDisabled}` : ""
-            }`}
-            aria-label={`${
-              canManageTemplates ? text.editTemplate : copy.analyticsAction
-            }: ${safeTemplateTitle}`}
-            aria-disabled={isBusy}
-            tabIndex={isBusy ? -1 : undefined}
-            onClick={(event) => {
-              if (isBusy) {
-                event.preventDefault();
-              }
-            }}
-          >
-            {canManageTemplates ? copy.editAction : copy.analyticsAction}
-          </Link>
-          {canManageTemplates ? (
-            <>
-              <Link
-                href={`${templateBasePath}/test/${encodeURIComponent(template.templateId)}`}
-                className={styles.cardSecondaryAction}
-                aria-label={`${copy.testAction}: ${safeTemplateTitle}`}
-              >
-                {copy.testAction}
-              </Link>
-              <Link
-                href={`${templateBasePath}/analytics/${encodeURIComponent(template.templateId)}`}
-                className={styles.cardSecondaryAction}
-                aria-label={`${copy.analyticsAction}: ${safeTemplateTitle}`}
-              >
-                {copy.analyticsAction}
-              </Link>
-            </>
-          ) : null}
-          {canManageTemplates ? (
-            <AdminActionMenu
-              label={text.actionsLabel}
-              items={actionItems}
-              disabled={isBusy}
-              align="end"
-              className={styles.cardActionMenu}
-            />
-          ) : null}
-        </div>
+          }}
+        >
+          {canManageTemplates ? copy.editAction : copy.analyticsAction}
+        </Link>
+        {canManageTemplates ? (
+          <>
+            <Link
+              href={`${templateBasePath}/test/${encodeURIComponent(template.templateId)}`}
+              className={styles.cardSecondaryAction}
+              aria-label={`${copy.testAction}: ${safeTemplateTitle}`}
+            >
+              {copy.testAction}
+            </Link>
+            <Link
+              href={`${templateBasePath}/analytics/${encodeURIComponent(template.templateId)}`}
+              className={styles.cardSecondaryAction}
+              aria-label={`${copy.analyticsAction}: ${safeTemplateTitle}`}
+            >
+              {copy.analyticsAction}
+            </Link>
+          </>
+        ) : null}
+        {canManageTemplates ? (
+          <AdminActionMenu
+            label={text.actionsLabel}
+            items={actionItems}
+            disabled={isBusy}
+            align="end"
+            className={styles.cardActionMenu}
+          />
+        ) : null}
       </div>
     </article>
   );
