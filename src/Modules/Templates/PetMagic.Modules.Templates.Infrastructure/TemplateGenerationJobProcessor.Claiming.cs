@@ -402,6 +402,9 @@ internal sealed partial class TemplateGenerationJobProcessor
         job.LastErrorMessage = TemplatesErrors.GenerationQueueOrphaned.Message;
         job.UpdatedAtUtc = DateTime.UtcNow;
         job.CompletedAtUtc = job.UpdatedAtUtc;
+        await pushNotificationSender.NotifyGenerationTerminalAsync(
+            TemplateGenerationService.MapResponse(job),
+            cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
         TemplateGenerationMetrics.RecordQueuedWithoutCharge(job);
         TemplateGenerationMetrics.RecordJobFailed(job, previousStatus, TemplatesErrors.GenerationQueueOrphaned.Code);

@@ -3,6 +3,7 @@ using System.Text.Json;
 
 using Microsoft.EntityFrameworkCore;
 
+using PetMagic.BuildingBlocks.Notifications;
 using PetMagic.BuildingBlocks.Observability;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
@@ -126,6 +127,61 @@ public sealed partial class TemplatesServiceTests
         Assert.Equal(userId, command.UserId);
         Assert.Equal(persisted.TokenCost, command.TokenCost);
         Assert.Equal(new[] { persisted.Id }, billing.ChargedGenerationIds);
+    }
+
+    [Fact]
+    public async Task StartAsync_ShouldAtomicallyEnqueueTerminalPushWhenBillingFails()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var billing = new RecordingGenerationBilling
+        {
+            ChargeError = new PetMagic.BuildingBlocks.Results.Error(
+                "economy.insufficient_balance",
+                "Not enough PawSpark balance.")
+        };
+        var generationService = CreateGenerationService(
+            dbContext,
+            billing: billing,
+            pushNotificationSender: new TemplateGenerationPushNotificationOutbox(dbContext));
+        var templateId = await CreateActiveImageTemplateAsync(
+            service,
+            "Failed Billing Portrait",
+            "Portrait",
+            ["billing"]);
+        var userId = Guid.NewGuid();
+
+        var started = await generationService.StartAsync(
+            new StartTemplateGenerationCommand(
+                userId,
+                templateId,
+                new TemplateAssetCommand(
+                    "https://cdn.example.com/source.jpg",
+                    "source.jpg",
+                    "image/jpeg",
+                    2048,
+                    null),
+                "failed-billing-key",
+                "failed-billing-hash",
+                3),
+            CancellationToken.None);
+
+        Assert.True(started.IsFailure);
+        var job = await dbContext.TemplateGenerationJobs.SingleAsync();
+        var billingCommand = await dbContext.TemplateGenerationBillingCommands.SingleAsync();
+        var pushMessage = await dbContext.PushOutboxMessages.SingleAsync(
+            x => x.DeduplicationKey == $"template_generation:{job.Id:D}:Failed");
+        Assert.Equal(TemplateGenerationStatus.Failed, job.Status);
+        Assert.Equal(TemplateGenerationBillingCommandStatuses.Failed, billingCommand.Status);
+        Assert.Equal($"template_generation:{job.Id:D}:Failed", pushMessage.DeduplicationKey);
+        Assert.Equal("generation_terminal", pushMessage.Kind);
+        Assert.Equal(PushOutboxStatus.Queued, pushMessage.Status);
+        Assert.Equal(userId, pushMessage.UserId);
+        var payload = JsonSerializer.Deserialize<TemplateGenerationResponse>(
+            pushMessage.PayloadJson,
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        Assert.NotNull(payload);
+        Assert.Equal("Failed", payload.Status);
     }
 
     [Fact]

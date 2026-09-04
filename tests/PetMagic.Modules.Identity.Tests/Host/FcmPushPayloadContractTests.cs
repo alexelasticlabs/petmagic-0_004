@@ -1,3 +1,8 @@
+using System.Security.Cryptography;
+using System.Text.Json;
+
+using Google.Apis.Auth.OAuth2;
+
 namespace PetMagic.Modules.Identity.Tests.Host;
 
 public sealed class FcmPushPayloadContractTests
@@ -71,10 +76,47 @@ public sealed class FcmPushPayloadContractTests
     {
         var source = File.ReadAllText(ResolveRepositoryPath(relativePath));
 
-        Assert.Contains("CredentialFactory.FromJson(json, credentialType: null)", source, StringComparison.Ordinal);
+        Assert.Contains(
+            "CredentialFactory.FromJson<ServiceAccountCredential>(json).ToGoogleCredential()",
+            source,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "((ITokenAccess)credential).GetAccessTokenForRequestAsync(cancellationToken: cancellationToken)",
+            source,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("CredentialFactory.FromJson(json, credentialType: null)", source, StringComparison.Ordinal);
         Assert.DoesNotContain("GoogleCredential.FromJson(", source, StringComparison.Ordinal);
         Assert.DoesNotContain("FromJsonParameters(", source, StringComparison.Ordinal);
         Assert.DoesNotContain("#pragma warning disable CS0618", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ServiceAccountCredentialFactory_ShouldCreateScopedTokenCredential()
+    {
+        const string firebaseMessagingScope = "https://www.googleapis.com/auth/firebase.messaging";
+        using var rsa = RSA.Create(2048);
+        var json = JsonSerializer.Serialize(new
+        {
+            type = "service_account",
+            project_id = "petmagic-test",
+            private_key_id = "test-key-id",
+            private_key = rsa.ExportPkcs8PrivateKeyPem(),
+            client_email = "push-test@petmagic-test.iam.gserviceaccount.com",
+            client_id = "1234567890",
+            auth_uri = "https://accounts.google.com/o/oauth2/auth",
+            token_uri = "https://oauth2.googleapis.com/token",
+            auth_provider_x509_cert_url = "https://www.googleapis.com/oauth2/v1/certs",
+            client_x509_cert_url = "https://www.googleapis.com/robot/v1/metadata/x509/push-test"
+        });
+
+        var credential = CredentialFactory
+            .FromJson<ServiceAccountCredential>(json)
+            .ToGoogleCredential()
+            .CreateScoped(firebaseMessagingScope);
+
+        var serviceAccount = Assert.IsType<ServiceAccountCredential>(credential.UnderlyingCredential);
+        Assert.Contains(firebaseMessagingScope, serviceAccount.Scopes);
+        Assert.IsAssignableFrom<ITokenAccess>(credential);
     }
 
     [Theory]
@@ -94,6 +136,22 @@ public sealed class FcmPushPayloadContractTests
         Assert.Contains("new FcmAndroidConfig(\"high\", new FcmAndroidNotification(\"petmagic_updates\"))", source);
         Assert.Contains("[property: JsonPropertyName(\"channel_id\")]", source);
         Assert.Contains("new FcmApnsConfig(new FcmApnsPayload(new FcmAps(\"default\"", source);
+    }
+
+    [Fact]
+    public void TemplateGenerationFcmSender_ShouldIncludeMediaTypeAndUnreadResultCount()
+    {
+        var source = File.ReadAllText(ResolveRepositoryPath(
+            "src/Modules/Templates/PetMagic.Modules.Templates.Infrastructure/FcmTemplateGenerationPushNotificationSender.cs"));
+
+        Assert.Contains("[\"mediaType\"] = mediaType", source, StringComparison.Ordinal);
+        Assert.Contains("[\"unreadCount\"] = unreadCompletedCount.ToString(CultureInfo.InvariantCulture)", source, StringComparison.Ordinal);
+        Assert.Contains("x.Status == TemplateGenerationStatus.Completed", source, StringComparison.Ordinal);
+        Assert.Contains("x.ResultViewedAtUtc == null", source, StringComparison.Ordinal);
+        Assert.Contains("x.HiddenByUserAtUtc == null", source, StringComparison.Ordinal);
+        Assert.Contains("!isFailed && unreadCompletedCount > 1", source, StringComparison.Ordinal);
+        Assert.Contains("? \"/creations\"", source, StringComparison.Ordinal);
+        Assert.Contains(": $\"/generations/{generation.GenerationId}\"", source, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -13,6 +14,7 @@ using Microsoft.Extensions.Logging;
 using PetMagic.BuildingBlocks.Notifications;
 using PetMagic.BuildingBlocks.Observability;
 using PetMagic.Modules.Templates.Application.Contracts;
+using PetMagic.Modules.Templates.Domain.Enums;
 using PetMagic.Modules.Templates.Infrastructure.Data;
 using PetMagic.Modules.Templates.Infrastructure.Entities;
 using PetMagic.Modules.Templates.Infrastructure.Options;
@@ -49,9 +51,22 @@ internal sealed class FcmTemplateGenerationPushNotificationSender(
             return PushDeliveryResult.Delivered;
         }
 
+        var isCompleted = generation.Status.Equals(
+            nameof(TemplateGenerationStatus.Completed),
+            StringComparison.OrdinalIgnoreCase);
+        var unreadCompletedCount = isCompleted
+            ? await dbContext.TemplateGenerationJobs
+                .AsNoTracking()
+                .CountAsync(
+                    x => x.UserId == generation.UserId
+                        && x.Status == TemplateGenerationStatus.Completed
+                        && x.ResultViewedAtUtc == null
+                        && x.HiddenByUserAtUtc == null,
+                    cancellationToken)
+            : 0;
         var accessToken = await GetAccessTokenAsync(cancellationToken);
         var deliveries = await Task.WhenAll(tokens.Select(token =>
-            SendAsync(generation, token, accessToken, cancellationToken)));
+            SendAsync(generation, token, accessToken, unreadCompletedCount, cancellationToken)));
         DisableInvalidTokens(deliveries);
         return Aggregate(deliveries.Select(x => x.Result).ToArray());
     }
@@ -60,26 +75,40 @@ internal sealed class FcmTemplateGenerationPushNotificationSender(
         TemplateGenerationResponse generation,
         TemplatePushDeviceToken token,
         string accessToken,
+        int unreadCompletedCount,
         CancellationToken cancellationToken)
     {
         var isFailed = generation.Status.Equals("Failed", StringComparison.OrdinalIgnoreCase);
         var locale = token.Locale;
-        var route = $"/generations/{generation.GenerationId}";
+        var route = !isFailed && unreadCompletedCount > 1
+            ? "/creations"
+            : $"/generations/{generation.GenerationId}";
         var eventId = generation.GenerationId.ToString();
+        var mediaType = NormalizeMediaType(generation.MediaType);
         var data = new Dictionary<string, string>
         {
             ["type"] = "template_generation",
             ["generationId"] = eventId,
             ["route"] = route,
             ["status"] = generation.Status,
+            ["mediaType"] = mediaType,
+            ["unreadCount"] = unreadCompletedCount.ToString(CultureInfo.InvariantCulture),
             ["dedupe_key"] = $"template_generation:{eventId}:{generation.Status}"
         };
         var request = new FcmSendRequest(
             new FcmMessage(
                 token.Token,
                 new FcmNotification(
-                    TemplateGenerationPushNotificationLocalizer.BuildTitle(locale, isFailed),
-                    TemplateGenerationPushNotificationLocalizer.BuildBody(locale, isFailed)),
+                    TemplateGenerationPushNotificationLocalizer.BuildTitle(
+                        locale,
+                        isFailed,
+                        mediaType,
+                        unreadCompletedCount),
+                    TemplateGenerationPushNotificationLocalizer.BuildBody(
+                        locale,
+                        isFailed,
+                        mediaType,
+                        unreadCompletedCount)),
                 data,
                 new FcmAndroidConfig("high", new FcmAndroidNotification("petmagic_updates")),
                 new FcmApnsConfig(new FcmApnsPayload(new FcmAps("default")))));
@@ -158,7 +187,7 @@ internal sealed class FcmTemplateGenerationPushNotificationSender(
     private async Task<string> GetAccessTokenAsync(CancellationToken cancellationToken)
     {
         credential ??= LoadCredential().CreateScoped(FirebaseMessagingScope);
-        return await credential.UnderlyingCredential.GetAccessTokenForRequestAsync(cancellationToken: cancellationToken);
+        return await ((ITokenAccess)credential).GetAccessTokenForRequestAsync(cancellationToken: cancellationToken);
     }
 
     private GoogleCredential LoadCredential()
@@ -174,7 +203,19 @@ internal sealed class FcmTemplateGenerationPushNotificationSender(
 
     private static GoogleCredential CreateCredentialFromJson(string json)
     {
-        return CredentialFactory.FromJson(json, credentialType: null);
+        return CredentialFactory.FromJson<ServiceAccountCredential>(json).ToGoogleCredential();
+    }
+
+    private static string NormalizeMediaType(string? mediaType)
+    {
+        if (string.Equals(mediaType, TemplateGenerationQueue.MediaTypeImage, StringComparison.OrdinalIgnoreCase))
+        {
+            return TemplateGenerationQueue.MediaTypeImage;
+        }
+
+        return string.Equals(mediaType, TemplateGenerationQueue.MediaTypeVideo, StringComparison.OrdinalIgnoreCase)
+            ? TemplateGenerationQueue.MediaTypeVideo
+            : "unknown";
     }
 
     private static string NormalizeJson(string value)

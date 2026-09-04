@@ -205,7 +205,7 @@ internal sealed class FcmEconomyPushNotificationSender(
     private async Task<string> GetAccessTokenAsync(CancellationToken cancellationToken)
     {
         credential ??= LoadCredential().CreateScoped(FirebaseMessagingScope);
-        return await credential.UnderlyingCredential.GetAccessTokenForRequestAsync(cancellationToken: cancellationToken);
+        return await ((ITokenAccess)credential).GetAccessTokenForRequestAsync(cancellationToken: cancellationToken);
     }
 
     private GoogleCredential LoadCredential()
@@ -221,7 +221,7 @@ internal sealed class FcmEconomyPushNotificationSender(
 
     private static GoogleCredential CreateCredentialFromJson(string json)
     {
-        return CredentialFactory.FromJson(json, credentialType: null);
+        return CredentialFactory.FromJson<ServiceAccountCredential>(json).ToGoogleCredential();
     }
 
     private static string NormalizeJson(string value)

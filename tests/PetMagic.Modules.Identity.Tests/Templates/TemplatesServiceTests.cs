@@ -201,7 +201,8 @@ public sealed partial class TemplatesServiceTests
         ITemplateAiProviderHealthService? aiProviderHealthService = null,
         IAdminAuditLog? adminAuditLog = null,
         FalQueueClient? falQueueClient = null,
-        IMediaStorage? mediaStorage = null)
+        IMediaStorage? mediaStorage = null,
+        ITemplateGenerationPushNotificationSender? pushNotificationSender = null)
     {
         return new TemplateGenerationService(
             dbContext,
@@ -211,7 +212,8 @@ public sealed partial class TemplatesServiceTests
             realtimeService: realtimeService,
             aiProviderHealthService: aiProviderHealthService,
             adminAuditLog: adminAuditLog,
-            falQueueClient: falQueueClient);
+            falQueueClient: falQueueClient,
+            pushNotificationSender: pushNotificationSender);
     }
 
     private static TemplatesOptions CreateTemplatesOptions(
@@ -771,12 +773,15 @@ public sealed partial class TemplatesServiceTests
     {
         public List<Guid> ChargedGenerationIds { get; } = [];
         public List<Guid> RefundedGenerationIds { get; } = [];
+        public PetMagic.BuildingBlocks.Results.Error? ChargeError { get; init; }
         public PetMagic.BuildingBlocks.Results.Error? RefundError { get; init; }
 
         public Task<PetMagic.BuildingBlocks.Results.Result> ChargeAsync(Guid userId, Guid generationId, int tokenCost, CancellationToken cancellationToken)
         {
             ChargedGenerationIds.Add(generationId);
-            return Task.FromResult(PetMagic.BuildingBlocks.Results.Result.Success());
+            return Task.FromResult(ChargeError is null
+                ? PetMagic.BuildingBlocks.Results.Result.Success()
+                : PetMagic.BuildingBlocks.Results.Result.Failure(ChargeError));
         }
 
         public Task<PetMagic.BuildingBlocks.Results.Result> RefundAsync(Guid userId, Guid generationId, int tokenCost, CancellationToken cancellationToken)

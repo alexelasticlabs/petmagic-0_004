@@ -4,7 +4,8 @@ This document defines the current push notification payloads and mobile routing 
 
 ## General rules
 
-- Backend sends FCM data payloads.
+- Backend sends FCM notification + data payloads so iOS and Android can show alerts while the app is backgrounded or terminated.
+- `Terminated` means a normal non-running app process. After an explicit iOS app-switcher swipe-away or Android force-stop, Firebase requires the user to reopen the app before background delivery resumes.
 - Mobile accepts only internal safe routes from `NotificationCoordinator`.
 - External schemes, query strings and fragments are rejected.
 - `dedupe_key` is used to suppress duplicate foreground UI messages.
@@ -15,7 +16,7 @@ This document defines the current push notification payloads and mobile routing 
 
 | Type | Sender | Required data | Route | Persistence |
 | --- | --- | --- | --- | --- |
-| `template_generation` | `FcmTemplateGenerationPushNotificationSender` | `type`, `generationId`, `status`, `route`, `dedupe_key` | `/generations/{generationId}` | Generation history unread/read |
+| `template_generation` | `FcmTemplateGenerationPushNotificationSender` | `type`, `generationId`, `status`, `mediaType`, `unreadCount`, `route`, `dedupe_key` | `/generations/{generationId}`; `/creations` for multiple unread completed results | Generation history unread/read |
 | `wallet` | `FcmEconomyPushNotificationSender` | `type`, `status`, `route`, `dedupe_key` | `/profile/wallet` | Transient-only |
 | `premium` | `FcmEconomyPushNotificationSender` | `type`, `status`, `route`, `dedupe_key`, optional `provider`, `planId` | `/profile` | Transient-only |
 | `support_chat` | `FcmSupportChatPushNotificationSender` | `type`, `conversationId`, `route`, `dedupe_key` | `/profile/support` | Transient-only |
@@ -44,7 +45,7 @@ The route parser must keep rejecting:
 
 Backend senders own title/body selection for their module:
 
-- template generation terminal status;
+- template generation terminal status, including image/video success copy and aggregate copy for multiple unread results;
 - economy wallet/premium status;
 - support chat message status.
 
@@ -64,6 +65,8 @@ There is no persistent unified notification inbox for wallet, premium or support
 ## Test checklist
 
 - Each sender emits stable `type`, `route` and `dedupe_key`.
+- Template completion emits `mediaType` and `unreadCount`; aggregate completion routes to `/creations`.
+- Aggregate completion copy is self-contained because FCM notification messages may collapse while a device is offline.
 - Each mobile handler accepts the intended route.
 - Unsafe routes are rejected.
 - Foreground duplicate messages do not produce duplicate UI.

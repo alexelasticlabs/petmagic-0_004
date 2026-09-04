@@ -111,6 +111,13 @@ internal sealed partial class TemplateGenerationService
             job.LastErrorMessage = safeErrorMessage;
             job.UpdatedAtUtc = failedAt;
             job.CompletedAtUtc = failedAt;
+            if (pushNotificationSender is not null)
+            {
+                await pushNotificationSender.NotifyGenerationTerminalAsync(
+                    MapResponse(job),
+                    cancellationToken);
+            }
+
             await dbContext.SaveChangesAsync(cancellationToken);
             TemplateGenerationMetrics.RecordJobFailed(job, previousStatus, safeErrorCode ?? "templates.billing_failed");
             return Result.Failure(charge.Error);

@@ -14,6 +14,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 using Npgsql;
 
+using PetMagic.BuildingBlocks.Notifications;
 using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Abstractions;
@@ -107,7 +108,10 @@ public sealed class TemplateGenerationJobProcessorTests
         dbContext.TemplateGenerationBillingCommands.Add(billingCommand);
         await dbContext.SaveChangesAsync();
 
-        var processed = await CreateProcessor(dbContext, billing: billing)
+        var processed = await CreateProcessor(
+                dbContext,
+                billing: billing,
+                pushNotificationSender: new TemplateGenerationPushNotificationOutbox(dbContext))
             .ProcessNextAsync(CancellationToken.None);
 
         var persistedJob = await dbContext.TemplateGenerationJobs.SingleAsync(x => x.Id == job.Id);
@@ -123,6 +127,12 @@ public sealed class TemplateGenerationJobProcessorTests
         Assert.DoesNotContain("charge-message-secret", persistedJob.LastErrorMessage, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("charge-api-secret", persistedCommand.LastErrorMessage, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("req-secret", persistedCommand.LastErrorMessage, StringComparison.OrdinalIgnoreCase);
+        var pushMessage = await dbContext.PushOutboxMessages.SingleAsync(
+            x => x.DeduplicationKey == $"template_generation:{job.Id:D}:Failed");
+        Assert.Equal($"template_generation:{job.Id:D}:Failed", pushMessage.DeduplicationKey);
+        Assert.Equal("generation_terminal", pushMessage.Kind);
+        Assert.Equal(PushOutboxStatus.Queued, pushMessage.Status);
+        Assert.Equal(job.UserId, pushMessage.UserId);
     }
 
     [Fact]
@@ -329,7 +339,8 @@ public sealed class TemplateGenerationJobProcessorTests
 
         var processor = CreateProcessor(
             dbContext,
-            options: CreateOptions(orphanQueuedJobTimeoutMilliseconds: 1));
+            options: CreateOptions(orphanQueuedJobTimeoutMilliseconds: 1),
+            pushNotificationSender: new TemplateGenerationPushNotificationOutbox(dbContext));
 
         var processed = await processor.ProcessNextAsync(CancellationToken.None);
 
@@ -340,6 +351,12 @@ public sealed class TemplateGenerationJobProcessorTests
         Assert.Null(persisted.ChargedAtUtc);
         Assert.Null(persisted.RefundedAtUtc);
         Assert.NotNull(persisted.CompletedAtUtc);
+        var pushMessage = await dbContext.PushOutboxMessages.SingleAsync(
+            x => x.DeduplicationKey == $"template_generation:{job.Id:D}:Failed");
+        Assert.Equal($"template_generation:{job.Id:D}:Failed", pushMessage.DeduplicationKey);
+        Assert.Equal("generation_terminal", pushMessage.Kind);
+        Assert.Equal(PushOutboxStatus.Queued, pushMessage.Status);
+        Assert.Equal(job.UserId, pushMessage.UserId);
     }
 
     [Fact]
@@ -3255,7 +3272,8 @@ public sealed class TemplateGenerationJobProcessorTests
         ITemplateWatermarkRenderer? watermarkRenderer = null,
         ITemplateGenerationProviderAttemptStore? providerAttemptStore = null,
         ITemplateGenerationRuntimePolicyProvider? runtimePolicyProvider = null,
-        IFalProviderRuntimeSnapshotService? providerRuntimeSnapshotService = null)
+        IFalProviderRuntimeSnapshotService? providerRuntimeSnapshotService = null,
+        ITemplateGenerationPushNotificationSender? pushNotificationSender = null)
     {
         return new TemplateGenerationJobProcessor(
             dbContext,
@@ -3269,7 +3287,7 @@ public sealed class TemplateGenerationJobProcessorTests
             videoThumbnailGenerator: videoThumbnailGenerator ?? new NoopVideoThumbnailGenerator(),
             billing: billing ?? new TestTemplateGenerationBilling(),
             realtimeService: new RecordingTemplateFeedRealtimeService(),
-            pushNotificationSender: new NoopPushNotificationSender(),
+            pushNotificationSender: pushNotificationSender ?? new NoopPushNotificationSender(),
             options: options ?? CreateOptions(),
             logger: logger ?? NullLogger<TemplateGenerationJobProcessor>.Instance,
             falQueueClient: falQueueClient,

@@ -69,6 +69,9 @@ internal sealed partial class TemplateGenerationJobProcessor
             job.LastErrorMessage = safeErrorMessage;
             job.UpdatedAtUtc = failedAt;
             job.CompletedAtUtc = failedAt;
+            await pushNotificationSender.NotifyGenerationTerminalAsync(
+                TemplateGenerationService.MapResponse(job),
+                cancellationToken);
             await dbContext.SaveChangesAsync(cancellationToken);
             TemplateGenerationMetrics.RecordJobFailed(job, previousStatus, safeErrorCode ?? "templates.billing_failed");
             await PublishStatusChangedAsync(job, cancellationToken);
