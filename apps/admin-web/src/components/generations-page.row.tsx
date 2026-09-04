@@ -290,6 +290,7 @@ export function GenerationRow({
         ? text.watermarkApplied
         : text.watermarkPending;
   const compareState = item.canCompareBeforeAfter ? text.compareReady : text.compareUnavailable;
+  const hasPreviewMedia = Boolean(item.inputPreviewUrl || item.resultPreviewUrl);
   const feedbackQuery = useQuery({
     queryKey: adminQueryKeys.feedback({ generationId: item.generationId, take: 5 }),
     queryFn: ({ signal }) =>
@@ -473,50 +474,48 @@ export function GenerationRow({
                   }
                 />
               ) : null}
-              <div className={styles.previewGrid}>
-                <section className={styles.previewCard}>
-                  <header>
-                    <strong>{text.before}</strong>
-                  </header>
+              {hasPreviewMedia ? (
+                <div className={styles.previewGrid}>
                   {item.inputPreviewUrl ? (
-                    <TemplateSecureMedia
-                      className={styles.previewImage}
-                      url={item.inputPreviewUrl}
-                      kind="image"
-                      alt={text.before}
-                      width={512}
-                      height={512}
-                      logContext={{
-                        surface: "generations-before-preview",
-                        templateId: item.templateId,
-                      }}
-                    />
-                  ) : (
-                    <div className={styles.previewFallback}>{text.previewMissing}</div>
-                  )}
-                </section>
-                <section className={styles.previewCard}>
-                  <header>
-                    <strong>{text.after}</strong>
-                  </header>
+                    <section className={styles.previewCard}>
+                      <header>
+                        <strong>{text.before}</strong>
+                      </header>
+                      <TemplateSecureMedia
+                        className={styles.previewImage}
+                        url={item.inputPreviewUrl}
+                        kind="image"
+                        alt={text.before}
+                        width={512}
+                        height={512}
+                        logContext={{
+                          surface: "generations-before-preview",
+                          templateId: item.templateId,
+                        }}
+                      />
+                    </section>
+                  ) : null}
                   {item.resultPreviewUrl ? (
-                    <TemplateSecureMedia
-                      className={styles.previewImage}
-                      url={item.resultPreviewUrl}
-                      kind="image"
-                      alt={text.after}
-                      width={512}
-                      height={512}
-                      logContext={{
-                        surface: "generations-after-preview",
-                        templateId: item.templateId,
-                      }}
-                    />
-                  ) : (
-                    <div className={styles.previewFallback}>{text.previewMissing}</div>
-                  )}
-                </section>
-              </div>
+                    <section className={styles.previewCard}>
+                      <header>
+                        <strong>{text.after}</strong>
+                      </header>
+                      <TemplateSecureMedia
+                        className={styles.previewImage}
+                        url={item.resultPreviewUrl}
+                        kind="image"
+                        alt={text.after}
+                        width={512}
+                        height={512}
+                        logContext={{
+                          surface: "generations-after-preview",
+                          templateId: item.templateId,
+                        }}
+                      />
+                    </section>
+                  ) : null}
+                </div>
+              ) : null}
               <div className={styles.detailsGrid}>
                 <div>
                   <span>{text.sourceType}</span>

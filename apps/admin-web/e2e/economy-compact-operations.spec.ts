@@ -666,6 +666,42 @@ test("promo codes use compact semantic cards on narrow screens", async ({ page }
   ).toHaveCount(0);
   await expect(page.getByRole("table")).toContainText("PETMAGIC-SUMMER-2026");
   await expectNoDocumentOverflow(page);
+
+  await page.setViewportSize({ width: 1024, height: 900 });
+  await page.getByRole("tab", { name: "Active", exact: true }).hover();
+  const promoToolbarLayout = await page.evaluate(() => {
+    const tabList = document.querySelector<HTMLElement>('[role="tablist"]');
+    const hoverTab = document.querySelector<HTMLElement>('[role="tab"][aria-selected="false"]');
+    const toolbarActions = document.querySelector<HTMLElement>(
+      '[data-testid="promo-codes-toolbar-actions"]'
+    );
+    if (!tabList || !hoverTab || !toolbarActions) {
+      throw new Error("Missing promo code toolbar controls");
+    }
+
+    const tabBounds = tabList.getBoundingClientRect();
+    const hoverBounds = hoverTab.getBoundingClientRect();
+    const actionCenterPositions = Array.from(toolbarActions.children).map((child) => {
+      const childBounds = (child as HTMLElement).getBoundingClientRect();
+      return Math.round((childBounds.top + childBounds.height / 2) * 10) / 10;
+    });
+
+    return {
+      actionCenterPositions,
+      clientWidth: document.documentElement.clientWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+      hoverBottom: hoverBounds.bottom,
+      hoverTop: hoverBounds.top,
+      tabBottom: tabBounds.bottom,
+      tabTop: tabBounds.top,
+    };
+  });
+  expect(promoToolbarLayout.scrollWidth).toBeLessThanOrEqual(promoToolbarLayout.clientWidth);
+  expect(promoToolbarLayout.hoverTop).toBeGreaterThanOrEqual(promoToolbarLayout.tabTop - 1);
+  expect(promoToolbarLayout.hoverBottom).toBeLessThanOrEqual(promoToolbarLayout.tabBottom + 1);
+  expect(new Set(promoToolbarLayout.actionCenterPositions).size).toBe(1);
+
+  await page.setViewportSize({ width: 1440, height: 960 });
   await page.screenshot({
     path: testInfo.outputPath("promo-codes-desktop-light-1440.png"),
     fullPage: true,

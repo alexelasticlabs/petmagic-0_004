@@ -244,8 +244,26 @@ export function TemplateCatalogCard({
               }
             }}
           >
-            {canManageTemplates ? text.editTemplate : copy.analyticsAction}
+            {canManageTemplates ? copy.editAction : copy.analyticsAction}
           </Link>
+          {canManageTemplates ? (
+            <>
+              <Link
+                href={`${templateBasePath}/test/${encodeURIComponent(template.templateId)}`}
+                className={styles.cardSecondaryAction}
+                aria-label={`${copy.testAction}: ${safeTemplateTitle}`}
+              >
+                {copy.testAction}
+              </Link>
+              <Link
+                href={`${templateBasePath}/analytics/${encodeURIComponent(template.templateId)}`}
+                className={styles.cardSecondaryAction}
+                aria-label={`${copy.analyticsAction}: ${safeTemplateTitle}`}
+              >
+                {copy.analyticsAction}
+              </Link>
+            </>
+          ) : null}
           {canManageTemplates ? (
             <AdminActionMenu
               label={text.actionsLabel}

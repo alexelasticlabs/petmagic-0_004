@@ -19,6 +19,9 @@ const promoCodesListCardPath = fileURLToPath(
 const promoCodesEditorDrawerPath = fileURLToPath(
   new URL("./promo-codes-editor-drawer.tsx", import.meta.url)
 );
+const promoCodesStylesPath = fileURLToPath(
+  new URL("./promo-codes-view.module.css", import.meta.url)
+);
 
 describe("buildPromoCodesViewOptions", () => {
   it("returns stable options shape for ru locale", () => {
@@ -113,5 +116,20 @@ describe("buildPromoCodesViewOptions", () => {
     expect(listSource).toContain("maxLength={PROMO_CODES_SEARCH_MAX_LENGTH}");
     expect(viewSource).not.toContain("setSearch(value);\n            setPage(1);");
     expect(listSource).not.toContain("onChange={(event) => onSearchChange(event.target.value)}");
+  });
+
+  it("keeps status hover and toolbar actions within their scrollable controls", () => {
+    const styles = readFileSync(promoCodesStylesPath, "utf8");
+    const listSource = readFileSync(promoCodesListCardPath, "utf8");
+
+    expect(styles).toContain(".statusTabs {\n  min-width: 0;");
+    expect(styles).toContain("padding-block: 0.16rem;");
+    expect(styles).not.toContain(
+      ".statusTab:hover {\n  border-color: color-mix(in srgb, var(--accent) 55%, var(--border-soft));\n  transform:"
+    );
+    expect(styles).toContain(".toolbarActions {\n  min-width: 0;");
+    expect(styles).toContain("flex-wrap: nowrap;");
+    expect(styles).toContain(".toolbarActions > * {\n  flex: 0 0 auto;");
+    expect(listSource).toContain('data-testid="promo-codes-toolbar-actions"');
   });
 });

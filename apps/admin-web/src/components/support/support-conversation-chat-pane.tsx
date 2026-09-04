@@ -60,6 +60,8 @@ type SupportConversationChatPaneProps = {
   highlightedMessageId: string | null;
   isComposerBusy: boolean;
   isComposerDisabled: boolean;
+  isOwnershipComposerNoticeVisible: boolean;
+  isOwnershipRequired: boolean;
   isAttachmentRetrySubmitting: boolean;
   isLoadingOlderMessages: boolean;
   isConversationClosed: boolean;
@@ -71,6 +73,7 @@ type SupportConversationChatPaneProps = {
   messagesEndRef: RefObject<HTMLDivElement | null>;
   jumpToMessage: (messageId: string) => void;
   onClaimConversation: () => void;
+  onOwnershipRequired: () => void;
   readOnlyComposerTitle: string;
   reply: string;
   replyComposerAttachment: SupportMessageAttachment | null | undefined;
@@ -122,6 +125,8 @@ export function SupportConversationChatPane({
   highlightedMessageId,
   isComposerBusy,
   isComposerDisabled,
+  isOwnershipComposerNoticeVisible,
+  isOwnershipRequired,
   isAttachmentRetrySubmitting,
   isLoadingOlderMessages,
   isConversationClosed,
@@ -129,6 +134,7 @@ export function SupportConversationChatPane({
   isDragging,
   jumpToMessage,
   onClaimConversation,
+  onOwnershipRequired,
   locale,
   messageLabels,
   messagesById,
@@ -181,11 +187,11 @@ export function SupportConversationChatPane({
         className={styles.chatPane}
         onDragOver={(event) => {
           event.preventDefault();
-          if (!isComposerDisabled) setIsDragging(true);
+          if (!isComposerDisabled && !isOwnershipRequired) setIsDragging(true);
         }}
         onDragEnter={(event) => {
           event.preventDefault();
-          if (!isComposerDisabled) setIsDragging(true);
+          if (!isComposerDisabled && !isOwnershipRequired) setIsDragging(true);
         }}
         onDragLeave={(event) => {
           if (!event.currentTarget.contains(event.relatedTarget as Node)) {
@@ -196,6 +202,10 @@ export function SupportConversationChatPane({
           event.preventDefault();
           setIsDragging(false);
           if (isComposerDisabled) return;
+          if (isOwnershipRequired) {
+            onOwnershipRequired();
+            return;
+          }
           const droppedFile = event.dataTransfer.files[0];
           if (droppedFile) {
             setSelectedAttachment(droppedFile);
@@ -269,27 +279,28 @@ export function SupportConversationChatPane({
                   </div>
                 ) : null}
               </div>
-            ) : isComposerDisabled ? (
-              <div
-                className={styles.ownershipComposerNotice}
-                data-testid="support-composer-ownership-gate"
-              >
-                <div className={styles.ownershipComposerCopy}>
-                  <strong>{copy.controller.ownershipRequired}</strong>
-                  <span>
-                    {locale === "ru"
-                      ? "Возьмите тикет в работу — после этого можно будет написать ответ или прикрепить файл."
-                      : "Claim the ticket to reply to the customer or attach a file."}
-                  </span>
-                </div>
-                {canClaimConversation ? (
-                  <Button variant="primary" size="sm" onClick={onClaimConversation}>
-                    {locale === "ru" ? "Взять в работу" : "Claim ticket"}
-                  </Button>
-                ) : null}
-              </div>
             ) : (
               <>
+                {isOwnershipComposerNoticeVisible ? (
+                  <div
+                    className={styles.ownershipComposerNotice}
+                    data-testid="support-composer-ownership-gate"
+                  >
+                    <div className={styles.ownershipComposerCopy}>
+                      <strong>{copy.controller.ownershipRequired}</strong>
+                      <span>
+                        {locale === "ru"
+                          ? "Возьмите тикет в работу — после этого можно будет написать ответ или прикрепить файл."
+                          : "Claim the ticket to reply to the customer or attach a file."}
+                      </span>
+                    </div>
+                    {canClaimConversation ? (
+                      <Button variant="primary" size="sm" onClick={onClaimConversation}>
+                        {locale === "ru" ? "Взять в работу" : "Claim ticket"}
+                      </Button>
+                    ) : null}
+                  </div>
+                ) : null}
                 <input
                   ref={attachmentInputRef}
                   type="file"
@@ -297,8 +308,9 @@ export function SupportConversationChatPane({
                   accept={SUPPORT_ATTACHMENT_ACCEPT}
                   disabled={isComposerDisabled}
                   onChange={(event) => {
-                    if (isComposerDisabled) {
+                    if (isComposerDisabled || isOwnershipRequired) {
                       event.currentTarget.value = "";
+                      onOwnershipRequired();
                       return;
                     }
 
@@ -430,7 +442,14 @@ export function SupportConversationChatPane({
                     type="button"
                     className={styles.composerIconBtn}
                     data-testid="support-composer-attachment"
-                    onClick={() => attachmentInputRef.current?.click()}
+                    onClick={() => {
+                      if (isOwnershipRequired) {
+                        onOwnershipRequired();
+                        return;
+                      }
+
+                      attachmentInputRef.current?.click();
+                    }}
                     disabled={isComposerDisabled}
                     aria-label={messageLabels.attachFile}
                     title={messageLabels.attachFile}

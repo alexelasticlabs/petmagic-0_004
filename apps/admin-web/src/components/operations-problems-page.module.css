@@ -1,0 +1,24 @@
+.page {
+  max-width: var(--admin-page-max-wide);
+}
+
+.backLink {
+  color: var(--brand);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.backLink:hover {
+  text-decoration: underline;
+}
+
+.backLink:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--brand) 64%, transparent);
+  outline-offset: 3px;
+}
+
+.identifier {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  overflow-wrap: anywhere;
+}

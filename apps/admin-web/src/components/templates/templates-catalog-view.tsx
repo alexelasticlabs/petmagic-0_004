@@ -508,7 +508,6 @@ export function TemplatesCatalogView({
           canManageTemplates={false}
           copy={copy}
           locale={locale}
-          summary={null}
           templateType={templateType}
         />
         <AdminPageGrid
@@ -531,7 +530,6 @@ export function TemplatesCatalogView({
         canManageTemplates={canManageTemplates}
         copy={copy}
         locale={locale}
-        summary={summary}
         templateType={templateType}
       />
 

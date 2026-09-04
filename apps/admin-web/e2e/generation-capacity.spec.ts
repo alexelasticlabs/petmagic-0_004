@@ -6,7 +6,9 @@ function getCapacitySurface(page: Page) {
   return page.locator('[data-admin-surface="generation-capacity"]');
 }
 
-test("keeps a healthy capacity overview compact until an operator opens it", async ({ page }) => {
+test("keeps a healthy capacity overview compact until an operator opens it", async ({
+  page,
+}, testInfo) => {
   await installMocks(
     page,
     createControl({
@@ -23,11 +25,9 @@ test("keeps a healthy capacity overview compact until an operator opens it", asy
   await page.goto("/en/generations");
 
   const capacitySurface = getCapacitySurface(page);
-  await expect(capacitySurface.getByText("Status refreshes every 15 seconds")).toBeVisible();
-  await expect(
-    capacitySurface.getByText("fal.ai balance is checked every 5 minutes")
-  ).toBeVisible();
-  await expect(capacitySurface.getByText(/^Updated:/)).toBeVisible();
+  await expect(capacitySurface.getByText("Admission enabled", { exact: true })).toHaveCount(0);
+  await expect(capacitySurface.getByText("Fresh", { exact: true })).toHaveCount(0);
+  await expect(capacitySurface.getByText(/^Updated:/)).toHaveCount(0);
   const overview = capacitySurface
     .locator("details")
     .filter({ hasText: "Capacity overview" })
@@ -36,10 +36,49 @@ test("keeps a healthy capacity overview compact until an operator opens it", asy
   await expect(
     overview.getByRole("progressbar", { name: "Capacity usage", exact: true })
   ).toBeHidden();
+  await page.screenshot({ path: testInfo.outputPath("generation-capacity-compact.png") });
 
   await overview.getByText("Capacity overview", { exact: true }).click();
   await expect(
     overview.getByRole("progressbar", { name: "Capacity usage", exact: true })
+  ).toBeVisible();
+});
+
+test("hides the expected Scheduler V2 rollout state without suppressing actionable warnings", async ({
+  page,
+}) => {
+  const baseControl = createControl();
+  await installMocks(
+    page,
+    createControl({
+      worker: { ...baseControl.worker, schedulerV2Enabled: false },
+      alerts: [
+        {
+          alertId: "generation-scheduler-v2-disabled",
+          statusChangedAtUtc: "2026-07-29T10:00:00Z",
+          severity: "warning",
+          title: "Scheduler V2 is disabled",
+          message: "The worker is using the compatibility loop until the rollout flag is enabled.",
+        },
+        {
+          alertId: "fal-concurrency-confirmation-stale",
+          statusChangedAtUtc: "2026-07-29T10:00:00Z",
+          severity: "warning",
+          title: "fal.ai concurrency confirmation is stale",
+          message: "Confirm the current fal.ai concurrency limit in the provider dashboard.",
+        },
+      ],
+    })
+  );
+  await loginAsAdmin(page);
+  await page.goto("/en/generations");
+
+  const capacitySurface = getCapacitySurface(page);
+  await expect(capacitySurface.getByText("Scheduler V2 is disabled", { exact: true })).toHaveCount(
+    0
+  );
+  await expect(
+    capacitySurface.getByText("fal.ai concurrency confirmation is stale", { exact: true })
   ).toBeVisible();
 });
 

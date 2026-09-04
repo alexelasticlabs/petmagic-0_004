@@ -86,6 +86,28 @@
   color: var(--text-strong) !important;
 }
 
+.systemStatusProblemLink {
+  display: inline-flex;
+  width: fit-content;
+  margin-top: 0.18rem;
+  color: var(--info);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.systemStatusProblemLink:hover {
+  color: var(--accent-strong);
+  text-decoration: underline;
+  text-underline-offset: 0.18rem;
+}
+
+.systemStatusProblemLink:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--brand) 64%, transparent);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
+
 .systemStatusNextStep strong {
   color: var(--text-muted);
   font-weight: 700;

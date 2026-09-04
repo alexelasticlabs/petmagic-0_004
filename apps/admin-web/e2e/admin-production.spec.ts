@@ -1012,6 +1012,11 @@ test("moderator RBAC and support claim/unassign ownership", async ({ page }) => 
   await expect(
     supportInfoPanel.getByRole("button", { name: "Claim ticket", exact: true })
   ).toBeVisible();
+  await expect(page.getByTestId("support-composer-ownership-gate")).toBeHidden();
+  const unassignedComposer = page.getByPlaceholder("Write a reply to the user...");
+  await expect(unassignedComposer).toBeEnabled();
+  await unassignedComposer.fill("A reply that still requires ticket ownership.");
+  await page.getByTestId("support-composer").getByRole("button", { name: "Reply" }).click();
   await expect(page.getByTestId("support-composer-ownership-gate")).toBeVisible();
   await page
     .getByTestId("support-composer-ownership-gate")
@@ -1077,7 +1082,7 @@ test("moderator RBAC and support claim/unassign ownership", async ({ page }) => 
     supportInfoPanel.getByRole("button", { name: "Change assignment", exact: true })
   ).toBeVisible();
   await unassignOwnTicket("Releasing ownership after compact-layout review.", 4);
-  await expect(page.getByTestId("support-composer-ownership-gate")).toBeVisible();
+  await expect(page.getByTestId("support-composer-ownership-gate")).toBeHidden();
   await page.keyboard.press("Escape");
 
   await page.setViewportSize({ width: 390, height: 844 });

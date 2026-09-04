@@ -36,6 +36,22 @@ public sealed record AdminWorkerOperationsStatusDto(
     DateTime? GenerationWorkerHeartbeatAtUtc,
     long? GenerationWorkerHeartbeatAgeSeconds);
 
+public sealed record AdminOperationsProblemListDto(
+    string Source,
+    IReadOnlyList<AdminOperationsProblemDto> Items);
+
+public sealed record AdminOperationsProblemDto(
+    string Source,
+    string Module,
+    string Id,
+    string Kind,
+    string Status,
+    int AttemptCount,
+    DateTime CreatedAtUtc,
+    DateTime UpdatedAtUtc,
+    DateTime? NextAttemptAtUtc,
+    string? ErrorCode);
+
 public sealed record AdminOperationsSnapshot(
     int EmailBacklogCount,
     int EmailDeadLetterCount,

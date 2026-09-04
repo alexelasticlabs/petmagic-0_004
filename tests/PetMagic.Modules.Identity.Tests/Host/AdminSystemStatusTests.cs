@@ -191,6 +191,26 @@ public sealed class AdminSystemStatusTests
         Assert.Contains("AddScoped<IAdminOperationsStatusService, AdminOperationsStatusService>()", program, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void OperationsProblemsEndpoint_ShouldBeAdminOnlyPrivateAndNotExposePayloads()
+    {
+        var root = FindRepositoryRoot();
+        var endpoints = File.ReadAllText(Path.Combine(
+            root, "src", "Host", "PetMagic.Host.Api", "Observability", "AdminSystemStatusEndpoints.cs"));
+        var service = File.ReadAllText(Path.Combine(
+            root, "src", "Host", "PetMagic.Host.Api", "Observability", "AdminOperationsProblemService.cs"));
+        var program = File.ReadAllText(Path.Combine(root, "src", "Host", "PetMagic.Host.Api", "Program.cs"));
+
+        Assert.Contains("MapGet(\"/api/admin/system/operations/problems\", GetOperationsProblemsAsync)", endpoints, StringComparison.Ordinal);
+        Assert.Contains(".RequireAuthorization(\"AdminOnly\")", endpoints, StringComparison.Ordinal);
+        Assert.Contains(".RequireRateLimiting(\"admin\")", endpoints, StringComparison.Ordinal);
+        Assert.Contains("AddScoped<IAdminOperationsProblemService, AdminOperationsProblemService>()", program, StringComparison.Ordinal);
+        Assert.Contains("private const int Take = 100", service, StringComparison.Ordinal);
+        Assert.DoesNotContain("PayloadJson", service, StringComparison.Ordinal);
+        Assert.DoesNotContain("RecipientEmail", service, StringComparison.Ordinal);
+        Assert.DoesNotContain("FailureMessage", service, StringComparison.Ordinal);
+    }
+
     private static HealthReport CreateReport(Dictionary<string, HealthReportEntry> entries) =>
         new(entries, TimeSpan.FromMilliseconds(10));
 

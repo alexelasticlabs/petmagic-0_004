@@ -244,7 +244,20 @@ describe("support visual contract", () => {
     );
 
     expect(conversationRowLayer).toContain("border-radius: 16px;");
+    expect(conversationRowLayer).toContain("border: 1px solid");
     expect(conversationRowLayer).not.toContain("border-radius: 0.9rem;");
+    expect(source).not.toContain(".conversationRowButton {\n  width: 100%;\n  border: 0;");
+  });
+
+  it("keeps compact queue rows within the pane without hiding their status metadata", () => {
+    const source = readSupportQueuePaneStyles();
+    const queueFooterLayer = sliceBetween(source, ".queueRowFooter {", ".queueStatusPill,");
+    const queuePillLayer = sliceBetween(source, ".queueStatusPill,", ".queueStatusIcon");
+
+    expect(queueFooterLayer).toContain("max-width: 100%;");
+    expect(queuePillLayer).toContain("max-width: 100%;");
+    expect(queuePillLayer).toContain("line-height: 1.2;");
+    expect(source).toContain(".slaPill {\n  white-space: normal;");
   });
 
   it("keeps attachment previews and side panel actions theme-aware", () => {

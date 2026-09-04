@@ -134,9 +134,9 @@ describe("support conversation controller errors", () => {
     expect(controllerSource).toContain("isSendReplySubmitting,");
     expect(pageSource).toContain("const isComposerBusy = isSendReplySubmitting;");
     expect(pageSource).toContain(
-      "const isComposerDisabled = isConversationReadOnly || !canMutateConversation || isComposerBusy;"
+      "const isComposerDisabled = isConversationReadOnly || !canManageSupportWorkspace || isComposerBusy;"
     );
-    expect(pageSource).toContain("if (isComposerDisabled) return;");
+    expect(pageSource).toContain("const revealOwnershipComposerNotice = () => {");
     expect(infoPanelSource).toContain("disabled={!canMutateConversation}");
     expect(infoPanelSource).toContain(
       "disabled={!canMutateConversation || statusMutation.isPending}"
@@ -605,10 +605,12 @@ describe("support conversation controller errors", () => {
     expect(pageSource).toContain("const submitReply = () => {");
     expect(pageSource).toContain("const isComposerBusy = isSendReplySubmitting;");
     expect(pageSource).toContain(
-      "const isComposerDisabled = isConversationReadOnly || !canMutateConversation || isComposerBusy;"
+      "const isComposerDisabled = isConversationReadOnly || !canManageSupportWorkspace || isComposerBusy;"
     );
     expect(pageSource).toContain("if (isComposerDisabled ||");
     expect(pageSource).toContain("(!reply.trim() && !hasComposerAttachment)");
+    expect(pageSource).toContain("if (!canMutateConversation) {");
+    expect(pageSource).toContain("revealOwnershipComposerNotice();");
     expect(pageSource).toContain("disabled={isComposerDisabled}");
     expect(pageSource).toContain(
       'selectReplyToMessage(null);\n    setReply("");\n    resetSelectedAttachment();'

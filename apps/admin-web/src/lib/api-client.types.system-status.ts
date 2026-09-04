@@ -50,3 +50,23 @@ export type AdminOperationsStatusDto = {
   };
   unavailableSources: string[];
 };
+
+export type AdminOperationsProblemSource = "email" | "audit" | "push";
+
+export type AdminOperationsProblem = {
+  source: AdminOperationsProblemSource;
+  module: string;
+  id: string;
+  kind: string;
+  status: string;
+  attemptCount: number;
+  createdAtUtc: string;
+  updatedAtUtc: string;
+  nextAttemptAtUtc?: string | null;
+  errorCode?: string | null;
+};
+
+export type AdminOperationsProblemList = {
+  source: AdminOperationsProblemSource;
+  items: AdminOperationsProblem[];
+};

@@ -349,6 +349,18 @@ test("refund recovery keeps one idempotency key across a controlled retry", asyn
   );
   await expect(page.getByText("Refund recovery portrait", { exact: true })).toBeVisible();
 
+  const desktopGenerationRow = page
+    .locator("tr")
+    .filter({ hasText: "Refund recovery portrait" })
+    .first();
+  const columnBorders = await desktopGenerationRow
+    .locator("td")
+    .evaluateAll((cells) =>
+      cells.slice(1).map((cell) => getComputedStyle(cell).borderInlineStartWidth)
+    );
+  expect(columnBorders).toHaveLength(11);
+  expect(columnBorders.every((width) => width === "1px")).toBe(true);
+
   const retryButton = page.getByRole("button", { name: /Retry refund:/ });
   await expect(retryButton).toBeVisible();
   await retryButton.click();
@@ -402,6 +414,8 @@ test("refund recovery keeps one idempotency key across a controlled retry", asyn
   const detailsPanelId = await hideDetails.getAttribute("aria-controls");
   expect(detailsPanelId).toBeTruthy();
   const details = page.locator(`#${detailsPanelId}`);
+  await expect(details.getByText("Before", { exact: true })).toHaveCount(0);
+  await expect(details.getByText("After", { exact: true })).toHaveCount(0);
   await expect(details.getByText("Pending", { exact: true })).toBeVisible();
   await expect(details.getByText("1 / 5", { exact: true })).toBeVisible();
   await expect(details.getByText("economy.refund_retry_queued", { exact: true })).toBeVisible();

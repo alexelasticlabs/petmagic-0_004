@@ -11,7 +11,7 @@ import {
   TemplatesIcon,
   VideoIcon,
 } from "@/components/admin/admin-icons";
-import { AdminCard, AdminContextBar, AdminMetricStrip } from "@/components/admin/admin-primitives";
+import { AdminCard, AdminContextBar } from "@/components/admin/admin-primitives";
 import type { TemplatesCatalogViewText } from "@/components/templates/templates-catalog-view.content";
 import styles from "@/components/templates/templates-catalog.module.css";
 import type { AdminTemplateCatalogSummary, TemplateType } from "@/lib/api-client";
@@ -21,7 +21,6 @@ type TemplatesCatalogWorkspaceHeaderProps = {
   canManageTemplates: boolean;
   copy: TemplatesCatalogViewText;
   locale: Locale;
-  summary: AdminTemplateCatalogSummary | null;
   templateType?: TemplateType;
 };
 
@@ -54,7 +53,6 @@ export function TemplatesCatalogWorkspaceHeader({
   canManageTemplates,
   copy,
   locale,
-  summary,
   templateType,
 }: TemplatesCatalogWorkspaceHeaderProps) {
   const categoriesPath = `/${locale}/templates/categories`;
@@ -130,32 +128,6 @@ export function TemplatesCatalogWorkspaceHeader({
           );
         })}
       </nav>
-
-      <AdminMetricStrip
-        className={styles.catalogMetricStrip}
-        items={[
-          {
-            label: copy.totalMetric,
-            value: formatMetric(summary?.totalTemplates, locale),
-          },
-          {
-            label: copy.activeMetric,
-            value: formatMetric(summary?.activeTemplates, locale),
-          },
-          {
-            label: copy.draftsMetric,
-            value: formatMetric(summary?.draftTemplates, locale),
-          },
-          {
-            label: copy.missingPreviewMetric,
-            value: formatMetric(summary?.missingPreviewTemplates, locale),
-          },
-          {
-            label: copy.qaOnlyMetric,
-            value: formatMetric(summary?.qaOnlyTemplates, locale),
-          },
-        ]}
-      />
     </>
   );
 }

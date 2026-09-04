@@ -680,9 +680,6 @@ test("unified templates catalog supports publishing filters and responsive cards
     "aria-current",
     "page"
   );
-  await expect(main.getByText("Всего", { exact: true }).locator("xpath=parent::*")).toContainText(
-    "3"
-  );
   await expect(main.getByRole("button", { name: /Черновики\s*1/ })).toBeVisible();
   await expect(main.getByRole("button", { name: /Без превью\s*1/ })).toBeVisible();
   await expect(main.getByRole("button", { name: /Только QA\s*1/ })).toBeVisible();
@@ -719,6 +716,8 @@ test("unified templates catalog supports publishing filters and responsive cards
 
   const featuredCard = main.locator("article").filter({ hasText: "Golden Studio Portrait" });
   await expect(featuredCard).toBeVisible();
+  await expect(featuredCard.getByRole("link", { name: /Тест:/ })).toBeVisible();
+  await expect(featuredCard.getByRole("link", { name: /Аналитика:/ })).toBeVisible();
   const featuredCardWidth = await featuredCard.evaluate(
     (element) => element.getBoundingClientRect().width
   );

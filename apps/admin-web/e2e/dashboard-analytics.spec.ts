@@ -241,6 +241,27 @@ async function installDashboardMocks(page: Page) {
       return;
     }
 
+    if (url.pathname === "/api/admin/system/operations/problems") {
+      await fulfillJson(route, {
+        source: url.searchParams.get("source"),
+        items: [
+          {
+            source: url.searchParams.get("source"),
+            module: "templates",
+            id: "33333333-3333-3333-3333-333333333333",
+            kind: "generation.completed",
+            status: "DeadLetter",
+            attemptCount: 8,
+            createdAtUtc: "2026-06-29T11:00:00Z",
+            updatedAtUtc: "2026-06-29T11:05:00Z",
+            nextAttemptAtUtc: null,
+            errorCode: "invalid_token",
+          },
+        ],
+      });
+      return;
+    }
+
     if (url.pathname === "/api/admin/support/tickets/metrics") {
       await fulfillJson(route, {
         totalConversations: 5,
@@ -345,6 +366,20 @@ test("dashboard switches commerce ranges and stays within the mobile viewport", 
   await expect(
     page.getByText(/Review the worker journal entry, fix the cause, and trigger the event again\./)
   ).toBeVisible();
+  const operationsProblemLink = page.getByRole("link", {
+    name: "Open problem records",
+    exact: true,
+  });
+  await expect(operationsProblemLink).toHaveAttribute("href", "/en/operations?source=push");
+  await operationsProblemLink.click();
+  await expect(page).toHaveURL(/\/en\/operations\?source=push$/);
+  await expect(
+    page.getByRole("heading", { name: "Operations problems", exact: true })
+  ).toBeVisible();
+  await expect(page.getByText("invalid_token", { exact: true })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath("operations-problems.png"), fullPage: true });
+  await page.goBack();
+  await expect(page.getByRole("heading", { name: "Dashboard", exact: true })).toBeVisible();
 
   const commercePeriod = page.getByRole("group", { name: "Commerce period", exact: true });
   await expect(commercePeriod).toHaveCount(1);

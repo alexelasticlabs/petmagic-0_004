@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { fetchAdminOperationsStatus, fetchAdminSystemStatus } from "@/lib/api-client.system-status";
+import {
+  fetchAdminOperationsProblems,
+  fetchAdminOperationsStatus,
+  fetchAdminSystemStatus,
+} from "@/lib/api-client.system-status";
 
 describe("api-client.system-status", () => {
   const originalPublicApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
@@ -133,6 +137,34 @@ describe("api-client.system-status", () => {
 
     await expect(fetchAdminOperationsStatus()).rejects.toThrow(
       "Admin operations status response contract is invalid."
+    );
+  });
+
+  it("loads sanitized problem records for one operations source", async () => {
+    const payload = {
+      source: "push",
+      items: [
+        {
+          source: "push",
+          module: "templates",
+          id: "11111111-1111-1111-1111-111111111111",
+          kind: "generation.completed",
+          status: "DeadLetter",
+          attemptCount: 8,
+          createdAtUtc: "2026-07-27T10:00:00Z",
+          updatedAtUtc: "2026-07-27T10:05:00Z",
+          nextAttemptAtUtc: null,
+          errorCode: "invalid_token",
+        },
+      ],
+    } as const;
+    const fetchMock = vi.fn<typeof fetch>(async () => Response.json(payload));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(fetchAdminOperationsProblems("push")).resolves.toEqual(payload);
+
+    expect(String(fetchMock.mock.calls[0][0])).toBe(
+      "https://api.example.com/api/admin/system/operations/problems?source=push"
     );
   });
 });

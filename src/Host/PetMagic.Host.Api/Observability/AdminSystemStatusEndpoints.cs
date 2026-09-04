@@ -18,6 +18,12 @@ public static class AdminSystemStatusEndpoints
             .RequireRateLimiting("admin")
             .RequireAuthorization("AdminOnly");
 
+        endpoints.MapGet("/api/admin/system/operations/problems", GetOperationsProblemsAsync)
+            .WithTags("Admin.System")
+            .AddEndpointFilter(ApplyPrivateResponseHeadersAsync)
+            .RequireRateLimiting("admin")
+            .RequireAuthorization("AdminOnly");
+
         return endpoints;
     }
 
@@ -44,5 +50,18 @@ public static class AdminSystemStatusEndpoints
         CancellationToken cancellationToken)
     {
         return TypedResults.Ok(await service.GetAsync(cancellationToken));
+    }
+
+    private static async Task<Results<Ok<AdminOperationsProblemListDto>, BadRequest>> GetOperationsProblemsAsync(
+        string? source,
+        IAdminOperationsProblemService service,
+        CancellationToken cancellationToken)
+    {
+        if (source is not ("email" or "audit" or "push"))
+        {
+            return TypedResults.BadRequest();
+        }
+
+        return TypedResults.Ok(await service.GetAsync(source, cancellationToken));
     }
 }

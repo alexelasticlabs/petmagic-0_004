@@ -203,7 +203,7 @@ export function PromoCodesListCard({
           })}
         </div>
 
-        <div className={styles.toolbarActions}>
+        <div className={styles.toolbarActions} data-testid="promo-codes-toolbar-actions">
           <Button
             variant="secondary"
             onClick={onExport}

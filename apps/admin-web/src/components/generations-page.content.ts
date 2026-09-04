@@ -54,7 +54,6 @@ export type GenerationsPageText = {
   resultAsset: string;
   pet: string;
   petPhoto: string;
-  previewMissing: string;
   diagnosticsTitle: string;
   emptyTitle: string;
   emptyDescription: string;
@@ -196,7 +195,6 @@ const generationsPageText: Record<Locale, GenerationsPageText> = {
     resultAsset: "Результирующий медиафайл",
     pet: "Питомец",
     petPhoto: "Фото питомца",
-    previewMissing: "Превью недоступно",
     diagnosticsTitle: "Диагностика",
     emptyTitle: "Генераций не найдено",
     emptyDescription: "Измените фильтры или дождитесь новых заданий генерации.",
@@ -384,7 +382,6 @@ const generationsPageText: Record<Locale, GenerationsPageText> = {
     resultAsset: "Result asset",
     pet: "Pet",
     petPhoto: "Pet photo",
-    previewMissing: "Preview unavailable",
     diagnosticsTitle: "Diagnostics",
     emptyTitle: "No generations found",
     emptyDescription: "Adjust filters or wait for new generation jobs.",

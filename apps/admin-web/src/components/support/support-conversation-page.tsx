@@ -67,6 +67,7 @@ export function SupportConversationPage({
   const [isSupportDetailsDrawerMode, setIsSupportDetailsDrawerMode] = useState(false);
   const [isSupportDetailsDrawerOpen, setIsSupportDetailsDrawerOpen] = useState(false);
   const [claimRequestId, setClaimRequestId] = useState(0);
+  const [isOwnershipComposerNoticeVisible, setIsOwnershipComposerNoticeVisible] = useState(false);
   const supportDetailsDrawerId = useId();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -209,7 +210,7 @@ export function SupportConversationPage({
 
   const isConversationReadOnly = conversation?.isReadOnly ?? false;
   const isComposerBusy = isSendReplySubmitting;
-  const isComposerDisabled = isConversationReadOnly || !canMutateConversation || isComposerBusy;
+  const isComposerDisabled = isConversationReadOnly || !canManageSupportWorkspace || isComposerBusy;
   const isConversationClosed = conversation?.status === "Closed";
   const canClaimConversation =
     Boolean(conversation) &&
@@ -226,6 +227,12 @@ export function SupportConversationPage({
       setIsSupportDetailsDrawerOpen(true);
     }
     setClaimRequestId((current) => current + 1);
+  };
+
+  const revealOwnershipComposerNotice = () => {
+    if (!isConversationReadOnly && canManageSupportWorkspace && !canMutateConversation) {
+      setIsOwnershipComposerNoticeVisible(true);
+    }
   };
   const isQueueControlsLocked = !canManageSupportWorkspace || inboxQuery.isFetching;
   const setQueueSubFilter = (value: SupportQueueSubFilter) => {
@@ -442,6 +449,7 @@ export function SupportConversationPage({
       setPendingAttachmentActionKey(null);
       setHighlightedMessageId(null);
       setIsDragging(false);
+      setIsOwnershipComposerNoticeVisible(false);
     });
 
     return () => {
@@ -451,6 +459,11 @@ export function SupportConversationPage({
 
   const submitReply = () => {
     if (isComposerDisabled || (!reply.trim() && !hasComposerAttachment)) {
+      return;
+    }
+
+    if (!canMutateConversation) {
+      revealOwnershipComposerNotice();
       return;
     }
 
@@ -649,6 +662,10 @@ export function SupportConversationPage({
               highlightedMessageId={highlightedMessageId}
               isComposerBusy={isComposerBusy}
               isComposerDisabled={isComposerDisabled}
+              isOwnershipComposerNoticeVisible={
+                isOwnershipComposerNoticeVisible && !canMutateConversation
+              }
+              isOwnershipRequired={!canMutateConversation}
               isAttachmentRetrySubmitting={isAttachmentRetrySubmitting}
               isLoadingOlderMessages={isLoadingOlderMessages}
               isConversationClosed={isConversationClosed}
@@ -656,6 +673,7 @@ export function SupportConversationPage({
               isDragging={isDragging}
               jumpToMessage={jumpToMessage}
               onClaimConversation={requestClaimConversation}
+              onOwnershipRequired={revealOwnershipComposerNotice}
               locale={locale}
               messageLabels={messageLabels}
               messagesById={messagesById}

@@ -1,6 +1,8 @@
 import { apiRequest } from "./api-client.core";
 
 import type {
+  AdminOperationsProblemList,
+  AdminOperationsProblemSource,
   AdminOperationsStatusDto,
   AdminSystemStatusResponse,
 } from "./api-client.types.system-status";
@@ -30,6 +32,22 @@ export async function fetchAdminOperationsStatus(
 
   if (!isAdminOperationsStatusDto(response)) {
     throw new Error("Admin operations status response contract is invalid.");
+  }
+
+  return response;
+}
+
+export async function fetchAdminOperationsProblems(
+  source: AdminOperationsProblemSource,
+  signal?: AbortSignal
+): Promise<AdminOperationsProblemList> {
+  const response = await apiRequest<unknown>(
+    `/api/admin/system/operations/problems?source=${encodeURIComponent(source)}`,
+    { method: "GET", signal }
+  );
+
+  if (!isAdminOperationsProblemList(response, source)) {
+    throw new Error("Admin operations problems response contract is invalid.");
   }
 
   return response;
@@ -126,6 +144,37 @@ function isAdminOperationsStatusDto(value: unknown): value is AdminOperationsSta
 
   return value.unavailableSources.every(
     (source) => typeof source === "string" && source.length > 0 && source.length <= 32
+  );
+}
+
+function isAdminOperationsProblemList(
+  value: unknown,
+  source: AdminOperationsProblemSource
+): value is AdminOperationsProblemList {
+  if (
+    !isRecord(value) ||
+    value.source !== source ||
+    !Array.isArray(value.items) ||
+    value.items.length > 100
+  ) {
+    return false;
+  }
+
+  return value.items.every(
+    (item) =>
+      isRecord(item) &&
+      item.source === source &&
+      typeof item.module === "string" &&
+      typeof item.id === "string" &&
+      typeof item.kind === "string" &&
+      typeof item.status === "string" &&
+      isNonNegativeInteger(item.attemptCount) &&
+      typeof item.createdAtUtc === "string" &&
+      typeof item.updatedAtUtc === "string" &&
+      isOptionalTimestamp(item.nextAttemptAtUtc) &&
+      (item.errorCode === null ||
+        item.errorCode === undefined ||
+        typeof item.errorCode === "string")
   );
 }
 

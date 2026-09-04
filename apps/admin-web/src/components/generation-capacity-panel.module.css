@@ -52,55 +52,6 @@
   opacity: 0.58;
 }
 
-.statusRow {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.45rem 0.7rem;
-  margin-bottom: 0.75rem;
-  color: var(--text-muted);
-  font-size: 0.73rem;
-}
-
-.liveStatus,
-.refreshPolicyNote {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.34rem;
-  min-height: 1.6rem;
-  border-radius: 999px;
-  padding: 0.22rem 0.5rem;
-  background: color-mix(in srgb, var(--surface-2) 84%, transparent);
-}
-
-.liveStatus {
-  color: var(--text-soft);
-  font-weight: 650;
-}
-
-.refreshPolicyNote {
-  color: var(--text-muted);
-}
-
-.liveStatusDot {
-  width: 0.45rem;
-  height: 0.45rem;
-  border-radius: 999px;
-  background: var(--success);
-  box-shadow: 0 0 0 0.18rem color-mix(in srgb, var(--success) 14%, transparent);
-}
-
-.liveStatusDotSyncing {
-  animation: liveStatusPulse 1s ease-in-out infinite;
-}
-
-@keyframes liveStatusPulse {
-  50% {
-    opacity: 0.38;
-    transform: scale(0.72);
-  }
-}
-
 .metricGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(12.5rem, 1fr));
@@ -495,10 +446,5 @@
   .detailGrid,
   .recoveryGrid {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .statusRow {
-    align-items: flex-start;
-    flex-direction: column;
   }
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
 
 import {
   AdminBadge,
@@ -50,6 +51,7 @@ const copy = {
       `${count} отправл. не будет доставлено автоматически: все попытки исчерпаны.`,
     queueNextStep:
       "Проверьте запись в журнале worker, устраните причину и инициируйте событие повторно. Повтор сам по себе не запускается, чтобы не отправить дубль.",
+    openProblems: "Открыть проблемные записи",
   },
   en: {
     title: "Operations health",
@@ -81,6 +83,7 @@ const copy = {
       `${count} delivery item(s) will not be retried automatically because all attempts were exhausted.`,
     queueNextStep:
       "Review the worker journal entry, fix the cause, and trigger the event again. It is not retried automatically to avoid duplicate delivery.",
+    openProblems: "Open problem records",
   },
 } as const;
 
@@ -174,6 +177,10 @@ export function DashboardOperationsHealth({ locale, enabled }: DashboardOperatio
                     data.email.backlogCount,
                     data.email.deadLetterCount
                   ),
+                  href:
+                    data.email.status === "healthy" || data.email.status === "unknown"
+                      ? undefined
+                      : `/${locale}/operations?source=email`,
                 },
                 {
                   key: "audit",
@@ -185,6 +192,10 @@ export function DashboardOperationsHealth({ locale, enabled }: DashboardOperatio
                     data.auditOutbox.backlogCount,
                     data.auditOutbox.deadLetterCount
                   ),
+                  href:
+                    data.auditOutbox.status === "healthy" || data.auditOutbox.status === "unknown"
+                      ? undefined
+                      : `/${locale}/operations?source=audit`,
                 },
                 {
                   key: "push",
@@ -196,6 +207,10 @@ export function DashboardOperationsHealth({ locale, enabled }: DashboardOperatio
                     data.pushOutbox.backlogCount,
                     data.pushOutbox.deadLetterCount
                   ),
+                  href:
+                    data.pushOutbox.status === "healthy" || data.pushOutbox.status === "unknown"
+                      ? undefined
+                      : `/${locale}/operations?source=push`,
                 },
                 {
                   key: "generations",
@@ -222,6 +237,10 @@ export function DashboardOperationsHealth({ locale, enabled }: DashboardOperatio
                         ? "Открытых критичных платёжных инцидентов нет."
                         : "No critical payment incidents are open.",
                   metrics: `${data.economy.openIncidentCount} ${text.open} · ${data.economy.criticalIncidentCount} ${text.critical}`,
+                  href:
+                    data.economy.status === "healthy" || data.economy.status === "unknown"
+                      ? undefined
+                      : `/${locale}/economy?workspace=payments&incidentStatus=open`,
                 },
                 {
                   key: "workers",
@@ -249,6 +268,7 @@ export function DashboardOperationsHealth({ locale, enabled }: DashboardOperatio
                 summary: string;
                 metrics: string;
                 nextStep?: string;
+                href?: string;
               }>
             ).map((item) => (
               <li key={item.key} className={styles.systemStatusCheck}>
@@ -259,6 +279,11 @@ export function DashboardOperationsHealth({ locale, enabled }: DashboardOperatio
                 <p>{item.summary}</p>
                 {item.nextStep ? (
                   <p className={styles.systemStatusNextStep}>{item.nextStep}</p>
+                ) : null}
+                {item.href ? (
+                  <Link className={styles.systemStatusProblemLink} href={item.href}>
+                    {text.openProblems}
+                  </Link>
                 ) : null}
                 <span className={styles.systemStatusMetrics}>{item.metrics}</span>
               </li>

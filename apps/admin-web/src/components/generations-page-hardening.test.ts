@@ -379,10 +379,16 @@ describe("generations page hardening", () => {
 
   it("renders expanded generation previews through the secure media component", () => {
     const source = readGenerationsPageLibrarySource();
+    const stylesSource = readFileSync(generationsStylesPath, "utf8");
 
     expect(source).toContain(
       'import { TemplateSecureMedia } from "@/components/templates/template-secure-media";'
     );
+    expect(source).toContain(
+      "const hasPreviewMedia = Boolean(item.inputPreviewUrl || item.resultPreviewUrl);"
+    );
+    expect(source).toContain("{hasPreviewMedia ? (");
+    expect(source).not.toContain("<div className={styles.previewFallback}");
     expect(source).not.toContain('import Image from "next/image";');
     expect(source).toContain("url={item.inputPreviewUrl}");
     expect(source).toContain('surface: "generations-before-preview"');
@@ -391,6 +397,9 @@ describe("generations page hardening", () => {
     expect(source).toContain("templateId: item.templateId");
     expect(source).not.toContain("src={item.inputPreviewUrl}");
     expect(source).not.toContain("src={item.resultPreviewUrl}");
+    expect(stylesSource).toContain(".generationTable > thead > tr > th + th,");
+    expect(stylesSource).toContain(".generationRow > td + td {");
+    expect(stylesSource).toContain("border-inline-start: 1px solid var(--border-soft);");
   });
 
   it("keeps clean watermark grant refresh non-blocking after success", () => {

@@ -210,6 +210,11 @@
   font-size: 0.73rem;
 }
 
+.generationTable > thead > tr > th + th,
+.generationRow > td + td {
+  border-inline-start: 1px solid var(--border-soft);
+}
+
 .inlineAction {
   width: fit-content;
   border: 1px solid var(--border-soft);
@@ -311,8 +316,7 @@
   font-size: 0.8rem;
 }
 
-.previewImage,
-.previewFallback {
+.previewImage {
   width: 100%;
   min-height: 15rem;
   border-radius: var(--radius-md);
@@ -322,13 +326,6 @@
 
 .previewImage {
   object-fit: contain;
-}
-
-.previewFallback {
-  display: grid;
-  place-items: center;
-  color: var(--text-muted);
-  font-size: 0.8rem;
 }
 
 .detailsGrid {
@@ -491,6 +488,10 @@
     border-bottom: 1px solid var(--border-soft);
     text-align: left;
     white-space: normal;
+  }
+
+  .generationRow > td + td {
+    border-inline-start: 0;
   }
 
   .generationRow > td::before {

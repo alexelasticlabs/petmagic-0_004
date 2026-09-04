@@ -182,7 +182,7 @@ describe("templates catalog actions", () => {
     expect(source).toContain("<AdminActionMenu");
     expect(source).toContain("className={styles.cardActionMenu}");
     expect(styles).toContain(
-      "grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 24rem))"
+      "grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr))"
     );
     expect(styles).toContain("overflow: visible;");
     expect(styles).toContain('.cardActionMenu [role="menu"]');

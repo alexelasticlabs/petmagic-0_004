@@ -1,15 +1,10 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useAdminNotifications } from "@/components/admin/admin-notifications";
-import {
-  AdminBadge,
-  AdminCard,
-  AdminKpiCard,
-  AdminStateCard,
-} from "@/components/admin/admin-primitives";
+import { AdminCard, AdminKpiCard, AdminStateCard } from "@/components/admin/admin-primitives";
 import { ConfirmationDialog } from "@/components/admin/confirmation-dialog";
 import {
   getGenerationCapacityAlertText,
@@ -191,6 +186,11 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
   });
 
   const control = capacityQuery.data;
+  const visibleAlerts = useMemo(
+    () =>
+      control?.alerts.filter((alert) => alert.alertId !== "generation-scheduler-v2-disabled") ?? [],
+    [control?.alerts]
+  );
   const snapshotTooOld = Boolean(
     control && isGenerationCapacitySnapshotTooOld(control.generatedAtUtc, freshnessNowMs)
   );
@@ -245,7 +245,7 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
     snapshotTooOld ||
     capacityQuery.isRefetchError ||
     refreshError ||
-    control?.alerts.length ||
+    visibleAlerts.length ||
     control?.lanes.submissionUnknownCount
   );
   const isOverviewOpen = requiresOperationalAttention || isOverviewManuallyOpen;
@@ -281,7 +281,7 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
     }
 
     let observedNewTransition = false;
-    for (const alert of control?.alerts ?? []) {
+    for (const alert of visibleAlerts) {
       const transitionKey = buildGenerationCapacityAlertTransitionKey(alert);
       if (!transitionKey || observedAlertTransitionsRef.current.has(transitionKey)) {
         continue;
@@ -321,13 +321,7 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
         // In-memory dedupe still applies when browser storage is unavailable.
       }
     }
-  }, [
-    addNotification,
-    alertTransitionsStorageKey,
-    control?.alerts,
-    locale,
-    text.notificationSource,
-  ]);
+  }, [addNotification, alertTransitionsStorageKey, locale, text.notificationSource, visibleAlerts]);
 
   const policyMutation = useMutation({
     mutationFn: updateAdminTemplateGenerationControlPolicy,
@@ -606,8 +600,6 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
       : control.worker.schedulerV2Enabled
         ? text.schedulerV2On
         : text.schedulerV2Off;
-  const isSynchronizing = capacityQuery.isFetching || refreshMutation.isPending;
-
   return (
     <>
       <div data-admin-surface="generation-capacity">
@@ -635,28 +627,6 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
             </div>
           }
         >
-          <div className={styles.statusRow}>
-            <AdminBadge tone={control.admissionEnabled ? "success" : "danger"}>
-              {control.admissionEnabled ? text.admissionOn : text.admissionOff}
-            </AdminBadge>
-            <AdminBadge tone={balanceTone(control.balance.state)}>
-              {text.balanceStateLabels[control.balance.state]}
-            </AdminBadge>
-            <span className={styles.liveStatus} aria-live="polite">
-              <span
-                aria-hidden="true"
-                className={`${styles.liveStatusDot} ${
-                  isSynchronizing ? styles.liveStatusDotSyncing : ""
-                }`}
-              />
-              {isSynchronizing
-                ? text.syncing
-                : text.updatedAt(formatOptionalDate(control.generatedAtUtc, locale))}
-            </span>
-            <span className={styles.refreshPolicyNote}>{text.autoRefresh}</span>
-            <span className={styles.refreshPolicyNote}>{text.providerBalanceRefresh}</span>
-          </div>
-
           {capacityQuery.isRefetchError || snapshotTooOld ? (
             <AdminStateCard
               title={snapshotTooOld ? text.snapshotTooOldTitle : text.snapshotRefreshFailedTitle}
@@ -679,9 +649,9 @@ export function GenerationCapacityPanel({ locale, enabled }: GenerationCapacityP
             />
           ) : null}
           {refreshError ? <AdminStateCard title={refreshError} tone="warning" /> : null}
-          {control.alerts.length > 0 ? (
+          {visibleAlerts.length > 0 ? (
             <section className={styles.alerts} aria-label={text.alerts}>
-              {control.alerts.map((alert) => (
+              {visibleAlerts.map((alert) => (
                 <AdminStateCard
                   key={buildGenerationCapacityAlertTransitionKey(alert)}
                   title={getGenerationCapacityAlertText(locale, alert).title}

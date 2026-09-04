@@ -139,6 +139,8 @@
   flex-wrap: wrap;
   gap: 0.26rem;
   overflow-x: auto;
+  padding-block: 0.16rem;
+  margin-block: -0.16rem;
   scrollbar-width: thin;
 }
 
@@ -160,13 +162,11 @@
     border-color 140ms ease,
     background-color 140ms ease,
     color 140ms ease,
-    transform 140ms ease,
     box-shadow 140ms ease;
 }
 
 .statusTab:hover {
   border-color: color-mix(in srgb, var(--accent) 55%, var(--border-soft));
-  transform: translateY(-1px);
   box-shadow: var(--shadow-soft);
 }
 
@@ -192,11 +192,20 @@
 }
 
 .toolbarActions {
+  min-width: 0;
+  max-width: 100%;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: flex-end;
   gap: 0.34rem;
   align-items: center;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: thin;
+}
+
+.toolbarActions > * {
+  flex: 0 0 auto;
 }
 
 .syncBadge {
@@ -931,7 +940,6 @@
   }
 
   .tableTopBar,
-  .toolbarActions,
   .pagination,
   .paginationCenter,
   .formActions,
@@ -943,6 +951,11 @@
   .statusTabs {
     width: 100%;
     flex-wrap: nowrap;
+  }
+
+  .toolbarActions {
+    width: 100%;
+    justify-content: flex-start;
   }
 
   .statusTab {
@@ -1081,10 +1094,6 @@
   .autoRefreshDot {
     transition: none;
     animation: none;
-  }
-
-  .statusTab:hover {
-    transform: none;
   }
 }
 

@@ -361,6 +361,7 @@ try
         .AddCheck<PushOutboxHealthCheck>("push_outbox");
     builder.Services.AddScoped<IAdminSystemStatusService, AdminSystemStatusService>();
     builder.Services.AddScoped<IAdminOperationsStatusService, AdminOperationsStatusService>();
+    builder.Services.AddScoped<IAdminOperationsProblemService, AdminOperationsProblemService>();
 
     builder.Services
         .AddOpenTelemetry()

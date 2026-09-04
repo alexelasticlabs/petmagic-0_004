@@ -36,22 +36,26 @@ describe("templates catalog visual contract", () => {
     expect(cssSource).not.toContain("__gNhzuG__");
   });
 
-  it("keeps compact catalog text stable and pagers icon-based", () => {
+  it("uses the media-led card layout from the approved catalog direction", () => {
     const catalogSource = readTemplatesCatalogViewLibrarySource();
     const cssSource = readFileSync(catalogCssPath, "utf8");
     const letterSpacingRules = cssSource.match(/letter-spacing:\s*[^;]+;/g) ?? [];
 
     expect(letterSpacingRules.every((rule) => rule === "letter-spacing: 0;")).toBe(true);
-    expect(cssSource).toContain(".bigMetric {");
-    expect(cssSource).toContain("font-size: 1.78rem;");
     expect(cssSource).toContain(
-      ".catalogMetricStrip {\n  grid-template-columns: repeat(5, minmax(0, 1fr));"
+      "grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr));"
     );
-    expect(cssSource).toContain(
-      ".catalogMetricStrip {\n    grid-template-columns: repeat(2, minmax(0, 1fr));"
-    );
-    expect(cssSource).toContain(".bigMetric {\n    font-size: 1.56rem;");
-    expect(cssSource).not.toMatch(/font-size:\s*[^;]*vw/);
+    expect(cssSource).toContain("grid-template-columns: minmax(8rem, 0.82fr) minmax(0, 1.18fr);");
+    expect(cssSource).toContain("aspect-ratio: 2 / 3;");
+    expect(cssSource).toContain("border-right: 1px solid var(--border-soft);");
+    expect(cssSource).toContain("@media (max-width: 560px)");
+    expect(cssSource).toContain("aspect-ratio: 16 / 9;");
+    expect(cssSource).toContain("grid-template-columns: repeat(3, minmax(0, 1fr)) auto;");
+    expect(catalogSource).toContain("className={styles.cardSecondaryAction}");
+    expect(catalogSource).toContain("copy.testAction");
+    expect(catalogSource).toContain("copy.analyticsAction");
+    expect(catalogSource).not.toContain("<AdminMetricStrip");
+    expect(cssSource).not.toContain(".catalogMetricStrip {");
     expect(catalogSource).toContain("CaretDownIcon");
     expect(catalogSource).toContain("aria-label={copy.previousPageLabel}");
     expect(catalogSource).toContain("aria-label={copy.nextPageLabel}");
@@ -98,9 +102,9 @@ describe("templates catalog visual contract", () => {
       'style={{ width: "0.85rem", height: "0.85rem", opacity: 0.7, flexShrink: 0 }}'
     );
     expect(cssSource).toContain(".cardMetricIcon {");
-    expect(cssSource).toContain("width: 0.85rem;");
-    expect(cssSource).toContain("height: 0.85rem;");
-    expect(cssSource).toContain("opacity: 0.7;");
+    expect(cssSource).toContain("width: 0.72rem;");
+    expect(cssSource).toContain("height: 0.72rem;");
+    expect(cssSource).toContain("opacity: 0.62;");
     expect(cssSource).toContain("flex-shrink: 0;");
   });
 
