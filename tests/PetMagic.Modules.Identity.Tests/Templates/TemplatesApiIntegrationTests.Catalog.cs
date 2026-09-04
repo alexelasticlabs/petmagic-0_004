@@ -714,6 +714,75 @@ public sealed partial class TemplatesApiIntegrationTests
     }
 
     [Fact]
+    public async Task PublicTemplatesDiscovery_ShouldBeAnonymousCachedAndReuseFeedCardContract()
+    {
+        await using var application = await TestApplication.CreateAsync();
+        var created = await CreateActiveImageTemplateAsync(
+            application.Client,
+            "Discovery Contract",
+            "Pet Mischief",
+            ["discovery"]);
+
+        application.Client.DefaultRequestHeaders.Authorization = null;
+        using var response = await application.Client.GetAsync("/api/templates/discovery");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("public, max-age=10", response.Headers.CacheControl?.ToString());
+        Assert.Contains("Accept-Language", response.Headers.Vary);
+        var discovery = await ReadJsonAsync<PublicTemplatesDiscoveryResponse>(response);
+        var section = Assert.Single(discovery.Sections);
+        Assert.Equal("Pet Mischief", section.Category);
+        var item = Assert.Single(section.Items);
+        Assert.Equal(created.TemplateId, item.TemplateId);
+        Assert.Equal(created.TokenCost, item.TokenCost);
+        Assert.Equal(item.ThumbnailUrl, item.Media.ThumbnailUrl);
+    }
+
+    [Fact]
+    public async Task PublicTemplatesDiscovery_WithQaContent_ShouldDisableSharedCaching()
+    {
+        await using var application = await TestApplication.CreateAsync();
+        var qaOnly = await CreateActiveImageTemplateAsync(
+            application.Client,
+            "QA Discovery Contract",
+            "QA Discovery",
+            ["qa-discovery"],
+            isQaOnly: true);
+
+        application.Client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue(TestAuthHandler.SchemeName);
+        using var response = await application.Client.GetAsync(
+            "/api/templates/discovery?includeQa=true");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.True(response.Headers.CacheControl?.Private);
+        Assert.True(response.Headers.CacheControl?.NoStore);
+        Assert.Contains("Accept-Language", response.Headers.Vary);
+        var discovery = await ReadJsonAsync<PublicTemplatesDiscoveryResponse>(response);
+        Assert.Contains(
+            discovery.Sections.SelectMany(section => section.Items),
+            item => item.TemplateId == qaOnly.TemplateId);
+    }
+
+    [Theory]
+    [InlineData("/api/templates/discovery?itemsPerSection=0", "templates.invalid_items_per_section")]
+    [InlineData("/api/templates/discovery?itemsPerSection=13", "templates.invalid_items_per_section")]
+    [InlineData("/api/templates/discovery?sectionLimit=0", "templates.invalid_section_limit")]
+    [InlineData("/api/templates/discovery?sectionLimit=25", "templates.invalid_section_limit")]
+    public async Task PublicTemplatesDiscovery_ShouldRejectOutOfBoundsQueries(string path, string expectedCode)
+    {
+        await using var application = await TestApplication.CreateAsync();
+        application.Client.DefaultRequestHeaders.Authorization = null;
+
+        using var response = await application.Client.GetAsync(path);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains(expectedCode, body);
+        Assert.DoesNotContain("\"detail\"", body, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task TemplateContentHealthCheck_ShouldMarkMissingPreviewUnhealthyWithoutBreakingFeed()
     {
         await using var application = await TestApplication.CreateAsync();

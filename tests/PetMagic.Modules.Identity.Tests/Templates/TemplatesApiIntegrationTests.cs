@@ -79,7 +79,12 @@ public sealed partial class TemplatesApiIntegrationTests
         return [0xFF, 0xD8, 0xFF, 0xE0, .. content];
     }
 
-    private static async Task<AdminTemplateResponse> CreateActiveImageTemplateAsync(HttpClient client, string title, string category, string[] tags)
+    private static async Task<AdminTemplateResponse> CreateActiveImageTemplateAsync(
+        HttpClient client,
+        string title,
+        string category,
+        string[] tags,
+        bool isQaOnly = false)
     {
         var slug = title.ToLowerInvariant().Replace(' ', '-');
         var media = await UploadCompletePublicMediaSetAsync(client, slug);
@@ -104,7 +109,8 @@ public sealed partial class TemplatesApiIntegrationTests
                 AnimatedPreviewAsset: media.AnimatedPreview,
                 FeedLoopLowAsset: media.FeedLoopLow,
                 FeedLoopMediumAsset: media.FeedLoopMedium,
-                DetailPreviewAsset: media.DetailPreview));
+                DetailPreviewAsset: media.DetailPreview,
+                IsQaOnly: isQaOnly));
     }
 
     private static async Task<(

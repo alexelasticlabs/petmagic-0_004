@@ -202,6 +202,28 @@ public sealed record PublicTemplatesFeedResponse(
     bool HasMore,
     DateTime GeneratedAtUtc);
 
+public static class PublicTemplatesDiscoveryLimits
+{
+    public const int DefaultItemsPerSection = 6;
+    public const int MaxItemsPerSection = 12;
+    public const int DefaultSectionLimit = 12;
+    public const int MaxSectionLimit = 24;
+}
+
+public sealed record PublicTemplatesDiscoveryQuery(
+    int ItemsPerSection,
+    int SectionLimit,
+    string? Locale,
+    bool IncludeQaOnly = false);
+
+public sealed record PublicTemplatesDiscoverySectionResponse(
+    string Category,
+    IReadOnlyList<FeedTemplateCardDto> Items);
+
+public sealed record PublicTemplatesDiscoveryResponse(
+    IReadOnlyList<PublicTemplatesDiscoverySectionResponse> Sections,
+    DateTime GeneratedAtUtc);
+
 public sealed record PublicRandomTemplateQuery(
     TemplateType? Type,
     string? Category,

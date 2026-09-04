@@ -103,6 +103,8 @@ public interface ITemplatesService
 
     Task<Result<PublicTemplatesFeedResponse>> ListPublicFeedAsync(PublicTemplatesFeedQuery query, CancellationToken cancellationToken);
 
+    Task<Result<PublicTemplatesDiscoveryResponse>> ListPublicDiscoveryAsync(PublicTemplatesDiscoveryQuery query, CancellationToken cancellationToken);
+
     Task<Result<PublicRandomTemplateResponse>> GetPublicRandomTemplateAsync(PublicRandomTemplateQuery query, CancellationToken cancellationToken);
 
     Task<Result<TemplateDetailDto>> GetPublicAsync(Guid templateId, string? locale, bool includeQaOnly, CancellationToken cancellationToken);

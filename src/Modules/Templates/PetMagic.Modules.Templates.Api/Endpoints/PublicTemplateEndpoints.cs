@@ -79,6 +79,7 @@ public static class PublicTemplateEndpoints
         group.MapGet("/changes", GetCatalogChangesAsync).AllowAnonymous();
         group.MapGet("/categories", ListCategoriesAsync).AllowAnonymous();
         group.MapGet("/feed", ListFeedAsync).AllowAnonymous();
+        group.MapGet("/discovery", ListDiscoveryAsync).AllowAnonymous();
         group.MapGet("/random", GetRandomTemplateAsync).AllowAnonymous();
         group.MapGet("/template-of-the-day", GetTemplateOfTheDayAsync).AllowAnonymous();
         group.MapGet("/{templateId:guid}", GetAsync).AllowAnonymous();
@@ -305,6 +306,46 @@ public static class PublicTemplateEndpoints
         return TypedResults.Ok(result.Value);
     }
 
+    private static async Task<Results<Ok<PublicTemplatesDiscoveryResponse>, ProblemHttpResult>> ListDiscoveryAsync(
+        HttpContext httpContext,
+        [FromQuery] int? itemsPerSection,
+        [FromQuery] int? sectionLimit,
+        [FromQuery] bool? includeQa,
+        [FromQuery] string? locale,
+        [FromServices] IHostEnvironment environment,
+        [FromServices] ITemplatesService service,
+        CancellationToken cancellationToken)
+    {
+        var resolvedItemsPerSection = itemsPerSection ?? PublicTemplatesDiscoveryLimits.DefaultItemsPerSection;
+        if (resolvedItemsPerSection is < 1 or > PublicTemplatesDiscoveryLimits.MaxItemsPerSection)
+        {
+            return ToPublicValidationProblem("templates.invalid_items_per_section");
+        }
+
+        var resolvedSectionLimit = sectionLimit ?? PublicTemplatesDiscoveryLimits.DefaultSectionLimit;
+        if (resolvedSectionLimit is < 1 or > PublicTemplatesDiscoveryLimits.MaxSectionLimit)
+        {
+            return ToPublicValidationProblem("templates.invalid_section_limit");
+        }
+
+        var includeQaOnly = CanIncludeQaTemplates(httpContext, environment, includeQa);
+        var result = await service.ListPublicDiscoveryAsync(
+            new PublicTemplatesDiscoveryQuery(
+                resolvedItemsPerSection,
+                resolvedSectionLimit,
+                ResolveLocalePreference(httpContext, locale),
+                includeQaOnly),
+            cancellationToken);
+
+        SetPublicCatalogCacheHeaders(httpContext, containsQaOnlyContent: includeQaOnly);
+        if (result.IsFailure)
+        {
+            return ToPublicCatalogProblem(result.Error.Code);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
     private static async Task<Results<Ok<PublicTemplateOfTheDayResponse>, ProblemHttpResult>> GetTemplateOfTheDayAsync(
         HttpContext httpContext,
         [FromQuery] DateOnly? date,
@@ -398,9 +439,14 @@ public static class PublicTemplateEndpoints
             && (httpContext.User.IsInRole("Admin") || httpContext.User.IsInRole("Moderator"));
     }
 
-    private static void SetPublicCatalogCacheHeaders(HttpContext httpContext)
+    private static void SetPublicCatalogCacheHeaders(
+        HttpContext httpContext,
+        bool containsQaOnlyContent = false)
     {
-        httpContext.Response.Headers.CacheControl = PublicCatalogCacheControl;
+        httpContext.Response.Headers.CacheControl = containsQaOnlyContent
+            ? "private, no-store"
+            : PublicCatalogCacheControl;
+        httpContext.Response.Headers.Vary = "Accept-Language";
     }
 
     private static bool TryParseOptionalTemplateType(string? rawType, out TemplateType? templateType)
