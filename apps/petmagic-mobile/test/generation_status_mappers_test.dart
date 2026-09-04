@@ -157,6 +157,52 @@ void main() {
         ),
         text.templateFlowStepFinalTouches,
       );
+
+      final preprocessingProviderQueued = _generation(
+        status: TemplateGenerationStatus.providerQueued,
+        stage: 'preprocess_provider_queued',
+        queuePosition: 2,
+      );
+      expect(
+        statusTitle(text, preprocessingProviderQueued),
+        text.templateFlowStepProcessPhoto,
+      );
+      expect(
+        etaLabel(text, preprocessingProviderQueued),
+        text.generationStatusEtaDefault,
+      );
+
+      final preprocessingProviderProcessing = _generation(
+        status: TemplateGenerationStatus.providerProcessing,
+        stage: 'preprocess_provider_processing',
+      );
+      expect(
+        statusTitle(text, preprocessingProviderProcessing),
+        text.templateFlowStepProcessPhoto,
+      );
+
+      final videoProviderQueued = _generation(
+        status: TemplateGenerationStatus.providerQueued,
+        stage: 'video_provider_queued',
+        queuePosition: 2,
+      );
+      expect(
+        statusTitle(text, videoProviderQueued),
+        text.templateFlowStepCreateMagic,
+      );
+      expect(
+        etaLabel(text, videoProviderQueued),
+        text.generationStatusEtaDefault,
+      );
+
+      final videoProviderProcessing = _generation(
+        status: TemplateGenerationStatus.providerProcessing,
+        stage: 'video_provider_processing',
+      );
+      expect(
+        statusTitle(text, videoProviderProcessing),
+        text.templateFlowStepCreateMagic,
+      );
     });
 
     testWidgets('ETA ignores backend English duration fallback', (

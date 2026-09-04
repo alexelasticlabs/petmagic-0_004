@@ -31,6 +31,13 @@ String stageStatusLabel(
     return text.generationStatusEtaFinalizing;
   }
 
+  if (_isPhotoProviderStage(generation)) {
+    return text.templateFlowStepProcessPhoto;
+  }
+  if (_isVideoProviderStage(generation)) {
+    return text.templateFlowStepCreateMagic;
+  }
+
   if (generation.status == TemplateGenerationStatus.submittingToProvider ||
       generation.status == TemplateGenerationStatus.providerQueued) {
     return text.generationStatusStageQueued;
@@ -60,10 +67,29 @@ String estimatedTimeLabel(
   AppLocalizations text,
   TemplateGenerationResult generation,
 ) {
+  if (_isPhotoProviderStage(generation) || _isVideoProviderStage(generation)) {
+    return text.generationStatusEtaNotifyHint;
+  }
   if (generation.stage == 'queued' || generation.isWaitingInQueue) {
     return text.generationStatusEtaStartsSoon;
   }
   return text.generationStatusEtaNotifyHint;
+}
+
+bool _isPhotoProviderStage(TemplateGenerationResult generation) {
+  return switch (generation.stage) {
+    'submitting_preprocess' ||
+    'preprocess_provider_queued' ||
+    'preprocess_provider_processing' => true,
+    _ => false,
+  };
+}
+
+bool _isVideoProviderStage(TemplateGenerationResult generation) {
+  return switch (generation.stage) {
+    'video_provider_queued' || 'video_provider_processing' => true,
+    _ => false,
+  };
 }
 
 String failureReasonMessage(

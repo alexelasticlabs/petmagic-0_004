@@ -1879,6 +1879,7 @@ public sealed class TemplateGenerationJobProcessorTests
         Assert.Null(afterPreprocess.MotionProviderRequestId);
         Assert.Equal("video_preprocessing", afterPreprocess.CurrentProviderStage);
         Assert.Equal(TemplateGenerationStatus.ProviderQueued, afterPreprocess.Status);
+        Assert.Equal("preprocess_provider_queued", TemplateGenerationService.ResolveStage(afterPreprocess));
         Assert.NotNull(afterPreprocess.ProviderCompletedAtUtc);
         Assert.NotNull(afterPreprocess.PreprocessingCompletedAtUtc);
         Assert.Null(afterPreprocess.LockedBy);
@@ -1890,6 +1891,7 @@ public sealed class TemplateGenerationJobProcessorTests
         Assert.Equal("video-provider-request-1", afterVideoSubmit.MotionProviderRequestId);
         Assert.Equal("video_generation", afterVideoSubmit.CurrentProviderStage);
         Assert.Equal(TemplateGenerationStatus.ProviderQueued, afterVideoSubmit.Status);
+        Assert.Equal("video_provider_queued", TemplateGenerationService.ResolveStage(afterVideoSubmit));
         Assert.Null(afterVideoSubmit.LockedBy);
         Assert.Null(afterVideoSubmit.LockedAtUtc);
 

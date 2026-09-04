@@ -76,6 +76,50 @@ void main() {
         text.generationStatusEtaStartsSoon,
       );
 
+      final preprocessingProviderQueued = _generation(
+        status: TemplateGenerationStatus.providerQueued,
+        stage: 'preprocess_provider_queued',
+      );
+      expect(
+        stageStatusLabel(text, preprocessingProviderQueued),
+        text.templateFlowStepProcessPhoto,
+      );
+      expect(
+        estimatedTimeLabel(text, preprocessingProviderQueued),
+        text.generationStatusEtaNotifyHint,
+      );
+
+      final preprocessingProviderProcessing = _generation(
+        status: TemplateGenerationStatus.providerProcessing,
+        stage: 'preprocess_provider_processing',
+      );
+      expect(
+        stageStatusLabel(text, preprocessingProviderProcessing),
+        text.templateFlowStepProcessPhoto,
+      );
+
+      final videoProviderQueued = _generation(
+        status: TemplateGenerationStatus.providerQueued,
+        stage: 'video_provider_queued',
+      );
+      expect(
+        stageStatusLabel(text, videoProviderQueued),
+        text.templateFlowStepCreateMagic,
+      );
+      expect(
+        estimatedTimeLabel(text, videoProviderQueued),
+        text.generationStatusEtaNotifyHint,
+      );
+
+      final videoProviderProcessing = _generation(
+        status: TemplateGenerationStatus.providerProcessing,
+        stage: 'video_provider_processing',
+      );
+      expect(
+        stageStatusLabel(text, videoProviderProcessing),
+        text.templateFlowStepCreateMagic,
+      );
+
       final providerProcessing = _generation(
         status: TemplateGenerationStatus.providerProcessing,
       );

@@ -7,6 +7,17 @@ double? _progressValue(TemplateGenerationResult? generation, bool isFailed) {
   if (generation == null) {
     return 0.18;
   }
+
+  return switch (generation.stage) {
+    'submitting_preprocess' || 'preprocess_provider_queued' => 0.44,
+    'preprocess_provider_processing' => 0.52,
+    'video_provider_queued' => 0.64,
+    'video_provider_processing' => 0.74,
+    _ => _progressValueForStatus(generation),
+  };
+}
+
+double _progressValueForStatus(TemplateGenerationResult generation) {
   return switch (generation.status) {
     TemplateGenerationStatus.queued => 0.28,
     TemplateGenerationStatus.uploading => 0.36,

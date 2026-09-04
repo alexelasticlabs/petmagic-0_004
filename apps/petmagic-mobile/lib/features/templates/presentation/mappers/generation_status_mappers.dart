@@ -18,6 +18,10 @@ String formatGenerationDateTime(DateTime value, Locale locale) {
 }
 
 String etaLabel(AppLocalizations text, TemplateGenerationResult generation) {
+  if (_isPhotoProviderStage(generation) || _isVideoProviderStage(generation)) {
+    return text.generationStatusEtaDefault;
+  }
+
   if (generation.isWaitingInQueue) {
     final position = generation.queuePosition;
     final waitSeconds = generation.estimatedWaitSeconds;
@@ -141,6 +145,12 @@ String statusTitle(AppLocalizations text, TemplateGenerationResult generation) {
   if (generation.isCancelled) {
     return text.generationStatusStatusCancelled;
   }
+  if (_isPhotoProviderStage(generation)) {
+    return text.templateFlowStepProcessPhoto;
+  }
+  if (_isVideoProviderStage(generation)) {
+    return text.templateFlowStepCreateMagic;
+  }
   return switch (generation.stage) {
     'queued' => text.generationStatusStageQueued,
     'preprocessing' => text.templateFlowStepProcessPhoto,
@@ -166,6 +176,22 @@ String statusTitle(AppLocalizations text, TemplateGenerationResult generation) {
         text.generationStatusStatusCreatingMagic,
       _ => text.generationStatusStatusCreatingMagic,
     },
+  };
+}
+
+bool _isPhotoProviderStage(TemplateGenerationResult generation) {
+  return switch (generation.stage) {
+    'submitting_preprocess' ||
+    'preprocess_provider_queued' ||
+    'preprocess_provider_processing' => true,
+    _ => false,
+  };
+}
+
+bool _isVideoProviderStage(TemplateGenerationResult generation) {
+  return switch (generation.stage) {
+    'video_provider_queued' || 'video_provider_processing' => true,
+    _ => false,
   };
 }
 
