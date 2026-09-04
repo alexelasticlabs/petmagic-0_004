@@ -87,6 +87,25 @@ class AppLocalizationsRu extends AppLocalizations {
   String get pickTemplateSubtitle => 'Выберите шаблон для питомца';
 
   @override
+  String get discoverHomeTitle => 'Кем станет ваш питомец?';
+
+  @override
+  String get discoverHomeSubtitle =>
+      'Листайте настроения и найдите новый образ PetMagic.';
+
+  @override
+  String get discoverCategoryEyebrow => 'ПОДБОРКА';
+
+  @override
+  String get discoverOpenCategoryAction => 'Открыть подборку';
+
+  @override
+  String get discoverMoreAction => 'Смотреть все';
+
+  @override
+  String get discoverCategoryCatalogSubtitle => 'Все шаблоны этой подборки';
+
+  @override
   String get searchTemplates => 'Поиск шаблонов';
 
   @override

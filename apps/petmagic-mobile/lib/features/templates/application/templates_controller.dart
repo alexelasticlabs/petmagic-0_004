@@ -9,6 +9,7 @@ import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
 import 'package:petmagic_mobile/features/templates/application/template_catalog_repository.dart';
 import 'package:petmagic_mobile/features/templates/application/template_scoped_invalidation_handler.dart';
 import 'package:petmagic_mobile/features/templates/application/templates_filter_reducer.dart';
+import 'package:petmagic_mobile/features/templates/application/templates_feed_policy.dart';
 import 'package:petmagic_mobile/features/templates/application/templates_feed_request_tracker.dart';
 import 'package:petmagic_mobile/features/templates/application/templates_initial_feed_loader.dart';
 import 'package:petmagic_mobile/features/templates/application/templates_metadata_coordinator.dart';
@@ -24,6 +25,10 @@ final templatesControllerProvider =
     NotifierProvider<TemplatesController, TemplatesState>(
       TemplatesController.new,
     );
+
+final templatesFeedClockProvider = Provider<DateTime Function()>((ref) {
+  return DateTime.now;
+});
 
 final templateThumbnailWarmupProvider =
     Provider<Future<void> Function(String, {int? mediaVersion})>((ref) {
@@ -109,6 +114,7 @@ class TemplatesController extends Notifier<TemplatesState> {
       metadataCoordinator: _metadataCoordinator,
       previewWarmupCoordinator: _previewWarmupCoordinator,
       realtimeCoordinator: _realtimeCoordinator,
+      nowUtc: () => ref.read(templatesFeedClockProvider)().toUtc(),
     );
     _paginationLoader = TemplatesPaginationLoader(
       repository: () => _repository,
@@ -222,6 +228,52 @@ class TemplatesController extends Notifier<TemplatesState> {
 
   Future<void> loadMore() => _paginationLoader.loadMore();
   Future<void> refresh() => loadInitial(forceRefresh: true);
+
+  bool get isCurrentFeedStale {
+    final current = state;
+    final itemsQueryKey = current.itemsQueryKey;
+    if (itemsQueryKey == null) {
+      return false;
+    }
+
+    final queryKey = current.query
+        .copyWith(clearCursor: true, resetPage: true)
+        .cacheKey;
+    if (itemsQueryKey != queryKey) {
+      return true;
+    }
+
+    final refreshedAtUtc = current.feedRefreshedAtUtcByQueryKey[queryKey];
+    if (refreshedAtUtc == null) {
+      return true;
+    }
+
+    final age = ref
+        .read(templatesFeedClockProvider)()
+        .toUtc()
+        .difference(refreshedAtUtc);
+    return age >= TemplatesFeedPolicy.refreshInterval;
+  }
+
+  /// Applies a catalog route entry as one state transition. Loading remains a
+  /// page-lifecycle concern so the route does not start duplicate requests
+  /// before its shell branch becomes visible.
+  bool applyRouteEntryFilters({String? category}) {
+    final next = TemplatesFilterReducer.forRouteEntry(
+      state,
+      category: category,
+    );
+    if (next == null) {
+      return false;
+    }
+
+    _invalidateActiveFeedWork(
+      clearLoadingState: false,
+      reason: 'route_entry_filters',
+    );
+    state = next;
+    return true;
+  }
 
   void setType(TemplateType? type) {
     final next = TemplatesFilterReducer.forType(state, type);

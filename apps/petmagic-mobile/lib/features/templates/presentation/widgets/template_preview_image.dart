@@ -4,6 +4,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:petmagic_mobile/core/performance/template_media_cache.dart';
 
+typedef TemplatePreviewImageFileLoader =
+    Future<File> Function(String imageUrl, {int? mediaVersion});
+
 class TemplatePreviewImage extends StatefulWidget {
   const TemplatePreviewImage({
     required this.imageUrl,
@@ -13,6 +16,8 @@ class TemplatePreviewImage extends StatefulWidget {
     this.alignment = Alignment.center,
     this.cacheWidth,
     this.filterQuality = FilterQuality.medium,
+    this.mediaVersion,
+    this.fileLoader,
     super.key,
   });
 
@@ -23,6 +28,8 @@ class TemplatePreviewImage extends StatefulWidget {
   final Alignment alignment;
   final int? cacheWidth;
   final FilterQuality filterQuality;
+  final int? mediaVersion;
+  final TemplatePreviewImageFileLoader? fileLoader;
 
   @override
   State<TemplatePreviewImage> createState() => _TemplatePreviewImageState();
@@ -34,15 +41,22 @@ class _TemplatePreviewImageState extends State<TemplatePreviewImage> {
   @override
   void initState() {
     super.initState();
-    _imageFileFuture = TemplateMediaCache.fetchThumbnailFile(widget.imageUrl);
+    _imageFileFuture = _loadImage();
   }
 
   @override
   void didUpdateWidget(covariant TemplatePreviewImage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.imageUrl != widget.imageUrl) {
-      _imageFileFuture = TemplateMediaCache.fetchThumbnailFile(widget.imageUrl);
+    if (oldWidget.imageUrl != widget.imageUrl ||
+        oldWidget.mediaVersion != widget.mediaVersion ||
+        oldWidget.fileLoader != widget.fileLoader) {
+      _imageFileFuture = _loadImage();
     }
+  }
+
+  Future<File> _loadImage() {
+    final loader = widget.fileLoader ?? TemplateMediaCache.fetchThumbnailFile;
+    return loader(widget.imageUrl, mediaVersion: widget.mediaVersion);
   }
 
   @override
@@ -74,7 +88,12 @@ class _TemplatePreviewImageState extends State<TemplatePreviewImage> {
             );
           },
           errorBuilder: (context, error, stackTrace) {
-            unawaited(TemplateMediaCache.removeThumbnailFile(widget.imageUrl));
+            unawaited(
+              TemplateMediaCache.removeThumbnailFile(
+                widget.imageUrl,
+                mediaVersion: widget.mediaVersion,
+              ),
+            );
             return widget.errorBuilder(context);
           },
         );

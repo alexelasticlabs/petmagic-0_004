@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 
 part 'app_destinations.part.dart';
+part 'app_template_destinations.part.dart';
 
 /// Typed application destinations used by orchestration code.
 ///

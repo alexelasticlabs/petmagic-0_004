@@ -13,6 +13,8 @@ import 'package:petmagic_mobile/features/profile/application/push_token_lifecycl
 import 'package:petmagic_mobile/features/support/data/support_chat_repository.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_realtime_client.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_repository.dart';
+import 'package:petmagic_mobile/features/templates/application/template_discovery_repository.dart';
+import 'package:petmagic_mobile/features/templates/data/template_discovery_repository.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_pet_repository_adapter.dart';
 import 'package:petmagic_mobile/features/templates/data/generation_gallery_store.dart';
@@ -54,6 +56,9 @@ final mobileProviderOverrides = [
   ),
   templatesRepositoryProvider.overrideWith(
     (ref) => ref.watch(defaultTemplatesRepositoryProvider),
+  ),
+  templateDiscoveryRepositoryProvider.overrideWith(
+    (ref) => ref.watch(defaultTemplateDiscoveryRepositoryProvider),
   ),
   templateGenerationRepositoryProvider.overrideWith(
     (ref) => ref.watch(dioTemplateGenerationRepositoryProvider),

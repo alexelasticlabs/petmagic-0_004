@@ -5,6 +5,29 @@ import 'package:petmagic_mobile/features/templates/domain/templates_query.dart';
 
 /// Produces the deterministic loading state for catalog filter changes.
 abstract final class TemplatesFilterReducer {
+  static TemplatesState? forRouteEntry(
+    TemplatesState state, {
+    String? category,
+  }) {
+    final normalizedCategory = TemplatesFeedPolicy.normalizeCategory(category);
+    final currentQuery = state.query;
+    if (currentQuery.type == null &&
+        currentQuery.category == normalizedCategory &&
+        currentQuery.search == null &&
+        currentQuery.cursor == null &&
+        currentQuery.page == 1) {
+      return null;
+    }
+
+    return _reset(
+      state,
+      TemplatesQuery(
+        category: normalizedCategory,
+        pageSize: currentQuery.normalizedPageSize,
+      ),
+    );
+  }
+
   static TemplatesState? forType(TemplatesState state, TemplateType? type) {
     if (state.query.type == type) return null;
     return _reset(

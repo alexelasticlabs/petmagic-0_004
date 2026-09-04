@@ -89,6 +89,26 @@ class AppLocalizationsEs extends AppLocalizations {
   String get pickTemplateSubtitle => 'Elige una plantilla para tu mascota';
 
   @override
+  String get discoverHomeTitle => '¿En qué se convertirá tu mascota?';
+
+  @override
+  String get discoverHomeSubtitle =>
+      'Desliza por estilos y encuentra su próximo look PetMagic.';
+
+  @override
+  String get discoverCategoryEyebrow => 'COLECCIÓN';
+
+  @override
+  String get discoverOpenCategoryAction => 'Abrir colección';
+
+  @override
+  String get discoverMoreAction => 'Ver todo';
+
+  @override
+  String get discoverCategoryCatalogSubtitle =>
+      'Todas las plantillas de esta colección';
+
+  @override
   String get searchTemplates => 'Buscar plantillas';
 
   @override

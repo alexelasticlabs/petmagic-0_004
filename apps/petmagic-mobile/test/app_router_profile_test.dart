@@ -19,6 +19,7 @@ import 'package:petmagic_mobile/features/profile/presentation/profile_settings_d
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_page.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
 import 'package:petmagic_mobile/features/pets/presentation/my_pets_page.dart';
+import 'package:petmagic_mobile/features/templates/application/template_discovery_repository.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_repository.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_result_input_page.dart';
@@ -109,6 +110,9 @@ void main() {
         templatesRepositoryProvider.overrideWith(
           (ref) => FakeTemplatesRepository(items: const [sampleTemplate]),
         ),
+        templateDiscoveryRepositoryProvider.overrideWith(
+          (ref) => const EmptyTemplateDiscoveryRepository(),
+        ),
         templateGenerationControllerProvider.overrideWith(
           IdleTemplateGenerationController.new,
         ),
@@ -186,6 +190,9 @@ void main() {
           ),
           templatesRepositoryProvider.overrideWith(
             (ref) => FakeTemplatesRepository(items: const [sampleTemplate]),
+          ),
+          templateDiscoveryRepositoryProvider.overrideWith(
+            (ref) => const EmptyTemplateDiscoveryRepository(),
           ),
           templateGenerationControllerProvider.overrideWith(
             IdleTemplateGenerationController.new,
@@ -287,6 +294,9 @@ void main() {
           ),
           templatesRepositoryProvider.overrideWith(
             (ref) => FakeTemplatesRepository(items: const [sampleTemplate]),
+          ),
+          templateDiscoveryRepositoryProvider.overrideWith(
+            (ref) => const EmptyTemplateDiscoveryRepository(),
           ),
           templateGenerationControllerProvider.overrideWith(
             IdleTemplateGenerationController.new,
@@ -445,6 +455,9 @@ void main() {
           ),
           templatesRepositoryProvider.overrideWith(
             (ref) => FakeTemplatesRepository(items: const [sampleTemplate]),
+          ),
+          templateDiscoveryRepositoryProvider.overrideWith(
+            (ref) => const EmptyTemplateDiscoveryRepository(),
           ),
           templateGenerationControllerProvider.overrideWith(
             IdleTemplateGenerationController.new,

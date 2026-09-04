@@ -70,9 +70,7 @@ class _FloatingBottomNav extends ConsumerWidget {
                     child: _BottomNavButton(
                       item: item,
                       selected: currentIndex == item.index,
-                      onTap: currentIndex == item.index
-                          ? null
-                          : () => onItemSelected(item.index),
+                      onTap: () => onItemSelected(item.index),
                     ),
                   ),
                 ),
@@ -182,6 +180,7 @@ class _BottomNavButton extends StatelessWidget {
       selected: selected,
       button: true,
       label: item.label,
+      onTap: onTap,
       child: ExcludeSemantics(
         child: PressableScale(
           borderRadius: BorderRadius.circular(12),

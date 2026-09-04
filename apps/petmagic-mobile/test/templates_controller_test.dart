@@ -408,6 +408,65 @@ void main() {
   );
 
   test(
+    'route entry resets type search and category atomically before one load',
+    () async {
+      const entryQuery = TemplatesQuery(category: 'Pet Mischief');
+      final repository = FakeTemplatesControllerRepository(
+        pagesByKey: {
+          entryQuery.cacheKey: TemplatesFeedPage(
+            items: [templateFixture('mischief-1', TemplateType.image)],
+            hasMore: false,
+          ),
+        },
+      );
+      final container = ProviderContainer(
+        overrides: [
+          templatesRepositoryProvider.overrideWithValue(repository),
+          realtimeClientProvider.overrideWithValue(const NoopRealtimeClient()),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(templatesControllerProvider.notifier);
+      controller.setType(TemplateType.video);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      controller.setCategory('Old Category');
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      controller.setSearch('magic');
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      final fetchesBeforeEntry = repository.fetchFeedCalls;
+
+      expect(
+        controller.applyRouteEntryFilters(category: ' Pet Mischief '),
+        isTrue,
+      );
+
+      final entryState = container.read(templatesControllerProvider);
+      expect(entryState.query.type, isNull);
+      expect(entryState.query.search, isNull);
+      expect(entryState.query.category, 'Pet Mischief');
+      expect(entryState.query.cursor, isNull);
+      expect(entryState.currentPage, 1);
+      expect(entryState.items, isEmpty);
+      expect(repository.fetchFeedCalls, fetchesBeforeEntry);
+
+      await controller.loadInitial(forceRefresh: true);
+
+      expect(repository.fetchFeedCalls, fetchesBeforeEntry + 1);
+      expect(repository.fetchedQueries.last.type, isNull);
+      expect(repository.fetchedQueries.last.search, isNull);
+      expect(repository.fetchedQueries.last.category, 'Pet Mischief');
+      expect(
+        container
+            .read(templatesControllerProvider)
+            .items
+            .map((item) => item.templateId),
+        ['mischief-1'],
+      );
+    },
+  );
+
+  test(
     'shows cached filter results immediately without clearing list',
     () async {
       final videoFetchCompleter = Completer<void>();
@@ -576,6 +635,97 @@ void main() {
   );
 
   test(
+    'revalidates a stale in-memory page when returning to a cached filter',
+    () async {
+      var now = DateTime.utc(2026, 9, 4, 12);
+      const allQuery = TemplatesQuery();
+      const videoQuery = TemplatesQuery(type: TemplateType.video);
+      final repository = FakeTemplatesControllerRepository(
+        pagesByKey: {
+          allQuery.cacheKey: TemplatesFeedPage(
+            items: [templateFixture('all-1', TemplateType.image)],
+            hasMore: false,
+          ),
+          videoQuery.cacheKey: TemplatesFeedPage(
+            items: [templateFixture('video-1', TemplateType.video)],
+            hasMore: false,
+          ),
+        },
+      );
+      final container = ProviderContainer(
+        overrides: [
+          templatesRepositoryProvider.overrideWithValue(repository),
+          realtimeClientProvider.overrideWithValue(const NoopRealtimeClient()),
+          templatesFeedClockProvider.overrideWithValue(() => now),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(templatesControllerProvider.notifier);
+      await controller.loadInitial(forceRefresh: true);
+      controller.setType(TemplateType.video);
+      await _waitUntil(() => repository.fetchFeedCalls == 2);
+
+      now = now.add(const Duration(seconds: 46));
+      controller.setType(null);
+      await _waitUntil(() => repository.fetchFeedCalls == 3);
+
+      final state = container.read(templatesControllerProvider);
+      expect(repository.fetchedQueries.map((query) => query.cacheKey), [
+        allQuery.cacheKey,
+        videoQuery.cacheKey,
+        allQuery.cacheKey,
+      ]);
+      expect(state.items.map((item) => item.templateId), ['all-1']);
+      expect(state.loadedFromCache, isFalse);
+      expect(state.feedRefreshedAtUtcByQueryKey[allQuery.cacheKey], now);
+    },
+  );
+
+  test(
+    'stale successful empty feed revalidates after the refresh interval',
+    () async {
+      var now = DateTime.utc(2026, 9, 4, 12);
+      const query = TemplatesQuery(category: 'Empty');
+      final repository = FakeTemplatesControllerRepository(
+        pagesByKey: {
+          query.cacheKey: const TemplatesFeedPage(items: [], hasMore: false),
+        },
+      );
+      final container = ProviderContainer(
+        overrides: [
+          templatesRepositoryProvider.overrideWithValue(repository),
+          realtimeClientProvider.overrideWithValue(const NoopRealtimeClient()),
+          templatesFeedClockProvider.overrideWithValue(() => now),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(templatesControllerProvider.notifier);
+      controller.setCategory('Empty');
+      await _waitUntil(() => repository.fetchFeedCalls == 1);
+
+      expect(container.read(templatesControllerProvider).items, isEmpty);
+      expect(controller.isCurrentFeedStale, isFalse);
+
+      now = now.add(const Duration(seconds: 46));
+
+      expect(controller.isCurrentFeedStale, isTrue);
+
+      await controller.loadInitial();
+
+      expect(repository.fetchFeedCalls, 2);
+      expect(controller.isCurrentFeedStale, isFalse);
+      expect(
+        container
+            .read(templatesControllerProvider)
+            .feedRefreshedAtUtcByQueryKey[query.cacheKey],
+        now,
+      );
+    },
+  );
+
+  test(
     'cancels in-flight feed load and ignores late result when screen hides',
     () async {
       final firstFetchCompleter = Completer<void>();
@@ -662,9 +812,14 @@ void main() {
 
       final state = container.read(templatesControllerProvider);
       expect(state.cachedPagesByQueryKey, hasLength(6));
+      expect(state.feedRefreshedAtUtcByQueryKey, hasLength(6));
       expect(
         state.cachedPagesByQueryKey.keys,
         queries.skip(1).map((query) => query.cacheKey),
+      );
+      expect(
+        state.feedRefreshedAtUtcByQueryKey.keys,
+        state.cachedPagesByQueryKey.keys,
       );
       expect(
         state.cachedPagesByQueryKey,

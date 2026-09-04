@@ -252,6 +252,42 @@ abstract class AppLocalizations {
   /// **'Pick a template for your pet'**
   String get pickTemplateSubtitle;
 
+  /// No description provided for @discoverHomeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'What will your pet become?'**
+  String get discoverHomeTitle;
+
+  /// No description provided for @discoverHomeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Swipe through moods and find the next PetMagic look.'**
+  String get discoverHomeSubtitle;
+
+  /// No description provided for @discoverCategoryEyebrow.
+  ///
+  /// In en, this message translates to:
+  /// **'COLLECTION'**
+  String get discoverCategoryEyebrow;
+
+  /// No description provided for @discoverOpenCategoryAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Open collection'**
+  String get discoverOpenCategoryAction;
+
+  /// No description provided for @discoverMoreAction.
+  ///
+  /// In en, this message translates to:
+  /// **'See all'**
+  String get discoverMoreAction;
+
+  /// No description provided for @discoverCategoryCatalogSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'All templates in this collection'**
+  String get discoverCategoryCatalogSubtitle;
+
   /// No description provided for @searchTemplates.
   ///
   /// In en, this message translates to:

@@ -3,6 +3,7 @@ import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 
 abstract final class TemplatesFeedPolicy {
   static const maxInMemoryFeedCaches = 6;
+  static const refreshInterval = Duration(seconds: 45);
 
   static String? normalizeCategory(String? value) {
     final normalized = value?.trim();

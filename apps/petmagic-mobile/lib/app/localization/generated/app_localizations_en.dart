@@ -88,6 +88,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get pickTemplateSubtitle => 'Pick a template for your pet';
 
   @override
+  String get discoverHomeTitle => 'What will your pet become?';
+
+  @override
+  String get discoverHomeSubtitle =>
+      'Swipe through moods and find the next PetMagic look.';
+
+  @override
+  String get discoverCategoryEyebrow => 'COLLECTION';
+
+  @override
+  String get discoverOpenCategoryAction => 'Open collection';
+
+  @override
+  String get discoverMoreAction => 'See all';
+
+  @override
+  String get discoverCategoryCatalogSubtitle =>
+      'All templates in this collection';
+
+  @override
   String get searchTemplates => 'Search templates';
 
   @override

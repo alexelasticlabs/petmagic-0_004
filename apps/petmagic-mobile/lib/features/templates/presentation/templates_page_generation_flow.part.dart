@@ -24,6 +24,8 @@ extension _TemplatesPageGenerationFlow on _TemplatesPageState {
           redirectPath: _templatesPageLocation(
             currentPetId: widget.initialPetId,
             currentPetPhotoId: widget.initialPetPhotoId,
+            category: widget.initialCategory,
+            autofocusSearch: widget.autofocusSearch,
           ),
         );
         return;
@@ -118,6 +120,8 @@ extension _TemplatesPageGenerationFlow on _TemplatesPageState {
             redirectPath: _templatesPageLocation(
               currentPetId: widget.initialPetId,
               currentPetPhotoId: widget.initialPetPhotoId,
+              category: widget.initialCategory,
+              autofocusSearch: widget.autofocusSearch,
             ),
           );
           return;
@@ -182,6 +186,8 @@ extension _TemplatesPageGenerationFlow on _TemplatesPageState {
           currentPetPhotoId: widget.initialPetPhotoId,
           petId: petId,
           petPhotoId: petPhotoId,
+          category: widget.initialCategory,
+          autofocusSearch: widget.autofocusSearch,
         ),
         title: text.petsAuthRequiredTitle,
         message: text.petsAuthRequiredMessage,
@@ -354,9 +360,13 @@ String _templatesPageLocation({
   required String? currentPetPhotoId,
   String? petId,
   String? petPhotoId,
+  String? category,
+  bool autofocusSearch = false,
 }) {
   return TemplatesPage.location(
     petId: petId ?? currentPetId,
     petPhotoId: petPhotoId ?? currentPetPhotoId,
+    category: category,
+    autofocusSearch: autofocusSearch,
   );
 }

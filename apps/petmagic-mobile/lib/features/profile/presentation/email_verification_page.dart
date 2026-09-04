@@ -220,7 +220,7 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage>
       setState(() {
         _info = text.emailVerificationConfirmedMessage;
       });
-      context.appNavigator.go(const TemplatesDestination());
+      context.appNavigator.go(const DiscoverDestination());
     } catch (error) {
       if (error is RequestCancelledException) {
         return;

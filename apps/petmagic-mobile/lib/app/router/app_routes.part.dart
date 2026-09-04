@@ -96,13 +96,32 @@ List<RouteBase> _buildAppRoutes(Ref ref) {
       branches: [
         StatefulShellBranch(
           navigatorKey: _templatesNavigatorKey,
+          initialLocation: TemplatesDiscoveryPage.routePath,
           routes: [
+            GoRoute(
+              path: TemplatesDiscoveryPage.routePath,
+              pageBuilder: (context, state) =>
+                  const NoTransitionPage(child: TemplatesDiscoveryPage()),
+            ),
             GoRoute(
               path: TemplatesPage.routePath,
               pageBuilder: (context, state) => NoTransitionPage(
                 child: TemplatesPage(
-                  initialPetId: state.uri.queryParameters['petId'],
-                  initialPetPhotoId: state.uri.queryParameters['petPhotoId'],
+                  initialPetId:
+                      state.uri.queryParameters[TemplatesPage.petIdQueryParam],
+                  initialPetPhotoId: state
+                      .uri
+                      .queryParameters[TemplatesPage.petPhotoIdQueryParam],
+                  initialCategory: state
+                      .uri
+                      .queryParameters[TemplatesPage.categoryQueryParam],
+                  autofocusSearch:
+                      state.uri.queryParameters[TemplatesPage
+                          .autofocusSearchQueryParam] ==
+                      '1',
+                  initialTemplate: state.extra is TemplateItem
+                      ? state.extra! as TemplateItem
+                      : null,
                 ),
               ),
             ),

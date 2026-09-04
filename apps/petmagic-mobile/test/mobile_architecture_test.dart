@@ -344,6 +344,7 @@ void main() {
     for (final provider in const [
       'appRuntimeInfoProvider',
       'templatesRepositoryProvider',
+      'templateDiscoveryRepositoryProvider',
       'petRepositoryProvider',
       'gamificationRepositoryProvider',
       'supportChatRepositoryProvider',

@@ -388,10 +388,14 @@ class FakeTemplatesController extends TemplatesController {
     int? knownCatalogVersion,
   }) async {
     loadInitialCalls.add(forceRefresh);
+    final queryKey = query.cacheKey;
     state = TemplatesState(
       query: query,
       items: items ?? [templateFixture('template-1', 'Template 1')],
-      itemsQueryKey: query.cacheKey,
+      itemsQueryKey: queryKey,
+      feedRefreshedAtUtcByQueryKey: {
+        queryKey: ref.read(templatesFeedClockProvider)().toUtc(),
+      },
       categories: categories,
       templateOfTheDay: templateOfTheDay,
       isTemplateOfTheDayLoading: isTemplateOfTheDayLoading,

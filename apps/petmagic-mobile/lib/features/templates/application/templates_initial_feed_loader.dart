@@ -23,6 +23,7 @@ final class TemplatesInitialFeedLoader {
     required this.metadataCoordinator,
     required this.previewWarmupCoordinator,
     required this.realtimeCoordinator,
+    required this.nowUtc,
   });
 
   final TemplatesRepository Function() repository;
@@ -34,6 +35,7 @@ final class TemplatesInitialFeedLoader {
   final TemplatesMetadataCoordinator metadataCoordinator;
   final TemplatesPreviewWarmupCoordinator previewWarmupCoordinator;
   final TemplatesRealtimeCoordinator realtimeCoordinator;
+  final DateTime Function() nowUtc;
 
   Future<void> loadInitial({
     bool forceRefresh = false,
@@ -90,6 +92,7 @@ final class TemplatesInitialFeedLoader {
         queryKey,
         page,
       );
+      final refreshedAtUtc = nowUtc();
       writeState(
         current.copyWith(
           items: page.items,
@@ -98,6 +101,12 @@ final class TemplatesInitialFeedLoader {
           nextCursor: page.nextCursor,
           clearNextCursor: page.nextCursor == null,
           itemsQueryKey: queryKey,
+          feedRefreshedAtUtcByQueryKey: _rememberRefreshTimestamp(
+            current.feedRefreshedAtUtcByQueryKey,
+            updatedCache,
+            queryKey,
+            refreshedAtUtc,
+          ),
           cachedPagesByQueryKey: updatedCache,
           hasMore: page.hasMore,
           loadedFromCache: false,
@@ -142,23 +151,26 @@ final class TemplatesInitialFeedLoader {
     String queryKey,
     int requestVersion,
   ) async {
-    final memoryPage = readState().cachedPagesByQueryKey[queryKey];
+    final current = readState();
+    final memoryPage = current.cachedPagesByQueryKey[queryKey];
     if (memoryPage != null) {
+      final isFresh = _isMemoryPageFresh(current, queryKey);
       _showCachedPage(
         query,
         queryKey,
         memoryPage,
-        isRefreshing: false,
+        isRefreshing: !isFresh,
         remember: false,
       );
       if (readState().categories.isEmpty) {
         unawaited(metadataCoordinator.refreshCategories(requestVersion));
       }
-      realtimeCoordinator.resumePendingRefreshIfNeeded();
-      return true;
+      if (isFresh) {
+        realtimeCoordinator.resumePendingRefreshIfNeeded();
+      }
+      return isFresh;
     }
 
-    final current = readState();
     final hasStaleItems = current.itemsQueryKey != null
         ? current.itemsQueryKey != queryKey
         : current.items.isNotEmpty;
@@ -198,6 +210,37 @@ final class TemplatesInitialFeedLoader {
       unawaited(metadataCoordinator.refreshCategories(requestVersion));
     }
     return false;
+  }
+
+  bool _isMemoryPageFresh(TemplatesState state, String queryKey) {
+    final refreshedAtUtc = state.feedRefreshedAtUtcByQueryKey[queryKey];
+    if (refreshedAtUtc == null) {
+      return false;
+    }
+
+    return nowUtc().difference(refreshedAtUtc) <
+        TemplatesFeedPolicy.refreshInterval;
+  }
+
+  Map<String, DateTime> _rememberRefreshTimestamp(
+    Map<String, DateTime> current,
+    Map<String, TemplatesFeedPage> cachedPages,
+    String queryKey,
+    DateTime refreshedAtUtc,
+  ) {
+    final updated = <String, DateTime>{};
+    for (final cachedQueryKey in cachedPages.keys) {
+      if (cachedQueryKey == queryKey) {
+        updated[cachedQueryKey] = refreshedAtUtc;
+        continue;
+      }
+
+      final existing = current[cachedQueryKey];
+      if (existing != null) {
+        updated[cachedQueryKey] = existing;
+      }
+    }
+    return updated;
   }
 
   void _showCachedPage(

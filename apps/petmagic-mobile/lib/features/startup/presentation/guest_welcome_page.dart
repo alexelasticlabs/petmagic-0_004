@@ -263,7 +263,7 @@ class _GuestWelcomePageState extends ConsumerState<GuestWelcomePage>
       if (!mounted) {
         return;
       }
-      context.appNavigator.go(const TemplatesDestination());
+      context.appNavigator.go(const DiscoverDestination());
     } catch (error, stackTrace) {
       _handleStartupActionFailure(
         operation: 'continue_as_guest',

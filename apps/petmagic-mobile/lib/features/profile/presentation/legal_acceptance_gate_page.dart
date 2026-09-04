@@ -167,7 +167,7 @@ class _LegalAcceptanceGatePageState
                 const SizedBox(height: 8),
                 OutlinedButton(
                   onPressed: () =>
-                      context.appNavigator.go(const TemplatesDestination()),
+                      context.appNavigator.go(const DiscoverDestination()),
                   child: Text(text.premiumContinueAction),
                 ),
               ],
@@ -202,7 +202,7 @@ class _LegalAcceptanceGatePageState
         .read(appLaunchControllerProvider.notifier)
         .markSignedInWithLegalStatus(requiresLegalAcceptance: requires);
     if (!requires) {
-      context.appNavigator.go(const TemplatesDestination());
+      context.appNavigator.go(const DiscoverDestination());
     }
   }
 

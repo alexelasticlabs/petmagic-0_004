@@ -19,6 +19,7 @@ import 'package:petmagic_mobile/features/profile/application/profile_controller.
 import 'package:petmagic_mobile/shared/auth/auth_required_sheet.dart';
 import 'package:petmagic_mobile/features/templates/application/template_generation_contract.dart';
 import 'package:petmagic_mobile/features/templates/application/template_catalog_repository.dart';
+import 'package:petmagic_mobile/features/templates/application/templates_feed_policy.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_generation_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_entitlement_provider.dart';
@@ -53,20 +54,40 @@ part 'templates_page_template_actions.part.dart';
 part 'templates_page_view.part.dart';
 
 class TemplatesPage extends ConsumerStatefulWidget {
-  const TemplatesPage({this.initialPetId, this.initialPetPhotoId, super.key});
+  const TemplatesPage({
+    this.initialPetId,
+    this.initialPetPhotoId,
+    this.initialCategory,
+    this.autofocusSearch = false,
+    this.initialTemplate,
+    super.key,
+  });
 
   final String? initialPetId;
   final String? initialPetPhotoId;
+  final String? initialCategory;
+  final bool autofocusSearch;
+  final TemplateItem? initialTemplate;
 
   static const routePath = '/templates';
   static const petIdQueryParam = 'petId';
   static const petPhotoIdQueryParam = 'petPhotoId';
+  static const categoryQueryParam = 'category';
+  static const autofocusSearchQueryParam = 'autofocusSearch';
 
-  static String location({String? petId, String? petPhotoId}) {
+  static String location({
+    String? petId,
+    String? petPhotoId,
+    String? category,
+    bool autofocusSearch = false,
+  }) {
     final queryParameters = <String, String>{
       if (petId != null && petId.trim().isNotEmpty) petIdQueryParam: petId,
       if (petPhotoId != null && petPhotoId.trim().isNotEmpty)
         petPhotoIdQueryParam: petPhotoId,
+      if (category != null && category.trim().isNotEmpty)
+        categoryQueryParam: category.trim(),
+      if (autofocusSearch) autofocusSearchQueryParam: '1',
     };
 
     if (queryParameters.isEmpty) {
@@ -81,7 +102,7 @@ class TemplatesPage extends ConsumerStatefulWidget {
 }
 
 class _TemplatesPageState extends ConsumerState<TemplatesPage> {
-  static const _refreshCooldown = Duration(seconds: 45);
+  static const _refreshCooldown = TemplatesFeedPolicy.refreshInterval;
   static const _gridCacheExtent = 400.0;
   static const _scrollIdleVelocityResetDelay = Duration(milliseconds: 140);
   static const _randomButtonSpacing = 24.0;
@@ -89,6 +110,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
 
   final _scrollController = ScrollController();
   final _searchController = TextEditingController();
+  final _searchFocusNode = FocusNode();
   final _imagePicker = ImagePicker();
   TemplatesController? _visibleTemplatesController;
   ProviderSubscription<TemplatesState>? _templatesSubscription;
@@ -103,6 +125,8 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
   bool? _isTabActive;
   bool _templatesScreenVisible = false;
   bool _shouldRefreshAccessOnReconnect = false;
+  bool _searchAutofocusHandled = false;
+  bool _initialTemplateHandled = false;
   Future<void>? _walletAccessRefreshInFlight;
   Future<void>? _profileAccessRefreshInFlight;
   DateTime? _lastScrollSampleAt;
@@ -127,12 +151,37 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
     );
     WidgetsBinding.instance.addObserver(_lifecycleObserver);
     _scrollController.addListener(_handleScroll);
+    _scheduleRouteEntryUpdate();
     _runAfterBuild(() {
       if (!mounted) {
         return;
       }
       _refreshAccessForAuthenticatedUser();
     });
+  }
+
+  @override
+  void didUpdateWidget(covariant TemplatesPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final categoryChanged =
+        TemplatesFeedPolicy.normalizeCategory(oldWidget.initialCategory) !=
+        TemplatesFeedPolicy.normalizeCategory(widget.initialCategory);
+    final autofocusChanged =
+        oldWidget.autofocusSearch != widget.autofocusSearch;
+    final templateChanged = !identical(
+      oldWidget.initialTemplate,
+      widget.initialTemplate,
+    );
+
+    if (autofocusChanged) {
+      _searchAutofocusHandled = false;
+    }
+    if (templateChanged) {
+      _initialTemplateHandled = false;
+    }
+    if (categoryChanged || autofocusChanged || templateChanged) {
+      _scheduleRouteEntryUpdate(refreshIfVisible: categoryChanged);
+    }
   }
 
   @override
@@ -154,6 +203,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
     _scrollIdleTimer?.cancel();
     _cancelPendingRandomTemplateRequest(clearLoadingState: false);
     _scrollController.dispose();
+    _searchFocusNode.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -211,15 +261,17 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
     _refreshAccessForAuthenticatedUser(forceRefresh: fromAppResume);
 
     final state = ref.read(templatesControllerProvider);
+    final controller = ref.read(templatesControllerProvider.notifier);
+    final isCurrentFeedStale = controller.isCurrentFeedStale;
     final shouldRefresh =
-        state.items.isEmpty ||
-        state.errorMessage != null ||
-        (fromAppResume && _isRefreshStale(DateTime.now()));
+        state.items.isEmpty || state.errorMessage != null || isCurrentFeedStale;
 
     if (shouldRefresh) {
       final shouldBypassCooldown =
-          _lastRefreshAt != null &&
-          (state.items.isEmpty || state.errorMessage != null);
+          isCurrentFeedStale ||
+          (state.items.isNotEmpty && state.errorMessage != null) ||
+          (_lastRefreshAt != null &&
+              (state.items.isEmpty || state.errorMessage != null));
       unawaited(_refreshFeed(forceRefresh: shouldBypassCooldown));
     }
   }
@@ -250,15 +302,6 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
 
       _handleScreenBecameVisible(fromAppResume: fromAppResume);
     });
-  }
-
-  bool _isRefreshStale(DateTime now) {
-    final lastRefreshAt = _lastRefreshAt;
-    if (lastRefreshAt == null) {
-      return true;
-    }
-
-    return now.difference(lastRefreshAt) >= _refreshCooldown;
   }
 
   void _refreshAccessForAuthenticatedUser({bool forceRefresh = false}) {

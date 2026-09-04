@@ -11,10 +11,14 @@ class TemplatesSearchField extends StatelessWidget {
     super.key,
     required this.controller,
     required this.onChanged,
+    this.focusNode,
+    this.autofocus = false,
   });
 
   final TextEditingController controller;
   final ValueChanged<String> onChanged;
+  final FocusNode? focusNode;
+  final bool autofocus;
 
   @override
   Widget build(BuildContext context) {
@@ -24,6 +28,8 @@ class TemplatesSearchField extends StatelessWidget {
     return TextField(
       key: const ValueKey('templates-search-field'),
       controller: controller,
+      focusNode: focusNode,
+      autofocus: autofocus,
       onChanged: onChanged,
       textInputAction: TextInputAction.search,
       style: TextStyle(

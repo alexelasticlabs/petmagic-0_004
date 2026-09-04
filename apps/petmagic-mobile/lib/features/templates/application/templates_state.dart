@@ -12,6 +12,7 @@ final class TemplatesState {
     this.currentPage = 1,
     this.nextCursor,
     this.itemsQueryKey,
+    this.feedRefreshedAtUtcByQueryKey = const {},
     this.cachedPagesByQueryKey = const {},
     this.hasMore = true,
     this.isLoading = false,
@@ -31,6 +32,7 @@ final class TemplatesState {
   final int currentPage;
   final String? nextCursor;
   final String? itemsQueryKey;
+  final Map<String, DateTime> feedRefreshedAtUtcByQueryKey;
   final Map<String, TemplatesFeedPage> cachedPagesByQueryKey;
   final bool hasMore;
   final bool isLoading;
@@ -56,6 +58,7 @@ final class TemplatesState {
     bool clearNextCursor = false,
     String? itemsQueryKey,
     bool clearItemsQueryKey = false,
+    Map<String, DateTime>? feedRefreshedAtUtcByQueryKey,
     Map<String, TemplatesFeedPage>? cachedPagesByQueryKey,
     bool? hasMore,
     bool? isLoading,
@@ -79,6 +82,8 @@ final class TemplatesState {
       itemsQueryKey: clearItemsQueryKey
           ? null
           : itemsQueryKey ?? this.itemsQueryKey,
+      feedRefreshedAtUtcByQueryKey:
+          feedRefreshedAtUtcByQueryKey ?? this.feedRefreshedAtUtcByQueryKey,
       cachedPagesByQueryKey:
           cachedPagesByQueryKey ?? this.cachedPagesByQueryKey,
       hasMore: hasMore ?? this.hasMore,

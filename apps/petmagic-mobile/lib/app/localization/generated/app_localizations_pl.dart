@@ -88,6 +88,26 @@ class AppLocalizationsPl extends AppLocalizations {
   String get pickTemplateSubtitle => 'Wybierz szablon dla swojego pupila';
 
   @override
+  String get discoverHomeTitle => 'Kim zostanie Twój pupil?';
+
+  @override
+  String get discoverHomeSubtitle =>
+      'Przeglądaj klimaty i znajdź kolejny wygląd PetMagic.';
+
+  @override
+  String get discoverCategoryEyebrow => 'KOLEKCJA';
+
+  @override
+  String get discoverOpenCategoryAction => 'Otwórz kolekcję';
+
+  @override
+  String get discoverMoreAction => 'Zobacz wszystkie';
+
+  @override
+  String get discoverCategoryCatalogSubtitle =>
+      'Wszystkie szablony z tej kolekcji';
+
+  @override
   String get searchTemplates => 'Szukaj szablonów';
 
   @override

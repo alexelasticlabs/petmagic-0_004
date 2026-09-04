@@ -469,7 +469,7 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
 
   String _resolvePostAuthRoute() {
     return normalizeAuthRedirectPath(widget.redirectPath) ??
-        const TemplatesDestination().location;
+        const DiscoverDestination().location;
   }
 
   String _mapErrorMessage(String raw, AppLocalizations text) {

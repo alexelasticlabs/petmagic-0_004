@@ -11,6 +11,7 @@ class TemplateTypeFilters extends StatelessWidget {
     required this.selectedCategory,
     required this.onTypeSelected,
     required this.onCategorySelected,
+    this.showCategoryFilter = true,
     super.key,
   });
 
@@ -19,6 +20,7 @@ class TemplateTypeFilters extends StatelessWidget {
   final String? selectedCategory;
   final ValueChanged<TemplateType?> onTypeSelected;
   final ValueChanged<String?> onCategorySelected;
+  final bool showCategoryFilter;
 
   @override
   Widget build(BuildContext context) {
@@ -74,7 +76,7 @@ class TemplateTypeFilters extends StatelessWidget {
             ),
           ),
         ),
-        if (normalizedCategories.isNotEmpty) ...[
+        if (showCategoryFilter && normalizedCategories.isNotEmpty) ...[
           const SizedBox(height: 8),
           _TemplateFilterGroup(
             label: text.templateCategoryFilterLabel,

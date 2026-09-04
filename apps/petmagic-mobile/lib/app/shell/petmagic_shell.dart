@@ -78,18 +78,21 @@ class _PetMagicShellState extends ConsumerState<PetMagicShell> {
               _FloatingBottomNav(
                 currentIndex: currentIndex,
                 onItemSelected: (index) {
-                  if (index == currentIndex) {
+                  if (navigationShell != null) {
+                    navigationShell.goBranch(
+                      index,
+                      initialLocation: index == currentIndex,
+                    );
                     return;
                   }
 
-                  if (navigationShell != null) {
-                    navigationShell.goBranch(index);
+                  if (index == currentIndex) {
                     return;
                   }
 
                   switch (index) {
                     case 0:
-                      context.go('/templates');
+                      context.go('/discover');
                     case 1:
                       context.go(GenerationsGalleryPage.routePath);
                     case 2:

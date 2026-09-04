@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
 import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/templates/domain/templates_query.dart';
@@ -17,6 +18,7 @@ import 'package:petmagic_mobile/features/templates/data/templates_remote_data_so
 import 'package:petmagic_mobile/features/templates/data/templates_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 import 'package:petmagic_mobile/features/templates/application/templates_controller.dart';
+import 'package:petmagic_mobile/features/templates/presentation/template_preview_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/template_card.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/template_type_filters.dart';
@@ -180,22 +182,385 @@ void main() {
     );
   });
 
-  test(
-    'templates top bar alert badge uses theme contrast for danger token',
-    () {
-      final source = File(
-        'lib/features/templates/presentation/widgets/templates_top_bar.dart',
-      ).readAsStringSync();
+  testWidgets('template filters can hide category controls in category mode', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        locale: const Locale('en'),
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: TemplateTypeFilters(
+            selectedType: null,
+            categories: const ['Pet Mischief'],
+            selectedCategory: 'Pet Mischief',
+            onTypeSelected: (_) {},
+            onCategorySelected: (_) {},
+            showCategoryFilter: false,
+          ),
+        ),
+      ),
+    );
 
-      expect(source, contains('color: colors.on(colors.danger)'));
-      expect(
-        source,
-        isNot(
-          contains('color: Colors.white,\n                    fontSize: 9'),
+    final context = tester.element(find.byType(TemplateTypeFilters));
+    final text = AppLocalizations.of(context);
+    expect(find.text(text.templateFormatFilterLabel), findsOneWidget);
+    expect(find.text(text.templateCategoryFilterLabel), findsNothing);
+    expect(find.text('Pet Mischief'), findsNothing);
+  });
+
+  test('templates top bar keeps foreground colors theme-derived', () {
+    final source = File(
+      'lib/features/templates/presentation/widgets/templates_top_bar.dart',
+    ).readAsStringSync();
+
+    expect(source, contains('color: colors.textStrong'));
+    expect(source, contains('foregroundColor: colors.accent'));
+    expect(source, isNot(contains('color: Colors.white')));
+  });
+
+  testWidgets(
+    'category route entry uses exact filter hides category row and focuses search',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final backend = _SlowTemplateFeedBackend(totalTemplates: 30);
+      final dio = Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
+        ..httpClientAdapter = backend;
+      final repository = _RemoteBackedTemplatesRepository(
+        TemplatesRemoteDataSource(dio),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appLaunchControllerProvider.overrideWith(
+              _AuthenticatedAppLaunchController.new,
+            ),
+            walletControllerProvider.overrideWith(_IdleWalletController.new),
+            templatesRepositoryProvider.overrideWithValue(repository),
+            realtimeClientProvider.overrideWith(
+              (ref) => const NoopRealtimeClient(),
+            ),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.light(),
+            locale: const Locale('en'),
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: const Scaffold(
+              body: TemplatesPage(
+                initialCategory: ' Pet Mischief ',
+                autofocusSearch: true,
+              ),
+            ),
+          ),
         ),
       );
+
+      await _pumpUntil(
+        tester,
+        () =>
+            _templatesState(tester).query.category == 'Pet Mischief' &&
+            _templatesState(tester).items.length == 20,
+      );
+
+      final context = tester.element(find.byType(TemplatesPage));
+      final text = AppLocalizations.of(context);
+      final categoryTitle = tester.widget<Text>(
+        find.byKey(const ValueKey('templates-category-title')),
+      );
+      final searchField = tester.widget<TextField>(
+        find.byKey(const ValueKey('templates-search-field')),
+      );
+
+      expect(categoryTitle.data, 'Pet Mischief');
+      expect(find.text(text.discoverCategoryCatalogSubtitle), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('templates-category-back-button')),
+        findsOneWidget,
+      );
+      expect(find.text(text.templateCategoryFilterLabel), findsNothing);
+      expect(find.text(text.templateFormatFilterLabel), findsOneWidget);
+      expect(searchField.autofocus, isTrue);
+      expect(searchField.focusNode?.hasFocus, isTrue);
+      expect(
+        backend.feedQueries.where(
+          (query) => query['category'] == 'Pet Mischief',
+        ),
+        hasLength(1),
+      );
+      expect(backend.feedQueries.last['type'], isNull);
+      expect(backend.feedQueries.last['search'], isNull);
+      expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets(
+    'stale same-category feed refreshes after remount and retained tab return',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      var now = DateTime.utc(2026, 9, 4, 12);
+      final pageVisible = ValueNotifier<bool>(true);
+      final tabTickerEnabled = ValueNotifier<bool>(true);
+      addTearDown(pageVisible.dispose);
+      addTearDown(tabTickerEnabled.dispose);
+      final backend = _SlowTemplateFeedBackend(totalTemplates: 30);
+      final dio = Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
+        ..httpClientAdapter = backend;
+      final repository = _RemoteBackedTemplatesRepository(
+        TemplatesRemoteDataSource(dio),
+      );
+      Future<void> pauseAndResumeApp() async {
+        for (final state in const [
+          AppLifecycleState.inactive,
+          AppLifecycleState.hidden,
+          AppLifecycleState.paused,
+          AppLifecycleState.hidden,
+          AppLifecycleState.inactive,
+          AppLifecycleState.resumed,
+        ]) {
+          tester.binding.handleAppLifecycleStateChanged(state);
+          await tester.pump();
+        }
+      }
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appLaunchControllerProvider.overrideWith(
+              _AuthenticatedAppLaunchController.new,
+            ),
+            walletControllerProvider.overrideWith(_IdleWalletController.new),
+            templatesRepositoryProvider.overrideWithValue(repository),
+            templatesFeedClockProvider.overrideWithValue(() => now),
+            realtimeClientProvider.overrideWith(
+              (ref) => const NoopRealtimeClient(),
+            ),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.light(),
+            locale: const Locale('en'),
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: ValueListenableBuilder<bool>(
+              valueListenable: pageVisible,
+              builder: (context, visible, child) {
+                return Scaffold(
+                  body: visible
+                      ? ValueListenableBuilder<bool>(
+                          valueListenable: tabTickerEnabled,
+                          builder: (context, enabled, child) =>
+                              TickerMode(enabled: enabled, child: child!),
+                          child: const TemplatesPage(
+                            initialCategory: 'Pet Mischief',
+                          ),
+                        )
+                      : const SizedBox.shrink(),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+
+      await _pumpUntil(
+        tester,
+        () =>
+            _templatesState(tester).items.length == 20 &&
+            backend.feedQueries.length == 1,
+      );
+      expect(
+        _templatesState(
+          tester,
+        ).feedRefreshedAtUtcByQueryKey[const TemplatesQuery(
+          category: 'Pet Mischief',
+        ).cacheKey],
+        now,
+      );
+
+      pageVisible.value = false;
+      await tester.pump();
+      now = now.add(const Duration(seconds: 44));
+      pageVisible.value = true;
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(backend.feedQueries, hasLength(1));
+
+      pageVisible.value = false;
+      await tester.pump();
+      now = now.add(const Duration(seconds: 2));
+      pageVisible.value = true;
+      await tester.pump();
+      await _pumpUntil(
+        tester,
+        () =>
+            backend.feedQueries.length == 2 &&
+            !_templatesState(tester).isRefreshing,
+      );
+
+      expect(
+        backend.feedQueries.where(
+          (query) => query['category'] == 'Pet Mischief',
+        ),
+        hasLength(2),
+      );
+      expect(
+        _templatesState(
+          tester,
+        ).feedRefreshedAtUtcByQueryKey[const TemplatesQuery(
+          category: 'Pet Mischief',
+        ).cacheKey],
+        now,
+      );
+
+      now = now.add(const Duration(seconds: 44));
+      await pauseAndResumeApp();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(backend.feedQueries, hasLength(2));
+
+      now = now.add(const Duration(seconds: 2));
+      await pauseAndResumeApp();
+      await _pumpUntil(
+        tester,
+        () =>
+            backend.feedQueries.length == 3 &&
+            !_templatesState(tester).isRefreshing,
+      );
+
+      expect(
+        _templatesState(
+          tester,
+        ).feedRefreshedAtUtcByQueryKey[const TemplatesQuery(
+          category: 'Pet Mischief',
+        ).cacheKey],
+        now,
+      );
+
+      tabTickerEnabled.value = false;
+      await tester.pump();
+      now = now.add(const Duration(seconds: 44));
+      tabTickerEnabled.value = true;
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(backend.feedQueries, hasLength(3));
+
+      tabTickerEnabled.value = false;
+      await tester.pump();
+      now = now.add(const Duration(seconds: 2));
+      tabTickerEnabled.value = true;
+      await tester.pump();
+      await _pumpUntil(
+        tester,
+        () =>
+            backend.feedQueries.length == 4 &&
+            !_templatesState(tester).isRefreshing,
+      );
+
+      expect(
+        backend.feedQueries.where(
+          (query) => query['category'] == 'Pet Mischief',
+        ),
+        hasLength(4),
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('card route payload opens existing preview flow only once', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    const initialTemplate = TemplateItem(
+      templateId: 'entry-template',
+      templateType: TemplateType.image,
+      title: 'Entry template',
+      shortDescription: 'Opened from discovery',
+      petPhotoRequirements: [],
+      category: 'Pet Mischief',
+      tags: [],
+      isPremium: false,
+      tokenCost: 1,
+    );
+    final backend = _SlowTemplateFeedBackend(totalTemplates: 30);
+    final dio = Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
+      ..httpClientAdapter = backend;
+    final repository = _RemoteBackedTemplatesRepository(
+      TemplatesRemoteDataSource(dio),
+    );
+    final navigator = _RecordingAppNavigator();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appLaunchControllerProvider.overrideWith(
+            _AuthenticatedAppLaunchController.new,
+          ),
+          walletControllerProvider.overrideWith(_IdleWalletController.new),
+          templatesRepositoryProvider.overrideWithValue(repository),
+          realtimeClientProvider.overrideWith(
+            (ref) => const NoopRealtimeClient(),
+          ),
+        ],
+        child: AppNavigationScope(
+          navigator: navigator,
+          child: MaterialApp(
+            theme: AppTheme.light(),
+            locale: const Locale('en'),
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: const Scaffold(
+              body: TemplatesPage(
+                initialCategory: 'Pet Mischief',
+                initialTemplate: initialTemplate,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await _pumpUntil(tester, () => navigator.pushes.length == 1);
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump();
+
+    expect(navigator.pushes, hasLength(1));
+    final destination = navigator.pushes.single;
+    expect(destination, isA<TemplatePreviewDestination>());
+    final args = destination.extra! as TemplatePreviewRouteArgs;
+    expect(args.template.templateId, initialTemplate.templateId);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets(
     'templates page uses backend cursor pages and drops stale search results',
@@ -915,6 +1280,17 @@ class _SlowTemplateFeedBackend implements HttpClientAdapter {
     Future<dynamic>? cancelFuture,
   ) async {
     if (options.path != '/api/templates/feed') {
+      if (options.path.startsWith('/api/templates/')) {
+        final templateId = Uri.decodeComponent(options.path.split('/').last);
+        return _jsonResponse(
+          _templateJson(
+            templateId,
+            category: templateId == 'entry-template'
+                ? 'Pet Mischief'
+                : 'Portrait',
+          ),
+        );
+      }
       return _jsonResponse({'template': null});
     }
 
@@ -1008,6 +1384,28 @@ class _SlowTemplateFeedBackend implements HttpClientAdapter {
 
   @override
   void close({bool force = false}) {}
+}
+
+class _RecordingAppNavigator implements AppNavigator {
+  final List<AppDestination> pushes = <AppDestination>[];
+
+  @override
+  bool canPop() => false;
+
+  @override
+  void go(AppDestination destination) {}
+
+  @override
+  void pop<T extends Object?>([T? result]) {}
+
+  @override
+  Future<T?> push<T>(AppDestination destination) async {
+    pushes.add(destination);
+    return null;
+  }
+
+  @override
+  void replace(AppDestination destination) {}
 }
 
 ResponseBody _jsonResponse(Map<String, Object?> json) {

@@ -1,28 +1,5 @@
 part of 'app_navigator.dart';
 
-final class TemplatesDestination extends AppDestination {
-  const TemplatesDestination({this.petId, this.petPhotoId});
-
-  final String? petId;
-  final String? petPhotoId;
-
-  @override
-  String get location {
-    final normalizedPetId = petId?.trim();
-    final normalizedPetPhotoId = petPhotoId?.trim();
-    final queryParameters = <String, String>{
-      if (normalizedPetId?.isNotEmpty ?? false) 'petId': normalizedPetId!,
-      if ((normalizedPetId?.isNotEmpty ?? false) &&
-          (normalizedPetPhotoId?.isNotEmpty ?? false))
-        'petPhotoId': normalizedPetPhotoId!,
-    };
-    return Uri(
-      path: '/templates',
-      queryParameters: queryParameters.isEmpty ? null : queryParameters,
-    ).toString();
-  }
-}
-
 final class CreateDestination extends AppDestination {
   const CreateDestination({this.source});
 
@@ -338,7 +315,7 @@ final class EmailVerificationDestination extends AppDestination {
 
 final class SafeRedirectDestination extends AppDestination {
   SafeRedirectDestination(String? location)
-    : _location = normalizeAuthRedirectPath(location) ?? '/templates';
+    : _location = normalizeAuthRedirectPath(location) ?? '/discover';
 
   final String _location;
 

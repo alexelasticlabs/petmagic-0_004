@@ -1,6 +1,45 @@
 part of 'templates_page.dart';
 
 extension _TemplatesPageLifecycle on _TemplatesPageState {
+  void _scheduleRouteEntryUpdate({bool refreshIfVisible = false}) {
+    _runAfterBuild(() {
+      final filtersChanged = _applyRouteEntryFilters();
+      _handleRouteEntryActions();
+      if (refreshIfVisible &&
+          filtersChanged &&
+          _isTabActive == true &&
+          _isAppResumed) {
+        unawaited(_refreshFeed(forceRefresh: true));
+      }
+    });
+  }
+
+  bool _applyRouteEntryFilters() {
+    _cancelPendingSearchDebounce();
+    _searchController.clear();
+    _lastRefreshAt = null;
+    return ref
+        .read(templatesControllerProvider.notifier)
+        .applyRouteEntryFilters(category: widget.initialCategory);
+  }
+
+  void _handleRouteEntryActions() {
+    if (widget.autofocusSearch && !_searchAutofocusHandled) {
+      _searchAutofocusHandled = true;
+      if (_searchFocusNode.canRequestFocus) {
+        _searchFocusNode.requestFocus();
+      }
+    }
+
+    final initialTemplate = widget.initialTemplate;
+    if (initialTemplate == null || _initialTemplateHandled) {
+      return;
+    }
+
+    _initialTemplateHandled = true;
+    unawaited(_handleTemplateSelected(initialTemplate));
+  }
+
   void _handleScroll() {
     if (!_scrollController.hasClients) return;
     final position = _scrollController.position;

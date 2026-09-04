@@ -58,6 +58,11 @@ extension _TemplatesPageView on _TemplatesPageState {
     final templateOfTheDay = headerState.templateOfTheDay;
     final selectedPetId = widget.initialPetId;
     final selectedPetPhotoId = widget.initialPetPhotoId;
+    final routeCategory = TemplatesFeedPolicy.normalizeCategory(
+      widget.initialCategory,
+    );
+    final isCategoryMode = routeCategory != null;
+    final showSecondaryHeader = isCategoryMode || widget.autofocusSearch;
     _trackTemplateOfTheDayViewed(templateOfTheDay);
 
     return DecoratedBox(
@@ -99,6 +104,8 @@ extension _TemplatesPageView on _TemplatesPageState {
                                 redirectPath: _templatesPageLocation(
                                   currentPetId: widget.initialPetId,
                                   currentPetPhotoId: widget.initialPetPhotoId,
+                                  category: routeCategory,
+                                  autofocusSearch: widget.autofocusSearch,
                                 ),
                               ),
                             ),
@@ -113,24 +120,95 @@ extension _TemplatesPageView on _TemplatesPageState {
                             ),
                           ),
                           const SizedBox(height: 6),
-                          Text(
-                            text.createMagicTitle,
-                            style: titleStyle?.copyWith(
-                              color: colors.textStrong,
-                              fontSize: 17,
-                              height: 1.08,
-                              fontWeight: FontWeight.w700,
+                          if (showSecondaryHeader)
+                            Row(
+                              key: ValueKey(
+                                isCategoryMode
+                                    ? 'templates-category-mode-header'
+                                    : 'templates-search-mode-header',
+                              ),
+                              children: [
+                                IconButton(
+                                  key: const ValueKey(
+                                    'templates-category-back-button',
+                                  ),
+                                  tooltip: MaterialLocalizations.of(
+                                    context,
+                                  ).backButtonTooltip,
+                                  onPressed: () {
+                                    final navigator = context.appNavigator;
+                                    if (navigator.canPop()) {
+                                      navigator.pop();
+                                      return;
+                                    }
+                                    navigator.go(const DiscoverDestination());
+                                  },
+                                  icon: const Icon(Icons.arrow_back_rounded),
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                                const SizedBox(width: 2),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        routeCategory ?? text.createMagicTitle,
+                                        key: isCategoryMode
+                                            ? const ValueKey(
+                                                'templates-category-title',
+                                              )
+                                            : null,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: titleStyle?.copyWith(
+                                          color: colors.textStrong,
+                                          fontSize: 17,
+                                          height: 1.08,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        isCategoryMode
+                                            ? text.discoverCategoryCatalogSubtitle
+                                            : text.pickTemplateSubtitle,
+                                        key: isCategoryMode
+                                            ? const ValueKey(
+                                                'templates-category-subtitle',
+                                              )
+                                            : null,
+                                        style: subtitleStyle?.copyWith(
+                                          color: colors.textSoft,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            )
+                          else ...[
+                            Text(
+                              text.createMagicTitle,
+                              style: titleStyle?.copyWith(
+                                color: colors.textStrong,
+                                fontSize: 17,
+                                height: 1.08,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            text.pickTemplateSubtitle,
-                            style: subtitleStyle?.copyWith(
-                              color: colors.textSoft,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
+                            const SizedBox(height: 2),
+                            Text(
+                              text.pickTemplateSubtitle,
+                              style: subtitleStyle?.copyWith(
+                                color: colors.textSoft,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
-                          ),
+                          ],
                           const SizedBox(height: 8),
                           CreateWithPetBlockSlot(
                             selectedPetId: selectedPetId,
@@ -139,6 +217,8 @@ extension _TemplatesPageView on _TemplatesPageState {
                           const SizedBox(height: 5),
                           TemplatesSearchField(
                             controller: _searchController,
+                            focusNode: _searchFocusNode,
+                            autofocus: widget.autofocusSearch,
                             onChanged: _handleSearchChanged,
                           ),
                           const SizedBox(height: 6),
@@ -148,6 +228,7 @@ extension _TemplatesPageView on _TemplatesPageState {
                             selectedCategory: headerState.query.category,
                             onTypeSelected: controller.setType,
                             onCategorySelected: controller.setCategory,
+                            showCategoryFilter: !isCategoryMode,
                           ),
                         ],
                       ),

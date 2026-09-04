@@ -631,7 +631,7 @@ void main() {
     expect(find.text('Passwords do not match.'), findsOneWidget);
   });
 
-  testWidgets('continues with Google and opens templates', (tester) async {
+  testWidgets('continues with Google and opens discovery', (tester) async {
     await pumpTestApp(
       tester,
       sharedPrefs: const {onboardingSeenKey: true},
@@ -648,7 +648,7 @@ void main() {
     await tester.pump();
     await pumpTestFrames(tester);
 
-    expect(find.text('Magic Studio'), findsOneWidget);
+    expect(find.text('What will your pet become?'), findsOneWidget);
   });
 
   testWidgets('shows localized message when external sign-in is cancelled', (
@@ -867,7 +867,7 @@ void main() {
     expect(container.read(profileControllerProvider).isAuthenticated, isFalse);
   });
 
-  testWidgets('opens templates directly for authenticated user', (
+  testWidgets('opens discovery directly for authenticated user', (
     tester,
   ) async {
     await pumpTestApp(
@@ -876,7 +876,7 @@ void main() {
       repository: FakeTemplatesRepository(items: const [sampleTemplate]),
     );
 
-    expect(find.text('Magic Studio'), findsOneWidget);
+    expect(find.text('What will your pet become?'), findsOneWidget);
   });
 
   testWidgets('guest can continue from welcome into template browsing', (
@@ -892,16 +892,8 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
 
-    expect(find.text('Magic Studio'), findsOneWidget);
-
-    await tester.scrollUntilVisible(
-      find.text('Try template'),
-      120,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.pump();
-
-    expect(find.text('Try template'), findsOneWidget);
+    expect(find.text('What will your pet become?'), findsOneWidget);
+    expect(find.text('Search templates'), findsOneWidget);
   });
 
   testWidgets('welcome guest action resets after startup failure', (

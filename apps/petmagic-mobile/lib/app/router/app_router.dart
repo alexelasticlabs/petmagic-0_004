@@ -31,6 +31,7 @@ import 'package:petmagic_mobile/features/templates/presentation/generation_statu
 import 'package:petmagic_mobile/features/templates/presentation/generations_gallery_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_preview_loader_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_preview_page.dart';
+import 'package:petmagic_mobile/features/templates/presentation/templates_discovery_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
 import 'package:petmagic_mobile/features/gamification/presentation/achievements_page.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/all_transactions_page.dart';
@@ -123,7 +124,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             isWelcomeRoute ||
             isAuthFlowRoute ||
             isLegalGateRoute) {
-          return TemplatesPage.routePath;
+          return TemplatesDiscoveryPage.routePath;
         }
         return null;
       }
@@ -141,7 +142,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       }
 
       if (isStartupRoute || isWelcomeRoute) {
-        return TemplatesPage.routePath;
+        return TemplatesDiscoveryPage.routePath;
       }
 
       return null;

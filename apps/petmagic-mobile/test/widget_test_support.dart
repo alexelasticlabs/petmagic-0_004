@@ -20,9 +20,11 @@ import 'package:petmagic_mobile/features/profile/domain/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
 import 'package:petmagic_mobile/features/support/application/support_realtime_gateway.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_repository.dart';
+import 'package:petmagic_mobile/features/templates/application/template_discovery_repository.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/templates_query.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_repository.dart';
+import 'package:petmagic_mobile/features/templates/domain/template_discovery_models.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 import 'package:petmagic_mobile/features/templates/application/generation_history_controller.dart';
@@ -144,6 +146,7 @@ Future<void> pumpTestApp(
   WidgetTester tester, {
   Map<String, Object> sharedPrefs = const {},
   TemplatesRepository? repository,
+  TemplateDiscoveryRepository? discoveryRepository,
   ProfileRepository? profileRepository,
   ExternalAuthRepository? externalAuthRepository,
   SupportChatRepository? supportChatRepository,
@@ -177,6 +180,10 @@ Future<void> pumpTestApp(
         authSessionStorageProvider.overrideWith((ref) => authStorage),
         templatesRepositoryProvider.overrideWith(
           (ref) => repository ?? FakeTemplatesRepository(),
+        ),
+        templateDiscoveryRepositoryProvider.overrideWith(
+          (ref) =>
+              discoveryRepository ?? const EmptyTemplateDiscoveryRepository(),
         ),
         templateGenerationControllerProvider.overrideWith(
           IdleTemplateGenerationController.new,
@@ -225,6 +232,22 @@ Future<void> pumpTestApp(
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();
   });
+}
+
+class EmptyTemplateDiscoveryRepository implements TemplateDiscoveryRepository {
+  const EmptyTemplateDiscoveryRepository();
+
+  @override
+  void cancelPendingRequest() {}
+
+  @override
+  Future<TemplateDiscovery> fetch() async => TemplateDiscovery(
+    sections: const [],
+    generatedAtUtc: DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
+  );
+
+  @override
+  Future<TemplateDiscovery?> readCached() async => null;
 }
 
 Future<void> pumpTestFrames(

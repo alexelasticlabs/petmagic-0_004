@@ -1,8 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
+import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 
 void main() {
   test('typed destinations preserve production route contracts', () {
+    expect(const DiscoverDestination().location, '/discover');
     expect(const TemplatesDestination().location, '/templates');
     expect(const CreateDestination().location, '/create');
     expect(
@@ -36,6 +38,31 @@ void main() {
     );
   });
 
+  test('templates destination preserves exact category and card payload', () {
+    const template = TemplateItem(
+      templateId: 'template-1',
+      templateType: TemplateType.image,
+      title: 'Portrait',
+      shortDescription: 'Portrait template',
+      petPhotoRequirements: [],
+      category: 'Pet Mischief',
+      tags: [],
+      isPremium: false,
+      tokenCost: 1,
+    );
+    const destination = TemplatesDestination(
+      category: ' Pet Mischief ',
+      autofocusSearch: true,
+      payload: template,
+    );
+
+    expect(
+      destination.location,
+      '/templates?category=Pet+Mischief&autofocusSearch=1',
+    );
+    expect(destination.extra, same(template));
+  });
+
   test('support destination bounds untrusted query values', () {
     final destination = SupportChatDestination(
       initialMessage: List.filled(300, ' x ').join(),
@@ -65,7 +92,7 @@ void main() {
     );
     expect(
       SafeRedirectDestination('https://example.test').location,
-      '/templates',
+      '/discover',
     );
   });
 
