@@ -46,8 +46,9 @@ void configureWidgetTestHarness() {
       defaultComparator is! TolerantGoldenFileComparator) {
     goldenFileComparator = TolerantGoldenFileComparator(
       defaultComparator.basedir.resolve('widget_test_support.dart'),
-      // Font geometry is deterministic; Skia antialiasing still differs by OS.
-      precisionTolerance: 0.08,
+      // Font geometry is deterministic; Skia antialiasing still differs by OS,
+      // and its relative footprint is larger on compact 320x568 baselines.
+      precisionTolerance: 0.095,
     );
   }
   setUpAll(() async {
