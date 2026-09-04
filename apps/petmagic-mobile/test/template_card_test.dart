@@ -963,6 +963,45 @@ void main() {
     },
   );
 
+  testWidgets(
+    'TemplateCard hides its description and keeps the premium label in the header',
+    (tester) async {
+      await tester.pumpWidget(
+        buildTemplateCardHost(
+          const TemplateItem(
+            templateId: 'premium-card-header',
+            templateType: TemplateType.image,
+            title: 'Premium template',
+            shortDescription: 'This text belongs only on the preview screen.',
+            petPhotoRequirements: ['Clear face'],
+            category: 'Funny',
+            tags: ['funny'],
+            isPremium: true,
+            tokenCost: 5,
+          ),
+          theme: AppTheme.dark(),
+          locale: const Locale('ru'),
+          size: const Size(188, 260),
+        ),
+      );
+      await tester.pump();
+
+      final premiumLabel = find.text('Премиум');
+      final title = find.text('Premium template');
+
+      expect(
+        find.text('This text belongs only on the preview screen.'),
+        findsNothing,
+      );
+      expect(premiumLabel, findsOneWidget);
+      expect(
+        tester.getRect(premiumLabel).bottom,
+        lessThan(tester.getRect(title).top),
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('TemplateCard labels a zero-cost featured template as free', (
     tester,
   ) async {
@@ -1020,7 +1059,7 @@ void main() {
 
       expect(actionLabel, findsOneWidget);
       expect(tester.getSize(actionLabel).height, greaterThan(0));
-      expect(tester.getSize(actionSurface).height, 38);
+      expect(tester.getSize(actionSurface).height, 30);
       expect(tester.takeException(), isNull);
     },
   );

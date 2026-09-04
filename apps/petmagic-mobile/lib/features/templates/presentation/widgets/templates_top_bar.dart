@@ -126,36 +126,10 @@ class _GiftButton extends StatelessWidget {
 
     return Tooltip(
       message: tooltip,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          _HeaderButton(
-            icon: Icons.card_giftcard_rounded,
-            color: colors.gold,
-            onPressed: onPressed,
-          ),
-          Positioned(
-            top: -4,
-            right: -2,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: colors.danger,
-                shape: BoxShape.circle,
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(4),
-                child: Text(
-                  '1',
-                  style: TextStyle(
-                    color: colors.on(colors.danger),
-                    fontSize: 9,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
+      child: _HeaderButton(
+        icon: Icons.emoji_events_rounded,
+        color: colors.gold,
+        onPressed: onPressed,
       ),
     );
   }

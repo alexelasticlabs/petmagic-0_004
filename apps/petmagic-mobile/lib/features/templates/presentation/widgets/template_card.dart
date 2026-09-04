@@ -296,6 +296,7 @@ class _TemplateCardState extends State<TemplateCard> {
                                   ? 'NEW'
                                   : widget.template.effectivePromoBadge,
                               type: widget.template.templateType,
+                              isPremium: widget.template.isPremium,
                               isFeatured: isFeatured,
                             ),
                           ),

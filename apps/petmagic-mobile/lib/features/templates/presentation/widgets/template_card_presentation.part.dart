@@ -32,12 +32,14 @@ class _TemplateHeaderBadges extends StatelessWidget {
     required this.type,
     this.highlightBadgeLabel,
     this.promoBadgeValue,
+    this.isPremium = false,
     this.isFeatured = false,
   });
 
   final TemplateType type;
   final String? highlightBadgeLabel;
   final String? promoBadgeValue;
+  final bool isPremium;
   final bool isFeatured;
 
   @override
@@ -54,6 +56,8 @@ class _TemplateHeaderBadges extends StatelessWidget {
         if (trimmedPromo != null && trimmedPromo.isNotEmpty)
           _PromoBadge(value: trimmedPromo),
         _MediaTypeBadge(type: type),
+        if (isPremium)
+          _AccessTag(label: AppLocalizations.of(context).premiumLabel),
       ],
     );
   }
@@ -108,20 +112,6 @@ class _TemplateDetails extends StatelessWidget {
             ],
           ),
         ),
-        if (template.shortDescription.trim().isNotEmpty) ...[
-          const SizedBox(height: 4),
-          Text(
-            template.shortDescription,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Colors.white.withValues(alpha: 0.82),
-              fontSize: 10.5,
-              height: 1.16,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
         if (tags.isNotEmpty) ...[
           const SizedBox(height: 4),
           SizedBox(
@@ -172,7 +162,6 @@ class _TemplateDetails extends StatelessWidget {
                 ),
               ),
             ),
-            if (template.isPremium) _AccessTag(label: text.premiumLabel),
             _TokenChip(cost: template.tokenCost),
           ],
         ),
@@ -220,7 +209,7 @@ class TemplateCardCta extends StatelessWidget {
         : colors.on(colors.accent);
     return PetMagicInteractiveSurface(
       onTap: onPressed,
-      borderRadius: BorderRadius.circular(19),
+      borderRadius: BorderRadius.circular(15),
       scaleDown: 0.98,
       child: DecoratedBox(
         decoration: BoxDecoration(
@@ -249,7 +238,7 @@ class TemplateCardCta extends StatelessWidget {
               : const LinearGradient(
                   colors: [Color(0xFF168A62), Color(0xFF15956A)],
                 ),
-          borderRadius: BorderRadius.circular(19),
+          borderRadius: BorderRadius.circular(15),
           border: Border.all(
             color: usePremiumStyle
                 ? const Color(0xFFF9E8B6).withValues(alpha: 0.68)
@@ -265,7 +254,7 @@ class TemplateCardCta extends StatelessWidget {
           ],
         ),
         child: ConstrainedBox(
-          constraints: const BoxConstraints.tightFor(height: 38),
+          constraints: const BoxConstraints.tightFor(height: 30),
           child: Stack(
             alignment: Alignment.center,
             children: [
@@ -284,10 +273,10 @@ class TemplateCardCta extends StatelessWidget {
                 ),
               ),
               Positioned(
-                right: 10,
+                right: 8,
                 child: Container(
-                  width: usePremiumStyle ? 20 : null,
-                  height: usePremiumStyle ? 20 : null,
+                  width: usePremiumStyle ? 18 : null,
+                  height: usePremiumStyle ? 18 : null,
                   decoration: usePremiumStyle
                       ? BoxDecoration(
                           color: const Color(0x26FFF3D2),
@@ -300,11 +289,11 @@ class TemplateCardCta extends StatelessWidget {
                         )
                       : null,
                   child: isPremiumLockCta
-                      ? const PremiumCrownIcon(size: 12)
+                      ? const PremiumCrownIcon(size: 11)
                       : Icon(
                           Icons.arrow_forward_rounded,
                           color: foregroundColor,
-                          size: usePremiumStyle ? 12 : 15,
+                          size: usePremiumStyle ? 11 : 14,
                         ),
                 ),
               ),
