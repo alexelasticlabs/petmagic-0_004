@@ -1,3 +1,5 @@
+import 'dart:async';
+
 export 'package:petmagic_mobile/features/templates/application/template_catalog_repository.dart'
     show TemplatesRepository, templatesRepositoryProvider;
 
@@ -183,6 +185,9 @@ class DefaultTemplatesRepository extends _TemplatesRepositoryBase
   @override
   Future<TemplatesFeedPage> fetchFeed(TemplatesQuery query) async {
     final dto = await _remoteDataSource.fetchFeed(query);
+    if (_isCanonicalFirstFeedPage(query)) {
+      unawaited(_persistFirstPageBestEffort(query, dto));
+    }
     final page = dto.toDomain();
     return TemplatesFeedPage(
       items: page.items,
@@ -190,6 +195,31 @@ class DefaultTemplatesRepository extends _TemplatesRepositoryBase
       hasMore: page.hasMore,
       page: query.page <= 0 ? 1 : query.page,
     );
+  }
+
+  bool _isCanonicalFirstFeedPage(TemplatesQuery query) {
+    return query.page == 1 &&
+        query.type == null &&
+        (query.category == null || query.category!.trim().isEmpty) &&
+        (query.search == null || query.search!.trim().isEmpty) &&
+        (query.cursor == null || query.cursor!.trim().isEmpty);
+  }
+
+  Future<void> _persistFirstPageBestEffort(
+    TemplatesQuery query,
+    TemplatesFeedDto page,
+  ) async {
+    try {
+      await _cacheDataSource.writeFirstPage(query, page);
+    } catch (error, stackTrace) {
+      AppLogger.warn(
+        feature: 'Templates.Repository',
+        operation: 'persist_first_feed_page',
+        message: 'Template first feed page persistence failed',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
   }
 
   @override

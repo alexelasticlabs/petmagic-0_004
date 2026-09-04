@@ -23,6 +23,8 @@ class TemplatesCacheDataSource {
   static const _catalogItemsKey = 'templates_catalog_items_v2';
   static const _catalogVersionKey = 'templates_catalog_version_v2';
   static const _catalogLastSyncAtKey = 'templates_catalog_last_sync_at_v2';
+  static const _firstFeedPageSnapshotKey =
+      'templates_feed_first_page_snapshot_v1';
 
   final SharedPreferencesAsync _preferences;
 
@@ -146,25 +148,69 @@ class TemplatesCacheDataSource {
   }
 
   Future<TemplatesFeedDto?> readFirstPage(TemplatesQuery query) async {
-    return readPage(
-      query.copyWith(page: 1, resetPage: true, clearCursor: true),
+    final firstPageQuery = query.copyWith(
+      page: 1,
+      resetPage: true,
+      clearCursor: true,
     );
+    final catalogPage = await readPage(firstPageQuery);
+    if (catalogPage != null) {
+      return catalogPage;
+    }
+
+    if (!_isCanonicalFirstFeedPageQuery(firstPageQuery)) {
+      return null;
+    }
+
+    return _readFirstFeedPageSnapshot(firstPageQuery);
   }
 
   Future<void> writeFirstPage(
     TemplatesQuery query,
     TemplatesFeedDto page,
   ) async {
-    if (query.page != 1) {
+    if (!_isCanonicalFirstFeedPageQuery(query)) {
       return;
     }
 
-    final existing = await readCatalogItems();
-    if (existing.isNotEmpty) {
-      return;
+    final sanitizedPage = TemplatesFeedDto(
+      items: page.items
+          .map(_sanitizePersistentCatalogItem)
+          .toList(growable: false),
+      nextCursor: page.nextCursor,
+      hasMore: page.hasMore,
+      page: 1,
+    );
+    await _preferences.setString(
+      _firstFeedPageSnapshotKey,
+      jsonEncode({
+        'pageSize': query.normalizedPageSize,
+        'feed': sanitizedPage.toJson(),
+      }),
+    );
+  }
+
+  Future<TemplatesFeedDto?> _readFirstFeedPageSnapshot(
+    TemplatesQuery query,
+  ) async {
+    final raw = await _preferences.getString(_firstFeedPageSnapshotKey);
+    if (raw == null || raw.isEmpty) {
+      return null;
     }
 
-    await writeCatalogItems(_sortByUpdatedAt(page.items));
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map ||
+          (decoded['pageSize'] as num?)?.toInt() != query.normalizedPageSize ||
+          decoded['feed'] is! Map) {
+        return null;
+      }
+
+      final feed = _sanitizePersistentCatalogItemMap(decoded['feed'] as Map);
+      return TemplatesFeedDto.fromJson(feed);
+    } on Object {
+      return null;
+    }
   }
 
   Future<List<String>> readCategories() async {
@@ -177,6 +223,14 @@ class TemplatesCacheDataSource {
             .toList(growable: false)
           ..sort();
     return categories;
+  }
+
+  bool _isCanonicalFirstFeedPageQuery(TemplatesQuery query) {
+    return query.page == 1 &&
+        query.type == null &&
+        (query.category == null || query.category!.trim().isEmpty) &&
+        (query.search == null || query.search!.trim().isEmpty) &&
+        (query.cursor == null || query.cursor!.trim().isEmpty);
   }
 
   List<TemplateItemDto> _sortByUpdatedAt(List<TemplateItemDto> items) {

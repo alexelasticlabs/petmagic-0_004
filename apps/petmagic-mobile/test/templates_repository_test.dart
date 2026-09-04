@@ -48,6 +48,210 @@ void main() {
   });
 
   test(
+    'first feed page persistence does not delay the remote result',
+    () async {
+      final backend = _FeedBackend();
+      final dio = Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
+        ..httpClientAdapter = backend;
+      final cacheDataSource = _ControlledFirstPageCacheDataSource();
+      addTearDown(cacheDataSource.releaseWrite);
+      final repository = DefaultTemplatesRepository(
+        remoteDataSource: TemplatesRemoteDataSource(dio),
+        cacheDataSource: cacheDataSource,
+      );
+
+      final page = await repository
+          .fetchFeed(
+            const TemplatesQuery(category: ' ', search: '\t', cursor: '\n'),
+          )
+          .timeout(const Duration(seconds: 1));
+      await cacheDataSource.writeStarted.future.timeout(
+        const Duration(seconds: 1),
+      );
+
+      expect(page.items.single.templateId, 'feed-template-1');
+      expect(cacheDataSource.writeCalls, 1);
+      expect(cacheDataSource.lastQuery?.page, 1);
+      expect(
+        cacheDataSource.lastPage?.items.single.templateId,
+        'feed-template-1',
+      );
+      expect(cacheDataSource.writeFinished.isCompleted, isFalse);
+
+      cacheDataSource.releaseWrite();
+      await cacheDataSource.writeFinished.future.timeout(
+        const Duration(seconds: 1),
+      );
+    },
+  );
+
+  test('later feed pages are not persisted as the first page', () async {
+    final backend = _FeedBackend();
+    final dio = Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
+      ..httpClientAdapter = backend;
+    final cacheDataSource = _ControlledFirstPageCacheDataSource();
+    addTearDown(cacheDataSource.releaseWrite);
+    final repository = DefaultTemplatesRepository(
+      remoteDataSource: TemplatesRemoteDataSource(dio),
+      cacheDataSource: cacheDataSource,
+    );
+
+    final page = await repository.fetchFeed(const TemplatesQuery(page: 2));
+    await Future<void>.delayed(Duration.zero);
+
+    expect(page.page, 2);
+    expect(cacheDataSource.writeCalls, 0);
+    expect(cacheDataSource.writeStarted.isCompleted, isFalse);
+  });
+
+  test(
+    'filtered first feed pages do not seed the shared catalog cache',
+    () async {
+      final backend = _FeedBackend();
+      final dio = Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
+        ..httpClientAdapter = backend;
+      final cacheDataSource = _ControlledFirstPageCacheDataSource();
+      final repository = DefaultTemplatesRepository(
+        remoteDataSource: TemplatesRemoteDataSource(dio),
+        cacheDataSource: cacheDataSource,
+      );
+      final filteredQueries = <String, TemplatesQuery>{
+        'type': const TemplatesQuery(type: TemplateType.video),
+        'category': const TemplatesQuery(category: 'Portrait'),
+        'search': const TemplatesQuery(search: 'magic'),
+        'cursor': const TemplatesQuery(cursor: 'next-cursor'),
+      };
+
+      for (final entry in filteredQueries.entries) {
+        await repository.fetchFeed(entry.value);
+        await Future<void>.delayed(Duration.zero);
+        expect(cacheDataSource.writeCalls, 0, reason: entry.key);
+      }
+
+      expect(cacheDataSource.writeStarted.isCompleted, isFalse);
+    },
+  );
+
+  test(
+    'first feed page cache failure does not fail the remote result',
+    () async {
+      final backend = _FeedBackend();
+      final dio = Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
+        ..httpClientAdapter = backend;
+      final cacheDataSource = _ControlledFirstPageCacheDataSource(
+        failWrite: true,
+      );
+      final repository = DefaultTemplatesRepository(
+        remoteDataSource: TemplatesRemoteDataSource(dio),
+        cacheDataSource: cacheDataSource,
+      );
+
+      final page = await repository.fetchFeed(const TemplatesQuery());
+      await cacheDataSource.writeStarted.future.timeout(
+        const Duration(seconds: 1),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(page.items.single.templateId, 'feed-template-1');
+      expect(cacheDataSource.writeCalls, 1);
+    },
+  );
+
+  test(
+    'first feed snapshot stays separate from the versioned full catalog',
+    () async {
+      final preferences = SharedPreferencesAsync();
+      final cacheDataSource = TemplatesCacheDataSource(preferences);
+      await cacheDataSource.writeCatalogVersion(7);
+      await cacheDataSource.writeFirstPage(
+        const TemplatesQuery(),
+        TemplatesFeedDto(
+          items: [
+            _catalogDto(
+              id: 'feed-snapshot',
+              title: 'Feed snapshot',
+              thumbnailUrl:
+                  'https://cdn.petmagic.test/snapshot-thumb.jpg?X-Amz-Signature=thumb-secret',
+              previewUrl:
+                  'https://cdn.petmagic.test/snapshot-preview.mp4?token=preview-secret',
+            ),
+          ],
+          nextCursor: 'next-cursor',
+          hasMore: true,
+          page: 1,
+        ),
+      );
+
+      final cachedPage = await cacheDataSource.readFirstPage(
+        const TemplatesQuery(),
+      );
+      final rawSnapshot = await preferences.getString(
+        'templates_feed_first_page_snapshot_v1',
+      );
+
+      expect(await cacheDataSource.readCatalogItems(), isEmpty);
+      expect(await cacheDataSource.readCatalogVersion(), 7);
+      expect(cachedPage?.items.single.templateId, 'feed-snapshot');
+      expect(cachedPage?.nextCursor, 'next-cursor');
+      expect(cachedPage?.hasMore, isTrue);
+      expect(rawSnapshot, isNotNull);
+      expect(rawSnapshot, isNot(contains('thumb-secret')));
+      expect(rawSnapshot, isNot(contains('preview-secret')));
+    },
+  );
+
+  test(
+    'first feed snapshot cannot short-circuit a same-version full resync',
+    () async {
+      final backend = _CatalogSyncBackend();
+      final dio = Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
+        ..httpClientAdapter = backend;
+      final cacheDataSource = TemplatesCacheDataSource(
+        SharedPreferencesAsync(),
+      );
+      await cacheDataSource.writeCatalogVersion(7);
+      await cacheDataSource.writeFirstPage(
+        const TemplatesQuery(),
+        TemplatesFeedDto(
+          items: [
+            _catalogDto(
+              id: 'feed-only',
+              title: 'Feed only',
+              thumbnailUrl: 'https://cdn.petmagic.test/feed-only-thumb.jpg',
+              previewUrl: 'https://cdn.petmagic.test/feed-only-preview.jpg',
+            ),
+          ],
+          nextCursor: 'next-cursor',
+          hasMore: true,
+          page: 1,
+        ),
+      );
+      final repository = DefaultTemplatesRepository(
+        remoteDataSource: TemplatesRemoteDataSource(dio),
+        cacheDataSource: cacheDataSource,
+      );
+
+      final items = await repository.readSyncedCatalogItems();
+
+      expect(backend.requestPaths, [
+        '/api/templates/catalog-version',
+        '/api/templates',
+        '/api/templates',
+      ]);
+      expect(items.map((item) => item.templateId), [
+        'catalog-new',
+        'catalog-old',
+      ]);
+      expect(
+        (await cacheDataSource.readFirstPage(
+          const TemplatesQuery(),
+        ))!.items.map((item) => item.templateId),
+        ['catalog-new', 'catalog-old'],
+      );
+    },
+  );
+
+  test(
     'full catalog resync uses paged catalog metadata instead of feed endpoint',
     () async {
       final backend = _CatalogSyncBackend();
@@ -672,6 +876,68 @@ Future<void> _writePreviousMediaCatalog(
       previewUrl: _sharedPreviewUrl,
     ),
   ], version: 1);
+}
+
+class _ControlledFirstPageCacheDataSource extends TemplatesCacheDataSource {
+  _ControlledFirstPageCacheDataSource({this.failWrite = false})
+    : super(SharedPreferencesAsync());
+
+  final bool failWrite;
+  final Completer<void> writeStarted = Completer<void>();
+  final Completer<void> writeFinished = Completer<void>();
+  final Completer<void> _releaseWrite = Completer<void>();
+  int writeCalls = 0;
+  TemplatesQuery? lastQuery;
+  TemplatesFeedDto? lastPage;
+
+  @override
+  Future<void> writeFirstPage(
+    TemplatesQuery query,
+    TemplatesFeedDto page,
+  ) async {
+    writeCalls++;
+    lastQuery = query;
+    lastPage = page;
+    if (!writeStarted.isCompleted) {
+      writeStarted.complete();
+    }
+    if (failWrite) {
+      throw StateError('first_page_cache_unavailable');
+    }
+    await _releaseWrite.future;
+    if (!writeFinished.isCompleted) {
+      writeFinished.complete();
+    }
+  }
+
+  void releaseWrite() {
+    if (!_releaseWrite.isCompleted) {
+      _releaseWrite.complete();
+    }
+  }
+}
+
+class _FeedBackend implements HttpClientAdapter {
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<dynamic>? cancelFuture,
+  ) async {
+    if (options.path != '/api/templates/feed') {
+      fail('Unexpected request path: ${options.path}');
+    }
+
+    return _jsonResponse({
+      'items': [_templateDetail(id: 'feed-template-1', title: 'Feed template')],
+      'nextCursor': 'next-cursor',
+      'hasMore': true,
+      'generatedAtUtc': '2026-09-04T12:00:00Z',
+    });
+  }
+
+  @override
+  void close({bool force = false}) {}
 }
 
 class _CatalogSyncBackend implements HttpClientAdapter {
