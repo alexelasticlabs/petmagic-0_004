@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:ui';
 
-import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
@@ -12,12 +11,11 @@ import 'package:petmagic_mobile/app/app.dart';
 import 'package:petmagic_mobile/app/composition/mobile_provider_overrides.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/core/config/app_config.dart';
+import 'package:petmagic_mobile/core/firebase/firebase_app_initializer.dart';
 import 'package:petmagic_mobile/core/logging/app_crash_reporter.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/performance/decoded_image_cache_budget.dart';
 import 'package:petmagic_mobile/shared/files/temp_media_cleanup.dart';
-
-const bool _skipFirebase = bool.fromEnvironment('PETMAGIC_SKIP_FIREBASE');
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -41,7 +39,7 @@ Future<void> main() async {
       }());
 
       TempMediaCleanup.scheduleTtlSweep();
-      if (!_skipFirebase) {
+      if (firebaseInitializationEnabled) {
         _registerFirebaseMessagingBackgroundHandler();
         unawaited(_configureFirebaseMessagingAsync());
       }
@@ -149,13 +147,13 @@ AppLocalizations _resolveErrorFallbackLocalizations() {
 }
 
 Future<bool> _initializeFirebase() async {
-  if (_skipFirebase) {
+  if (!firebaseInitializationEnabled) {
     return false;
   }
 
   try {
-    if (Firebase.apps.isEmpty) {
-      await Firebase.initializeApp();
+    if (!await firebaseAppInitializer.ensureInitialized()) {
+      return false;
     }
     await AppCrashReporter.initialize();
     AppCrashReporter.runStagingProbeIfRequested();

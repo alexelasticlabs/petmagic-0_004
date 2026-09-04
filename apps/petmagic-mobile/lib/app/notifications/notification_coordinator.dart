@@ -4,12 +4,15 @@ import 'dart:io';
 import 'dart:ui';
 
 import 'package:crypto/crypto.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:petmagic_mobile/core/logging/app_logger.dart';
+import 'package:petmagic_mobile/core/notifications/authenticated_notification_initialization_runner.dart';
 import 'package:petmagic_mobile/core/auth/auth_session_storage.dart';
+import 'package:petmagic_mobile/core/firebase/firebase_app_initializer.dart';
+import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/notifications/notification_foreground_copy.dart';
+import 'package:petmagic_mobile/core/notifications/firebase_messaging_token_reader.dart';
 import 'package:petmagic_mobile/core/notifications/notification_route_resolver.dart';
+import 'package:petmagic_mobile/core/notifications/push_token_registration_retry_scheduler.dart';
 import 'package:petmagic_mobile/app/notifications/push_token_registrar.dart';
 import 'package:petmagic_mobile/features/support/application/support_contract.dart';
 import 'package:petmagic_mobile/features/templates/application/template_generation_contract.dart';
@@ -18,6 +21,7 @@ import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 
 part 'notification_interaction_coordinator.part.dart';
 part 'notification_firebase_readiness.part.dart';
+part 'notification_authenticated_initialization.part.dart';
 
 abstract class _NotificationCoordinatorBase {
   _NotificationCoordinatorBase({
@@ -26,24 +30,38 @@ abstract class _NotificationCoordinatorBase {
     required WalletRepositoryPort walletRepository,
     required AuthSessionStore sessionStorage,
     required void Function(String route) onRouteRequested,
+    FirebaseAppInitializer? appInitializer,
+    FirebaseMessagingTokenReader? tokenReader,
   }) : _pushTokenRegistrar = PushTokenRegistrar(
          templateRepository: templateRepository,
          supportRepository: supportRepository,
          walletRepository: walletRepository,
          sessionStorage: sessionStorage,
        ),
+       _appInitializer = appInitializer ?? firebaseAppInitializer,
+       _tokenReader = tokenReader ?? firebaseMessagingTokenReader,
        _onRouteRequested = onRouteRequested;
 
   final PushTokenRegistrar _pushTokenRegistrar;
+  final FirebaseAppInitializer _appInitializer;
+  final FirebaseMessagingTokenReader _tokenReader;
   final void Function(String route) _onRouteRequested;
+  final AuthenticatedNotificationInitializationRunner _initializationRunner =
+      AuthenticatedNotificationInitializationRunner();
+  late final PushTokenRegistrationRetryScheduler
+  _tokenRegistrationRetryScheduler;
   final NotificationRouteResolver _routeResolver =
       const NotificationRouteResolver();
   static final RegExp _routeControlCharacters = RegExp(r'[\x00-\x1F\x7F]');
   static const Duration _handledInteractionWindow = Duration(minutes: 5);
-  static const Duration _firebaseReadinessTimeout = Duration(seconds: 3);
-  static const Duration _firebaseReadinessPollInterval = Duration(
-    milliseconds: 100,
-  );
+  static const List<Duration> _firebaseInitializationRetryDelays = [
+    Duration(milliseconds: 250),
+    Duration(seconds: 1),
+    Duration(seconds: 3),
+    Duration(seconds: 10),
+    Duration(seconds: 30),
+    Duration(minutes: 1),
+  ];
   static const int _maxHandledInteractions = 128;
   static const int _maxExternalDedupeKeyLength = 160;
 
@@ -57,7 +75,6 @@ abstract class _NotificationCoordinatorBase {
   bool _isDisposed = false;
   bool _initialMessageHandled = false;
   bool _initialized = false;
-  bool _initializing = false;
   bool _authenticatedReady = false;
   bool _authSessionActive = false;
   int _registrationEpoch = 0;
@@ -71,43 +88,31 @@ class NotificationCoordinator extends _NotificationCoordinatorBase
     required super.walletRepository,
     required super.sessionStorage,
     required super.onRouteRequested,
-  });
+    super.appInitializer,
+    super.tokenReader,
+  }) {
+    _tokenRegistrationRetryScheduler = PushTokenRegistrationRetryScheduler(
+      canRetry: () => !_isDisposed && _authSessionActive && _firebaseReady,
+      onFailure: (error, stackTrace) {
+        _logNotificationFailure(
+          'schedule_token_registration_retry',
+          error,
+          stackTrace,
+        );
+      },
+    );
+  }
 
   Future<void> initializeForAuthenticatedUser() async {
-    if (_isDisposed || _authenticatedReady || _initializing) {
+    if (_isDisposed || _authenticatedReady) {
       return;
     }
 
-    _authSessionActive = true;
-    _initializing = true;
-    try {
-      if (!await _waitForFirebaseReady()) {
-        return;
-      }
-
-      await _ensureInitialized();
-      final permissionAllowed = await _ensureNotificationPermissionAllowed();
-      if (!permissionAllowed) {
-        await _unregisterCurrentToken(markSessionInactive: false);
-        _authenticatedReady = true;
-        return;
-      }
-
-      await registerCurrentToken();
-
-      final initialMessage = await FirebaseMessaging.instance
-          .getInitialMessage();
-      if (!_initialMessageHandled && initialMessage != null) {
-        _initialMessageHandled = true;
-        _handleRemoteMessageRoute(initialMessage);
-      } else {
-        _initialMessageHandled = true;
-      }
-
-      _authenticatedReady = true;
-    } finally {
-      _initializing = false;
+    if (!_authSessionActive) {
+      _registrationEpoch++;
     }
+    _authSessionActive = true;
+    await _initializationRunner.activateAndRun(_initializeAuthenticatedSession);
   }
 
   Future<void> registerCurrentToken() async {
@@ -115,27 +120,37 @@ class NotificationCoordinator extends _NotificationCoordinatorBase
       return;
     }
 
+    final epoch = _registrationEpoch;
     try {
       final permissionAllowed = await _notificationsAllowed();
+      if (!_canContinueRegistration(epoch)) {
+        return;
+      }
       if (!permissionAllowed) {
         await _unregisterCurrentToken(markSessionInactive: false);
         return;
       }
 
-      final token = await FirebaseMessaging.instance.getToken();
+      final token = await _tokenReader.readToken(
+        canContinue: () => _canContinueRegistration(epoch),
+      );
       if (token == null || token.isEmpty) {
+        _scheduleCurrentTokenRegistrationRetry();
         return;
       }
 
-      final epoch = _registrationEpoch;
       final previousToken = _lastRegisteredToken;
       final registered = await _registerTokenWithRetry(token, epoch: epoch);
       if (registered && _canContinueRegistration(epoch)) {
         _lastRegisteredToken = token;
+        _tokenRegistrationRetryScheduler.reset();
         await _unregisterStaleToken(previousToken, replacementToken: token);
+      } else {
+        _scheduleCurrentTokenRegistrationRetry();
       }
     } catch (error, stackTrace) {
       _logNotificationFailure('register_current_token', error, stackTrace);
+      _scheduleCurrentTokenRegistrationRetry();
     }
   }
 
@@ -146,18 +161,23 @@ class NotificationCoordinator extends _NotificationCoordinatorBase
   Future<void> _unregisterCurrentToken({
     required bool markSessionInactive,
   }) async {
+    _tokenRegistrationRetryScheduler.cancel();
     final epoch = ++_registrationEpoch;
     if (markSessionInactive) {
       _authSessionActive = false;
       _authenticatedReady = false;
+      _initializationRunner.deactivate();
       _handledInteractions.clear();
       _cancelFirebaseReadinessWait();
     }
 
+    final registeredToken =
+        _lastRegisteredToken ?? await _pushTokenRegistrar.readRegisteredToken();
     final token =
-        _lastRegisteredToken ??
-        await _pushTokenRegistrar.readRegisteredToken() ??
-        await _readCurrentFirebaseToken();
+        registeredToken ??
+        (markSessionInactive
+            ? null
+            : await _readCurrentFirebaseToken(epoch: epoch));
     if (token == null || token.isEmpty) {
       return;
     }
@@ -177,28 +197,30 @@ class NotificationCoordinator extends _NotificationCoordinatorBase
     }
   }
 
-  Future<String?> _readCurrentFirebaseToken() async {
+  Future<String?> _readCurrentFirebaseToken({required int epoch}) async {
     if (!_firebaseReady) {
       return null;
     }
 
-    final token = await FirebaseMessaging.instance.getToken();
-    final normalized = token?.trim();
-    return normalized == null || normalized.isEmpty ? null : normalized;
+    return _tokenReader.readToken(
+      canContinue: () => !_isDisposed && epoch == _registrationEpoch,
+    );
   }
 
   Future<void> dispose() async {
     _isDisposed = true;
     _authSessionActive = false;
     _registrationEpoch++;
+    _initializationRunner.dispose();
     _cancelFirebaseReadinessWait();
+    _tokenRegistrationRetryScheduler.cancel();
     await _tokenRefreshSubscription?.cancel();
     await _messageOpenedSubscription?.cancel();
     await _foregroundMessageSubscription?.cancel();
     _handledInteractions.clear();
   }
 
-  bool get _firebaseReady => Firebase.apps.isNotEmpty;
+  bool get _firebaseReady => _appInitializer.isInitialized;
 
   Future<void> _ensureInitialized() async {
     if (_initialized) {
@@ -287,11 +309,19 @@ class NotificationCoordinator extends _NotificationCoordinatorBase
       final registered = await _registerTokenWithRetry(token, epoch: epoch);
       if (registered && _canContinueRegistration(epoch)) {
         _lastRegisteredToken = token;
+        _tokenRegistrationRetryScheduler.reset();
         await _unregisterStaleToken(previousToken, replacementToken: token);
+      } else {
+        _scheduleCurrentTokenRegistrationRetry();
       }
     } catch (error, stackTrace) {
       _logNotificationFailure('register_refreshed_token', error, stackTrace);
+      _scheduleCurrentTokenRegistrationRetry();
     }
+  }
+
+  void _scheduleCurrentTokenRegistrationRetry() {
+    _tokenRegistrationRetryScheduler.schedule(registerCurrentToken);
   }
 
   Future<bool> _registerTokenWithRetry(

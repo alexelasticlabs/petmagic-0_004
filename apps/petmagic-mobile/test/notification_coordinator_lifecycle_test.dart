@@ -109,6 +109,24 @@ void main() {
     expect(body, isNot(contains('message.data')));
   });
 
+  test('all mobile FCM token reads use the APNs-aware helper', () {
+    final coordinatorSource = _readNotificationCoordinatorSource();
+    final lifecycleAdapterSource = File(
+      'lib/app/notifications/firebase_push_token_lifecycle_adapter.dart',
+    ).readAsStringSync();
+
+    expect(coordinatorSource, contains('_tokenReader.readToken('));
+    expect(lifecycleAdapterSource, contains('_tokenReader.readToken('));
+    expect(
+      coordinatorSource,
+      isNot(contains('FirebaseMessaging.instance.getToken()')),
+    );
+    expect(
+      lifecycleAdapterSource,
+      isNot(contains('FirebaseMessaging.instance.getToken()')),
+    );
+  });
+
   test('notification routes are constrained to safe internal destinations', () {
     final source = File(
       'lib/core/notifications/notification_route_resolver.dart',
@@ -149,17 +167,37 @@ void main() {
       expect(coordinatorSource, contains('requestPermission('));
       expect(coordinatorSource, contains('getNotificationSettings()'));
       expect(coordinatorSource, contains('_notificationsAllowed()'));
-      expect(coordinatorSource, contains('_waitForFirebaseReady()'));
       expect(
         coordinatorSource,
-        contains('static const Duration _firebaseReadinessTimeout'),
+        contains('_waitForFirebaseReady(sessionEpoch)'),
       );
+      expect(coordinatorSource, contains('FirebaseAppInitializer'));
       expect(
         coordinatorSource,
-        contains('return _firebaseReady && _canContinueInitialization();'),
+        contains('_appInitializer.ensureInitialized()'),
       );
+      expect(coordinatorSource, contains('_firebaseInitializationRetryDelays'));
+      expect(coordinatorSource, isNot(contains('final deadline =')));
       expect(coordinatorSource, contains('_cancelFirebaseReadinessWait();'));
       expect(coordinatorSource, contains('_firebaseReadinessTimer?.cancel();'));
+      expect(coordinatorSource, contains('_tokenReader.readToken('));
+      expect(
+        coordinatorSource,
+        contains('_scheduleCurrentTokenRegistrationRetry()'),
+      );
+      expect(
+        coordinatorSource,
+        contains('_tokenRegistrationRetryScheduler.cancel();'),
+      );
+      expect(
+        coordinatorSource,
+        contains('_initializationRunner.activateAndRun('),
+      );
+      expect(
+        coordinatorSource,
+        contains('_initializationRunner.deactivate();'),
+      );
+      expect(coordinatorSource, contains('_appInitializer.enabled'));
       expect(
         coordinatorSource,
         contains('AuthorizationStatus.denied &&\n        !Platform.isAndroid'),
@@ -511,6 +549,7 @@ void main() {
 String _readNotificationCoordinatorSource() {
   return [
     'lib/app/notifications/notification_coordinator.dart',
+    'lib/app/notifications/notification_authenticated_initialization.part.dart',
     'lib/app/notifications/notification_interaction_coordinator.part.dart',
     'lib/app/notifications/notification_firebase_readiness.part.dart',
   ].map((path) => File(path).readAsStringSync()).join('\n');

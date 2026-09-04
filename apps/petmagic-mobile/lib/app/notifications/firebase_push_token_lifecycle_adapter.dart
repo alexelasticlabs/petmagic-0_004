@@ -1,8 +1,8 @@
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/app/notifications/push_token_registrar.dart';
 import 'package:petmagic_mobile/core/auth/auth_session_storage.dart';
+import 'package:petmagic_mobile/core/firebase/firebase_app_initializer.dart';
+import 'package:petmagic_mobile/core/notifications/firebase_messaging_token_reader.dart';
 import 'package:petmagic_mobile/features/profile/application/push_token_lifecycle_port.dart';
 import 'package:petmagic_mobile/features/support/application/support_contract.dart';
 import 'package:petmagic_mobile/features/templates/application/template_generation_contract.dart';
@@ -22,11 +22,17 @@ final firebasePushTokenLifecycleAdapterProvider =
 
 final class FirebasePushTokenLifecycleAdapter
     implements PushTokenLifecyclePort {
-  const FirebasePushTokenLifecycleAdapter({
+  FirebasePushTokenLifecycleAdapter({
     required PushTokenRegistrar registrar,
-  }) : _registrar = registrar;
+    FirebaseAppInitializer? appInitializer,
+    FirebaseMessagingTokenReader? tokenReader,
+  }) : _registrar = registrar,
+       _appInitializer = appInitializer ?? firebaseAppInitializer,
+       _tokenReader = tokenReader ?? firebaseMessagingTokenReader;
 
   final PushTokenRegistrar _registrar;
+  final FirebaseAppInitializer _appInitializer;
+  final FirebaseMessagingTokenReader _tokenReader;
 
   @override
   Future<String?> readRegisteredToken() => _registrar.readRegisteredToken();
@@ -68,7 +74,8 @@ final class FirebasePushTokenLifecycleAdapter
     final cachedToken = await readRegisteredToken();
     if (!canContinue()) return;
 
-    final token = cachedToken ?? await readCurrentDeviceToken();
+    final token =
+        cachedToken ?? await _readFirebaseToken(canContinue: canContinue);
     if (token == null || token.isEmpty || !canContinue()) return;
 
     await unregisterToken(
@@ -78,10 +85,10 @@ final class FirebasePushTokenLifecycleAdapter
     );
   }
 
-  Future<String?> _readFirebaseToken() async {
-    if (Firebase.apps.isEmpty) return null;
-    final token = await FirebaseMessaging.instance.getToken();
-    final normalized = token?.trim();
-    return normalized == null || normalized.isEmpty ? null : normalized;
+  Future<String?> _readFirebaseToken({bool Function()? canContinue}) async {
+    if (canContinue != null && !canContinue()) return null;
+    if (!await _appInitializer.ensureInitialized()) return null;
+    if (canContinue != null && !canContinue()) return null;
+    return _tokenReader.readToken(canContinue: canContinue);
   }
 }
