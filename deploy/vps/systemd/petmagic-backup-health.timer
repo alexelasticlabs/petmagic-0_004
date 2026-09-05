@@ -1,0 +1,10 @@
+[Unit]
+Description=Check PetMagic backup freshness every 15 minutes
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=15min
+Unit=petmagic-backup-health.service
+
+[Install]
+WantedBy=timers.target

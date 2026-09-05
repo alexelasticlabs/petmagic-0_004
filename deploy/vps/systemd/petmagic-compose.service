@@ -12,7 +12,8 @@ Type=notify
 NotifyAccess=all
 RuntimeDirectory=petmagic
 RuntimeDirectoryMode=0700
-RuntimeDirectoryPreserve=restart
+# Preserve lock inodes across an explicit maintenance stop/start too.
+RuntimeDirectoryPreserve=yes
 WorkingDirectory=/opt/petmagic/current
 ExecStartPre=/usr/bin/bash /opt/petmagic/current/deploy/vps/scripts/runtime-preflight.sh
 ExecStart=/usr/bin/bash /opt/petmagic/current/deploy/vps/scripts/supervise-stack.sh

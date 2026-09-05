@@ -10,6 +10,6 @@ User=root
 WorkingDirectory=/opt/petmagic/current
 Environment=PETMAGIC_POSTGRES_BACKUP_RETENTION_DAYS=14
 Environment=PETMAGIC_API_DATA_BACKUP_RETENTION_DAYS=14
-ExecStart=/usr/bin/bash /opt/petmagic/current/deploy/vps/scripts/backup-offsite.sh
+ExecStart=/usr/bin/bash /opt/petmagic/shared/operations/backup-offsite.sh
 TimeoutStartSec=1h
 TimeoutStopSec=420

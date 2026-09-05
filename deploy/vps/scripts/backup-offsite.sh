@@ -9,6 +9,7 @@ readonly backup_dir="/opt/petmagic/shared/backups/postgres"
 readonly api_data_dir="/opt/petmagic/shared/api-data"
 readonly api_snapshot_dir="/opt/petmagic/shared/backups/api-data"
 readonly backup_job_lock="/run/petmagic/backup-job.lock"
+readonly release_lock="/run/petmagic/release.lock"
 readonly maintenance_lock="/run/petmagic/maintenance.lock"
 readonly retention_days="${PETMAGIC_API_DATA_BACKUP_RETENTION_DAYS:-14}"
 api_snapshot_partial=""
@@ -43,12 +44,17 @@ if ! [[ "$retention_days" =~ ^[1-9][0-9]*$ ]]; then
 fi
 
 cd "$deploy_root"
+exec 7>"$release_lock"
+if ! flock -w 600 7; then
+  echo "Timed out waiting for a PetMagic release." >&2
+  exit 1
+fi
 /usr/bin/bash deploy/vps/scripts/preflight.sh "$env_file"
 compose=(docker compose --env-file "$env_file" -f docker-compose.yml -f deploy/vps/compose.vps.yaml)
 
 exec 9>"$backup_job_lock"
-if ! flock -n 9; then
-  echo "Another PetMagic backup is already running." >&2
+if ! flock -w 600 9; then
+  echo "Timed out waiting for another PetMagic backup." >&2
   exit 1
 fi
 
@@ -199,7 +205,19 @@ restic backup \
   /opt/petmagic/shared/backups/render-restore.marker \
   /opt/petmagic/shared/backups/render-disk-restore.marker
 
-restic forget --keep-daily 14 --keep-weekly 8 --keep-monthly 12 --prune
+restic forget --tag production --group-by host,tags \
+  --keep-daily 14 --keep-weekly 8 --keep-monthly 12 --prune
 restic check
+python3 - <<'PY'
+import json
+from pathlib import Path
+import time
+
+directory = Path('/opt/petmagic/shared/backups/status')
+directory.mkdir(mode=0o700, exist_ok=True)
+temporary = directory / 'postgres-nightly.tmp'
+temporary.write_text(json.dumps({'completed_at': time.time()}) + '\n')
+temporary.replace(directory / 'postgres-nightly.json')
+PY
 trap - EXIT
 echo "Encrypted off-site backup completed."

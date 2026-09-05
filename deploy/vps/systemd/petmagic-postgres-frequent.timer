@@ -1,0 +1,12 @@
+[Unit]
+Description=PetMagic PostgreSQL off-site backup every 15 minutes
+
+[Timer]
+# Offset from the coordinated nightly backup at 03:30 UTC.
+OnCalendar=*-*-* *:07,22,37,52:00 UTC
+AccuracySec=10s
+Persistent=true
+Unit=petmagic-postgres-frequent.service
+
+[Install]
+WantedBy=timers.target

@@ -145,6 +145,44 @@ API and worker, then encrypts and uploads the artifacts to the private R2 restic
 repository. It retains daily, weekly, and monthly snapshots. The restic password
 is `/opt/petmagic/shared/env/restic-password`, mode `0600`; never display it.
 
+PostgreSQL also has an online off-site copy every 15 minutes (`:07`, `:22`, `:37`,
+`:52` UTC), through `petmagic-postgres-frequent.timer`. `pg_dump` takes a consistent
+database snapshot without stopping the API. Each dump is validated locally,
+checksummed and encrypted by restic before a success marker is written. Failed
+uploads preserve the local dump and retry up to three times. Local frequent dumps
+are retained for three days; off-site retention keeps all snapshots from the last
+24 hours, then 14 daily, 8 weekly and 12 monthly restore points.
+
+Frequent snapshots have a separate `postgres-frequent` tag. Both retention
+policies group by `host,tags`, because timestamped filenames must not create
+independent retention groups. Nightly retention selects only `production`
+snapshots, so it cannot remove the recent frequent database restore points.
+All backup and restore operations share the release and backup locks. The Compose
+unit preserves its runtime directory across maintenance stops to retain the same
+lock inodes.
+
+`petmagic-postgres-verify.timer` runs every Sunday at 04:40 UTC: it reads and checks
+the encrypted repository, downloads the latest frequent snapshot, verifies its
+checksum and restores it into a disposable PostgreSQL container without network
+access or published ports. Production data is never used as the restore target.
+`petmagic-backup-health.timer` checks success markers every 15 minutes and fails
+if a database copy is over 45 minutes old, the coordinated nightly copy is over
+30 hours old, or restore verification is over eight days old. Failures are visible
+in systemd/journald; an external notification destination is a separate integration.
+
+Install `scripts/postgres-backups.py` and `scripts/backup-offsite.sh` into the
+root-only `/opt/petmagic/shared/operations/` directory before installing the
+corresponding systemd units. Run a frequent backup, a coordinated nightly backup,
+an isolated restore, and the freshness check successfully before enabling timers.
+Failure-path tests run with `python3 scripts/qa/test_postgres_backups.py` on Linux.
+
+The database recovery-point target is 15 minutes plus backup completion time;
+this is snapshot recovery, not continuous WAL/PITR or a zero-data-loss guarantee.
+Local API files are covered by the coordinated nightly snapshot. R2 application
+media objects are separate from these database/local-file snapshots. Disaster
+recovery also requires a separately protected operator copy of the restic password
+and dedicated backup credentials: copies on the VPS alone cannot survive its loss.
+
 Before modifying backup configuration, first perform a read-only repository
 check and an isolated restore test. Do not delete snapshots, reinitialize the
 repository, or change R2 credentials during an incident.

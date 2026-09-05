@@ -1,0 +1,10 @@
+[Unit]
+Description=Weekly PetMagic PostgreSQL off-site restore verification
+
+[Timer]
+OnCalendar=Sun *-*-* 04:40:00 UTC
+Persistent=true
+Unit=petmagic-postgres-verify.service
+
+[Install]
+WantedBy=timers.target
