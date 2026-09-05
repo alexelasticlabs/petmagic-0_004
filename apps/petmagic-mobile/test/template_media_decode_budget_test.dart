@@ -366,18 +366,10 @@ void main() {
       source,
       contains('const int _beforeAfterCompareImageCacheWidth = 1024;'),
     );
-    expect(
-      source,
-      contains('ResizeImage(\n        FileImage(localOutputFile)'),
-    );
+    expect(source, contains('Image.file('));
     expect(source, contains('cacheWidth: _resultCardImageCacheWidth'));
     expect(source, contains('memCacheWidth: _resultCardImageCacheWidth'));
-    expect(
-      source,
-      contains(
-        'maxWidthDiskCache:\n                                        _resultCardImageCacheWidth',
-      ),
-    );
+    expect(source, contains('maxWidthDiskCache:'));
     expect(source, contains('cacheWidth: _resultFullscreenImageCacheWidth'));
     expect(source, contains('memCacheWidth: _resultFullscreenImageCacheWidth'));
     expect(

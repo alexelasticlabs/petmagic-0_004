@@ -84,17 +84,33 @@ class TemplateDiscoveryRail extends StatelessWidget {
         children: [
           _DiscoverySectionHeading(
             category: section.category,
+            title: section.displayTitle,
+            identity: section.identity,
             moreLabel: moreLabel,
             onMorePressed: onMorePressed,
           ),
+          if (section.subtitle case final subtitle?)
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: PetMagicSpacing.sm,
+              ),
+              child: Text(
+                subtitle,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: colors.textSoft),
+              ),
+            ),
           const SizedBox(height: PetMagicSpacing.xs),
           DiscoveryRailViewport(
-            key: PageStorageKey('discovery-rail-position-${section.category}'),
+            key: PageStorageKey('discovery-rail-position-${section.identity}'),
             showIndicator: contentWidth > MediaQuery.sizeOf(context).width,
             child: SizedBox(
               height: previewHeight + footerHeight,
               child: ListView.separated(
-                key: ValueKey('discovery-rail-${section.category}'),
+                key: ValueKey('discovery-rail-${section.identity}'),
                 scrollDirection: Axis.horizontal,
                 physics: DiscoverySnapPhysics(
                   itemExtent: tileWidth + 9,

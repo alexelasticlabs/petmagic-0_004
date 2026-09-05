@@ -193,10 +193,10 @@ void main() {
       'lib/features/templates/presentation/widgets/pet_shortcut_avatar.dart',
     ).readAsString();
 
-    expect(source, contains('const int _petShortcutAvatarCacheWidth = 64;'));
+    expect(source, contains('.clamp(64, 192)'));
     expect(source, contains('cacheKey: persistentSafeProfileAvatarUrl(url)'));
-    expect(source, contains('memCacheWidth: _petShortcutAvatarCacheWidth'));
-    expect(source, contains('maxWidthDiskCache: _petShortcutAvatarCacheWidth'));
+    expect(source, contains('memCacheWidth: cacheWidth'));
+    expect(source, contains('maxWidthDiskCache: cacheWidth'));
     expect(source, contains('filterQuality: FilterQuality.medium'));
   });
 

@@ -7,6 +7,7 @@ class _DiscoverySearchHeaderDelegate extends SliverPersistentHeaderDelegate {
     required this.onCatalogPressed,
     required this.onRandomPressed,
     required this.actionHeight,
+    required this.searchEnabled,
   });
 
   final String catalogLabel;
@@ -14,6 +15,7 @@ class _DiscoverySearchHeaderDelegate extends SliverPersistentHeaderDelegate {
   final VoidCallback onCatalogPressed;
   final VoidCallback? onRandomPressed;
   final double actionHeight;
+  final bool searchEnabled;
 
   @override
   double get minExtent => actionHeight + 12;
@@ -66,7 +68,11 @@ class _DiscoverySearchHeaderDelegate extends SliverPersistentHeaderDelegate {
                 onTap: onCatalogPressed,
                 child: ExcludeSemantics(
                   child: PetMagicInteractiveSurface(
-                    key: const ValueKey('discovery-catalog-launcher'),
+                    key: ValueKey(
+                      searchEnabled
+                          ? 'discovery-search-launcher'
+                          : 'discovery-catalog-launcher',
+                    ),
                     onTap: onCatalogPressed,
                     borderRadius: BorderRadius.circular(18),
                     child: Container(
@@ -79,7 +85,9 @@ class _DiscoverySearchHeaderDelegate extends SliverPersistentHeaderDelegate {
                       child: Row(
                         children: [
                           Icon(
-                            Icons.grid_view_rounded,
+                            searchEnabled
+                                ? Icons.search_rounded
+                                : Icons.grid_view_rounded,
                             size: 19,
                             color: colors.accentInk,
                           ),
@@ -161,6 +169,7 @@ class _DiscoverySearchHeaderDelegate extends SliverPersistentHeaderDelegate {
       oldDelegate.catalogLabel != catalogLabel ||
       oldDelegate.randomLabel != randomLabel ||
       oldDelegate.actionHeight != actionHeight ||
+      oldDelegate.searchEnabled != searchEnabled ||
       oldDelegate.onCatalogPressed != onCatalogPressed ||
       oldDelegate.onRandomPressed != onRandomPressed;
 }

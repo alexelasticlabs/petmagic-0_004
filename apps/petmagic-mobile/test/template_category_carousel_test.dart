@@ -9,6 +9,75 @@ import 'package:petmagic_mobile/features/templates/presentation/widgets/template
 import 'package:visibility_detector/visibility_detector.dart';
 
 void main() {
+  testWidgets(
+    'large text widens the carousel without resetting the selection',
+    (tester) async {
+      await tester.pumpWidget(
+        _carouselHost(autoAdvanceInterval: const Duration(minutes: 1)),
+      );
+      await tester.drag(find.byType(PageView), const Offset(-300, 0));
+      await tester.pumpAndSettle();
+      expect(_currentPage(tester), closeTo(2, 0.001));
+      await tester.pumpWidget(
+        _carouselHost(
+          autoAdvanceInterval: const Duration(minutes: 1),
+          textScaler: const TextScaler.linear(2),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<PageView>(find.byType(PageView))
+            .controller!
+            .viewportFraction,
+        0.88,
+      );
+      expect(_currentPage(tester), closeTo(2, 0.001));
+      expect(tester.takeException(), isNull);
+      await _disposeCarousel(tester);
+    },
+  );
+
+  testWidgets('disabled autoplay still allows manual category swipes', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _carouselHost(
+        autoAdvanceInterval: const Duration(seconds: 5),
+        autoplayEnabled: false,
+      ),
+    );
+    await tester.pump(const Duration(seconds: 30));
+    expect(_currentPage(tester), closeTo(1, 0.001));
+    await tester.drag(find.byType(PageView), const Offset(-300, 0));
+    await tester.pumpAndSettle();
+    expect(_currentPage(tester), closeTo(2, 0.001));
+    await _disposeCarousel(tester);
+  });
+
+  testWidgets(
+    'configured interval replaces default and disabling cancels its timer',
+    (tester) async {
+      await tester.pumpWidget(
+        _carouselHost(autoAdvanceInterval: const Duration(seconds: 12)),
+      );
+      await tester.pump(const Duration(seconds: 11));
+      expect(_currentPage(tester), closeTo(1, 0.001));
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump(PetMagicMotion.slow);
+      expect(_currentPage(tester), closeTo(2, 0.001));
+      await tester.pumpWidget(
+        _carouselHost(
+          autoAdvanceInterval: const Duration(seconds: 12),
+          autoplayEnabled: false,
+        ),
+      );
+      await tester.pump(const Duration(seconds: 30));
+      expect(_currentPage(tester), closeTo(2, 0.001));
+      await _disposeCarousel(tester);
+    },
+  );
+
   late Duration visibilityInterval;
   setUp(() {
     visibilityInterval = VisibilityDetectorController.instance.updateInterval;
@@ -359,6 +428,7 @@ void main() {
 Widget _carouselHost({
   required Duration autoAdvanceInterval,
   bool disableAnimations = false,
+  bool autoplayEnabled = true,
   TextScaler textScaler = TextScaler.noScaling,
   ValueChanged<String> onCategoryPressed = _ignoreCategory,
   ValueChanged<int>? onActiveCategoryChanged,
@@ -375,6 +445,7 @@ Widget _carouselHost({
     eyebrowLabel: 'Discover',
     openLabel: 'Open',
     autoAdvanceInterval: autoAdvanceInterval,
+    autoplayEnabled: autoplayEnabled,
     onCategoryPressed: onCategoryPressed,
     onActiveCategoryChanged: onActiveCategoryChanged,
   );

@@ -52,7 +52,14 @@ void main() {
 
     expect(app, isNot(contains('ref.watch(networkStatusControllerProvider);')));
     expect(shell, contains('class _ActiveGenerationBannerSlot'));
-    expect(shell, contains('PerformanceGuard.isDegradedMode(context)'));
+    expect(
+      shell,
+      contains('PerformanceGuard.shouldDisableGlassEffects(context)'),
+    );
+    expect(
+      shell,
+      contains('PerformanceGuard.shouldDisableSharedRouteAnimations(context)'),
+    );
     expect(shell, contains('AppPerformanceTrace.setRouteLabel(location);'));
     expect(templatesPage, contains('ref.listen<String?>('));
     expect(

@@ -42,7 +42,7 @@ class TemplateCategoryCarousel extends StatefulWidget {
 
 class _TemplateCategoryCarouselState extends State<TemplateCategoryCarousel>
     with WidgetsBindingObserver {
-  static const _viewportFraction = 0.58;
+  static const _defaultViewportFraction = 0.58;
   static const _interactionResumeDelay = Duration(seconds: 4);
 
   late PageController _pageController;
@@ -58,6 +58,7 @@ class _TemplateCategoryCarouselState extends State<TemplateCategoryCarousel>
   bool _reduceMotion = false;
   bool _isVisible = false;
   bool _hasKeyboardFocus = false;
+  double _viewportFraction = _defaultViewportFraction;
 
   @override
   void initState() {
@@ -75,6 +76,14 @@ class _TemplateCategoryCarouselState extends State<TemplateCategoryCarousel>
     super.didChangeDependencies();
     _tickerEnabled = TickerMode.valuesOf(context).enabled;
     final mediaQuery = MediaQuery.of(context);
+    final viewportFraction = mediaQuery.textScaler.scale(20) > 26
+        ? 0.88
+        : _defaultViewportFraction;
+    if (_viewportFraction != viewportFraction) {
+      _viewportFraction = viewportFraction;
+      _pageController.dispose();
+      _pageController = _createController(initialPage: _rawPage);
+    }
     _reduceMotion =
         mediaQuery.disableAnimations || mediaQuery.accessibleNavigation;
     _scheduleAutoAdvance();
@@ -118,8 +127,8 @@ class _TemplateCategoryCarouselState extends State<TemplateCategoryCarousel>
     super.dispose();
   }
 
-  PageController _createController() => PageController(
-    initialPage: widget.sections.length > 1 ? 1 : 0,
+  PageController _createController({int? initialPage}) => PageController(
+    initialPage: initialPage ?? (widget.sections.length > 1 ? 1 : 0),
     viewportFraction: _viewportFraction,
   );
 
@@ -320,7 +329,7 @@ class _TemplateCategoryCarouselState extends State<TemplateCategoryCarousel>
         child: LayoutBuilder(
           builder: (context, constraints) {
             final cardWidth = math.min(
-              240.0,
+              _viewportFraction == _defaultViewportFraction ? 240.0 : 320.0,
               constraints.maxWidth * _viewportFraction - 10,
             );
             final height = cardWidth * 1.5 + 14;
@@ -401,7 +410,7 @@ class _TemplateCategoryCarouselState extends State<TemplateCategoryCarousel>
                 _CarouselProgress(
                   currentIndex: _logicalPage,
                   categories: sections
-                      .map((section) => section.category)
+                      .map((section) => section.displayTitle)
                       .toList(),
                   label: widget.eyebrowLabel,
                   reduceMotion: _reduceMotion,

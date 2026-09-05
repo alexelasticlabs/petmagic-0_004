@@ -95,7 +95,7 @@ extension _NetworkVideoPreviewLifecycle on _NetworkVideoPreviewState {
       return;
     }
     if (!MediaLifecyclePolicy.hasVideoPreviewSlot(
-      reserveForActive: !widget.isActive,
+      reserveForActive: !widget.isActive && widget.playbackRegistry == null,
     )) {
       return;
     }

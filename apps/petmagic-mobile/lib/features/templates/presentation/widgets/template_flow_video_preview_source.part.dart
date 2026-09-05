@@ -62,7 +62,7 @@ extension _NetworkVideoPreviewSource on _NetworkVideoPreviewState {
       if (!_isCurrentUpgrade(token, previous)) return;
       try {
         await next.initialize();
-      } catch (_) {
+      } catch (error) {
         nativeDecodeFailed =
             widget.useSharedPreviewCache &&
             next.dataSourceType == DataSourceType.file &&

@@ -58,9 +58,12 @@ final class TemplateDiscoveryRemoteDataSource {
 
   Map<String, Object?> _localizedQueryParameters() {
     final languageTag = _runtimeInfo.locale.languageTag.trim();
-    return languageTag.isEmpty || languageTag.toLowerCase().startsWith('en')
-        ? const <String, Object?>{}
-        : <String, Object?>{'locale': languageTag};
+    return <String, Object?>{
+      'sectionLimit': 24,
+      'itemsPerSection': 12,
+      if (languageTag.isNotEmpty && !languageTag.toLowerCase().startsWith('en'))
+        'locale': languageTag,
+    };
   }
 
   void cancelPendingRequest() {

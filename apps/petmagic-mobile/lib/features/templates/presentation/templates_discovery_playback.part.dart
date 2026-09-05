@@ -94,7 +94,7 @@ class _TemplateDiscoveryRailsState
       itemCount: widget.sections.length,
       findItemIndexCallback: (key) {
         final index = widget.sections.indexWhere(
-          (section) => ValueKey(section.category) == key,
+          (section) => ValueKey(section.identity) == key,
         );
         return index < 0 ? null : index;
       },
@@ -102,7 +102,7 @@ class _TemplateDiscoveryRailsState
       itemBuilder: (context, index) {
         final section = widget.sections[index];
         return DiscoverySectionReveal(
-          key: ValueKey(section.category),
+          key: ValueKey(section.identity),
           child: TemplateDiscoveryRail(
             section: section,
             sectionIndex: index,

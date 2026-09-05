@@ -224,6 +224,7 @@ void main() {
       expect(offlineState.isLoading, isFalse);
       expect(offlineState.errorMessage, 'templates.request_failed');
 
+      controller.handleNetworkAvailable();
       final freshLoad = controller.refreshIfNeeded();
       await repository.secondFetchStarted.future;
       repository.completeSecondFetch(_discovery('Fresh category'));

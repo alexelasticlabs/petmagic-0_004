@@ -70,7 +70,11 @@ void main() {
     final response = await dataSource.fetch();
 
     expect(capturedOptions?.path, '/api/templates/discovery');
-    expect(capturedOptions?.queryParameters, {'locale': 'ru-BY'});
+    expect(capturedOptions?.queryParameters, {
+      'locale': 'ru-BY',
+      'sectionLimit': 24,
+      'itemsPerSection': 12,
+    });
     expect(response.generatedAtUtc, DateTime.utc(2026, 9, 4, 6));
     final section = response.sections.single;
     expect(section.category, 'Pet Mischief');

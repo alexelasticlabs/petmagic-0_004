@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
+import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/performance/media_prefetch_budget.dart';
 
 /// Rejects oversized media both from Content-Length and while streaming when
@@ -63,8 +64,19 @@ final class BoundedHttpFileService extends FileService {
         throw StateError('template_${mediaKind}_download_too_large');
       }
       constraint?.checkContentLength(contentLength);
-    } catch (_) {
+    } catch (error, stackTrace) {
       await response.content.listen(null).cancel();
+      AppLogger.warn(
+        feature: 'Templates.BoundedHttpFileService',
+        operation: 'reject_response_before_stream',
+        message: 'Template media response was rejected before streaming.',
+        context: {
+          'media_kind': mediaKind,
+          'has_content_length': contentLength != null,
+        },
+        error: error,
+        stackTrace: stackTrace,
+      );
       rethrow;
     }
 

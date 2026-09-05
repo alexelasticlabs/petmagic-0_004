@@ -40,11 +40,12 @@ class _CategorySpotlightCard extends StatelessWidget {
       container: true,
       button: true,
       selected: isSelected,
-      label: '${section.category}, ${logicalIndex + 1} / $total',
+      label: '${section.displayTitle}, ${logicalIndex + 1} / $total',
+      hint: section.subtitle,
       onTap: onSemanticPressed,
       child: ExcludeSemantics(
         child: PetMagicInteractiveSurface(
-          key: ValueKey('discovery-category-${section.category}'),
+          key: ValueKey('discovery-category-${section.identity}'),
           onTap: onPressed,
           haptic: PressableScaleHaptic.selection,
           borderRadius: BorderRadius.circular(PetMagicRadii.lg),
@@ -185,7 +186,7 @@ class _CategorySpotlightCard extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          section.category,
+                          section.displayTitle,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.headlineSmall
@@ -197,6 +198,16 @@ class _CategorySpotlightCard extends StatelessWidget {
                                 letterSpacing: -0.55,
                               ),
                         ),
+                        if (section.subtitle case final subtitle?) ...[
+                          const SizedBox(height: 5),
+                          Text(
+                            subtitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: Colors.white, fontSize: 11),
+                          ),
+                        ],
                         const SizedBox(height: 9),
                         DecoratedBox(
                           decoration: BoxDecoration(

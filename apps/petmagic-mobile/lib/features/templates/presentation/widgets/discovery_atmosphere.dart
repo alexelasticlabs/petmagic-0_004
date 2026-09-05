@@ -95,16 +95,18 @@ class DiscoveryIntroduction extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 6),
-        Text(
-          subtitle,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: colors.textSoft,
-            fontSize: 12,
-            height: 1.4,
-            fontWeight: FontWeight.w500,
+        if (subtitle.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Text(
+            subtitle,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: colors.textSoft,
+              fontSize: 12,
+              height: 1.4,
+              fontWeight: FontWeight.w500,
+            ),
           ),
-        ),
+        ],
       ],
     );
   }

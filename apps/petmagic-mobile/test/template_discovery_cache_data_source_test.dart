@@ -74,7 +74,10 @@ void main() {
 
       final fetch = repository.fetch();
       final request = await requestStarted.future;
-      expect(request.queryParameters, isEmpty);
+      expect(request.queryParameters, {
+        'sectionLimit': 24,
+        'itemsPerSection': 12,
+      });
 
       runtimeInfo.locale = const AppLocale(
         languageTag: 'ru-RU',

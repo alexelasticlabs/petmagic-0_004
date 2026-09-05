@@ -66,7 +66,11 @@ extension _NetworkVideoPreviewInitialize on _NetworkVideoPreviewState {
 
       lease = _TemplateVideoPreviewControllerLease.tryAcquire(
         useSharedPreviewCache: widget.useSharedPreviewCache,
-        reserveForActive: !widget.isActive,
+        // A coordinated preview session owns an active page in the same
+        // registry. Its warm neighbours may use the final decoder; an
+        // uncoordinated offscreen preview must keep that slot for the active
+        // surface that may not be mounted yet.
+        reserveForActive: !widget.isActive && widget.playbackRegistry == null,
       );
       if (lease == null) {
         await _disposeUnleasedController(controller);
@@ -104,7 +108,7 @@ extension _NetworkVideoPreviewInitialize on _NetworkVideoPreviewState {
 
       try {
         await controller.initialize();
-      } catch (_) {
+      } catch (error) {
         nativeDecodeFailed =
             widget.useSharedPreviewCache &&
             controller.dataSourceType == DataSourceType.file &&

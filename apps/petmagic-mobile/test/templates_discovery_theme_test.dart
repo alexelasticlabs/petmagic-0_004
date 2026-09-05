@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
+import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
 import 'package:petmagic_mobile/core/performance/template_media_cache.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/templates/application/template_discovery_repository.dart';
@@ -175,6 +176,36 @@ void main() {
     );
   }
 
+  for (final (width, scale, theme) in [
+    (390.0, 1.0, ThemeMode.dark),
+    (320.0, 2.0, ThemeMode.light),
+  ]) {
+    testWidgets('Discovery Composer at ${width.toInt()}dp with scale $scale', (
+      tester,
+    ) async {
+      tester.view.physicalSize = Size(width, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final mode = ValueNotifier(theme);
+      addTearDown(mode.dispose);
+      await _pumpPage(tester, mode, scale: scale, configured: true);
+      await expectLater(
+        find.byKey(const Key('discovery-theme-surface')),
+        matchesGoldenFile('goldens/discovery_composer_${width.toInt()}.png'),
+      );
+      expect(find.text('Магия осени'), findsOneWidget);
+      await tester.drag(find.byType(CustomScrollView), const Offset(0, -390));
+      await tester.pumpAndSettle();
+      expect(find.text('Весёлые истории'), findsOneWidget);
+      expect(find.text('Новые образы для вашего питомца'), findsOneWidget);
+      expect(find.byType(TemplateDiscoveryRail), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+    });
+  }
+
   testWidgets(
     'light Discovery and random sheet fit 320dp at 200 percent text',
     (tester) async {
@@ -185,6 +216,8 @@ void main() {
       final mode = ValueNotifier(ThemeMode.light);
       addTearDown(mode.dispose);
       await _pumpPage(tester, mode, scale: 2);
+      await tester.drag(find.byType(CustomScrollView), const Offset(0, -300));
+      await tester.pumpAndSettle();
       await tester.ensureVisible(
         find.byKey(const ValueKey('discovery-random-launcher')),
       );
@@ -201,12 +234,14 @@ Future<void> _pumpPage(
   WidgetTester tester,
   ValueNotifier<ThemeMode> mode, {
   double scale = 1,
+  bool configured = false,
 }) async {
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        realtimeClientProvider.overrideWithValue(const NoopRealtimeClient()),
         templateDiscoveryRepositoryProvider.overrideWithValue(
-          const _DiscoveryRepository(),
+          _DiscoveryRepository(configured: configured),
         ),
         appLaunchControllerProvider.overrideWith(_GuestLaunch.new),
         walletControllerProvider.overrideWith(IdleWalletController.new),
@@ -251,13 +286,16 @@ Future<void> _pumpPage(
   });
   for (var attempt = 0; attempt < 30; attempt++) {
     await tester.pump();
-    if (find.byType(Image).evaluate().length >= 2) break;
+    if (find.byType(Image).evaluate().length >= (configured ? 1 : 2)) break;
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 10)),
     );
   }
   await tester.pumpAndSettle();
-  expect(find.byType(Image).evaluate().length, greaterThanOrEqualTo(2));
+  expect(
+    find.byType(Image).evaluate().length,
+    greaterThanOrEqualTo(configured ? 1 : 2),
+  );
 }
 
 class _GuestLaunch extends AppLaunchController {
@@ -272,7 +310,8 @@ class _GuestLaunch extends AppLaunchController {
 }
 
 class _DiscoveryRepository implements TemplateDiscoveryRepository {
-  const _DiscoveryRepository();
+  const _DiscoveryRepository({this.configured = false});
+  final bool configured;
   @override
   void cancelPendingRequest() {}
   @override
@@ -280,13 +319,28 @@ class _DiscoveryRepository implements TemplateDiscoveryRepository {
   @override
   Future<TemplateDiscovery> fetch() async => TemplateDiscovery(
     generatedAtUtc: DateTime.utc(2026, 9, 5),
+    schemaVersion: configured ? 2 : 1,
+    page: configured
+        ? const TemplateDiscoveryPageSettings(
+            title: 'Магия осени',
+            subtitle: 'Свежие идеи и любимые коллекции',
+            autoplayEnabled: false,
+            autoplayIntervalMs: 18000,
+          )
+        : null,
     sections: [
       TemplateDiscoverySection(
         category: 'Cinematic',
+        title: configured ? 'Приключения на большом экране' : null,
+        subtitle: configured ? 'Ваш питомец в главной роли' : null,
+        showAsRail: !configured,
         items: [_item('agent', 'Секретный агент')],
       ),
       TemplateDiscoverySection(
         category: 'Funny',
+        title: configured ? 'Весёлые истории' : null,
+        subtitle: configured ? 'Новые образы для вашего питомца' : null,
+        showInCarousel: !configured,
         items: [
           _item('premium', 'Фотография домашнего животного', premium: true),
           _item('video', 'Танцующая звезда', video: true),

@@ -9,6 +9,7 @@ import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
+import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
 import 'package:petmagic_mobile/core/performance/media_lifecycle_policy.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/application/profile_controller.dart';
@@ -35,6 +36,162 @@ import 'templates_page_lifecycle_test_support.dart'
     show RandomTemplatesRepository;
 
 void main() {
+  testWidgets('V2 copy and surfaces keep original category navigation', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final navigator = _RecordingNavigator();
+    await _pumpDiscoveryPage(
+      tester,
+      repository: _FakeDiscoveryRepository(_configuredDiscovery()),
+      navigator: navigator,
+    );
+    expect(find.text('Магия осени'), findsOneWidget);
+    expect(find.text('Новые идеи для питомца'), findsOneWidget);
+    final carousel = tester.widget<TemplateCategoryCarousel>(
+      find.byType(TemplateCategoryCarousel),
+    );
+    expect(carousel.sections.map((section) => section.identity), ['hero']);
+    expect(carousel.autoplayEnabled, isFalse);
+    expect(carousel.autoAdvanceInterval, const Duration(seconds: 18));
+    final semantics = tester.ensureSemantics();
+    tester.semantics.performAction(
+      find.semantics.byLabel('Осенние приключения, 1 / 1'),
+      SemanticsAction.tap,
+    );
+    expect((navigator.pushes.last as TemplatesDestination).category, 'Funny');
+    semantics.dispose();
+
+    final search = find.byKey(const ValueKey('discovery-search-launcher'));
+    await tester.ensureVisible(search);
+    await tester.pumpAndSettle();
+    await tester.tap(search);
+    final searchDestination = navigator.pushes.last as TemplatesDestination;
+    expect(searchDestination.autofocusSearch, isTrue);
+    expect(searchDestination.category, isNull);
+
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -250));
+    await tester.pumpAndSettle();
+    expect(find.byType(TemplateDiscoveryRail), findsOneWidget);
+    expect(find.text('Истории питомцев'), findsOneWidget);
+    expect(find.text('Подборка редакции'), findsOneWidget);
+    final more = find.byKey(const ValueKey('discovery-more-rail'));
+    await tester.ensureVisible(more);
+    await tester.pumpAndSettle();
+    await tester.tap(more);
+    expect(
+      (navigator.pushes.last as TemplatesDestination).category,
+      'Pet Mischief',
+    );
+    expect(find.byKey(const ValueKey('discovery-rail-hidden')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'V2 disables carousel and search without removing catalog or random',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(320, 740));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final navigator = _RecordingNavigator();
+      await _pumpDiscoveryPage(
+        tester,
+        repository: _FakeDiscoveryRepository(
+          _configuredDiscovery(carouselEnabled: false, searchEnabled: false),
+        ),
+        navigator: navigator,
+        textScaler: const TextScaler.linear(2),
+      );
+      expect(find.byType(TemplateCategoryCarousel), findsNothing);
+      expect(
+        find.byKey(const ValueKey('discovery-search-launcher')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('discovery-random-launcher')),
+        findsOneWidget,
+      );
+      final catalog = find.byKey(const ValueKey('discovery-catalog-launcher'));
+      await tester.ensureVisible(catalog);
+      await tester.pumpAndSettle();
+      await tester.tap(catalog);
+      expect(
+        (navigator.pushes.last as TemplatesDestination).autofocusSearch,
+        isFalse,
+      );
+      await tester.drag(find.byType(CustomScrollView), const Offset(0, -250));
+      await tester.pumpAndSettle();
+      expect(find.byType(TemplateDiscoveryRail), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('refresh to legacy API clears published page controls', (
+    tester,
+  ) async {
+    final repository = _FakeDiscoveryRepository(
+      _configuredDiscovery(carouselEnabled: false),
+    );
+    await _pumpDiscoveryPage(
+      tester,
+      repository: repository,
+      navigator: _RecordingNavigator(),
+    );
+    expect(find.byType(TemplateCategoryCarousel), findsNothing);
+    repository.discovery = _discoveryFixture();
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(TemplatesDiscoveryPage)),
+    );
+    await container
+        .read(templateDiscoveryControllerProvider.notifier)
+        .loadInitial(forceRefresh: true);
+    await tester.pumpAndSettle();
+    final carousel = tester.widget<TemplateCategoryCarousel>(
+      find.byType(TemplateCategoryCarousel),
+    );
+    expect(carousel.sections, hasLength(2));
+    expect(carousel.autoAdvanceInterval, const Duration(seconds: 7));
+    expect(carousel.autoplayEnabled, isTrue);
+    expect(find.text('Магия осени'), findsNothing);
+    expect(
+      find.byKey(const ValueKey('discovery-catalog-launcher')),
+      findsOneWidget,
+    );
+    expect(
+      container.read(templateDiscoveryControllerProvider).revision,
+      isNull,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('no visible surfaces render the empty state safely', (
+    tester,
+  ) async {
+    final discovery = TemplateDiscovery(
+      generatedAtUtc: DateTime.utc(2026, 9, 5),
+      page: const TemplateDiscoveryPageSettings(carouselEnabled: false),
+      sections: const [
+        TemplateDiscoverySection(
+          category: 'Hidden',
+          items: [],
+          showAsRail: false,
+        ),
+      ],
+    );
+    await _pumpDiscoveryPage(
+      tester,
+      repository: _FakeDiscoveryRepository(discovery),
+      navigator: _RecordingNavigator(),
+    );
+    final text = AppLocalizations.of(
+      tester.element(find.byType(TemplatesDiscoveryPage)),
+    );
+    expect(find.text(text.emptyTemplatesTitle), findsOneWidget);
+    expect(find.byType(TemplateCategoryCarousel), findsNothing);
+    expect(find.byType(TemplateDiscoveryRail), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   for (final scale in [1.0, 2.0]) {
     testWidgets('caption uses only its measured height at text scale $scale', (
       tester,
@@ -651,6 +808,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          realtimeClientProvider.overrideWithValue(const NoopRealtimeClient()),
           templateDiscoveryRepositoryProvider.overrideWithValue(repository),
           appLaunchControllerProvider.overrideWith(
             _GuestAppLaunchController.new,
@@ -731,6 +889,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          realtimeClientProvider.overrideWithValue(const NoopRealtimeClient()),
           templateDiscoveryRepositoryProvider.overrideWithValue(repository),
           appLaunchControllerProvider.overrideWith(
             _AuthenticatedAppLaunchController.new,
@@ -818,6 +977,48 @@ TemplateDiscovery _discoveryFixture() {
   );
 }
 
+TemplateDiscovery _configuredDiscovery({
+  bool carouselEnabled = true,
+  bool searchEnabled = true,
+}) => TemplateDiscovery(
+  generatedAtUtc: DateTime.utc(2026, 9, 5),
+  schemaVersion: 2,
+  revision: 8,
+  page: TemplateDiscoveryPageSettings(
+    title: 'Магия осени',
+    subtitle: 'Новые идеи для питомца',
+    carouselEnabled: carouselEnabled,
+    searchEnabled: searchEnabled,
+    autoplayEnabled: false,
+    autoplayIntervalMs: 18000,
+  ),
+  sections: const [
+    TemplateDiscoverySection(
+      category: 'Funny',
+      sectionId: 'hero',
+      title: 'Осенние приключения',
+      subtitle: 'Попробуйте новое',
+      showAsRail: false,
+      items: [_mischiefCard],
+    ),
+    TemplateDiscoverySection(
+      category: 'Pet Mischief',
+      sectionId: 'rail',
+      title: 'Истории питомцев',
+      subtitle: 'Подборка редакции',
+      showInCarousel: false,
+      items: [_mischiefCard],
+    ),
+    TemplateDiscoverySection(
+      category: 'Pawsome Frames',
+      sectionId: 'hidden',
+      showAsRail: false,
+      showInCarousel: false,
+      items: [_framesCard],
+    ),
+  ],
+);
+
 TemplateDiscovery _scrollableDiscoveryFixture() {
   return TemplateDiscovery(
     sections: const [
@@ -892,6 +1093,7 @@ Future<void> _pumpDiscoveryPage(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        realtimeClientProvider.overrideWithValue(const NoopRealtimeClient()),
         if (randomRepository != null)
           templatesRepositoryProvider.overrideWithValue(randomRepository),
         templateDiscoveryRepositoryProvider.overrideWithValue(repository),
@@ -934,8 +1136,11 @@ Future<void> _pumpDiscoveryPage(
     tester,
     () =>
         repository.fetchCalls == 1 &&
-        find.byType(TemplateCategoryCarousel).evaluate().isNotEmpty,
+        ProviderScope.containerOf(
+          tester.element(find.byType(TemplatesDiscoveryPage)),
+        ).read(templateDiscoveryControllerProvider).hasLoaded,
   );
+  await tester.pump();
 }
 
 Future<void> _pumpUntil(WidgetTester tester, bool Function() condition) async {

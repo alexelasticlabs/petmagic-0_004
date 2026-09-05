@@ -3,10 +3,14 @@ part of 'template_discovery_rail.dart';
 class _DiscoverySectionHeading extends StatelessWidget {
   const _DiscoverySectionHeading({
     required this.category,
+    required this.title,
+    required this.identity,
     required this.moreLabel,
     required this.onMorePressed,
   });
   final String category;
+  final String title;
+  final String identity;
   final String moreLabel;
   final VoidCallback onMorePressed;
 
@@ -20,7 +24,7 @@ class _DiscoverySectionHeading extends StatelessWidget {
           final compactAction =
               constraints.maxWidth < 336 ||
               MediaQuery.textScalerOf(context).scale(13) > 16;
-          final actionLabel = '$moreLabel: $category';
+          final actionLabel = '$moreLabel: $title';
           return Row(
             children: [
               if (compactAction)
@@ -39,10 +43,10 @@ class _DiscoverySectionHeading extends StatelessWidget {
                 child: Semantics(
                   header: true,
                   child: Tooltip(
-                    message: category,
+                    message: title,
                     excludeFromSemantics: true,
                     child: Text(
-                      category,
+                      title,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -66,7 +70,7 @@ class _DiscoverySectionHeading extends StatelessWidget {
                     message: actionLabel,
                     child: compactAction
                         ? IconButton(
-                            key: ValueKey('discovery-more-$category'),
+                            key: ValueKey('discovery-more-$identity'),
                             onPressed: onMorePressed,
                             constraints: const BoxConstraints(
                               minWidth: 48,
@@ -79,7 +83,7 @@ class _DiscoverySectionHeading extends StatelessWidget {
                             ),
                           )
                         : TextButton(
-                            key: ValueKey('discovery-more-$category'),
+                            key: ValueKey('discovery-more-$identity'),
                             onPressed: onMorePressed,
                             style: TextButton.styleFrom(
                               foregroundColor: colors.accentInk,

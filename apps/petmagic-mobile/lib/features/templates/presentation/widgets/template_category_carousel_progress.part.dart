@@ -76,7 +76,8 @@ bool _sameCategories(
     return false;
   }
   for (var index = 0; index < left.length; index++) {
-    if (left[index].category != right[index].category) {
+    if (left[index].identity != right[index].identity ||
+        left[index].category != right[index].category) {
       return false;
     }
   }

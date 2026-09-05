@@ -12,6 +12,7 @@ import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/application/profile_controller.dart';
 import 'package:petmagic_mobile/features/templates/application/template_discovery_controller.dart';
+import 'package:petmagic_mobile/features/templates/application/template_discovery_realtime.dart';
 import 'package:petmagic_mobile/features/templates/application/template_catalog_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_discovery_models.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
@@ -84,6 +85,11 @@ class _TemplatesDiscoveryPageState extends ConsumerState<TemplatesDiscoveryPage>
         return;
       }
       _syncControllerVisibility();
+      if (ref.read(networkStatusControllerProvider).hasInternet) {
+        _discoveryController.handleNetworkAvailable();
+      } else {
+        _discoveryController.handleNetworkUnavailable();
+      }
       if (_isAppResumed && _isTabActive == true) {
         unawaited(_discoveryController.refreshIfNeeded());
       }
@@ -193,6 +199,7 @@ class _TemplatesDiscoveryPageState extends ConsumerState<TemplatesDiscoveryPage>
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(templateDiscoveryRealtimeProvider);
     ref.listen<NetworkStatusState>(networkStatusControllerProvider, (
       previous,
       next,
@@ -206,7 +213,7 @@ class _TemplatesDiscoveryPageState extends ConsumerState<TemplatesDiscoveryPage>
         if (_shouldRefreshAccessOnReconnect) {
           _refreshAccessForAuthenticatedUser(forceRefresh: true);
         }
-        unawaited(_discoveryController.refreshIfNeeded());
+        _discoveryController.handleNetworkAvailable();
       }
     });
 
@@ -215,6 +222,10 @@ class _TemplatesDiscoveryPageState extends ConsumerState<TemplatesDiscoveryPage>
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final bottomInset = petMagicScrollableBottomInset(context);
+    final page = state.page;
+    final carouselSections = state.carouselSections;
+    final railSections = state.railSections;
+    final searchEnabled = page?.searchEnabled == true;
 
     return DiscoveryAtmosphere(
       collectionIndex: _activeCollection,
@@ -262,25 +273,30 @@ class _TemplatesDiscoveryPageState extends ConsumerState<TemplatesDiscoveryPage>
                         ),
                         const SizedBox(height: PetMagicSpacing.lg),
                         DiscoveryIntroduction(
-                          title: text.discoverHomeTitle,
-                          subtitle: text.discoverHomeSubtitle,
+                          title: page?.title ?? text.discoverHomeTitle,
+                          subtitle: page?.subtitle ?? text.discoverHomeSubtitle,
                         ),
                         const CreateWithPetBlockSlot(
                           selectedPetId: null,
                           selectedPetPhotoId: null,
                           padding: EdgeInsets.only(top: 12),
                         ),
-                        if (state.sections.isNotEmpty) ...[
+                        if (carouselSections.isNotEmpty) ...[
                           const SizedBox(height: PetMagicSpacing.sm),
                           TemplateCategoryCarousel(
-                            sections: state.sections,
+                            sections: carouselSections,
                             eyebrowLabel: text.discoverCategoryEyebrow,
                             openLabel: text.discoverOpenCategoryAction,
-                            autoplayEnabled: !_isVerticalScrolling,
+                            autoplayEnabled:
+                                !_isVerticalScrolling &&
+                                (page?.autoplayEnabled ?? true),
+                            autoAdvanceInterval:
+                                page?.autoAdvanceInterval ??
+                                const Duration(seconds: 7),
                             onActiveCategoryChanged: (index) =>
                                 _activeCollection.value =
                                     discoveryCollectionIndex(
-                                      state.sections[index].category,
+                                      carouselSections[index].category,
                                     ),
                             onCategoryPressed: _openCategory,
                           ),
@@ -293,7 +309,10 @@ class _TemplatesDiscoveryPageState extends ConsumerState<TemplatesDiscoveryPage>
                   pinned: true,
                   delegate: _DiscoverySearchHeaderDelegate(
                     randomLabel: text.randomTemplateAction,
-                    catalogLabel: text.generationStatusAllTemplatesAction,
+                    catalogLabel: searchEnabled
+                        ? text.searchTemplates
+                        : text.generationStatusAllTemplatesAction,
+                    searchEnabled: searchEnabled,
                     actionHeight:
                         (MediaQuery.textScalerOf(context).scale(13) * 2 + 16)
                             .clamp(48.0, 88.0),
@@ -301,7 +320,7 @@ class _TemplatesDiscoveryPageState extends ConsumerState<TemplatesDiscoveryPage>
                         ? null
                         : _openRandomTemplate,
                     onCatalogPressed: () => context.appNavigator.push<void>(
-                      const TemplatesDestination(),
+                      TemplatesDestination(autofocusSearch: searchEnabled),
                     ),
                   ),
                 ),
@@ -343,7 +362,7 @@ class _TemplatesDiscoveryPageState extends ConsumerState<TemplatesDiscoveryPage>
                   )
                 else
                   _TemplateDiscoveryRails(
-                    sections: state.sections,
+                    sections: railSections,
                     moreLabel: text.discoverMoreAction,
                     previewControllerFactory: widget.previewControllerFactory,
                     onMorePressed: _openCategory,

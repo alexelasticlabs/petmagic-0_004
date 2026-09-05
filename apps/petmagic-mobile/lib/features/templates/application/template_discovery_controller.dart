@@ -29,11 +29,14 @@ final class TemplateDiscoveryController
   DateTime? _lastRemoteRefreshAtUtc;
   int _requestVersion = 0;
   bool _isScreenVisible = true;
+  bool _hasInternet = true;
+  Timer? _invalidationTimer;
 
   @override
   TemplateDiscoveryState build() {
     final repository = ref.read(templateDiscoveryRepositoryProvider);
     ref.onDispose(() {
+      _invalidationTimer?.cancel();
       _requestVersion++;
       (_requestRepository ?? repository).cancelPendingRequest();
       _requestRepository = null;
@@ -48,6 +51,7 @@ final class TemplateDiscoveryController
 
     _isScreenVisible = visible;
     if (!visible) {
+      _invalidationTimer?.cancel();
       _requestVersion++;
       (_requestRepository ?? _repository).cancelPendingRequest();
       _requestRepository = null;
@@ -62,6 +66,8 @@ final class TemplateDiscoveryController
   }
 
   void handleNetworkUnavailable() {
+    _hasInternet = false;
+    _invalidationTimer?.cancel();
     if (_activeLoad == null && _requestRepository == null) {
       return;
     }
@@ -78,6 +84,7 @@ final class TemplateDiscoveryController
   }
 
   void resetForLocale() {
+    _invalidationTimer?.cancel();
     _requestVersion++;
     (_requestRepository ?? _repository).cancelPendingRequest();
     _requestRepository = null;
@@ -97,10 +104,14 @@ final class TemplateDiscoveryController
   }
 
   Future<void> loadInitial({bool forceRefresh = false}) {
+    if (!_isScreenVisible || (!_hasInternet && state.hasLoaded)) {
+      return Future.value();
+    }
     final active = _activeLoad;
     if (active != null) {
       return active;
     }
+    _invalidationTimer?.cancel();
 
     late final Future<void> load;
     load = _load(forceRefresh: forceRefresh).whenComplete(() {
@@ -110,6 +121,28 @@ final class TemplateDiscoveryController
     });
     _activeLoad = load;
     return load;
+  }
+
+  void handleNetworkAvailable() {
+    _hasInternet = true;
+    unawaited(refreshIfNeeded());
+  }
+
+  void invalidate() {
+    _lastRemoteRefreshAtUtc = null;
+    _invalidationTimer?.cancel();
+    // A response started before publication must not restore the old revision.
+    _requestVersion++;
+    _requestRepository?.cancelPendingRequest();
+    _requestRepository = null;
+    _activeLoad = null;
+    if (state.isLoading || state.isRefreshing) {
+      state = state.copyWith(isLoading: false, isRefreshing: false);
+    }
+    if (!_isScreenVisible || !_hasInternet) return;
+    _invalidationTimer = Timer(const Duration(milliseconds: 350), () {
+      if (ref.mounted) unawaited(loadInitial(forceRefresh: true));
+    });
   }
 
   Future<void> _load({required bool forceRefresh}) async {
@@ -122,6 +155,16 @@ final class TemplateDiscoveryController
         await _restoreCache(repository, requestVersion);
       }
       if (!_isCurrent(requestVersion)) {
+        return;
+      }
+
+      if (!_hasInternet) {
+        state = state.copyWith(
+          hasLoaded: true,
+          isLoading: false,
+          isRefreshing: false,
+          errorMessage: 'templates.request_failed',
+        );
         return;
       }
 
@@ -140,7 +183,7 @@ final class TemplateDiscoveryController
           .read(templateDiscoveryClockProvider)()
           .toUtc();
       state = state.copyWith(
-        sections: discovery.sections,
+        discovery: discovery,
         isLoading: false,
         isRefreshing: false,
         loadedFromCache: false,
@@ -177,7 +220,7 @@ final class TemplateDiscoveryController
       }
 
       state = state.copyWith(
-        sections: cached.sections,
+        discovery: cached,
         loadedFromCache: true,
         hasLoaded: true,
         clearError: true,

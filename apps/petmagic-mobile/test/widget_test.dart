@@ -893,7 +893,10 @@ void main() {
     await tester.pump(const Duration(milliseconds: 600));
 
     expect(find.text('What will your pet become?'), findsOneWidget);
-    expect(find.text('Search templates'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('discovery-catalog-launcher')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('welcome guest action resets after startup failure', (
