@@ -2,16 +2,8 @@
 
 import Link from "next/link";
 
-import {
-  CalendarIcon,
-  CaretDownIcon,
-  ChartIcon,
-  ImageIcon,
-  PlusIcon,
-  TemplatesIcon,
-  VideoIcon,
-} from "@/components/admin/admin-icons";
-import { AdminCard, AdminContextBar } from "@/components/admin/admin-primitives";
+import { AdminActionMenu } from "@/components/admin/admin-action-menu";
+import { CaretDownIcon, ImageIcon, PlusIcon, VideoIcon } from "@/components/admin/admin-icons";
 import type { TemplatesCatalogViewText } from "@/components/templates/templates-catalog-view.content";
 import styles from "@/components/templates/templates-catalog.module.css";
 import type { AdminTemplateCatalogSummary, TemplateType } from "@/lib/api-client";
@@ -71,60 +63,7 @@ export function TemplatesCatalogWorkspaceHeader({
   ] satisfies ReadonlyArray<{ href: string; label: string; type?: TemplateType }>;
 
   return (
-    <>
-      <AdminContextBar
-        className={styles.catalogHero}
-        actions={
-          <div className={styles.catalogActions}>
-            {canBrowseTemplates && onToggleArchive ? (
-              <button
-                type="button"
-                className={styles.secondaryLink}
-                aria-pressed={showingArchived}
-                disabled={archiveDisabled}
-                onClick={onToggleArchive}
-              >
-                <span>{showingArchived ? copy.allTemplates : copy.archivedTemplates}</span>
-              </button>
-            ) : null}
-            {canManageTemplates && templateType ? (
-              <Link
-                href={`/${locale}/templates/${editorType}/editor`}
-                className={styles.primaryLink}
-              >
-                <PlusIcon className={styles.linkIcon} />
-                <span>{copy.createTemplate}</span>
-              </Link>
-            ) : null}
-            {canManageTemplates && !templateType ? (
-              <details className={styles.createMenu}>
-                <summary className={styles.primaryLink}>
-                  <PlusIcon className={styles.linkIcon} />
-                  <span>{copy.createTemplate}</span>
-                  <CaretDownIcon className={styles.createMenuCaret} />
-                </summary>
-                <div className={styles.createMenuPanel} aria-label={copy.chooseTemplateType}>
-                  <Link
-                    href={`/${locale}/templates/video/editor`}
-                    className={styles.createMenuItem}
-                  >
-                    <VideoIcon className={styles.createMenuIcon} />
-                    <span>{copy.createVideoTemplate}</span>
-                  </Link>
-                  <Link
-                    href={`/${locale}/templates/image/editor`}
-                    className={styles.createMenuItem}
-                  >
-                    <ImageIcon className={styles.createMenuIcon} />
-                    <span>{copy.createImageTemplate}</span>
-                  </Link>
-                </div>
-              </details>
-            ) : null}
-          </div>
-        }
-      />
-
+    <div className={styles.catalogHeader}>
       <nav className={styles.typeTabs} aria-label={copy.typesLabel}>
         {typeTabs.map((item) => {
           const isCurrent = item.type === templateType;
@@ -140,7 +79,45 @@ export function TemplatesCatalogWorkspaceHeader({
           );
         })}
       </nav>
-    </>
+      <div className={styles.catalogActions}>
+        {canBrowseTemplates && onToggleArchive ? (
+          <button
+            type="button"
+            className={styles.secondaryLink}
+            aria-pressed={showingArchived}
+            disabled={archiveDisabled}
+            onClick={onToggleArchive}
+          >
+            <span>{showingArchived ? copy.allTemplates : copy.archivedTemplates}</span>
+          </button>
+        ) : null}
+        {canManageTemplates && templateType ? (
+          <Link href={`/${locale}/templates/${editorType}/editor`} className={styles.primaryLink}>
+            <PlusIcon className={styles.linkIcon} />
+            <span>{copy.createTemplate}</span>
+          </Link>
+        ) : null}
+        {canManageTemplates && !templateType ? (
+          <details className={styles.createMenu}>
+            <summary className={styles.primaryLink}>
+              <PlusIcon className={styles.linkIcon} />
+              <span>{copy.createTemplate}</span>
+              <CaretDownIcon className={styles.createMenuCaret} />
+            </summary>
+            <div className={styles.createMenuPanel} aria-label={copy.chooseTemplateType}>
+              <Link href={`/${locale}/templates/video/editor`} className={styles.createMenuItem}>
+                <VideoIcon className={styles.createMenuIcon} />
+                <span>{copy.createVideoTemplate}</span>
+              </Link>
+              <Link href={`/${locale}/templates/image/editor`} className={styles.createMenuItem}>
+                <ImageIcon className={styles.createMenuIcon} />
+                <span>{copy.createImageTemplate}</span>
+              </Link>
+            </div>
+          </details>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
@@ -172,47 +149,42 @@ export function TemplatesCatalogRail({
 
   return (
     <aside className={styles.catalogRail} aria-label={copy.publicationControlTitle}>
-      <AdminCard
-        className={styles.railCard}
-        title={copy.publicationControlTitle}
-        description={copy.publicationControlDescription}
-      >
-        <div className={styles.railActions}>
-          {attentionItems.map((item) => (
-            <button
-              key={item.label}
-              type="button"
-              className={styles.railAction}
-              disabled={item.value === 0}
-              onClick={item.onClick}
-            >
-              <span>{item.label}</span>
-              <strong>{formatMetric(item.value, locale)}</strong>
-              <CaretDownIcon className={styles.railActionIcon} />
-            </button>
-          ))}
-        </div>
-      </AdminCard>
-
-      <AdminCard className={styles.railCard} title={copy.quickLinksTitle}>
-        <nav className={styles.quickLinks} aria-label={copy.quickLinksTitle}>
-          <Link href={`/${locale}/templates/analytics`} className={styles.quickLink}>
-            <ChartIcon className={styles.quickLinkIcon} />
-            <span>{copy.analyticsHubAction}</span>
-            <CaretDownIcon className={styles.quickLinkCaret} />
-          </Link>
-          <Link href={`/${locale}/templates/daily-featured`} className={styles.quickLink}>
-            <CalendarIcon className={styles.quickLinkIcon} />
-            <span>{copy.dailyFeaturedAction}</span>
-            <CaretDownIcon className={styles.quickLinkCaret} />
-          </Link>
-          <Link href={`/${locale}/templates/categories`} className={styles.quickLink}>
-            <TemplatesIcon className={styles.quickLinkIcon} />
-            <span>{copy.categoriesAction}</span>
-            <CaretDownIcon className={styles.quickLinkCaret} />
-          </Link>
-        </nav>
-      </AdminCard>
+      <div className={styles.railActions}>
+        {attentionItems.map((item) => (
+          <button
+            key={item.label}
+            type="button"
+            className={styles.railAction}
+            disabled={item.value === 0}
+            onClick={item.onClick}
+          >
+            <span>{item.label}</span>
+            <strong>{formatMetric(item.value, locale)}</strong>
+          </button>
+        ))}
+      </div>
+      <AdminActionMenu
+        label={copy.quickLinksTitle}
+        align="end"
+        className={styles.catalogLinksMenu}
+        items={[
+          {
+            id: "analytics",
+            label: copy.analyticsHubAction,
+            href: `/${locale}/templates/analytics`,
+          },
+          {
+            id: "daily",
+            label: copy.dailyFeaturedAction,
+            href: `/${locale}/templates/daily-featured`,
+          },
+          {
+            id: "categories",
+            label: copy.categoriesAction,
+            href: `/${locale}/templates/categories`,
+          },
+        ]}
+      />
     </aside>
   );
 }

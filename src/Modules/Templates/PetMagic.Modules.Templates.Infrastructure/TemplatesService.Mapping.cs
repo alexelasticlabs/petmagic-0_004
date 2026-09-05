@@ -353,22 +353,21 @@ internal sealed partial class TemplatesService
             resolvedFeedLoopLowUrl = previewUrl;
         }
 
-        var primaryContentType = feedLoopLowContentType
-            ?? animatedPreviewContentType
-            ?? feedLoopMediumContentType
-            ?? thumbnailContentType
-            ?? previewContentType;
-        var primaryDurationSeconds = feedLoopLowDurationSeconds
-            ?? animatedPreviewDurationSeconds
-            ?? feedLoopMediumDurationSeconds
-            ?? thumbnailDurationSeconds
-            ?? previewDurationSeconds;
-        var primarySizeBytes = feedLoopLowFileSizeBytes
-            ?? animatedPreviewFileSizeBytes
-            ?? feedLoopMediumFileSizeBytes
-            ?? thumbnailFileSizeBytes
-            ?? previewFileSizeBytes;
-        var mediaKind = ResolveTemplateMediaKind(primaryContentType);
+        // Metadata belongs to the selected file. A missing size or duration
+        // must not be filled using a different derivative's measurements.
+        (string? ContentType, double? DurationSeconds, long? SizeBytes) primaryMedia =
+            !string.IsNullOrWhiteSpace(feedLoopLowUrl)
+                ? (feedLoopLowContentType, feedLoopLowDurationSeconds, feedLoopLowFileSizeBytes)
+                : !string.IsNullOrWhiteSpace(resolvedFeedLoopLowUrl)
+                    ? (previewContentType, previewDurationSeconds, previewFileSizeBytes)
+                    : !string.IsNullOrWhiteSpace(animatedPreviewUrl)
+                        ? (animatedPreviewContentType, animatedPreviewDurationSeconds, animatedPreviewFileSizeBytes)
+                        : !string.IsNullOrWhiteSpace(feedLoopMediumUrl)
+                            ? (feedLoopMediumContentType, feedLoopMediumDurationSeconds, feedLoopMediumFileSizeBytes)
+                            : !string.IsNullOrWhiteSpace(thumbnailUrl)
+                                ? (thumbnailContentType, thumbnailDurationSeconds, thumbnailFileSizeBytes)
+                                : (previewContentType, previewDurationSeconds, previewFileSizeBytes);
+        var mediaKind = ResolveTemplateMediaKind(primaryMedia.ContentType);
 
         return new FeedTemplateCardDto(
             templateId,
@@ -387,13 +386,13 @@ internal sealed partial class TemplatesService
                 resolvedFeedLoopLowUrl,
                 feedLoopMediumUrl,
                 mediaKind,
-                DurationMs: ToDurationMs(primaryDurationSeconds),
-                SizeBytes: primarySizeBytes,
+                DurationMs: ToDurationMs(primaryMedia.DurationSeconds),
+                SizeBytes: primaryMedia.SizeBytes,
                 MediaVersion: version),
             mediaKind,
             null,
-            ToDurationMs(primaryDurationSeconds),
-            primarySizeBytes,
+            ToDurationMs(primaryMedia.DurationSeconds),
+            primaryMedia.SizeBytes,
             version,
             version);
     }

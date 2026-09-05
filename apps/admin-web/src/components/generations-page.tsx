@@ -608,6 +608,37 @@ export function GenerationsPage({ locale }: GenerationsPageProps) {
           />
         ) : null}
 
+        <div className={styles.historyActions}>
+          <button
+            type="button"
+            className={styles.button}
+            disabled={generationsQuery.isFetching}
+            onClick={() => {
+              requestGenerationsRetry();
+              requestGenerationMetricsRetry();
+            }}
+          >
+            {text.refreshHistory}
+          </button>
+          <button
+            type="button"
+            className={styles.button}
+            disabled={
+              areGenerationFiltersLocked ||
+              !(search || user || provider || status !== "All" || refundState !== "all")
+            }
+            onClick={() => {
+              setSearch("");
+              setUser("");
+              setProvider("");
+              setStatus("All");
+              setRefundState("all");
+              resetGenerationListContext();
+            }}
+          >
+            {text.resetFilters}
+          </button>
+        </div>
         <AdminFilterToolbar title={text.filtersTitle} description={text.filtersDescription}>
           <div className={styles.filters}>
             <label className={styles.field}>
@@ -749,12 +780,9 @@ export function GenerationsPage({ locale }: GenerationsPageProps) {
                     <th>{text.status}</th>
                     <th>{text.provider}</th>
                     <th>{text.cost}</th>
-                    <th>{text.attempts}</th>
-                    <th>{text.usdLabel}</th>
                     <th>{text.failure}</th>
                     <th>{text.watermark}</th>
                     <th>{text.created}</th>
-                    <th>{text.completedAt}</th>
                   </tr>
                 </thead>
                 <tbody>

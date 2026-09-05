@@ -194,7 +194,11 @@ type RefundRequest = {
   body: unknown;
 };
 
-async function installRefundRecoveryMocks(page: Page, failFirstRefundRequest: boolean) {
+async function installRefundRecoveryMocks(
+  page: Page,
+  failFirstRefundRequest: boolean,
+  media: Record<string, unknown> = {}
+) {
   const session = createAdminSession();
   const refundRequests: RefundRequest[] = [];
   let refundQueued = false;
@@ -254,7 +258,8 @@ async function installRefundRecoveryMocks(page: Page, failFirstRefundRequest: bo
       request.method() === "GET"
     ) {
       detailRequests += 1;
-      await fulfillJson(route, createGenerationDetail(refundQueued));
+      const detail = createGenerationDetail(refundQueued);
+      await fulfillJson(route, { ...detail, generation: { ...detail.generation, ...media } });
       return;
     }
 
@@ -273,7 +278,7 @@ async function installRefundRecoveryMocks(page: Page, failFirstRefundRequest: bo
       listRequests += 1;
       const requestedRefundState = url.searchParams.get("refundState");
       requestedRefundStates.push(requestedRefundState);
-      const generation = createGeneration(refundQueued);
+      const generation = { ...createGeneration(refundQueued), ...media };
       const items =
         !requestedRefundState || requestedRefundState === generation.refundState
           ? [generation]
@@ -358,7 +363,7 @@ test("refund recovery keeps one idempotency key across a controlled retry", asyn
     .evaluateAll((cells) =>
       cells.slice(1).map((cell) => getComputedStyle(cell).borderInlineStartWidth)
     );
-  expect(columnBorders).toHaveLength(11);
+  expect(columnBorders).toHaveLength(8);
   expect(columnBorders.every((width) => width === "1px")).toBe(true);
 
   const retryButton = page.getByRole("button", { name: /Retry refund:/ });
@@ -414,8 +419,9 @@ test("refund recovery keeps one idempotency key across a controlled retry", asyn
   const detailsPanelId = await hideDetails.getAttribute("aria-controls");
   expect(detailsPanelId).toBeTruthy();
   const details = page.locator(`#${detailsPanelId}`);
-  await expect(details.getByText("Before", { exact: true })).toHaveCount(0);
-  await expect(details.getByText("After", { exact: true })).toHaveCount(0);
+  await expect(details.getByText("Source media is unavailable", { exact: true })).toBeVisible();
+  await expect(details.getByText("Result is not available yet", { exact: true })).toBeVisible();
+  await details.getByText("Technical details", { exact: true }).click();
   await expect(details.getByText("Pending", { exact: true })).toBeVisible();
   await expect(details.getByText("1 / 5", { exact: true })).toBeVisible();
   await expect(details.getByText("economy.refund_retry_queued", { exact: true })).toBeVisible();
@@ -486,4 +492,153 @@ test("exhausted refund recovery dialog stays within the 390px viewport", async (
   });
   expect(api.getRefundRequests()).toEqual([]);
   expect(runtimeErrors).toEqual([]);
+});
+
+const signedMediaOrigin = "https://" + "a".repeat(32) + ".r2.cloudflarestorage.com";
+const sourcePreview = signedMediaOrigin + "/private/source.jpg?signature=synthetic";
+const resultVideo = signedMediaOrigin + "/private/result.webm?signature=synthetic";
+const imageFixture =
+  '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480"><rect width="640" height="480" fill="#dbeafe"/><circle cx="320" cy="215" r="100" fill="#60a5fa"/><text x="320" y="380" text-anchor="middle" font-size="32" fill="#1e3a8a">TEST SOURCE</text></svg>';
+
+async function openMediaHistory(page: Page) {
+  await page.goto("/en/generations");
+  await expect(page).toHaveTitle(/PetMagic/);
+  await page.getByRole("button", { name: /Show:/ }).click();
+  return page.locator("#generation-details-" + generationId);
+}
+
+test("generation media renders signed image and playable video without fetching full blobs", async ({
+  page,
+}, testInfo) => {
+  const api = await installRefundRecoveryMocks(page, false, {
+    templateTitle: "Video portrait",
+    templateType: "Video",
+    status: "Completed",
+    inputPreviewUrl: sourcePreview,
+    resultPreviewUrl: signedMediaOrigin + "/private/poster.jpg",
+    resultMediaUrl: resultVideo,
+    resultMediaType: "video",
+    canCompareBeforeAfter: true,
+  });
+  await loginAsAdmin(page);
+  const runtimeErrors = collectUnexpectedRuntimeErrors(page);
+  // Generate a tiny real video in-browser; no provider or remote media dependency.
+  const bytes = await page.evaluate(async () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 320;
+    canvas.height = 240;
+    const ctx = canvas.getContext("2d")!;
+    const stream = canvas.captureStream(10);
+    const recorder = new MediaRecorder(stream, { mimeType: "video/webm" });
+    const chunks: Blob[] = [];
+    const result = new Promise<number[]>((resolve) => {
+      recorder.ondataavailable = (event) => chunks.push(event.data);
+      recorder.onstop = async () =>
+        resolve(Array.from(new Uint8Array(await new Blob(chunks).arrayBuffer())));
+    });
+    recorder.start();
+    ctx.fillStyle = "#c4b5fd";
+    ctx.fillRect(0, 0, 320, 240);
+    ctx.fillStyle = "#312e81";
+    ctx.font = "24px sans-serif";
+    ctx.fillText("TEST RESULT", 75, 130);
+    for (let frame = 0; frame < 12; frame += 1) {
+      ctx.fillStyle = frame % 2 ? "#818cf8" : "#c4b5fd";
+      ctx.fillRect(0, 0, 24, 24);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    recorder.stop();
+    stream.getTracks().forEach((track) => track.stop());
+    return result;
+  });
+  const mediaRequests: string[] = [];
+  await page.route(signedMediaOrigin + "/**", async (route) => {
+    mediaRequests.push(route.request().resourceType());
+    await route.fulfill({
+      contentType: route.request().url().includes(".webm") ? "video/webm" : "image/svg+xml",
+      body: route.request().url().includes(".webm") ? Buffer.from(bytes) : imageFixture,
+    });
+  });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  const details = await openMediaHistory(page);
+  const before = details.getByRole("img", { name: "Before", exact: true });
+  await expect(before).toBeVisible();
+  await expect.poll(() => before.evaluate((node: HTMLImageElement) => node.naturalWidth)).toBe(640);
+  const video = details.locator("video");
+  await expect(video).toHaveAttribute("controls", "");
+  await expect
+    .poll(() => video.evaluate((node: HTMLVideoElement) => node.readyState))
+    .toBeGreaterThanOrEqual(2);
+  await video.scrollIntoViewIfNeeded();
+  await video.evaluate((node: HTMLVideoElement) => node.play());
+  await expect
+    .poll(() => video.evaluate((node: HTMLVideoElement) => node.currentTime))
+    .toBeGreaterThan(0);
+  await video.evaluate((node: HTMLVideoElement) => node.pause());
+  await expect(details.getByText("Loading media…", { exact: true })).toHaveCount(0);
+  await expect(details.getByRole("link", { name: "Open file ↗" })).toHaveCount(2);
+  await details.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath("generation-media-desktop.png") });
+  const requests = api.getDetailRequests();
+  await details.getByRole("button", { name: "Refresh media", exact: true }).click();
+  await expect.poll(api.getDetailRequests).toBeGreaterThan(requests);
+  expect(mediaRequests).not.toContain("fetch");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await details.scrollIntoViewIfNeeded();
+  await expect(before).toBeVisible();
+  const bounds = await video.boundingBox();
+  expect(bounds!.x).toBeGreaterThanOrEqual(0);
+  expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(390);
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
+    .toBe(true);
+  await page.screenshot({ path: testInfo.outputPath("generation-media-mobile.png") });
+  expect(runtimeErrors).toEqual([]);
+});
+
+test("generation media failure is visible and refresh recovers an expired signed URL", async ({
+  page,
+}) => {
+  const media = {
+    inputPreviewUrl: sourcePreview,
+    resultPreviewUrl: sourcePreview,
+    status: "Completed",
+  };
+  const api = await installRefundRecoveryMocks(page, false, media);
+  await loginAsAdmin(page);
+  await page.route(signedMediaOrigin + "/**", (route) =>
+    route.request().url().includes("renewed")
+      ? route.fulfill({ contentType: "image/svg+xml", body: imageFixture })
+      : route.fulfill({ status: 403, body: "Expired" })
+  );
+  const details = await openMediaHistory(page);
+  await expect(details.getByText("Unable to load media", { exact: false })).toHaveCount(2);
+  media.inputPreviewUrl = sourcePreview + "&renewed=1";
+  media.resultPreviewUrl = sourcePreview + "&renewed=1";
+  await details.getByRole("button", { name: "Refresh media", exact: true }).click();
+  await expect.poll(api.getDetailRequests).toBeGreaterThan(1);
+  await expect(details.getByRole("img", { name: "After", exact: true })).toBeVisible();
+  await expect(details.getByText("Unable to load media", { exact: false })).toHaveCount(0);
+  await expect
+    .poll(() =>
+      details
+        .getByRole("img", { name: "After", exact: true })
+        .evaluate((node: HTMLImageElement) => node.naturalWidth)
+    )
+    .toBe(640);
+});
+
+test("generation history resets filters and refreshes the server-backed list", async ({ page }) => {
+  const api = await installRefundRecoveryMocks(page, false);
+  await loginAsAdmin(page);
+  await page.goto("/en/generations?refundState=exhausted");
+  await page.getByRole("button", { name: "Reset filters", exact: true }).click();
+  await expect(page.getByRole("combobox", { name: "Charge refund", exact: true })).toHaveValue(
+    "all"
+  );
+  await expect(page).not.toHaveURL(/refundState=/);
+  await expect(page.getByRole("button", { name: "Refresh history", exact: true })).toBeEnabled();
+  const requests = api.getListRequests();
+  await page.getByRole("button", { name: "Refresh history", exact: true }).click();
+  await expect.poll(api.getListRequests).toBeGreaterThan(requests);
 });

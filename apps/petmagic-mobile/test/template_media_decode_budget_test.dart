@@ -59,7 +59,14 @@ void main() {
     final videoLifecycleSource = await File(
       'lib/features/templates/presentation/widgets/template_flow_video_preview_lifecycle.part.dart',
     ).readAsString().then((source) => source.replaceAll('\r\n', '\n'));
-    final contentSource = '$frameSource\n$videoSource\n$videoLifecycleSource';
+    final videoViewSource = await File(
+      'lib/features/templates/presentation/widgets/template_flow_video_preview_view.part.dart',
+    ).readAsString();
+    final videoInitializeSource = await File(
+      'lib/features/templates/presentation/widgets/template_flow_video_preview_initialize.part.dart',
+    ).readAsString().then((source) => source.replaceAll('\r\n', '\n'));
+    final contentSource =
+        '$frameSource\n$videoSource\n$videoInitializeSource\n$videoLifecycleSource\n$videoViewSource';
 
     expect(fullCardSource, contains('VisibilityDetector('));
     expect(
@@ -169,8 +176,8 @@ void main() {
     expect(contentSource, contains('playbackIdentity: template.templateId'));
     expect(contentSource, contains('mediaVersion: template.mediaVersion'));
     expect(contentSource, contains('useSharedPreviewCache: true'));
-    expect(contentSource, contains('safeDetailPreviewUrl'));
-    expect(contentSource, contains('template.detailPreviewIsVideo'));
+    expect(contentSource, contains('TemplatePreviewMediaSelection('));
+    expect(contentSource, contains('selection.usesDetailImageCache'));
     expect(contentSource, contains('TemplateMediaCache.fetchPreviewFile'));
     expect(contentSource, contains('backdropUsesDetailCache'));
     expect(contentSource, contains('fileLoader: backdropUsesDetailCache'));
@@ -183,9 +190,12 @@ void main() {
       contains('return SizedBox.expand(child: clippedMedia)'),
     );
     expect(contentSource, contains('isActive: isActive'));
-    expect(contentSource, contains('final poster = hasPoster'));
+    expect(contentSource, contains('widget.placeholder ??'));
+    expect(contentSource, contains('(hasPoster'));
     expect(
-      contentSource.indexOf('poster,\n'),
+      contentSource.indexOf(
+        'ExcludeSemantics(excluding: isInitialized, child: poster)',
+      ),
       lessThan(contentSource.indexOf('if (isInitialized) ...[')),
     );
     expect(contentSource, contains('cacheWidth: widget.posterCacheWidth'));

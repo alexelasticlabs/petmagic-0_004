@@ -611,6 +611,125 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                     b.ToTable("templates_categories", (string)null);
                 });
 
+            modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateDiscoveryCommandReceipt", b =>
+                {
+                    b.Property<Guid>("ActorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("IdempotencyKey")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RequestHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("RevisionId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("ActorId", "IdempotencyKey");
+
+                    b.HasIndex("RevisionId");
+
+                    b.ToTable("templates_discovery_command_receipts", (string)null);
+                });
+
+            modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateDiscoveryPage", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("DraftRevisionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("LastRevisionNumber")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid?>("PublishedRevisionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DraftRevisionId");
+
+                    b.HasIndex("PublishedRevisionId");
+
+                    b.ToTable("templates_discovery_pages", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            LastRevisionNumber = 0L,
+                            Version = 0L
+                        });
+                });
+
+            modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateDiscoveryRevision", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("BasedOnRevisionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("DocumentJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<long>("EditVersion")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("Number")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("PublishedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("PublishedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UpdatedBy")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BasedOnRevisionId");
+
+                    b.HasIndex("Number")
+                        .IsUnique();
+
+                    b.ToTable("templates_discovery_revisions", (string)null);
+                });
+
             modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateGenerationBillingCommand", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1346,8 +1465,9 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                     b.HasIndex("QueueMediaType", "MediaImportCompletedAtUtc")
                         .IsDescending(false, true)
                         .HasDatabaseName("IX_tgj_Completed_MediaType_ImportCompletedAtUtc")
-                        .HasFilter("\"Status\" = 3 AND \"ImportStartedAtUtc\" IS NOT NULL AND \"MediaImportCompletedAtUtc\" IS NOT NULL")
-                        .HasAnnotation("Npgsql:IndexInclude", new[] { "ImportStartedAtUtc" });
+                        .HasFilter("\"Status\" = 3 AND \"ImportStartedAtUtc\" IS NOT NULL AND \"MediaImportCompletedAtUtc\" IS NOT NULL");
+
+                    NpgsqlIndexBuilderExtensions.IncludeProperties(b.HasIndex("QueueMediaType", "MediaImportCompletedAtUtc"), new[] { "ImportStartedAtUtc" });
 
                     b.HasIndex("Status", "CancellationNextAttemptAtUtc")
                         .HasDatabaseName("IX_tgj_PendingCancellation")
@@ -1382,11 +1502,6 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                         .HasDatabaseName("UX_templates_generation_jobs_UserId_RequestHash_active")
                         .HasFilter(" \"Status\" IN (1, 2, 6, 7, 8, 9, 10, 11) AND \"RequestHash\" IS NOT NULL ");
 
-                    b.HasIndex("UserId", "QueueTier", "LastAttemptAtUtc")
-                        .IsDescending(false, false, true)
-                        .HasDatabaseName("IX_tgj_UserId_QueueTier_LastAttemptAtUtc")
-                        .HasFilter("\"LastAttemptAtUtc\" IS NOT NULL");
-
                     b.HasIndex("UserId", "Status")
                         .HasDatabaseName("IX_templates_generation_jobs_UserId_Status");
 
@@ -1410,6 +1525,11 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
 
                     b.HasIndex("UserId", "PetId", "CreatedAtUtc")
                         .HasDatabaseName("IX_tgj_UserId_PetId_CreatedAtUtc");
+
+                    b.HasIndex("UserId", "QueueTier", "LastAttemptAtUtc")
+                        .IsDescending(false, false, true)
+                        .HasDatabaseName("IX_tgj_UserId_QueueTier_LastAttemptAtUtc")
+                        .HasFilter("\"LastAttemptAtUtc\" IS NOT NULL");
 
                     b.HasIndex("UserId", "Status", "ResultViewedAtUtc");
 
@@ -1540,8 +1660,9 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                     b.HasIndex("Stage", "ProviderCompletedAtUtc")
                         .IsDescending(false, true)
                         .HasDatabaseName("IX_tgpa_Completed_Stage_ProviderCompletedAtUtc")
-                        .HasFilter("\"State\" = 6 AND \"SubmittedAtUtc\" IS NOT NULL AND \"ProviderCompletedAtUtc\" IS NOT NULL")
-                        .HasAnnotation("Npgsql:IndexInclude", new[] { "SubmittedAtUtc" });
+                        .HasFilter("\"State\" = 6 AND \"SubmittedAtUtc\" IS NOT NULL AND \"ProviderCompletedAtUtc\" IS NOT NULL");
+
+                    NpgsqlIndexBuilderExtensions.IncludeProperties(b.HasIndex("Stage", "ProviderCompletedAtUtc"), new[] { "SubmittedAtUtc" });
 
                     b.HasIndex("State", "LockedAtUtc")
                         .HasDatabaseName("IX_tgpa_State_LockedAtUtc")
@@ -1867,13 +1988,13 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
 
                     b.HasIndex("GenerationId");
 
+                    b.HasIndex("Url")
+                        .IsUnique();
+
                     b.HasIndex("GenerationId", "MediaType")
                         .IsUnique()
                         .HasDatabaseName("UX_tmr_GenerationResult_GenerationId_MediaType")
                         .HasFilter("\"GenerationId\" IS NOT NULL AND \"SourceType\" = 'generation_result'");
-
-                    b.HasIndex("Url")
-                        .IsUnique();
 
                     b.HasIndex("GenerationJobId", "LifecycleState");
 
@@ -2417,6 +2538,36 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Template");
+                });
+
+            modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateDiscoveryCommandReceipt", b =>
+                {
+                    b.HasOne("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateDiscoveryRevision", null)
+                        .WithMany()
+                        .HasForeignKey("RevisionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateDiscoveryPage", b =>
+                {
+                    b.HasOne("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateDiscoveryRevision", null)
+                        .WithMany()
+                        .HasForeignKey("DraftRevisionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateDiscoveryRevision", null)
+                        .WithMany()
+                        .HasForeignKey("PublishedRevisionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateDiscoveryRevision", b =>
+                {
+                    b.HasOne("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateDiscoveryRevision", null)
+                        .WithMany()
+                        .HasForeignKey("BasedOnRevisionId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateGenerationBillingCommand", b =>

@@ -31,13 +31,16 @@ abstract class _TemplatesRepositoryBase implements TemplatesRepository {
     required TemplatesRemoteDataSource remoteDataSource,
     required TemplatesCacheDataSource cacheDataSource,
     TemplateMediaCleanup? mediaCleanup,
+    DateTime Function()? nowUtc,
   }) : _remoteDataSource = remoteDataSource,
        _cacheDataSource = cacheDataSource,
-       _mediaCleanup = mediaCleanup ?? _removeTemplateMediaFromCache;
+       _mediaCleanup = mediaCleanup ?? _removeTemplateMediaFromCache,
+       _nowUtc = nowUtc ?? DateTime.now;
 
   final TemplatesRemoteDataSource _remoteDataSource;
   final TemplatesCacheDataSource _cacheDataSource;
   final TemplateMediaCleanup _mediaCleanup;
+  final DateTime Function() _nowUtc;
   final Map<String, _CachedTemplateDetail> _templateDetailsById =
       <String, _CachedTemplateDetail>{};
   final Map<String, Future<TemplateItem>> _templateDetailFetchesById =
@@ -175,6 +178,7 @@ class DefaultTemplatesRepository extends _TemplatesRepositoryBase
     required super.remoteDataSource,
     required super.cacheDataSource,
     super.mediaCleanup,
+    super.nowUtc,
   });
   @override
   Future<TemplatesFeedPage?> readCachedFirstPage(TemplatesQuery query) async {
@@ -242,13 +246,20 @@ class DefaultTemplatesRepository extends _TemplatesRepositoryBase
     String templateId, {
     bool forceRefresh = false,
     String? analyticsSource,
+    int? minimumVersion,
   }) async {
     final normalizedId = templateId.trim();
     final cacheKey = normalizedId.isEmpty ? templateId : normalizedId;
-    final now = DateTime.now().toUtc();
+    final now = _nowUtc().toUtc();
     final cached = _templateDetailsById[cacheKey];
-    if (!forceRefresh && cached != null && cached.expiresAtUtc.isAfter(now)) {
-      _rememberTemplateDetail(cacheKey, cached.template, now);
+    if (!forceRefresh &&
+        cached != null &&
+        cached.expiresAtUtc.isAfter(now) &&
+        _matchesMinimumVersion(cached.template, minimumVersion)) {
+      // Reading updates LRU order without extending freshness indefinitely.
+      _templateDetailsById.remove(cacheKey);
+      _templateDetailsById[cacheKey] = cached;
+      unawaited(_recordReusedTemplateView(cacheKey, analyticsSource));
       return cached.template;
     }
 
@@ -258,7 +269,17 @@ class DefaultTemplatesRepository extends _TemplatesRepositoryBase
 
     final inFlight = _templateDetailFetchesById[cacheKey];
     if (!forceRefresh && inFlight != null) {
-      return inFlight;
+      final template = await inFlight;
+      if (!_matchesMinimumVersion(template, minimumVersion)) {
+        return fetchTemplate(
+          cacheKey,
+          forceRefresh: true,
+          analyticsSource: analyticsSource,
+          minimumVersion: minimumVersion,
+        );
+      }
+      unawaited(_recordReusedTemplateView(cacheKey, analyticsSource));
+      return template;
     }
 
     final cacheGeneration = _templateDetailCacheGeneration;
@@ -267,8 +288,9 @@ class DefaultTemplatesRepository extends _TemplatesRepositoryBase
         .fetchTemplate(cacheKey, analyticsSource: analyticsSource)
         .then((dto) {
           final template = dto.toDomain();
-          if (cacheGeneration == _templateDetailCacheGeneration) {
-            _rememberTemplateDetail(cacheKey, template, DateTime.now().toUtc());
+          if (cacheGeneration == _templateDetailCacheGeneration &&
+              identical(_templateDetailFetchesById[cacheKey], fetch)) {
+            _rememberTemplateDetail(cacheKey, template, _nowUtc().toUtc());
           }
           return template;
         })
@@ -279,6 +301,35 @@ class DefaultTemplatesRepository extends _TemplatesRepositoryBase
         });
     _templateDetailFetchesById[cacheKey] = fetch;
     return fetch;
+  }
+
+  bool _matchesMinimumVersion(TemplateItem template, int? minimumVersion) =>
+      minimumVersion == null ||
+      (template.mediaVersion ?? template.version) >= minimumVersion;
+
+  Future<void> _recordReusedTemplateView(
+    String templateId,
+    String? analyticsSource,
+  ) async {
+    final source = analyticsSource?.trim();
+    if (source == null || source.isEmpty) return;
+
+    // GET records its own view; only openings that reuse data need a POST.
+    try {
+      await _remoteDataSource.recordAnalyticsEvent(
+        templateId: templateId,
+        eventType: 'view',
+        source: source,
+      );
+    } catch (error, stackTrace) {
+      AppLogger.warn(
+        feature: 'Templates.Repository',
+        operation: 'record_reused_template_view',
+        message: 'Cached template view analytics could not be recorded.',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
   }
 
   @override
@@ -297,11 +348,7 @@ class DefaultTemplatesRepository extends _TemplatesRepositoryBase
     );
     final template = dto.toDomain();
     if (template != null && cacheGeneration == _templateDetailCacheGeneration) {
-      _rememberTemplateDetail(
-        template.templateId,
-        template,
-        DateTime.now().toUtc(),
-      );
+      _rememberTemplateDetail(template.templateId, template, _nowUtc().toUtc());
     }
     return template;
   }

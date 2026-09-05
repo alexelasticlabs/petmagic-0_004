@@ -1,8 +1,114 @@
+import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
+import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/performance/media_lifecycle_policy.dart';
+import 'package:petmagic_mobile/features/templates/presentation/widgets/template_flow_sheets.dart';
+import 'package:video_player/video_player.dart';
+import 'package:video_player_platform_interface/video_player_platform_interface.dart';
+import 'package:visibility_detector/visibility_detector.dart';
+
+import 'template_card_test_support.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  group('template preview download leases', () {
+    late VideoPlayerPlatform originalPlatform;
+
+    setUp(() {
+      originalPlatform = VideoPlayerPlatform.instance;
+      VideoPlayerPlatform.instance = FakeVideoPlayerPlatform();
+      VisibilityDetectorController.instance.updateInterval = Duration.zero;
+      MediaLifecyclePolicy.reset();
+    });
+
+    tearDown(() {
+      VideoPlayerPlatform.instance = originalPlatform;
+      VisibilityDetectorController.instance.updateInterval = const Duration(
+        milliseconds: 500,
+      );
+      MediaLifecyclePolicy.reset();
+    });
+
+    testWidgets(
+      'background download holds no decoder and late completion preserves resumed preview',
+      (tester) async {
+        final requests = <Completer<VideoPlayerController>>[];
+        await tester.pumpWidget(
+          _previewHost((url) {
+            final request = Completer<VideoPlayerController>();
+            requests.add(request);
+            return request.future;
+          }),
+        );
+        showTemplateCard(tester, size: const Size(64, 76));
+        await tester.pump();
+        expect(requests, hasLength(1));
+        expect(MediaLifecyclePolicy.activeVideoPreviews, 0);
+
+        tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+        await tester.pump();
+        expect(MediaLifecyclePolicy.activeVideoPreviews, 0);
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        await tester.pump();
+        expect(requests, hasLength(2));
+
+        final resumed = _TrackingPreviewController();
+        requests.last.complete(resumed);
+        await pumpUntil(
+          tester,
+          () => find.byType(VideoPlayer).evaluate().isNotEmpty,
+          timeout: const Duration(seconds: 1),
+        );
+        expect(resumed.initializeCalls, 1);
+        expect(MediaLifecyclePolicy.activeVideoPreviews, 1);
+
+        final stale = _TrackingPreviewController();
+        requests.first.complete(stale);
+        await tester.pump();
+        expect(stale.initializeCalls, 0);
+        expect(stale.disposeCalls, 1);
+        expect(MediaLifecyclePolicy.activeVideoPreviews, 1);
+        expect(find.byType(VideoPlayer), findsOneWidget);
+
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.runAsync(() async {
+          await Future<void>.delayed(Duration.zero);
+        });
+        await tester.pump();
+        expect(resumed.disposeCalls, 1);
+        expect(MediaLifecyclePolicy.activeVideoPreviews, 0);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets('unleased ready controller is disposed before slot retry', (
+      tester,
+    ) async {
+      for (var index = 0; index < 4; index++) {
+        expect(MediaLifecyclePolicy.tryAcquireVideoPreviewSlot(), isTrue);
+      }
+      final ready = _TrackingPreviewController();
+      await tester.pumpWidget(_previewHost((_) async => ready));
+      showTemplateCard(tester, size: const Size(64, 76));
+      await tester.pump();
+      expect(ready.initializeCalls, 0);
+      expect(ready.disposeCalls, 1);
+      expect(MediaLifecyclePolicy.activeVideoPreviews, 4);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(ready.disposeCalls, 1);
+      expect(tester.takeException(), isNull);
+    });
+  });
+
   group('network video preview lifecycle', () {
     test('generation result previews ignore stale async initialization', () {
       final sectionsSource = _readGenerationStatusSectionsLibrarySource();
@@ -87,7 +193,11 @@ void main() {
       final lifecycleSource = File(
         'lib/features/templates/presentation/widgets/template_flow_video_preview_lifecycle.part.dart',
       ).readAsStringSync().replaceAll('\r\n', '\n');
-      final source = '$frameSource\n$videoSource\n$lifecycleSource';
+      final initializeSource = File(
+        'lib/features/templates/presentation/widgets/template_flow_video_preview_initialize.part.dart',
+      ).readAsStringSync().replaceAll('\r\n', '\n');
+      final source =
+          '$frameSource\n$videoSource\n$initializeSource\n$lifecycleSource';
 
       expect(parentSource, contains("import 'dart:async';"));
       expect(
@@ -135,7 +245,8 @@ void main() {
       expect(source, contains('state == AppLifecycleState.hidden'));
       expect(source, contains('unawaited(_disposeVideoController());'));
       expect(source, contains('oldWidget.isActive != widget.isActive'));
-      expect(source, contains('if (!widget.isActive)'));
+      expect(source, contains('if (!_canPrepare)'));
+      expect(source, contains('widget.isActive || widget.prepareWhileVisible'));
       expect(source, contains('widget.autoplay && !_manualPaused'));
       expect(source, contains('_manualStarted ||'));
       expect(
@@ -218,7 +329,8 @@ void main() {
       expect(flowLeaseAssignment, greaterThan(flowControllerAssignment));
       expect(nativeControllerDispose, isNonNegative);
       expect(nativeControllerDispose, lessThan(slotRelease));
-      expect(source, contains('if (!_isAppResumed ||'));
+      expect(source, contains('bool get _canLoad =>\n      _isAppResumed &&'));
+      expect(initializeSource, contains('if (!_canLoad ||'));
       expect(source, contains('_isAppResumed = false;'));
     });
 
@@ -296,6 +408,48 @@ void main() {
       }
     });
   });
+}
+
+Widget _previewHost(
+  Future<VideoPlayerController> Function(String) controllerFactory,
+) => MaterialApp(
+  theme: AppTheme.dark(),
+  localizationsDelegates: AppLocalizations.localizationsDelegates,
+  supportedLocales: AppLocalizations.supportedLocales,
+  home: Scaffold(
+    body: Center(
+      child: SizedBox(
+        width: 64,
+        height: 76,
+        child: TemplateVideoThumbnail(
+          template: videoTemplate(),
+          isActive: true,
+          placeholder: const ColoredBox(color: Colors.black),
+          controllerFactory: controllerFactory,
+        ),
+      ),
+    ),
+  ),
+);
+
+class _TrackingPreviewController extends VideoPlayerController {
+  _TrackingPreviewController()
+    : super.networkUrl(Uri.parse('https://cdn.example.com/preview.mp4'));
+
+  int initializeCalls = 0;
+  int disposeCalls = 0;
+
+  @override
+  Future<void> initialize() {
+    initializeCalls++;
+    return super.initialize();
+  }
+
+  @override
+  Future<void> dispose() {
+    disposeCalls++;
+    return super.dispose();
+  }
 }
 
 String _readGenerationStatusSectionsLibrarySource() {

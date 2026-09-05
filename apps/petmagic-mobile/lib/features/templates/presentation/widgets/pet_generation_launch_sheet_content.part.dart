@@ -144,9 +144,14 @@ class _PetLaunchTemplateCard extends StatelessWidget {
 }
 
 class _PetLaunchPetCard extends StatelessWidget {
-  const _PetLaunchPetCard({required this.petName, required this.balance});
+  const _PetLaunchPetCard({
+    required this.petName,
+    required this.balance,
+    this.avatarUrl,
+  });
 
   final String? petName;
+  final String? avatarUrl;
   final int balance;
 
   @override
@@ -164,14 +169,14 @@ class _PetLaunchPetCard extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         child: Row(
           children: [
-            Icon(Icons.pets_rounded, color: colors.accent, size: 22),
+            PetShortcutAvatar(avatarUrl: avatarUrl, size: 42),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
                 name == null || name.isEmpty
                     ? text.petsGenerateWithPet
                     : text.petsGenerateWithName(name),
-                maxLines: 1,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.labelLarge?.copyWith(
                   color: colors.textStrong,

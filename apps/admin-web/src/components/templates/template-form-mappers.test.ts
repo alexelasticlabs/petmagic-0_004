@@ -49,6 +49,69 @@ beforeEach(() => {
 });
 
 describe("template form numeric hardening", () => {
+  it.each([3_439_810, 12_345_678, 123_456_789])(
+    "preserves the complete uploaded primary and reference size %i in API payloads",
+    async (fileSizeBytes) => {
+      const form = {
+        ...createInitialTemplateForm("Video"),
+        previewUrlSource: "uploaded" as const,
+        previewUrl: "https://cdn.example.com/preview.mp4",
+        previewFileName: "preview.mp4",
+        previewContentType: "video/mp4",
+        previewFileSizeBytes: fileSizeBytes.toString(),
+        referenceUrlSource: "uploaded" as const,
+        referenceUrl: "https://cdn.example.com/reference.mp4",
+        referenceFileName: "reference.mp4",
+        referenceContentType: "video/mp4",
+        referenceFileSizeBytes: fileSizeBytes.toString(),
+      };
+
+      await saveVideoTemplateFromForm(undefined, form, "Draft");
+      const videoPayload = apiClientMocks.createVideoTemplate.mock.calls[0]?.[0];
+      expect(videoPayload.previewAsset.fileSizeBytes).toBe(fileSizeBytes);
+      expect(videoPayload.referenceMotionAsset.fileSizeBytes).toBe(fileSizeBytes);
+      expect(videoPayload.feedLoopLowAsset.fileSizeBytes).toBe(fileSizeBytes);
+
+      await saveImageTemplateFromForm(
+        undefined,
+        {
+          ...form,
+          previewUrl: "https://cdn.example.com/preview.jpg",
+          previewContentType: "image/jpeg",
+        },
+        "Draft"
+      );
+      const imagePayload = apiClientMocks.createImageTemplate.mock.calls[0]?.[0];
+      expect(imagePayload.previewAsset.fileSizeBytes).toBe(fileSizeBytes);
+      expect(imagePayload.thumbnailAsset.fileSizeBytes).toBe(fileSizeBytes);
+      expect(imagePayload.detailPreviewAsset.fileSizeBytes).toBe(fileSizeBytes);
+    }
+  );
+
+  it.each(["0", "-3439810", "3.439810", "3e6", "3439810bytes", "9007199254740992", "Infinity"])(
+    "does not turn invalid file size %s into a different valid size",
+    async (fileSizeBytes) => {
+      const form = {
+        ...createInitialTemplateForm("Video"),
+        previewUrlSource: "uploaded" as const,
+        previewUrl: "https://cdn.example.com/preview.mp4",
+        previewFileName: "preview.mp4",
+        previewContentType: "video/mp4",
+        previewFileSizeBytes: fileSizeBytes,
+        referenceUrlSource: "uploaded" as const,
+        referenceUrl: "https://cdn.example.com/reference.mp4",
+        referenceFileName: "reference.mp4",
+        referenceContentType: "video/mp4",
+        referenceFileSizeBytes: fileSizeBytes,
+      };
+
+      await saveVideoTemplateFromForm(undefined, form, "Draft");
+      const payload = apiClientMocks.createVideoTemplate.mock.calls[0]?.[0];
+      expect(payload.previewAsset.fileSizeBytes).toBeUndefined();
+      expect(payload.referenceMotionAsset.fileSizeBytes).toBeUndefined();
+    }
+  );
+
   it("normalizes token cost to bounded digits only", () => {
     expect(normalizeTemplateIntegerInput("12e3.456789")).toBe("123456");
     expect(normalizeTemplateIntegerInput("abc")).toBe("");

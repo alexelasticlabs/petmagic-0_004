@@ -415,6 +415,7 @@ class _ControlledTemplatesRepository extends FakeTemplatesRepository {
     String templateId, {
     bool forceRefresh = false,
     String? analyticsSource,
+    int? minimumVersion,
   }) {
     requestedTemplateIds.add(templateId);
     final request = Completer<TemplateItem>();

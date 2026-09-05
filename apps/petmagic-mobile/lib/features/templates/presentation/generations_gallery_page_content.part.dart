@@ -11,16 +11,23 @@ extension on _GenerationsGalleryPageState {
       return [
         SliverFillRemaining(
           hasScrollBody: false,
-          child: ProtectedAuthGate(
-            subtitle: text.generationStatusEmptyMessage,
-            onSignIn: () {
-              unawaited(
-                showAuthRequiredSheet(
-                  context,
-                  redirectPath: GenerationsGalleryPage.routePath,
-                ),
-              );
-            },
+          child: Padding(
+            padding: EdgeInsets.only(
+              bottom: PetMagicShellScope.isPresent(context)
+                  ? petMagicBottomNavInset(context)
+                  : 0,
+            ),
+            child: ProtectedAuthGate(
+              subtitle: text.generationStatusEmptyMessage,
+              onSignIn: () {
+                unawaited(
+                  showAuthRequiredSheet(
+                    context,
+                    redirectPath: GenerationsGalleryPage.routePath,
+                  ),
+                );
+              },
+            ),
           ),
         ),
       ];

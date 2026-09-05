@@ -1,7 +1,11 @@
 part of 'generation_status_page.dart';
 
 class _ResultCard extends StatefulWidget {
-  const _ResultCard({required this.generation, required this.onOpenViewer});
+  const _ResultCard({
+    required this.generation,
+    required this.onOpenViewer,
+    super.key,
+  });
 
   final TemplateGenerationResult generation;
   final VoidCallback onOpenViewer;
@@ -16,6 +20,8 @@ class _ResultCardState extends State<_ResultCard> {
   ImageStream? _aspectRatioStream;
   ImageStreamListener? _aspectRatioListener;
   double? _aspectRatio;
+  bool _mediaReady = false;
+  bool _readyUpdateScheduled = false;
 
   @override
   void initState() {
@@ -46,6 +52,15 @@ class _ResultCardState extends State<_ResultCard> {
   void dispose() {
     _detachAspectRatioListener();
     super.dispose();
+  }
+
+  void _markMediaReady() {
+    if (_mediaReady || _readyUpdateScheduled) return;
+    _readyUpdateScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _readyUpdateScheduled = false;
+      if (mounted && !_mediaReady) setState(() => _mediaReady = true);
+    });
   }
 
   void _resolveImageAspectRatio() {
@@ -108,124 +123,163 @@ class _ResultCardState extends State<_ResultCard> {
     final isVideo = isVideoGeneration(widget.generation);
     final aspectRatio = _aspectRatio ?? (isVideo ? 9.0 / 16.0 : 2.0 / 3.0);
     final borderRadius = BorderRadius.circular(22);
-    return AnimatedSize(
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: colors.surfaceStrong,
-          borderRadius: borderRadius,
-        ),
-        child: ClipRRect(
-          borderRadius: borderRadius,
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: borderRadius,
-              onTap: safeMediaUrl.isEmpty ? null : widget.onOpenViewer,
-              child: AspectRatio(
-                aspectRatio: aspectRatio,
-                child: safeMediaUrl.isEmpty && localOutputFile == null
-                    ? _MediaPlaceholder(
-                        label: text.templateFlowResultUnavailable,
-                      )
-                    : Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          ColoredBox(
-                            color: colors.surfaceStrong,
-                            child: isVideo
-                                ? _InlineVideoPreview(
-                                    url: safeMediaUrl,
-                                    localFilePath: localOutputFile?.path,
-                                    onAspectRatioResolved: (ar) {
-                                      if (mounted) {
-                                        setState(() => _aspectRatio = ar);
-                                      }
-                                    },
-                                  )
-                                : localOutputFile != null
-                                ? Image.file(
-                                    localOutputFile,
-                                    fit: BoxFit.cover,
-                                    cacheWidth: _resultCardImageCacheWidth,
-                                    filterQuality: FilterQuality.medium,
-                                  )
-                                : CachedNetworkImage(
-                                    imageUrl: safeMediaUrl,
-                                    cacheKey: persistentSafeGenerationMediaUrl(
-                                      safeMediaUrl,
+    return GenerationResultReveal(
+      ready: _mediaReady,
+      child: AnimatedSize(
+        duration: PetMotion.reduceMotion(context)
+            ? Duration.zero
+            : const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: colors.surfaceStrong,
+            borderRadius: borderRadius,
+          ),
+          child: ClipRRect(
+            borderRadius: borderRadius,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: borderRadius,
+                onTap: safeMediaUrl.isEmpty && localOutputFile == null
+                    ? null
+                    : widget.onOpenViewer,
+                child: AspectRatio(
+                  aspectRatio: aspectRatio,
+                  child: safeMediaUrl.isEmpty && localOutputFile == null
+                      ? _MediaPlaceholder(
+                          label: text.templateFlowResultUnavailable,
+                        )
+                      : Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            ColoredBox(
+                              color: colors.surfaceStrong,
+                              child: isVideo
+                                  ? _InlineVideoPreview(
+                                      url: safeMediaUrl,
+                                      localFilePath: localOutputFile?.path,
+                                      onReady: _markMediaReady,
+                                      onAspectRatioResolved: (ar) {
+                                        if (mounted) {
+                                          setState(() => _aspectRatio = ar);
+                                        }
+                                      },
+                                    )
+                                  : localOutputFile != null
+                                  ? Image.file(
+                                      localOutputFile,
+                                      fit: BoxFit.cover,
+                                      cacheWidth: _resultCardImageCacheWidth,
+                                      filterQuality: FilterQuality.medium,
+                                      frameBuilder:
+                                          (context, child, frame, synchronous) {
+                                            if (frame != null) {
+                                              _markMediaReady();
+                                            }
+                                            return child;
+                                          },
+                                      errorBuilder: (_, _, _) =>
+                                          _MediaPlaceholder(
+                                            label: text
+                                                .templateFlowResultLoadFailed,
+                                          ),
+                                    )
+                                  : CachedNetworkImage(
+                                      imageUrl: safeMediaUrl,
+                                      cacheKey:
+                                          persistentSafeGenerationMediaUrl(
+                                            safeMediaUrl,
+                                          ),
+                                      fit: BoxFit.cover,
+                                      memCacheWidth: _resultCardImageCacheWidth,
+                                      maxWidthDiskCache:
+                                          _resultCardImageCacheWidth,
+                                      filterQuality: FilterQuality.medium,
+                                      imageBuilder: (context, provider) =>
+                                          Image(
+                                            image: provider,
+                                            fit: BoxFit.cover,
+                                            filterQuality: FilterQuality.medium,
+                                            frameBuilder:
+                                                (
+                                                  context,
+                                                  child,
+                                                  frame,
+                                                  synchronous,
+                                                ) {
+                                                  if (frame != null) {
+                                                    _markMediaReady();
+                                                  }
+                                                  return child;
+                                                },
+                                          ),
+                                      errorWidget: (context, url, error) =>
+                                          _MediaPlaceholder(
+                                            label: text
+                                                .templateFlowResultLoadFailed,
+                                          ),
                                     ),
-                                    fit: BoxFit.cover,
-                                    memCacheWidth: _resultCardImageCacheWidth,
-                                    maxWidthDiskCache:
-                                        _resultCardImageCacheWidth,
-                                    filterQuality: FilterQuality.medium,
-                                    errorWidget: (context, url, error) =>
-                                        _MediaPlaceholder(
-                                          label:
-                                              text.templateFlowResultLoadFailed,
-                                        ),
+                            ),
+                            const Positioned(
+                              bottom: 0,
+                              left: 0,
+                              right: 0,
+                              height: 96,
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                                      Colors.transparent,
+                                      Color(0xB5000000),
+                                    ],
                                   ),
-                          ),
-                          const Positioned(
-                            bottom: 0,
-                            left: 0,
-                            right: 0,
-                            height: 96,
-                            child: DecoratedBox(
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                  colors: [
-                                    Colors.transparent,
-                                    Color(0xB5000000),
-                                  ],
                                 ),
                               ),
                             ),
-                          ),
-                          Positioned(
-                            bottom: 14,
-                            right: 14,
-                            child: DecoratedBox(
-                              decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.52),
-                                borderRadius: BorderRadius.circular(999),
-                                border: Border.all(
-                                  color: Colors.white.withValues(alpha: 0.18),
+                            Positioned(
+                              bottom: 14,
+                              right: 14,
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.52),
+                                  borderRadius: BorderRadius.circular(999),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.18),
+                                  ),
                                 ),
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 7,
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(
-                                      Icons.fullscreen_rounded,
-                                      color: Colors.white,
-                                      size: 15,
-                                    ),
-                                    const SizedBox(width: 5),
-                                    Text(
-                                      text.templateFlowPreviewFallback,
-                                      style: const TextStyle(
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 7,
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(
+                                        Icons.fullscreen_rounded,
                                         color: Colors.white,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w700,
+                                        size: 15,
                                       ),
-                                    ),
-                                  ],
+                                      const SizedBox(width: 5),
+                                      Text(
+                                        text.templateFlowPreviewFallback,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                        ],
-                      ),
+                          ],
+                        ),
+                ),
               ),
             ),
           ),

@@ -48,66 +48,24 @@ class _StateView extends StatelessWidget {
     this.subtitle,
     this.actionLabel,
     this.onAction,
+    this.actionIcon,
   });
 
   final String title;
   final String? subtitle;
   final String? actionLabel;
   final VoidCallback? onAction;
+  final IconData? actionIcon;
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.petMagicColors;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                color: colors.accent.withValues(alpha: 0.10),
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: colors.accent.withValues(alpha: 0.26),
-                  width: 1.5,
-                ),
-              ),
-              child: Icon(
-                Icons.pets_rounded,
-                size: 32,
-                color: colors.accent.withValues(alpha: 0.72),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: colors.textStrong,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            if (subtitle != null) ...[
-              const SizedBox(height: 7),
-              Text(
-                subtitle!,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: colors.textMuted,
-                  height: 1.4,
-                ),
-              ),
-            ],
-            if (actionLabel != null && onAction != null) ...[
-              const SizedBox(height: 20),
-              FilledButton(onPressed: onAction, child: Text(actionLabel!)),
-            ],
-          ],
-        ),
-      ),
+    return PetMagicAsyncStateView(
+      icon: Icons.pets_rounded,
+      title: title,
+      message: subtitle ?? '',
+      actionLabel: actionLabel,
+      actionIcon: actionIcon,
+      onAction: onAction,
     );
   }
 }

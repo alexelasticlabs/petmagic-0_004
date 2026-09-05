@@ -4,15 +4,21 @@ extension _NetworkVideoPreviewLifecycle on _NetworkVideoPreviewState {
   Future<void> _disposeVideoController({bool notifyWhenComplete = true}) {
     _initializeRequestVersion++;
     _controllerInitInFlight = false;
-    _slotRetryScheduled = false;
-    _slotRetryAttempts = 0;
+    _cancelSlotWait();
+    final upgradeDispose = _cancelUpgrade();
     final controller = _controller;
     final lease = _controllerLease;
+    widget.playbackRegistry?._withdraw(
+      widget.playbackIdentity,
+      widget.mediaVersion,
+      controller,
+    );
     _controller = null;
     _controllerLease = null;
+    _sourceUrl = null;
 
     if (controller == null && lease == null) {
-      return Future<void>.value();
+      return upgradeDispose;
     }
 
     assert(lease == null || identical(lease.controller, controller));
@@ -23,7 +29,7 @@ extension _NetworkVideoPreviewLifecycle on _NetworkVideoPreviewState {
             notifyWhenComplete: notifyWhenComplete,
           )
         : _disposeUnleasedController(controller!);
-    return disposeFuture;
+    return Future.wait([disposeFuture, upgradeDispose]);
   }
 
   Future<void> _trackControllerDispose(
@@ -43,7 +49,7 @@ extension _NetworkVideoPreviewLifecycle on _NetworkVideoPreviewState {
     if (notifyWhenComplete) {
       unawaited(
         disposeFuture.whenComplete(() {
-          _notifyControllerDisposed();
+          _refreshVideoPreview();
         }),
       );
     }
@@ -65,6 +71,71 @@ extension _NetworkVideoPreviewLifecycle on _NetworkVideoPreviewState {
       );
     }
   }
+
+  void _waitForSlot({bool detail = false}) {
+    if (!mounted || !_canLoad || (detail && !widget.isActive)) return;
+    _waitingForSlot = true;
+    _waitingForDetailSlot = detail;
+    MediaLifecyclePolicy.addVideoPreviewSlotListener(_slotReleaseListener);
+    // A previous lease can finish disposal between the failed acquire and here.
+    scheduleMicrotask(_resumeAfterSlotRelease);
+  }
+
+  void _cancelSlotWait({bool detailOnly = false}) {
+    if (detailOnly && !_waitingForDetailSlot) return;
+    MediaLifecyclePolicy.removeVideoPreviewSlotListener(_slotReleaseListener);
+    _waitingForSlot = false;
+    _waitingForDetailSlot = false;
+  }
+
+  void _resumeAfterSlotRelease() {
+    if (!_waitingForSlot) return;
+    if (!mounted || !_canLoad || (_waitingForDetailSlot && !widget.isActive)) {
+      _cancelSlotWait();
+      return;
+    }
+    if (!MediaLifecyclePolicy.hasVideoPreviewSlot(
+      reserveForActive: !widget.isActive,
+    )) {
+      return;
+    }
+    if (_waitingForDetailSlot && _upgradeInFlight) return;
+    final detail = _waitingForDetailSlot;
+    _cancelSlotWait();
+    if (detail) {
+      unawaited(_upgradeToDetail());
+    } else if (_controller == null &&
+        !_controllerInitInFlight &&
+        !_failedToLoad) {
+      unawaited(_initialize());
+    }
+  }
+
+  Future<bool> _rejectCachedSource(
+    String sourceUrl, {
+    required int? mediaVersion,
+  }) async {
+    if (_rejectedSourceUrls.length >=
+            _NetworkVideoPreviewState._maxRejectedSources ||
+        !_rejectedSourceUrls.add(sourceUrl)) {
+      return false;
+    }
+    try {
+      await TemplateMediaCache.removePreviewFile(
+        sourceUrl,
+        mediaVersion: mediaVersion,
+      );
+    } catch (error, stackTrace) {
+      AppLogger.warn(
+        feature: 'Templates.FlowMediaPreview',
+        operation: 'remove_unplayable_cached_source',
+        message: 'Unplayable cached preview could not be removed.',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+    return true;
+  }
 }
 
 final class _TemplateVideoPreviewControllerLease {
@@ -72,8 +143,12 @@ final class _TemplateVideoPreviewControllerLease {
 
   static _TemplateVideoPreviewControllerLease? tryAcquire({
     required bool useSharedPreviewCache,
+    bool reserveForActive = false,
   }) {
-    if (!MediaLifecyclePolicy.tryAcquireVideoPreviewSlot()) {
+    if (!MediaLifecyclePolicy.hasVideoPreviewSlot(
+          reserveForActive: reserveForActive,
+        ) ||
+        !MediaLifecyclePolicy.tryAcquireVideoPreviewSlot()) {
       return null;
     }
 

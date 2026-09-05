@@ -11,6 +11,7 @@ import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
 import 'package:petmagic_mobile/shared/navigation/app_navigation_context.dart';
 
 import 'pet_shortcut_avatar.dart';
+import 'pet_creation_identity.dart';
 
 part 'create_with_pet_picker_widgets.part.dart';
 
@@ -19,10 +20,12 @@ class CreateWithPetBlockSlot extends ConsumerWidget {
     super.key,
     required this.selectedPetId,
     required this.selectedPetPhotoId,
+    this.padding = EdgeInsets.zero,
   });
 
   final String? selectedPetId;
   final String? selectedPetPhotoId;
+  final EdgeInsetsGeometry padding;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -31,10 +34,13 @@ class CreateWithPetBlockSlot extends ConsumerWidget {
       return const SizedBox.shrink();
     }
 
-    return _CreateWithPetBlock(
-      pets: ref.watch(petsProvider),
-      selectedPetId: selectedPetId,
-      selectedPetPhotoId: selectedPetPhotoId,
+    return Padding(
+      padding: padding,
+      child: _CreateWithPetBlock(
+        pets: ref.watch(petsProvider),
+        selectedPetId: selectedPetId,
+        selectedPetPhotoId: selectedPetPhotoId,
+      ),
     );
   }
 }
@@ -90,7 +96,7 @@ class _CreateWithPetBlock extends StatelessWidget {
                   children: [
                     Icon(
                       Icons.add_circle_outline_rounded,
-                      color: colors.accent,
+                      color: colors.accentInk,
                       size: 20,
                     ),
                     const SizedBox(width: 10),
@@ -98,7 +104,7 @@ class _CreateWithPetBlock extends StatelessWidget {
                       child: Text(
                         text.petsAddAction,
                         style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                          color: colors.accent,
+                          color: colors.accentInk,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -113,9 +119,10 @@ class _CreateWithPetBlock extends StatelessWidget {
           (pet) => pet.id == selectedPetId,
           orElse: () => items.first,
         );
-        return Row(
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Expanded(
+            SizedBox(
               child: _SelectedPetHomeButton(
                 pet: selectedPet,
                 isSelected: selectedPetId == selectedPet.id,
@@ -139,15 +146,19 @@ class _CreateWithPetBlock extends StatelessWidget {
                 },
               ),
             ),
-            const SizedBox(width: 10),
-            OutlinedButton(
-              onPressed: () =>
-                  context.appNavigator.push(const PetsDestination()),
-              style: OutlinedButton.styleFrom(
-                minimumSize: const Size(92, 46),
-                padding: const EdgeInsets.symmetric(horizontal: 12),
+            const SizedBox(height: 4),
+            Align(
+              alignment: AlignmentDirectional.centerEnd,
+              child: TextButton(
+                onPressed: () =>
+                    context.appNavigator.push(const PetsDestination()),
+                style: TextButton.styleFrom(
+                  foregroundColor: colors.textSoft,
+                  minimumSize: const Size(92, 48),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                ),
+                child: Text(text.profilePetsTitle),
               ),
-              child: Text(text.profilePetsTitle),
             ),
           ],
         );
@@ -170,61 +181,14 @@ class _SelectedPetHomeButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
-    final colors = context.petMagicColors;
-    return InkWell(
-      borderRadius: BorderRadius.circular(16),
-      onTap: onPressed,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        height: 52,
-        padding: const EdgeInsets.fromLTRB(7, 6, 10, 6),
-        decoration: BoxDecoration(
-          color: colors.surface.withValues(alpha: 0.86),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isSelected
-                ? colors.accent.withValues(alpha: 0.86)
-                : colors.border.withValues(alpha: 0.62),
-          ),
-        ),
-        child: Row(
-          children: [
-            PetShortcutAvatar(avatarUrl: pet.avatarUrl, size: 38),
-            const SizedBox(width: 9),
-            Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    pet.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      color: colors.textStrong,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    [
-                      templatePetTypeLabel(pet.type, text),
-                      pet.breed,
-                    ].whereType<String>().join(' • '),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: colors.textSoft,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Icon(Icons.keyboard_arrow_down_rounded, color: colors.textMuted),
-          ],
-        ),
-      ),
+    return PetCreationIdentity(
+      name: pet.name,
+      caption: isSelected
+          ? text.petsGenerateWithPet
+          : text.petsChooseFromMyPetsAction,
+      avatarUrl: pet.avatarUrl,
+      selected: isSelected,
+      onPressed: onPressed,
     );
   }
 }

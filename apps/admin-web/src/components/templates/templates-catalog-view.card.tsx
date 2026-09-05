@@ -1,20 +1,16 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 
 import { AdminActionMenu, type AdminActionMenuItem } from "@/components/admin/admin-action-menu";
-import {
-  CancelCircleIcon,
-  DollarIcon,
-  ImageIcon,
-  PlayCircleIcon,
-  VideoIcon,
-} from "@/components/admin/admin-icons";
+import { ImageIcon, VideoIcon } from "@/components/admin/admin-icons";
 import { AdminStatusBadge } from "@/components/admin/admin-primitives";
 import {
   getTemplateAccessLabel,
   getTemplateStatusLabel,
 } from "@/components/templates/template-admin-shared";
+import { TemplateCatalogPreview } from "@/components/templates/template-catalog-preview";
 import { inferTemplateMediaKind } from "@/components/templates/template-media-utils";
 import { TemplateSecureMedia } from "@/components/templates/template-secure-media";
 import {
@@ -30,19 +26,10 @@ import type {
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
-import type { ReactElement } from "react";
-
 export const statusColors: Record<TemplateStatus, string> = {
   Draft: "var(--warning)",
   Active: "var(--success)",
   Archived: "var(--text-muted)",
-};
-
-const METRIC_ICONS: Record<string, ReactElement> = {
-  cardMetric_primary: <DollarIcon className={styles.cardMetricIcon} />,
-  cardMetric_info: <ImageIcon className={styles.cardMetricIcon} />,
-  cardMetric_success: <PlayCircleIcon className={styles.cardMetricIcon} />,
-  cardMetric_danger: <CancelCircleIcon className={styles.cardMetricIcon} />,
 };
 
 export type TemplateCatalogCardProps = {
@@ -67,6 +54,7 @@ export function TemplateCatalogCard({
   onDeleteTemplate,
 }: TemplateCatalogCardProps) {
   const text = getDictionary(locale);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const isBusy = busyTemplateId !== null;
   const safeTemplateTitle = sanitizeSensitiveText(template.title, 96);
   const safeTemplateDescription = sanitizeSensitiveText(template.shortDescription, 180);
@@ -132,6 +120,16 @@ export function TemplateCatalogCard({
     <article className={styles.templateCard}>
       <div className={styles.cardMedia}>
         {previewUrl ? (
+          <button
+            type="button"
+            className={styles.previewTrigger}
+            aria-label={`${copy.previewAction}: ${safeTemplateTitle}`}
+            onClick={() => setPreviewOpen(true)}
+          >
+            <span>{copy.previewAction}</span>
+          </button>
+        ) : null}
+        {previewUrl ? (
           previewKind === "video" ? (
             <TemplateSecureMedia
               className={styles.cardMediaAsset}
@@ -174,6 +172,8 @@ export function TemplateCatalogCard({
             <span>{copy.missingPreviewMetric}</span>
           </div>
         )}
+      </div>
+      <div className={styles.cardBody}>
         <span className={styles.cardMediaKind}>
           {template.templateType === "Video" ? (
             <VideoIcon className={styles.cardMediaKindIcon} />
@@ -184,12 +184,11 @@ export function TemplateCatalogCard({
             ? text.templateKindVideoBadge
             : text.templateKindImageBadge}
         </span>
-      </div>
-      <div className={styles.cardBody}>
+
         <div className={styles.cardTitleRow}>
           <div>
             <h2 title={safeTemplateTitle}>{safeTemplateTitle}</h2>
-            <p>{safeTemplateDescription}</p>
+            <p title={safeTemplateDescription}>{safeTemplateDescription}</p>
           </div>
         </div>
         <div className={styles.metaRow}>
@@ -200,8 +199,11 @@ export function TemplateCatalogCard({
           {template.isQaOnly ? <span className={styles.qaOnlyPill}>{copy.qaOnlyLabel}</span> : null}
         </div>
         <div className={styles.cardFooter}>
-          <span className={styles.cardTimestamp}>
-            {copy.updatedShort} {formatDate(template.updatedAtUtc, locale)}
+          <span
+            className={styles.cardTimestamp}
+            title={`${copy.updatedShort} ${formatDate(template.updatedAtUtc, locale)}`}
+          >
+            {formatDate(template.updatedAtUtc, locale)}
           </span>
           <AdminStatusBadge
             className={styles.cardStatusBadge}
@@ -210,19 +212,18 @@ export function TemplateCatalogCard({
             {getTemplateStatusLabel(template.status, locale)}
           </AdminStatusBadge>
         </div>
-        <div className={styles.cardMetrics}>
-          {getTemplateCardMetrics(template, analytics, locale, copy).map((metric) => (
-            <div
-              key={metric.label}
-              className={`${styles.cardMetric} ${styles[metric.tone]}`}
-              title={metric.label}
-            >
-              {METRIC_ICONS[metric.tone]}
-              <span className={styles.cardMetricLabel}>{metric.label}</span>
-              <strong>{metric.value}</strong>
-            </div>
-          ))}
-        </div>
+      </div>
+      <div className={styles.cardMetrics}>
+        {getTemplateCardMetrics(template, analytics, locale, copy).map((metric) => (
+          <div
+            key={metric.label}
+            className={`${styles.cardMetric} ${styles[metric.tone]}`}
+            title={`${metric.label}: ${metric.value}`}
+          >
+            <span className={styles.cardMetricLabel}>{metric.label}</span>
+            <strong>{metric.value}</strong>
+          </div>
+        ))}
       </div>
       <div className={styles.cardActions}>
         <Link
@@ -231,7 +232,7 @@ export function TemplateCatalogCard({
               ? `${templateBasePath}/editor?templateId=${encodeURIComponent(template.templateId)}`
               : `${templateBasePath}/analytics/${encodeURIComponent(template.templateId)}`
           }
-          className={`ui-button ui-button--primary ui-button--sm${
+          className={`ui-button ui-button--secondary ui-button--sm${
             isBusy ? ` ${styles.cardActionIconButtonDisabled}` : ""
           }`}
           aria-label={`${
@@ -275,6 +276,17 @@ export function TemplateCatalogCard({
           />
         ) : null}
       </div>
+      {previewOpen && previewUrl ? (
+        <TemplateCatalogPreview
+          url={previewUrl}
+          kind={previewKind === "video" ? "video" : "image"}
+          title={safeTemplateTitle}
+          description={safeTemplateDescription}
+          closeLabel={copy.closePreview}
+          errorLabel={copy.previewUnavailable}
+          onClose={() => setPreviewOpen(false)}
+        />
+      ) : null}
     </article>
   );
 }

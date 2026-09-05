@@ -43,7 +43,7 @@ class _PetGenerationHistoryTile extends StatelessWidget {
       child: ListTile(
         title: Text(generation.templateTitle ?? generation.templateId),
         subtitle: Text(
-          '${generation.templateType ?? text.petsTemplateFallback} â€¢ ${_petGenerationStatusTitle(text, generation)} â€¢ ${_formatDate(context, generation.createdAtUtc)}',
+          '${generation.templateType ?? text.petsTemplateFallback} · ${_petGenerationStatusTitle(text, generation)} · ${_formatDate(context, generation.createdAtUtc)}',
         ),
         trailing: Wrap(
           spacing: 4,

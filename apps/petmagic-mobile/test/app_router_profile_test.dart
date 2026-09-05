@@ -159,7 +159,7 @@ void main() {
       tester.element(find.byType(Scaffold).first),
     );
 
-    expect(find.text(text.authSignInRequired), findsOneWidget);
+    expect(find.text(text.authRequiredTitle), findsOneWidget);
     expect(find.text(text.authRequiredMessage), findsOneWidget);
     expect(
       find.widgetWithText(FilledButton, text.profileSignInAction),
@@ -242,7 +242,7 @@ void main() {
       await pumpTestFrames(tester);
       await tester.pumpAndSettle();
       expect(find.byType(GenerationsGalleryPage), findsOneWidget);
-      expect(find.text(text.authSignInRequired), findsAtLeastNWidgets(1));
+      expect(find.text(text.authRequiredTitle), findsAtLeastNWidgets(1));
       expect(
         find.text(text.generationStatusEmptyMessage),
         findsAtLeastNWidgets(1),

@@ -805,7 +805,7 @@ void main() {
       );
       expect(flowSource, contains('parseSafeGenerationMediaUri('));
       expect(flowSource, contains('generation.outputUrl'));
-      expect(flowSource, contains('asset?.url'));
+      expect(flowSource, contains('TemplatePreviewMediaSelection('));
       expect(
         flowSource,
         contains('final resultCacheWidth = _templatePreviewCacheDimension('),
@@ -831,13 +831,22 @@ void main() {
     final trackingSource = await File(
       'lib/core/performance/media_cache_tracking.dart',
     ).readAsString();
-    final source = '$cacheSource\n$trackingSource';
+    final downloadsSource = await File(
+      'lib/core/performance/template_media_cache_downloads.part.dart',
+    ).readAsString();
+    final source = '$cacheSource\n$trackingSource\n$downloadsSource';
 
     expect(source, contains('_maxThumbnailInFlightFetches'));
     expect(source, contains('_maxPreviewInFlightFetches'));
     expect(source, contains('MediaCacheTracking.rememberInFlightFetch('));
-    expect(source, contains('maxEntries: _maxThumbnailInFlightFetches'));
-    expect(source, contains('maxEntries: _maxPreviewInFlightFetches'));
+    expect(
+      downloadsSource.replaceAll(RegExp(r'\s+'), ' '),
+      contains(
+        'maxEntries: preview '
+        '? TemplateMediaCache._maxPreviewInFlightFetches '
+        ': TemplateMediaCache._maxThumbnailInFlightFetches',
+      ),
+    );
     expect(source, contains('fetches.remove(fetches.keys.first)'));
   });
 }

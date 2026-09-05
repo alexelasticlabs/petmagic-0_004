@@ -125,3 +125,38 @@ describe("buildNonceContentSecurityPolicy", () => {
     ).toThrow("NEXT_PUBLIC_API_BASE_URL must use HTTPS in production.");
   });
 });
+
+describe("private generation media CSP", () => {
+  it("allows only the configured R2 account for signed files", () => {
+    const origin = "https://" + "a".repeat(32) + ".r2.cloudflarestorage.com";
+    const policy = buildNonceContentSecurityPolicy(
+      "nonce",
+      "https://api.petgpt.app",
+      "production",
+      "https://cdn.petgpt.app",
+      false,
+      undefined,
+      "a".repeat(32)
+    );
+    for (const directive of ["img-src", "media-src", "connect-src"]) {
+      expect(policy.split("; ").find((value) => value.startsWith(directive))).toContain(origin);
+    }
+    expect(policy).not.toContain("*.r2.cloudflarestorage.com");
+    expect(policy.split("; ").find((value) => value.startsWith("script-src"))).not.toContain(
+      origin
+    );
+  });
+  it("rejects account values that could inject CSP directives", () => {
+    expect(() =>
+      buildNonceContentSecurityPolicy(
+        "nonce",
+        "https://api.petgpt.app",
+        "production",
+        undefined,
+        false,
+        undefined,
+        "abc; img-src *"
+      )
+    ).toThrow("TEMPLATES_R2_ACCOUNT_ID");
+  });
+});

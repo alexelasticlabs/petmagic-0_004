@@ -16,14 +16,16 @@ internal sealed partial class TemplatesService
     private const int TemplateAssetFileNameMaxLength = 256;
     private const int TemplateAssetContentTypeMaxLength = 128;
 
-    private Result ValidateVideoModels(string preprocessingModel, string klingModel)
+    private Result ValidateVideoModels(string? preprocessingModel, string? klingModel)
     {
-        if (!options.AllowedPreprocessingModels.Contains(preprocessingModel.Trim(), StringComparer.OrdinalIgnoreCase))
+        if (string.IsNullOrWhiteSpace(preprocessingModel)
+            || !options.AllowedPreprocessingModels.Contains(preprocessingModel.Trim(), StringComparer.OrdinalIgnoreCase))
         {
             return Result.Failure(TemplatesErrors.InvalidPreprocessingModel);
         }
 
-        if (!options.AllowedKlingModels.Contains(klingModel.Trim(), StringComparer.OrdinalIgnoreCase))
+        if (string.IsNullOrWhiteSpace(klingModel)
+            || !options.AllowedKlingModels.Contains(klingModel.Trim(), StringComparer.OrdinalIgnoreCase))
         {
             return Result.Failure(TemplatesErrors.InvalidKlingModel);
         }

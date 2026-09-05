@@ -215,7 +215,7 @@ void main() {
     final text = AppLocalizations.of(walletContext);
 
     expect(find.byType(ProtectedAuthGate), findsOneWidget);
-    expect(find.text(text.authSignInRequired), findsOneWidget);
+    expect(find.text(text.authRequiredTitle), findsOneWidget);
     expect(find.text(text.authRequiredMessage), findsOneWidget);
     expect(find.text(text.appUnavailableServerTitle), findsNothing);
   });
@@ -655,7 +655,7 @@ void main() {
       final text = AppLocalizations.of(transactionsContext);
 
       expect(find.byType(ProtectedAuthGate), findsOneWidget);
-      expect(find.text(text.authSignInRequired), findsOneWidget);
+      expect(find.text(text.authRequiredTitle), findsOneWidget);
       expect(find.text(text.authRequiredMessage), findsOneWidget);
       expect(repository.walletFetchCount, 0);
       expect(repository.ledgerFetchCount, 0);

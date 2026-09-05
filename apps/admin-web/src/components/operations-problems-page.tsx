@@ -1,9 +1,9 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
 
 import {
   AdminBadge,
@@ -15,6 +15,7 @@ import {
   adminTableStyles,
 } from "@/components/admin/admin-primitives";
 import { ensureAdminSession } from "@/components/admin/admin-session";
+import styles from "@/components/operations-problems-page.module.css";
 import { Button } from "@/components/ui/button";
 import { adminQueryKeys } from "@/lib/admin-query-keys";
 import {
@@ -24,7 +25,6 @@ import {
 } from "@/lib/api-client";
 import { formatDateTime } from "@/lib/format-date-time";
 import { type Locale } from "@/lib/i18n";
-import styles from "@/components/operations-problems-page.module.css";
 
 type OperationsProblemsPageProps = { locale: Locale };
 

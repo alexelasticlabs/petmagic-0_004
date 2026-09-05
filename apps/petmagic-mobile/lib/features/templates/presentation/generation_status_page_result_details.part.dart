@@ -68,11 +68,13 @@ class _InlineVideoPreview extends StatefulWidget {
     required this.url,
     required this.localFilePath,
     this.onAspectRatioResolved,
+    this.onReady,
   });
 
   final String url;
   final String? localFilePath;
   final ValueChanged<double>? onAspectRatioResolved;
+  final VoidCallback? onReady;
 
   @override
   State<_InlineVideoPreview> createState() => _InlineVideoPreviewState();
@@ -200,6 +202,7 @@ class _InlineVideoPreviewState extends State<_InlineVideoPreview> {
         return;
       }
       setState(() {});
+      widget.onReady?.call();
     } catch (error, stackTrace) {
       AppLogger.warn(
         feature: 'Templates.GenerationStatusResultSections',

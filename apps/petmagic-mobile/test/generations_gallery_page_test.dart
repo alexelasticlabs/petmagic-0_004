@@ -208,7 +208,7 @@ void main() {
     final text = galleryText(tester);
 
     expect(find.byType(ProtectedAuthGate), findsOneWidget);
-    expect(find.text(text.authSignInRequired), findsOneWidget);
+    expect(find.text(text.authRequiredTitle), findsOneWidget);
     expect(find.text(text.generationStatusEmptyMessage), findsOneWidget);
     expect(find.text(text.profileSignInAction), findsOneWidget);
     expect(harness.controller.screenVisibilityCalls, [false]);
@@ -418,6 +418,41 @@ void main() {
       find.byType(Scaffold).first,
       matchesGoldenFile('goldens/shared_empty.png'),
     );
+    await tester.tap(
+      find.widgetWithText(FilledButton, text.createHubBrowseAction),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      emptyHarness.router.routeInformationProvider.value.uri.path,
+      '/templates',
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('empty gallery filter offers a way back to all creations', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final harness = GalleryHarness(items: const []);
+    addTearDown(harness.router.dispose);
+    await tester.pumpWidget(harness.app(disableAnimations: true));
+    await tester.pumpAndSettle();
+    final text = galleryText(tester);
+    await tester.tap(
+      find.widgetWithText(ChoiceChip, text.generationStatusFilterActive),
+    );
+    await tester.pumpAndSettle();
+    final action = find.widgetWithText(FilledButton, text.discoverMoreAction);
+    expect(action, findsOneWidget);
+    await tester.tap(action);
+    await tester.pumpAndSettle();
+    expect(harness.controller.loadCalls.last, GenerationHistoryFilter.all);
+    expect(
+      find.widgetWithText(FilledButton, text.createHubBrowseAction),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('gallery renders offline and recovered data banners', (

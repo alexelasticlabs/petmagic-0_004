@@ -35,6 +35,8 @@ import 'package:petmagic_mobile/shared/widgets/motion.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_haptics.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 import 'package:video_player/video_player.dart';
+import 'widgets/generation_result_reveal.dart';
+import 'widgets/generation_result_quick_actions.dart';
 
 part 'generation_status_page_common_sections.dart';
 part 'generation_status_page_compare_viewer.part.dart';

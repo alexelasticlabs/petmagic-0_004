@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
+import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/startup/presentation/guest_welcome_page.dart';
 import 'package:petmagic_mobile/features/startup/presentation/widgets/startup_chrome.dart';
 import 'package:petmagic_mobile/features/templates/application/generation_history_controller.dart';
@@ -52,6 +53,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          appLaunchControllerProvider.overrideWith(
+            _AuthenticatedLaunchController.new,
+          ),
           generationHistoryControllerProvider.overrideWith(
             _IdleGenerationHistoryController.new,
           ),
@@ -76,7 +80,7 @@ void main() {
     debugDefaultTargetPlatformOverride = null;
   });
 
-  testWidgets('five-tab shell exposes one TalkBack label per destination', (
+  testWidgets('four-tab shell exposes one TalkBack label per destination', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
@@ -86,6 +90,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          appLaunchControllerProvider.overrideWith(
+            _AuthenticatedLaunchController.new,
+          ),
           generationHistoryControllerProvider.overrideWith(
             _IdleGenerationHistoryController.new,
           ),
@@ -127,6 +134,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          appLaunchControllerProvider.overrideWith(
+            _AuthenticatedLaunchController.new,
+          ),
           generationHistoryControllerProvider.overrideWith(
             _IdleGenerationHistoryController.new,
           ),
@@ -157,6 +167,9 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            appLaunchControllerProvider.overrideWith(
+              _AuthenticatedLaunchController.new,
+            ),
             generationHistoryControllerProvider.overrideWith(
               _ActiveGenerationHistoryController.new,
             ),
@@ -488,4 +501,15 @@ BoxDecoration _containerDecoration(WidgetTester tester, double radius) {
 
   expect(containers, hasLength(1));
   return containers.single.decoration! as BoxDecoration;
+}
+
+class _AuthenticatedLaunchController extends AppLaunchController {
+  @override
+  AppLaunchState build() => const AppLaunchState(
+    isLoading: false,
+    isAuthenticated: true,
+    requiresLegalAcceptance: false,
+    hasSeenOnboarding: true,
+    guestSessionReady: true,
+  );
 }

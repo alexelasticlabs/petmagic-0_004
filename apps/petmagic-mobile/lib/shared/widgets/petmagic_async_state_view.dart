@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/shared/widgets/motion.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_animated_button_child.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_state_illustration.dart';
 
 class PetMagicAsyncStateView extends StatelessWidget {
   const PetMagicAsyncStateView({
@@ -13,6 +14,7 @@ class PetMagicAsyncStateView extends StatelessWidget {
     this.footer,
     this.padding,
     this.iconColor,
+    this.actionIcon,
     super.key,
   });
 
@@ -24,6 +26,7 @@ class PetMagicAsyncStateView extends StatelessWidget {
   final Widget? footer;
   final EdgeInsetsGeometry? padding;
   final Color? iconColor;
+  final IconData? actionIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -34,42 +37,63 @@ class PetMagicAsyncStateView extends StatelessWidget {
       duration: duration,
       switchInCurve: PetMotion.emphasized,
       switchOutCurve: Curves.easeIn,
-      child: Padding(
+      child: Center(
         key: ValueKey('$title|$message|$actionLabel'),
-        padding: padding ?? const EdgeInsets.fromLTRB(28, 36, 28, 36),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: iconColor ?? colors.accent, size: 46),
-            const SizedBox(height: 16),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                color: colors.textStrong,
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-              ),
+        child: SingleChildScrollView(
+          primary: false,
+          padding: padding ?? const EdgeInsets.fromLTRB(24, 24, 24, 24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 360),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: PetMagicStateIllustration(
+                    icon: icon,
+                    color: iconColor,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    color: colors.textStrong,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    height: 1.3,
+                  ),
+                ),
+                if (message.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: colors.textSoft,
+                      fontSize: 14,
+                      height: 1.5,
+                    ),
+                  ),
+                ],
+                if (actionLabel != null && onAction != null) ...[
+                  const SizedBox(height: 24),
+                  FilledButton.icon(
+                    onPressed: onAction,
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(48),
+                    ),
+                    icon: actionIcon == null
+                        ? null
+                        : Icon(actionIcon, size: 19),
+                    label: PetMagicAnimatedButtonChild(label: actionLabel!),
+                  ),
+                ],
+                if (footer != null) ...[const SizedBox(height: 14), footer!],
+              ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: colors.textMuted,
-                fontSize: 13,
-                height: 1.35,
-              ),
-            ),
-            if (actionLabel != null && onAction != null) ...[
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: onAction,
-                child: PetMagicAnimatedButtonChild(label: actionLabel!),
-              ),
-            ],
-            if (footer != null) ...[const SizedBox(height: 14), footer!],
-          ],
+          ),
         ),
       ),
     );

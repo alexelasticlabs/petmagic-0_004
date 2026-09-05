@@ -4,7 +4,7 @@
   margin: 0 auto;
   min-width: 0;
   display: grid;
-  gap: clamp(0.8rem, 0.7rem + 0.24vw, 0.96rem);
+  gap: 0.5rem;
 }
 
 .catalogActions {
@@ -15,8 +15,15 @@
   gap: 0.45rem;
 }
 
-.catalogHero {
+.catalogHeader {
   min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--border-soft);
+  padding-bottom: 0.25rem;
 }
 
 .typeTabs {
@@ -25,7 +32,6 @@
   align-items: center;
   gap: 0.28rem;
   overflow-x: auto;
-  border-bottom: 1px solid var(--border-soft);
   scrollbar-width: thin;
 }
 
@@ -267,15 +273,15 @@
 
 .catalogShell {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(12rem, 13rem);
-  gap: clamp(1rem, 0.8rem + 0.34vw, 1.25rem);
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.5rem;
   align-items: start;
 }
 
 .catalogMain {
   min-width: 0;
   display: grid;
-  gap: clamp(0.68rem, 0.6rem + 0.22vw, 0.84rem);
+  gap: 0.5rem;
 }
 
 .filtersDock {
@@ -283,7 +289,7 @@
   display: grid;
   gap: 0.5rem;
   border-bottom: 1px solid var(--border-soft);
-  padding: 0 0 0.85rem;
+  padding: 0 0 0.5rem;
   background: transparent;
   box-shadow: none;
 }
@@ -371,12 +377,9 @@
 }
 
 .selectField > span {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  font-weight: 600;
 }
 
 .searchField input,
@@ -495,43 +498,32 @@
 }
 
 .catalogRail {
-  position: sticky;
-  top: 0.75rem;
   min-width: 0;
-  display: grid;
-  gap: 1rem;
-  border-left: 1px solid var(--border-soft);
-  padding-left: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
 }
 
-.railCard {
+.railActions {
   min-width: 0;
-  border: 0;
-  border-radius: 0;
-  padding: 0;
-  background: transparent;
-  box-shadow: none;
-}
-
-.railActions,
-.quickLinks {
-  min-width: 0;
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
   gap: 0.42rem;
 }
 
-.railAction,
-.quickLink {
+.railAction {
   min-width: 0;
-  min-height: 2.75rem;
+  min-height: 2rem;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.48rem;
   border: 0;
   border-bottom: 1px solid var(--border-soft);
   border-radius: 0;
-  padding: 0.56rem 0;
+  padding: 0.3rem 0.4rem;
   background: transparent;
   color: var(--text-soft);
   font: inherit;
@@ -546,16 +538,14 @@
     transform 140ms ease;
 }
 
-.railAction:not(:disabled):hover,
-.quickLink:hover {
+.railAction:not(:disabled):hover {
   transform: none;
   border-color: var(--accent);
   background: transparent;
   color: var(--accent);
 }
 
-.railAction:focus-visible,
-.quickLink:focus-visible {
+.railAction:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -571,23 +561,6 @@
   font-size: 0.88rem;
 }
 
-.railActionIcon,
-.quickLinkCaret {
-  width: 0.68rem;
-  height: 0.68rem;
-  transform: rotate(-90deg);
-}
-
-.quickLink {
-  grid-template-columns: auto minmax(0, 1fr) auto;
-}
-
-.quickLinkIcon {
-  width: 0.95rem;
-  height: 0.95rem;
-  color: var(--accent);
-}
-
 .resultSummary {
   margin: 0;
   color: var(--text-muted);
@@ -598,8 +571,8 @@
 .cardGrid {
   min-width: 0;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: clamp(0.85rem, 0.65rem + 0.35vw, 1rem);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr));
+  gap: 0.75rem;
   align-items: stretch;
 }
 
@@ -610,8 +583,8 @@
      content inside the card and makes the control appear broken. */
   overflow: visible;
   display: grid;
-  grid-template-columns: minmax(0, 43%) minmax(0, 57%);
-  grid-template-rows: minmax(17.25rem, auto) auto;
+  grid-template-columns: 7rem minmax(0, 1fr);
+  grid-template-rows: minmax(10.75rem, 1fr) auto auto;
   border: 1px solid var(--border-soft);
   border-radius: var(--radius);
   background: var(--surface-1);
@@ -623,7 +596,7 @@
 }
 
 .templateCard:hover {
-  transform: translateY(-2px);
+  transform: none;
   border-color: var(--border-accent);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 8%, transparent);
 }
@@ -631,20 +604,22 @@
 .cardMedia {
   position: relative;
   min-width: 0;
-  min-height: 17rem;
+  min-height: 0;
   grid-column: 1;
   grid-row: 1;
   overflow: hidden;
-  border-radius: calc(var(--radius) - 1px) 0 0 calc(var(--radius) - 1px);
+  border-radius: calc(var(--radius) - 1px) 0 0 0;
   border-right: 1px solid var(--border-soft);
   background: var(--surface-2);
 }
 
 .cardMediaAsset {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   display: block;
-  object-fit: cover;
+  object-fit: contain;
 }
 
 .cardMediaPlaceholder {
@@ -669,7 +644,7 @@
   place-items: center;
   align-content: center;
   gap: 0.28rem;
-  padding: 1rem;
+  padding: 0.6rem;
   background:
     linear-gradient(135deg, color-mix(in srgb, var(--warning) 10%, transparent), transparent 62%),
     var(--surface-2);
@@ -699,21 +674,12 @@
 }
 
 .cardMediaKind {
-  position: absolute;
-  top: 0.5rem;
-  left: 0.5rem;
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 0.32rem;
-  min-height: 1.55rem;
-  border: 1px solid color-mix(in srgb, var(--accent-contrast) 18%, transparent);
-  border-radius: var(--radius-sm);
-  padding: 0.22rem 0.44rem;
-  background: color-mix(in srgb, var(--phone-screen-surface) 76%, transparent);
-  color: var(--accent-contrast);
-  font-size: 0.67rem;
-  font-weight: 600;
-  backdrop-filter: blur(10px);
+  gap: 0.3rem;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  font-weight: 500;
 }
 
 .cardMediaKindIcon {
@@ -729,11 +695,12 @@
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
-  gap: 0.48rem;
+  gap: 0.45rem;
   padding: 0.75rem;
 }
 
 .cardFooter {
+  margin-top: auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -748,19 +715,10 @@
 
 .cardTimestamp {
   min-width: 0;
-  display: inline-flex;
-  align-items: center;
-  min-height: 1.4rem;
-  padding: 0.14rem 0.38rem;
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-sm);
-  background: var(--surface-2);
   color: var(--text-muted);
-  font-size: 0.64rem;
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-size: 0.68rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
 .cardStatusBadge {
@@ -784,6 +742,7 @@
 }
 
 .cardTitleRow h2 {
+  overflow-wrap: anywhere;
   margin: 0;
   color: var(--text-strong);
   font-family: var(--font-heading), sans-serif;
@@ -797,6 +756,11 @@
 }
 
 .cardTitleRow p {
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
   margin: 0.3rem 0 0;
   color: var(--text-soft);
   font-size: 0.76rem;
@@ -829,15 +793,25 @@
   width: fit-content;
   min-height: 1.42rem;
   max-width: 100%;
-  border: 1px solid var(--border-soft);
+  border: 0;
   border-radius: var(--radius-sm);
-  padding: 0.25rem 0.52rem;
-  background: color-mix(in srgb, var(--surface-2) 84%, transparent);
+  padding: 0.12rem 0.35rem;
+  background: var(--surface-2);
   color: var(--text-soft);
   font-size: 0.72rem;
   font-weight: 600;
   overflow-wrap: anywhere;
   word-break: break-word;
+}
+
+.metaRow .premiumPill {
+  background: var(--warning-soft-bg);
+  color: var(--warning-soft-fg);
+}
+
+.metaRow .qaOnlyPill {
+  background: var(--info-soft-bg);
+  color: var(--info-soft-fg);
 }
 
 .cardActions,
@@ -860,59 +834,49 @@
   white-space: nowrap;
 }
 
+.cardActions > a:only-child {
+  grid-column: 1 / -1;
+}
+
 .cardActions > a:first-child {
-  font-size: 0.68rem;
+  font-size: 0.72rem;
+  color: var(--accent);
+  background: var(--accent-soft-bg);
+  border-color: transparent;
 }
 
 .cardMetrics {
-  margin-top: auto;
+  grid-column: 1 / -1;
+  grid-row: 2;
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 0.2rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-top: 1px solid var(--border-soft);
+  padding: 0.6rem 0.35rem;
+  background: color-mix(in srgb, var(--surface-2) 55%, var(--surface-1));
 }
 
 .cardMetric {
   min-width: 0;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  justify-content: start;
-  gap: 0.28rem;
-  border: 0;
-  border-radius: 0;
-  padding: 0;
-  background: transparent;
-  box-shadow: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0 0.35rem;
 }
 
 .cardMetric strong {
-  min-width: 0;
   color: var(--text-strong);
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   font-weight: 600;
-  line-height: 1.1;
-  letter-spacing: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
 }
 
 .cardMetricLabel {
-  max-width: 100%;
   color: var(--text-muted);
   font-size: 0.66rem;
-  font-weight: 600;
-  line-height: 1.1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.cardMetricIcon {
-  width: 0.72rem;
-  height: 0.72rem;
-  opacity: 0.62;
-  flex-shrink: 0;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
 }
 
 .cardMetric_primary strong {
@@ -933,7 +897,7 @@
 
 .cardActions {
   grid-column: 1 / -1;
-  grid-row: 2;
+  grid-row: 3;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
   gap: 0.32rem;
@@ -952,7 +916,9 @@
   width: 2rem;
   min-width: 2rem;
   min-height: 2.1rem;
-  justify-content: space-between;
+  justify-content: center;
+  gap: 0;
+  padding: 0;
   border: 1px solid var(--border-soft);
   background: var(--surface-2);
   color: var(--text-soft);
@@ -1135,6 +1101,8 @@
 }
 
 .listStatusBadge {
+  white-space: nowrap;
+  width: max-content;
   min-height: 1.4rem;
   padding-inline: 0.55rem;
   font-size: 0.68rem;
@@ -1474,9 +1442,10 @@
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0.85rem 0.25rem 0;
+  flex-wrap: wrap;
+  padding: 0.15rem 0;
   color: var(--text-muted);
-  font-size: 0.9rem;
+  font-size: 0.78rem;
 }
 
 .paginationActions {
@@ -1513,17 +1482,6 @@
   }
 }
 
-@media (max-width: 1280px) {
-  .catalogShell {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .catalogRail {
-    position: static;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
 @media (max-width: 1120px) {
   .filtersDock .filtersBar {
     border-top: 1px solid var(--border-soft);
@@ -1545,17 +1503,9 @@
     font-size: 0.72rem;
     font-weight: 600;
   }
-
-  .cardGrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 
 @media (max-width: 760px) {
-  .catalogHero {
-    min-width: 0;
-  }
-
   .catalogActions {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
@@ -1630,14 +1580,6 @@
     grid-template-columns: 1fr;
     border-left: 0;
     padding-left: 0;
-  }
-
-  .templateCard {
-    grid-template-columns: minmax(0, 42%) minmax(0, 58%);
-  }
-
-  .cardMedia {
-    min-height: 14rem;
   }
 
   .cardActions .cardActionIconButton {
@@ -1746,33 +1688,11 @@
 }
 
 @media (max-width: 560px) {
-  .cardGrid {
-    grid-template-columns: 1fr;
-  }
-
   .templateCard {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto auto auto;
+    grid-template-columns: 6rem minmax(0, 1fr);
   }
-
-  .cardMedia {
-    grid-column: 1;
-    grid-row: 1;
-    min-height: 0;
-    aspect-ratio: 16 / 9;
-    border-right: 0;
-    border-bottom: 1px solid var(--border-soft);
-    border-radius: calc(var(--radius) - 1px) calc(var(--radius) - 1px) 0 0;
-  }
-
   .cardBody {
-    grid-column: 1;
-    grid-row: 2;
-    padding: 0.7rem;
-  }
-
-  .cardActions {
-    grid-row: 3;
+    padding: 0.55rem;
   }
 }
 
@@ -1825,7 +1745,6 @@
   .typeTabActive,
   .createMenuCaret,
   .railAction,
-  .quickLink,
   .templateCard,
   .cardActionIconButton,
   .viewButton,
@@ -1835,5 +1754,156 @@
 
   .skeletonCard {
     animation: none;
+  }
+}
+
+.pageSizeControl,
+.pageJump {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+.pageSizeControl select,
+.pageJump input {
+  min-height: 2rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  padding: 0.3rem 0.4rem;
+  background: var(--surface-1);
+  color: var(--text-strong);
+  font: inherit;
+}
+.pageJump input {
+  width: 4rem;
+}
+.pageSizeControl select:focus-visible,
+.pageJump input:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.cardMetric + .cardMetric {
+  border-left: 1px solid var(--border-soft);
+}
+.templateCard:focus-within {
+  border-color: var(--border-accent);
+}
+.previewTrigger {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: zoom-in;
+}
+.previewTrigger span {
+  position: absolute;
+  bottom: 0.35rem;
+  left: 0.35rem;
+  right: 0.35rem;
+  padding: 0.35rem 0.2rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  color: var(--text-strong);
+  font: inherit;
+  font-size: 0.65rem;
+  opacity: 0;
+}
+.previewTrigger:hover span,
+.previewTrigger:focus-visible span {
+  opacity: 1;
+}
+.previewTrigger:focus-visible {
+  outline: none;
+  box-shadow: inset var(--focus-ring);
+}
+.previewDialog {
+  width: min(52rem, calc(100vw - 2rem));
+  max-height: calc(100dvh - 2rem);
+  margin: auto;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface-1);
+  color: var(--text-strong);
+  box-shadow: var(--shadow-strong);
+  overflow: auto;
+}
+.previewDialog::backdrop {
+  background: rgb(0 0 0 / 65%);
+}
+.previewDialogHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem;
+}
+.previewDialogHeader h2 {
+  margin: 0;
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+.previewDialogHeader button {
+  flex: 0 0 auto;
+}
+.previewDialogMedia {
+  display: block;
+  width: 100%;
+  height: min(65dvh, 44rem);
+  object-fit: contain;
+  background: var(--surface-2);
+}
+.previewDialogDescription {
+  margin: 0;
+  padding: 1rem;
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+.catalogLinksMenu {
+  margin-left: auto;
+}
+.catalogLinksMenu > button {
+  font-size: 0.75rem;
+}
+@media (max-width: 760px) {
+  .catalogActions {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .catalogActions .primaryLink {
+    line-height: 1.25;
+    text-align: center;
+  }
+  .railActions {
+    gap: 0.25rem;
+  }
+  .railAction {
+    font-size: 0.7rem;
+    gap: 0.35rem;
+  }
+  .catalogLinksMenu > button {
+    min-height: 2.5rem;
+  }
+  .cardActions > a,
+  .cardSecondaryAction {
+    min-height: 2.75rem;
+  }
+  .previewTrigger span {
+    opacity: 1;
+    font-size: 0.6rem;
+  }
+  .previewDialogHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0.75rem;
+    gap: 0.5rem;
+  }
+  .previewDialogHeader button {
+    order: -1;
+    align-self: flex-end;
   }
 }

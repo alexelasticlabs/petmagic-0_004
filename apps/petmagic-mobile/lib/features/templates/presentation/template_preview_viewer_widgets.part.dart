@@ -10,7 +10,7 @@ class _TemplatePreviewScrim extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          stops: const [0, 0.18, 0.5, 0.7, 1],
+          stops: const [0, 0.18, 0.48, 0.76, 1],
           colors: [
             Colors.black.withValues(alpha: 0.28),
             Colors.transparent,
@@ -29,14 +29,12 @@ class _TemplatePreviewIconButton extends StatelessWidget {
     required this.icon,
     required this.tooltip,
     required this.onPressed,
-    this.isLoading = false,
     super.key,
   });
 
   final IconData icon;
   final String tooltip;
   final VoidCallback? onPressed;
-  final bool isLoading;
 
   @override
   Widget build(BuildContext context) {
@@ -49,16 +47,7 @@ class _TemplatePreviewIconButton extends StatelessWidget {
         tooltip: tooltip,
         color: onPressed == null ? Colors.white54 : Colors.white,
         iconSize: 21,
-        icon: isLoading
-            ? const SizedBox.square(
-                key: ValueKey('template-preview-icon-loading'),
-                dimension: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
-                ),
-              )
-            : Icon(icon),
+        icon: Icon(icon),
       ),
     );
   }
@@ -67,20 +56,17 @@ class _TemplatePreviewIconButton extends StatelessWidget {
 class _TemplatePreviewSummary extends StatelessWidget {
   const _TemplatePreviewSummary({
     required this.template,
-    required this.isPremiumLocked,
     required this.reduceMotion,
     required this.direction,
   });
 
   final TemplateItem template;
-  final bool isPremiumLocked;
   final bool reduceMotion;
   final int direction;
 
   @override
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
-    final colors = context.petMagicColors;
     final title = template.title.trim().isEmpty
         ? text.templateDetailFallbackTitle
         : template.title.trim();
@@ -95,12 +81,25 @@ class _TemplatePreviewSummary extends StatelessWidget {
             : _TemplatePreviewPageState._contentAnimationDuration,
         switchInCurve: Curves.easeOutCubic,
         switchOutCurve: Curves.easeIn,
+        layoutBuilder: (current, previous) => Stack(
+          alignment: Alignment.topCenter,
+          children: [
+            for (final child in previous)
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: IgnorePointer(child: ExcludeSemantics(child: child)),
+              ),
+            ?current,
+          ],
+        ),
         transitionBuilder: (child, animation) {
           return FadeTransition(
             opacity: animation,
             child: SlideTransition(
               position: Tween<Offset>(
-                begin: Offset(0.04 * direction, 0),
+                begin: Offset(0.12 * direction, 0.06),
                 end: Offset.zero,
               ).animate(animation),
               child: child,
@@ -111,70 +110,150 @@ class _TemplatePreviewSummary extends StatelessWidget {
           key: ValueKey('template-preview-summary:${template.templateId}'),
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (template.isPremium) ...[
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const PremiumCrownIcon(size: 15),
-                  const SizedBox(width: 5),
-                  Text(
-                    text.premiumLabel,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: colors.gold,
-                      fontWeight: FontWeight.w800,
+            SizedBox(
+              height: MediaQuery.textScalerOf(context).scale(44),
+              child: Center(
+                child: Text(
+                  title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: Colors.white,
+                    fontSize: 20,
+                    height: 1.08,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.35,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 4),
+            _TemplatePreviewDescription(
+              key: ValueKey(
+                'template-preview-description:${template.templateId}',
+              ),
+              description: template.shortDescription,
+              isVideo: template.isVideo,
+              reduceMotion: reduceMotion,
+            ),
+            const SizedBox(height: 6),
+            SizedBox(
+              height: MediaQuery.textScalerOf(context).scale(
+                MediaQuery.sizeOf(context).width /
+                            MediaQuery.textScalerOf(context).scale(1) <
+                        360
+                    ? 48
+                    : 28,
+              ),
+              child: Center(
+                child: Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 14,
+                  runSpacing: 4,
+                  children: [
+                    _TemplatePreviewMetaItem(
+                      icon: template.isVideo
+                          ? Icons.videocam_rounded
+                          : Icons.image_rounded,
+                      label: _resultLabel(text),
                     ),
-                  ),
-                  if (isPremiumLocked) ...[
-                    const SizedBox(width: 4),
-                    Icon(Icons.lock_rounded, size: 13, color: colors.gold),
+                    if (template.tokenCost > 0)
+                      _TemplatePreviewMetaItem(
+                        iconWidget: const PawSparkIcon(size: 15),
+                        label:
+                            '${template.tokenCost} ${text.walletBalanceUnit}',
+                      )
+                    else if (!template.isPremium)
+                      _TemplatePreviewMetaItem(
+                        icon: Icons.auto_awesome_rounded,
+                        label: text.freeLabel,
+                      ),
                   ],
-                ],
+                ),
               ),
-              const SizedBox(height: 5),
-            ],
+            ),
+            const SizedBox(height: 4),
             Text(
-              title,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+              text.templatePreviewCreationTime(
+                template.isVideo
+                    ? text.templateDetailVideoEta
+                    : text.templateDetailImageEta,
+              ),
+              key: const ValueKey('template-preview-creation-time'),
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: Colors.white,
-                fontSize: 22,
-                height: 1.08,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.35,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Colors.white60,
+                height: 1.4,
               ),
             ),
-            const SizedBox(height: 11),
-            Wrap(
-              alignment: WrapAlignment.center,
-              spacing: 18,
-              runSpacing: 8,
-              children: [
-                _TemplatePreviewMetaItem(
-                  icon: template.isVideo
-                      ? Icons.videocam_rounded
-                      : Icons.image_rounded,
-                  label: template.isVideo ? text.videoLabel : text.imageLabel,
-                ),
-                _TemplatePreviewMetaItem(
-                  icon: Icons.schedule_rounded,
-                  label: template.isVideo
-                      ? text.templateDetailVideoEta
-                      : text.templateDetailImageEta,
-                ),
-                if (template.tokenCost > 0)
-                  _TemplatePreviewMetaItem(
-                    iconWidget: const PawSparkIcon(size: 15),
-                    label: '${template.tokenCost} ${text.walletBalanceUnit}',
-                  )
-                else if (!template.isPremium)
-                  _TemplatePreviewMetaItem(
-                    icon: Icons.auto_awesome_rounded,
-                    label: text.freeLabel,
-                  ),
-              ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _resultLabel(AppLocalizations text) {
+    if (!template.isVideo) return text.templatePreviewImageResult;
+    // Preview/loop duration can differ from the motion reference used by generation.
+    final seconds = template.referenceVideoDurationSeconds;
+    if (seconds == null || !seconds.isFinite || seconds <= 0) {
+      return text.templatePreviewVideoDurationUnknown;
+    }
+    final format = NumberFormat.decimalPattern(text.localeName)
+      ..maximumFractionDigits = 1;
+    final duration = format.format(seconds);
+    return text.templatePreviewVideoResult(duration);
+  }
+}
+
+class _TemplatePreviewPremiumBadge extends StatelessWidget {
+  const _TemplatePreviewPremiumBadge({required this.isLocked});
+
+  final bool isLocked;
+
+  @override
+  Widget build(BuildContext context) {
+    final gold = context.petMagicColors.gold;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(colors: [const Color(0xFFFFE5A3), gold]),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFFFE5A3)),
+        boxShadow: [
+          BoxShadow(color: gold.withValues(alpha: 0.24), blurRadius: 18),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.workspace_premium_rounded,
+              size: 18,
+              color: Color(0xFF30200A),
             ),
+            const SizedBox(width: 5),
+            Flexible(
+              child: Text(
+                AppLocalizations.of(context).premiumLabel,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: const Color(0xFF30200A),
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            if (isLocked) ...[
+              const SizedBox(width: 4),
+              const Icon(
+                Icons.lock_rounded,
+                size: 13,
+                color: Color(0xFF30200A),
+              ),
+            ],
           ],
         ),
       ),
@@ -200,11 +279,13 @@ class _TemplatePreviewMetaItem extends StatelessWidget {
       children: [
         iconWidget ?? Icon(icon, size: 15, color: Colors.white70),
         const SizedBox(width: 5),
-        Text(
-          label,
-          style: Theme.of(context).textTheme.labelMedium?.copyWith(
-            color: Colors.white70,
-            fontWeight: FontWeight.w700,
+        Flexible(
+          child: Text(
+            label,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: Colors.white70,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
       ],
@@ -213,18 +294,45 @@ class _TemplatePreviewMetaItem extends StatelessWidget {
 }
 
 class _TemplatePreviewThumbnail extends StatelessWidget {
-  const _TemplatePreviewThumbnail({required this.template});
+  const _TemplatePreviewThumbnail({
+    required this.template,
+    required this.isActive,
+    required this.autoplay,
+    required this.playbackRegistry,
+  });
 
   final TemplateItem template;
+  final bool isActive;
+  final bool autoplay;
+  final TemplatePreviewPlaybackRegistry playbackRegistry;
 
   @override
   Widget build(BuildContext context) {
     final imageUrl = _resolveTemplatePreviewThumbnail(template);
+    final poster = imageUrl == null
+        ? _placeholder(context)
+        : TemplatePreviewImage(
+            imageUrl: imageUrl,
+            fit: BoxFit.cover,
+            cacheWidth: 192,
+            mediaVersion: template.mediaVersion,
+            placeholder: _placeholder(context),
+            errorBuilder: (_) => _placeholder(context),
+          );
+    final fallback = TemplateVideoThumbnail(
+      template: template,
+      isActive: isActive,
+      autoplay: autoplay,
+      placeholder: poster,
+      playbackRegistry: playbackRegistry,
+    );
     return Stack(
       fit: StackFit.expand,
       children: [
-        if (imageUrl == null)
-          _placeholder(context)
+        if (template.isVideo ||
+            template.detailPreviewIsVideo ||
+            imageUrl == null)
+          fallback
         else
           TemplatePreviewImage(
             imageUrl: imageUrl,
@@ -232,13 +340,32 @@ class _TemplatePreviewThumbnail extends StatelessWidget {
             cacheWidth: 192,
             mediaVersion: template.mediaVersion,
             placeholder: _placeholder(context),
-            errorBuilder: (_) => _placeholder(context),
+            errorBuilder: (_) => fallback,
           ),
         if (template.isVideo)
           const Positioned(
             right: 4,
             bottom: 4,
             child: _TemplatePreviewVideoBadge(),
+          ),
+        if (template.isPremium)
+          Positioned(
+            top: 3,
+            right: 3,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: context.petMagicColors.gold,
+                shape: BoxShape.circle,
+              ),
+              child: const Padding(
+                padding: EdgeInsets.all(3),
+                child: Icon(
+                  Icons.workspace_premium_rounded,
+                  size: 12,
+                  color: Color(0xFF30200A),
+                ),
+              ),
+            ),
           ),
       ],
     );
@@ -273,7 +400,7 @@ class _TemplatePreviewVideoBadge extends StatelessWidget {
       ),
       child: const SizedBox.square(
         dimension: 20,
-        child: Icon(Icons.play_arrow_rounded, size: 13, color: Colors.white),
+        child: Icon(Icons.graphic_eq_rounded, size: 13, color: Colors.white),
       ),
     );
   }

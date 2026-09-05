@@ -206,7 +206,8 @@ internal sealed partial class TemplatesService
             parentInfoByGenerationId.TryGetValue(row.ParentGenerationId ?? Guid.Empty, out var parentInfo);
             childCountsByGenerationId.TryGetValue(row.GenerationId, out var childCount);
             inputPreviewsByGenerationId.TryGetValue(row.GenerationId, out var inputPreviewUrl);
-            resultPreviewsByGenerationId.TryGetValue(row.GenerationId, out var resultPreviewUrl);
+            resultPreviewsByGenerationId.TryGetValue(row.GenerationId, out var resultMedia);
+            var resultPreviewUrl = resultMedia?.PreviewUrl;
             var watermarkedMediaUrl = await CreateAdminGenerationReadUrlAsync(row.WatermarkedMediaPath, cancellationToken);
 
             items.Add(new AdminTemplateGenerationListItemResponse(
@@ -249,7 +250,7 @@ internal sealed partial class TemplatesService
                     row.ResultMediaAssetId,
                     inputPreviewUrl,
                     resultPreviewUrl,
-                    false,
+                    inputPreviewUrl is not null && (resultPreviewUrl is not null || resultMedia?.MediaUrl is not null),
                     parentInfo?.TemplateTitle,
                     parentInfo?.TemplateType,
                     childCount,
@@ -263,7 +264,9 @@ internal sealed partial class TemplatesService
                     row.PetPhotoId,
                     CanAdminCancelGeneration(row),
                     CanAdminRetryGeneration(row.Status, row.UserId, row.ChargedAtUtc, row.RefundedAtUtc),
-                    row.GamificationLegacyReviewRequired));
+                    row.GamificationLegacyReviewRequired,
+                    resultMedia?.MediaUrl,
+                    resultMedia?.MediaType));
         }
 
         return Result.Success(new AdminTemplateGenerationListPageResponse(
@@ -453,13 +456,13 @@ internal sealed partial class TemplatesService
         return previewsByGenerationId;
     }
 
-    private async Task<IReadOnlyDictionary<Guid, string?>> LoadAdminGenerationResultPreviewsAsync(
+    private async Task<IReadOnlyDictionary<Guid, AdminGenerationResultMediaLinks>> LoadAdminGenerationResultPreviewsAsync(
         IReadOnlyCollection<AdminGenerationPageRow> rows,
         CancellationToken cancellationToken)
     {
         if (rows.Count == 0)
         {
-            return new Dictionary<Guid, string?>();
+            return new Dictionary<Guid, AdminGenerationResultMediaLinks>();
         }
 
         var generationIds = rows.Select(row => row.GenerationId).ToArray();
@@ -476,14 +479,15 @@ internal sealed partial class TemplatesService
                     || (media.GenerationId.HasValue
                         && generationIds.Contains(media.GenerationId.Value)
                         && media.SourceType == "generation_result"
-                        && media.MediaType == "image")))
+                        && (media.MediaType == "image" || media.MediaType == "video"))))
             .Select(media => new AdminGenerationResultMediaRow(
                 media.Id,
                 media.GenerationId,
                 media.PreviewUrl,
                 media.Url,
                 media.WatermarkedPreviewUrl,
-                media.WatermarkedStoragePath))
+                media.WatermarkedStoragePath,
+                media.MediaType))
             .ToListAsync(cancellationToken);
 
         var mediaById = mediaRows.ToDictionary(media => media.Id);
@@ -492,7 +496,7 @@ internal sealed partial class TemplatesService
             .GroupBy(media => media.GenerationId!.Value)
             .ToDictionary(group => group.Key, group => group.First());
 
-        var previewsByGenerationId = new Dictionary<Guid, string?>();
+        var previewsByGenerationId = new Dictionary<Guid, AdminGenerationResultMediaLinks>();
         foreach (var row in rows)
         {
             AdminGenerationResultMediaRow? media = null;
@@ -502,11 +506,19 @@ internal sealed partial class TemplatesService
             }
 
             media ??= fallbackMediaByGenerationId.GetValueOrDefault(row.GenerationId);
-            previewsByGenerationId[row.GenerationId] = media is null
-                ? null
-                : await CreateAdminGenerationReadUrlAsync(
-                    ResolveAdminGenerationResultPreviewUrl(row, media),
-                    cancellationToken);
+            if (media is null)
+            {
+                continue;
+            }
+
+            var previewUrl = await CreateAdminGenerationReadUrlAsync(
+                ResolveAdminGenerationResultPreviewUrl(row, media), cancellationToken);
+            var mediaPath = row.IsWatermarkRequired && !row.IsWatermarkRemoved
+                ? media.WatermarkedStoragePath
+                : media.Url;
+            var mediaUrl = await CreateAdminGenerationReadUrlAsync(mediaPath, cancellationToken);
+            previewsByGenerationId[row.GenerationId] = new AdminGenerationResultMediaLinks(
+                previewUrl, mediaUrl, media.MediaType);
         }
 
         return previewsByGenerationId;
@@ -738,5 +750,8 @@ internal sealed partial class TemplatesService
         string? PreviewUrl,
         string Url,
         string? WatermarkedPreviewUrl,
-        string? WatermarkedStoragePath);
+        string? WatermarkedStoragePath,
+        string MediaType);
+
+    private sealed record AdminGenerationResultMediaLinks(string? PreviewUrl, string? MediaUrl, string MediaType);
 }

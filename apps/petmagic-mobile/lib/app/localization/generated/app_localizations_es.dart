@@ -9,6 +9,29 @@ class AppLocalizationsEs extends AppLocalizations {
   AppLocalizationsEs([String locale = 'es']) : super(locale);
 
   @override
+  String templatePreviewVideoResult(String duration) {
+    return 'Resultado: vídeo ≈ $duration s';
+  }
+
+  @override
+  String get templatePreviewVideoDurationUnknown =>
+      'Vídeo · duración no indicada';
+
+  @override
+  String get templatePreviewImageResult => 'Resultado: imagen';
+
+  @override
+  String templatePreviewCreationTime(String eta) {
+    return 'La creación suele tardar $eta';
+  }
+
+  @override
+  String get templatePreviewDescriptionMore => 'Más sobre esta plantilla';
+
+  @override
+  String get templatePreviewDescriptionLess => 'Ver menos';
+
+  @override
   String get navDiscover => 'Descubrir';
 
   @override
@@ -3200,11 +3223,11 @@ class AppLocalizationsEs extends AppLocalizations {
       'No vendemos datos personales. Solo los compartimos con procesadores necesarios para operar PetMagic.';
 
   @override
-  String get authRequiredTitle => 'Inicia sesión para desbloquear esta acción';
+  String get authRequiredTitle => 'Inicia sesión en PetMagic';
 
   @override
   String get authRequiredMessage =>
-      'Los invitados pueden explorar la app, pero las acciones de plantillas, las recompensas y las funciones de PawSpark requieren una cuenta de PetMagic.';
+      'Crea fotos y vídeos de tu mascota, guarda tus resultados y recibe recompensas con una cuenta de PetMagic. Puedes explorar plantillas sin iniciar sesión.';
 
   @override
   String get authRequiredContinueBrowsing => 'Continuar navegando';

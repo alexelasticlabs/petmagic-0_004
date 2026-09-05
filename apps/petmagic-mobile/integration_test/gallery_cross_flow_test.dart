@@ -530,6 +530,7 @@ class _SingleTemplateRepository implements TemplatesRepository {
     String templateId, {
     bool forceRefresh = false,
     String? analyticsSource,
+    int? minimumVersion,
   }) async {
     return template;
   }

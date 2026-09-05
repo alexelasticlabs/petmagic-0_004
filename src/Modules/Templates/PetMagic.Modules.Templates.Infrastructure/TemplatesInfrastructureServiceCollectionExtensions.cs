@@ -321,6 +321,7 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         services.AddScoped<ITemplateMediaLifecycleService, TemplateMediaLifecycleService>();
         services.AddScoped<ITemplateVisibilityPolicy, TemplateVisibilityPolicy>();
         services.AddScoped<ITemplatesService, TemplatesService>();
+        services.AddScoped<ITemplateDiscoveryAdminService, TemplateDiscoveryAdminService>();
         services.AddScoped<IPetsService, PetsService>();
         services.AddScoped<IFeedbackService, FeedbackService>();
         services.AddScoped<IAdminUserTemplateAnalyticsReader, AdminUserTemplateAnalyticsReader>();

@@ -309,6 +309,8 @@ services:
       ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION: "${ADMIN_WEB_ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION:-false}"
       NEXT_PUBLIC_ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION: "${ADMIN_WEB_ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION:-false}"
       ADMIN_MEDIA_ORIGINS: "${ADMIN_MEDIA_ORIGINS:-}"
+      # Non-secret account ID; allows only this account's private signed media origin.
+      TEMPLATES_R2_ACCOUNT_ID: "${R2_ACCOUNT_ID:-}"
       # Keep the R2 public origin in the browser CSP even when its storage URL
       # uses a path or a non-CDN r2.dev hostname.
       TEMPLATES_R2_PUBLIC_BASE_URL: "${R2_PUBLIC_URL:?R2_PUBLIC_URL is required for template media CSP}"

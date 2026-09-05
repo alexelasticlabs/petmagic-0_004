@@ -197,10 +197,19 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.text(text.generationStatusDownloadWithoutWatermark),
+        find.descendant(
+          of: find.byType(BottomSheet),
+          matching: find.text(text.generationStatusDownloadWithoutWatermark),
+        ),
         findsOne,
       );
-      expect(find.text(text.generationStatusShareWithWatermark), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byType(BottomSheet),
+          matching: find.text(text.generationStatusShareWithWatermark),
+        ),
+        findsNothing,
+      );
 
       await tester.pump(const Duration(seconds: 4));
     },
@@ -336,13 +345,37 @@ void main() {
       await tester.tap(find.byIcon(Icons.more_vert_rounded));
       await tester.pumpAndSettle();
 
-      expect(find.text(text.generationStatusSaveAction), findsOne);
-      expect(find.text(text.supportChatShareAction), findsOne);
+      expect(
+        find.descendant(
+          of: find.byType(BottomSheet),
+          matching: find.text(text.generationStatusSaveAction),
+        ),
+        findsOne,
+      );
+      expect(
+        find.descendant(
+          of: find.byType(BottomSheet),
+          matching: find.text(text.supportChatShareAction),
+        ),
+        findsOne,
+      );
       expect(find.text('Generate similar'), findsWidgets);
       expect(find.text(text.generationStatusRemoveWatermark), findsNothing);
       expect(find.text(text.generationStatusUpgradePremium), findsNothing);
-      expect(find.text(text.generationStatusShareWithWatermark), findsNothing);
-      expect(find.text(text.generationStatusSaveWithWatermark), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byType(BottomSheet),
+          matching: find.text(text.generationStatusShareWithWatermark),
+        ),
+        findsNothing,
+      );
+      expect(
+        find.descendant(
+          of: find.byType(BottomSheet),
+          matching: find.text(text.generationStatusSaveWithWatermark),
+        ),
+        findsNothing,
+      );
     },
   );
 

@@ -11,24 +11,82 @@ final class TemplateMediaCacheBudget {
 
   static bool _thumbnailCleanupRunning = false;
   static bool _previewCleanupRunning = false;
+  static bool _thumbnailCleanupRequested = false;
+  static bool _previewCleanupRequested = false;
+  static bool _thumbnailBudgetChecked = false;
+  static bool _previewBudgetChecked = false;
+  static const _accessWriteInterval = Duration(minutes: 1);
+  static const _maxAccessReferences = 550;
+  static final _lastAccessByPath = <String, DateTime>{};
+
+  /// Persist recency without reading media bytes or writing on every rebuild.
+  /// The byte budget uses this timestamp across page changes and app restarts.
+  static Future<bool> recordAccess(
+    File file, {
+    required MediaCacheFailureLogger onFailure,
+  }) async {
+    final now = DateTime.now();
+    final previous = _lastAccessByPath[file.path];
+    if (previous != null && now.difference(previous) < _accessWriteInterval) {
+      return false;
+    }
+    _lastAccessByPath.remove(file.path);
+    _lastAccessByPath[file.path] = now;
+    while (_lastAccessByPath.length > _maxAccessReferences) {
+      _lastAccessByPath.remove(_lastAccessByPath.keys.first);
+    }
+    try {
+      await file.setLastModified(now);
+      return true;
+    } catch (error, stackTrace) {
+      _lastAccessByPath.remove(file.path);
+      onFailure('cache_access_timestamp', error, stackTrace);
+      return false;
+    }
+  }
+
+  static void releaseMemoryReferences() => _lastAccessByPath.clear();
+
+  static void ensurePreviewBudget(
+    Directory directory, {
+    required MediaCacheFailureLogger onFailure,
+  }) {
+    if (!_previewBudgetChecked) {
+      schedulePreview(directory, onFailure: onFailure);
+    }
+  }
+
+  static void ensureThumbnailBudget(
+    Directory directory, {
+    required MediaCacheFailureLogger onFailure,
+  }) {
+    if (!_thumbnailBudgetChecked) {
+      scheduleThumbnail(directory, onFailure: onFailure);
+    }
+  }
 
   static void schedulePreview(
     Directory directory, {
     required MediaCacheFailureLogger onFailure,
   }) {
+    _previewBudgetChecked = true;
+    _previewCleanupRequested = true;
     if (_previewCleanupRunning) {
       return;
     }
     _previewCleanupRunning = true;
     Future<void>(() async {
       try {
-        await trimDirectory(
-          directory,
-          maxBytes: AppConfig.previewVideoCacheMaxBytesSafe,
-          statStage: 'preview_budget_stat_file',
-          deleteStage: 'preview_budget_delete_file',
-          onFailure: onFailure,
-        );
+        do {
+          _previewCleanupRequested = false;
+          await trimDirectory(
+            directory,
+            maxBytes: AppConfig.previewVideoCacheMaxBytesSafe,
+            statStage: 'preview_budget_stat_file',
+            deleteStage: 'preview_budget_delete_file',
+            onFailure: onFailure,
+          );
+        } while (_previewCleanupRequested);
       } catch (error, stackTrace) {
         onFailure('preview_budget_cleanup', error, stackTrace);
       } finally {
@@ -41,19 +99,24 @@ final class TemplateMediaCacheBudget {
     Directory directory, {
     required MediaCacheFailureLogger onFailure,
   }) {
+    _thumbnailBudgetChecked = true;
+    _thumbnailCleanupRequested = true;
     if (_thumbnailCleanupRunning) {
       return;
     }
     _thumbnailCleanupRunning = true;
     Future<void>(() async {
       try {
-        await trimDirectory(
-          directory,
-          maxBytes: AppConfig.mediaCacheMaxBytesSafe,
-          statStage: 'thumbnail_budget_stat_file',
-          deleteStage: 'thumbnail_budget_delete_file',
-          onFailure: onFailure,
-        );
+        do {
+          _thumbnailCleanupRequested = false;
+          await trimDirectory(
+            directory,
+            maxBytes: AppConfig.mediaCacheMaxBytesSafe,
+            statStage: 'thumbnail_budget_stat_file',
+            deleteStage: 'thumbnail_budget_delete_file',
+            onFailure: onFailure,
+          );
+        } while (_thumbnailCleanupRequested);
       } catch (error, stackTrace) {
         onFailure('thumbnail_budget_cleanup', error, stackTrace);
       } finally {
@@ -109,6 +172,7 @@ final class TemplateMediaCacheBudget {
       }
       try {
         await item.file.delete();
+        _lastAccessByPath.remove(item.file.path);
         totalBytes -= item.sizeBytes;
       } catch (error, stackTrace) {
         onFailure(deleteStage, error, stackTrace);

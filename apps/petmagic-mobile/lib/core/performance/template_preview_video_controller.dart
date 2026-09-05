@@ -11,16 +11,14 @@ Future<VideoPlayerController> createCachedTemplatePreviewVideoController(
 }) async {
   File? cachedFile;
   try {
-    cachedFile = await TemplateMediaCache.getCachedPreviewFile(
-      previewUrl,
-      mediaVersion: mediaVersion,
-    );
-    cachedFile ??= await TemplateMediaCache.fetchPreviewFile(
+    cachedFile = await TemplateMediaCache.fetchPreviewFile(
       previewUrl,
       mediaVersion: mediaVersion,
     );
   } catch (error) {
-    if (_isPreviewCacheInvalidation(error)) {
+    if (_isPreviewCacheInvalidation(error) ||
+        error is StateError &&
+            error.message == 'template_preview_download_too_large') {
       rethrow;
     }
     cachedFile = null;

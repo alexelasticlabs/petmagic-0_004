@@ -185,8 +185,8 @@
 
 .failure {
   display: inline-block;
-  min-width: 9rem;
-  max-width: 18rem;
+  min-width: 0;
+  max-width: 12rem;
   white-space: normal;
   overflow-wrap: anywhere;
   color: var(--text-soft);
@@ -217,6 +217,10 @@
 
 .inlineAction {
   width: fit-content;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--control-height-sm);
+  text-decoration: none;
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-sm);
   background: var(--surface-2);
@@ -318,8 +322,10 @@
 
 .previewImage {
   width: 100%;
-  min-height: 15rem;
-  border-radius: var(--radius-md);
+  display: block;
+  height: clamp(16rem, 32vw, 28rem);
+  min-height: 16rem;
+  border-radius: var(--radius);
   border: 1px solid var(--border-soft);
   background: var(--surface-1);
 }
@@ -504,16 +510,11 @@
     text-transform: uppercase;
   }
 
-  .generationRow > td:nth-child(6),
-  .generationRow > td:nth-child(7),
-  .generationRow > td:nth-child(8),
-  .generationRow > td:nth-child(10),
-  .generationRow > td:nth-child(12) {
+  .generationRow > td:nth-child(6) {
     display: none;
   }
 
-  .generationRow > td:last-child,
-  .generationRow > td:nth-child(11) {
+  .generationRow > td:last-child {
     border-bottom: 0;
   }
 
@@ -540,5 +541,107 @@
 
   .detailsPanel {
     padding: 0.75rem;
+  }
+}
+
+.historyActions,
+.detailsToolbar,
+.previewCard header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.historyActions {
+  justify-content: flex-end;
+}
+.previewCard {
+  min-width: 0;
+}
+.previewFrame {
+  position: relative;
+  min-height: 16rem;
+  background: var(--surface-1);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.previewFrame .previewImage {
+  border: 0;
+}
+.mediaState {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: var(--space-2);
+  text-align: center;
+  min-height: 16rem;
+  padding: 1.5rem;
+  color: var(--text-muted);
+  white-space: normal;
+}
+.previewImage + .mediaState {
+  position: absolute;
+  inset: 0;
+  background: var(--surface-1);
+  pointer-events: none;
+}
+.mediaState small {
+  max-width: 24rem;
+}
+.technicalDetails {
+  border-block: 1px solid var(--border-soft);
+  padding-block: 0.75rem;
+}
+.technicalDetails summary {
+  cursor: pointer;
+  color: var(--text-soft);
+  font-weight: 600;
+  font-size: 0.82rem;
+  padding-block: 0.35rem;
+}
+.technicalDetails[open] .detailsGrid {
+  padding-top: 1rem;
+}
+.technicalDetails summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+.secondaryText {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  padding-top: 0.25rem;
+}
+.generationRow[data-expanded] {
+  background: var(--accent-soft);
+}
+.generationTable {
+  width: 100%;
+}
+.generationTable td {
+  vertical-align: top;
+}
+.generationRow > td:nth-child(5) {
+  max-width: 13rem;
+  overflow-wrap: anywhere;
+}
+.generationRow > td:first-child > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.4rem;
+}
+@media (max-width: 640px) {
+  .generationRow > td:nth-child(5) {
+    max-width: none;
+  }
+  .previewImage {
+    height: 18rem;
+  }
+  .historyActions {
+    justify-content: flex-start;
   }
 }

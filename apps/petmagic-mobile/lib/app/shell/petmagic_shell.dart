@@ -1,7 +1,7 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,12 +9,16 @@ import 'package:petmagic_mobile/app/localization/generated/app_localizations.dar
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/performance/app_performance_monitor.dart';
 import 'package:petmagic_mobile/core/performance/performance_guard.dart';
+import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
+import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
 import 'package:petmagic_mobile/features/rewards/presentation/rewards_page.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/application/generation_history_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generations_gallery_page.dart';
 import 'package:petmagic_mobile/shared/files/persistent_media_url.dart';
+import 'package:petmagic_mobile/shared/auth/auth_required_sheet.dart';
+import 'package:petmagic_mobile/shared/navigation/app_navigation_context.dart';
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_navigation_layout.dart';
 import 'package:petmagic_mobile/shared/widgets/pressable_scale.dart';
@@ -24,9 +28,6 @@ part 'petmagic_shell_backdrop.part.dart';
 part 'petmagic_shell_navigation.part.dart';
 part 'petmagic_shell_transition.part.dart';
 
-const _bottomNavHeight = 42.0;
-const _bottomNavOuterGap = 10.0;
-const _bottomNavBackdropExtra = 64.0;
 const _activeGenerationThumbnailCacheWidth = 96;
 
 class PetMagicShell extends ConsumerStatefulWidget {
@@ -58,6 +59,9 @@ class _PetMagicShellState extends ConsumerState<PetMagicShell> {
     AppPerformanceTrace.setRouteLabel(location);
     final navigationShell = widget.navigationShell;
     final showBottomNav = !hasKeyboard && isCurrentRoute;
+    final isAuthenticated = ref.watch(
+      appLaunchControllerProvider.select((state) => state.isAuthenticated),
+    );
     final currentIndex =
         navigationShell?.currentIndex ??
         _resolveCurrentIndexFromLocation(location);
@@ -73,11 +77,17 @@ class _PetMagicShellState extends ConsumerState<PetMagicShell> {
               child: navigationShell ?? widget.child!,
             ),
             if (showBottomNav) const _BottomNavBackdrop(),
-            if (showBottomNav) _ActiveGenerationBannerSlot(location: location),
+            if (showBottomNav && isAuthenticated)
+              _ActiveGenerationBannerSlot(location: location),
             if (showBottomNav)
               _FloatingBottomNav(
                 currentIndex: currentIndex,
+                isAuthenticated: isAuthenticated,
                 onItemSelected: (index) {
+                  if (!isAuthenticated && index != 0) {
+                    _openGuestDestination(index);
+                    return;
+                  }
                   if (navigationShell != null) {
                     navigationShell.goBranch(
                       index,
@@ -104,6 +114,28 @@ class _PetMagicShellState extends ConsumerState<PetMagicShell> {
               ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _openGuestDestination(int index) {
+    if (index == 3) {
+      unawaited(
+        context.appNavigator.push<void>(
+          const AuthDestination(redirectPath: '/profile'),
+        ),
+      );
+      return;
+    }
+    final text = AppLocalizations.of(context);
+    unawaited(
+      showAuthRequiredSheet(
+        context,
+        redirectPath: index == 1
+            ? GenerationsGalleryPage.routePath
+            : RewardsPage.routePath,
+        title: index == 1 ? text.navCreations : text.navRewards,
+        showSignUp: true,
       ),
     );
   }

@@ -36,6 +36,7 @@ public static partial class AdminTemplateEndpoints
             .RequireAuthorization("ModeratorOrAdmin")
             .RequireRateLimiting("admin");
 
+        MapDiscoveryEndpoints(group);
         group.MapGet("/", ListAsync);
         group.MapGet("/analytics", GetAnalyticsOverviewAsync);
         group.MapGet("/moderation", GetModerationQueueAsync);

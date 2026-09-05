@@ -96,15 +96,14 @@ class _GalleryMediaStateBanner extends StatelessWidget {
   }
 }
 
-class _EmptyState extends StatelessWidget {
+class _EmptyState extends ConsumerWidget {
   const _EmptyState({required this.filter});
 
   final GenerationHistoryFilter filter;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final text = AppLocalizations.of(context);
-    final colors = context.petMagicColors;
     final icon = switch (filter) {
       GenerationHistoryFilter.active => Icons.hourglass_empty_rounded,
       GenerationHistoryFilter.ready => Icons.collections_rounded,
@@ -114,42 +113,35 @@ class _EmptyState extends StatelessWidget {
     final message = filter == GenerationHistoryFilter.all
         ? text.generationStatusEmptyMessage
         : subtitleForFilter(text, filter);
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          DecoratedBox(
-            decoration: BoxDecoration(
-              color: colors.surfaceGlass,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: colors.border.withValues(alpha: 0.7)),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(13),
-              child: Icon(icon, size: 34, color: colors.textMuted),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            text.generationStatusEmptyTitle,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: colors.textStrong,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            message,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: colors.textSoft,
-              height: 1.4,
-            ),
-          ),
-        ],
+    return PetMagicAsyncStateView(
+      icon: icon,
+      title: text.generationStatusEmptyTitle,
+      message: message,
+      actionLabel: filter == GenerationHistoryFilter.all
+          ? text.createHubBrowseAction
+          : text.discoverMoreAction,
+      actionIcon: filter == GenerationHistoryFilter.all
+          ? Icons.auto_awesome_rounded
+          : Icons.photo_library_outlined,
+      padding: EdgeInsets.fromLTRB(
+        24,
+        24,
+        24,
+        PetMagicShellScope.isPresent(context)
+            ? petMagicBottomNavInset(context)
+            : 24,
       ),
+      onAction: () {
+        if (filter == GenerationHistoryFilter.all) {
+          context.appNavigator.go(const TemplatesDestination());
+        } else {
+          unawaited(
+            ref
+                .read(generationHistoryControllerProvider.notifier)
+                .load(filter: GenerationHistoryFilter.all),
+          );
+        }
+      },
     );
   }
 }

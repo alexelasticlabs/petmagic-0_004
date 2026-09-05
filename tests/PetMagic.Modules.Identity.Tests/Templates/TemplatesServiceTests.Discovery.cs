@@ -115,7 +115,7 @@ public sealed partial class TemplatesServiceTests
         Assert.True(discovery.IsSuccess);
         Assert.Equal(3, discovery.Value.Sections.Count);
         Assert.All(discovery.Value.Sections, section => Assert.Equal(2, section.Items.Count));
-        Assert.Equal(3, commandCounter.ReaderCount);
+        Assert.Equal(4, commandCounter.ReaderCount); // One published-revision lookup plus three bounded fallback queries.
     }
 
     private sealed class ReaderCommandCounter : DbCommandInterceptor

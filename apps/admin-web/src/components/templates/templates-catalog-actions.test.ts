@@ -158,7 +158,7 @@ describe("templates catalog actions", () => {
     expect(source).toContain("setTemplatePendingArchiveId(null);");
     expect(source).toContain("setTemplatePendingDeleteId(null);");
     expect(source).toContain("onClick={() => resetCatalogContext(Math.max(1, currentPage - 1))}");
-    expect(source).toContain("onClick={() => resetCatalogContext(pageNumber)}");
+    expect(source).toContain("resetCatalogContext(nextPage);");
     expect(source).toContain("onClick={() => resetCatalogContext(currentPage + 1)}");
     expect(source).toContain('showingArchived={archiveFilter === "archived"}');
     expect(source).toContain("onToggleArchive={toggleArchiveFilter}");

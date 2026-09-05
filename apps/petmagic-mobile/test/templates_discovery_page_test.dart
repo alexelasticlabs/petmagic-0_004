@@ -15,6 +15,7 @@ import 'package:petmagic_mobile/features/profile/application/profile_controller.
 import 'package:petmagic_mobile/features/profile/domain/profile_models.dart';
 import 'package:petmagic_mobile/features/templates/application/template_discovery_controller.dart';
 import 'package:petmagic_mobile/features/templates/application/template_discovery_repository.dart';
+import 'package:petmagic_mobile/features/templates/application/template_catalog_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_discovery_models.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_feed_playback_manager.dart';
@@ -30,8 +31,95 @@ import 'package:video_player_platform_interface/video_player_platform_interface.
 import 'package:visibility_detector/visibility_detector.dart';
 
 import 'template_card_test_support.dart';
+import 'templates_page_lifecycle_test_support.dart'
+    show RandomTemplatesRepository;
 
 void main() {
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('caption uses only its measured height at text scale $scale', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await _pumpDiscoveryPage(
+        tester,
+        repository: _FakeDiscoveryRepository(_discoveryFixture()),
+        navigator: _RecordingNavigator(),
+        textScaler: TextScaler.linear(scale),
+      );
+      await tester.drag(find.byType(CustomScrollView), const Offset(0, -300));
+      await tester.pumpAndSettle();
+      final rail = find.byKey(const ValueKey('discovery-rail-Pet Mischief'));
+      final title = find.text(_mischiefCard.title);
+      await Scrollable.ensureVisible(tester.element(title), alignment: 0.4);
+      await tester.pumpAndSettle();
+      expect(
+        tester.getRect(rail).bottom - tester.getRect(title).bottom,
+        inInclusiveRange(0, 1),
+      );
+      final nextSection = find.byWidgetPredicate(
+        (widget) =>
+            widget is TemplateDiscoveryRail &&
+            widget.section.category == 'Pawsome Frames',
+      );
+      expect(
+        tester.getRect(nextSection).top - tester.getRect(title).bottom,
+        inInclusiveRange(8, 9),
+      );
+      final style = tester.widget<Text>(title).style!;
+      expect(style.fontFamily, isNot('Comfortaa'));
+      expect(style.fontWeight, FontWeight.w600);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('discovery has one compact toolbar and portrait premium cards', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await _pumpDiscoveryPage(
+      tester,
+      repository: _FakeDiscoveryRepository(_discoveryFixture()),
+      navigator: _RecordingNavigator(),
+    );
+    final catalog = find.byKey(const ValueKey('discovery-catalog-launcher'));
+    final random = find.byKey(const ValueKey('discovery-random-launcher'));
+    expect(tester.getSize(catalog).height, inInclusiveRange(48, 52));
+    expect(tester.getRect(catalog).top, tester.getRect(random).top);
+    expect(
+      find.byKey(const ValueKey('discovery-search-launcher')),
+      findsNothing,
+    );
+    expect(find.byKey(const ValueKey('discovery-format-video')), findsNothing);
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -300));
+    await tester.pumpAndSettle();
+    final frame = find.byKey(const ValueKey('discovery-frame-frames-card'));
+    await Scrollable.ensureVisible(tester.element(frame), alignment: 0.5);
+    await tester.pumpAndSettle();
+    final frameRect = tester.getRect(frame);
+    expect(
+      tester
+          .getSize(find.byKey(const ValueKey('discovery-more-Pawsome Frames')))
+          .height,
+      greaterThanOrEqualTo(48),
+    );
+    expect(frameRect.width / frameRect.height, closeTo(2 / 3, 0.001));
+    final price = tester.getRect(
+      find.byKey(const ValueKey('discovery-price-frames-card')),
+    );
+    expect(frameRect.contains(price.topLeft), isTrue);
+    expect(frameRect.contains(price.bottomRight), isTrue);
+    expect(
+      tester.getRect(find.text(_framesCard.title)).top,
+      greaterThan(frameRect.bottom),
+    );
+    final decoration =
+        tester.widget<Container>(frame).foregroundDecoration! as BoxDecoration;
+    expect((decoration.border! as Border).top.width, 1.5);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'discovery renders category content and preserves catalog navigation intent',
     (tester) async {
@@ -46,6 +134,7 @@ void main() {
         repository: repository,
         navigator: navigator,
       );
+      await tester.drag(find.byType(CustomScrollView), const Offset(0, -210));
       await _pumpUntil(
         tester,
         () => find.byType(TemplateDiscoveryRail).evaluate().length == 2,
@@ -87,13 +176,16 @@ void main() {
         expect(moreDestination.autofocusSearch, isFalse);
         expect(moreDestination.payload, isNull);
 
-        final searchAction = find.semantics.byLabel(text.searchTemplates);
-        tester.semantics.performAction(searchAction, SemanticsAction.tap);
+        final catalogAction = find.semantics.byLabel(
+          text.generationStatusAllTemplatesAction,
+        );
+        tester.semantics.performAction(catalogAction, SemanticsAction.tap);
         await tester.pump();
-        final searchDestination = navigator.pushes.last as TemplatesDestination;
-        expect(searchDestination.category, isNull);
-        expect(searchDestination.autofocusSearch, isTrue);
-        expect(searchDestination.payload, isNull);
+        final catalogDestination =
+            navigator.pushes.last as TemplatesDestination;
+        expect(catalogDestination.category, isNull);
+        expect(catalogDestination.autofocusSearch, isFalse);
+        expect(catalogDestination.payload, isNull);
 
         final premiumCardLabel =
             '${_framesCard.title}, ${text.videoLabel}, 0:07, '
@@ -120,6 +212,160 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('discovery random uses backend selection and opens preview', (
+    tester,
+  ) async {
+    final repository = RandomTemplatesRepository(
+      items: [imageTemplate(id: 'outside-discovery')],
+    );
+    final navigator = _RecordingNavigator();
+    await _pumpDiscoveryPage(
+      tester,
+      repository: _FakeDiscoveryRepository(_discoveryFixture()),
+      navigator: navigator,
+      randomRepository: repository,
+    );
+    final text = AppLocalizations.of(
+      tester.element(find.byType(TemplatesDiscoveryPage)),
+    );
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('discovery-random-launcher')),
+    );
+    await tester.tap(find.byKey(const ValueKey('discovery-random-launcher')));
+    await tester.pumpAndSettle();
+    expect(find.text(text.randomTemplateSheetDescription), findsOneWidget);
+    expect(repository.fetchRandomTemplateCalls, 0);
+    await tester.tap(find.text(text.randomTemplateFindAction));
+    await tester.pumpAndSettle();
+    expect(repository.fetchRandomTemplateCalls, 1);
+    expect(repository.lastRandomMode, TemplateRandomMode.any);
+    expect(repository.lastRandomCategory, isNull);
+    expect(repository.lastIncludePremium, isFalse);
+    expect(repository.lastRandomAccess, TemplateRandomAccess.available);
+    final session =
+        (navigator.pushes.single as TemplatesDestination).payload!
+            as TemplatePreviewSession;
+    expect(session.initialTemplate.templateId, 'outside-discovery');
+    expect(session.source, TemplatePreviewSource.random);
+    expect(repository.cancelPendingRandomTemplateRequestCalls, 0);
+    await tester.tap(find.byKey(const ValueKey('discovery-catalog-launcher')));
+    await tester.pump();
+    final catalog = navigator.pushes.last as TemplatesDestination;
+    expect(catalog.category, isNull);
+    expect(catalog.payload, isNull);
+    expect(catalog.autofocusSearch, isFalse);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('discovery random dismissal cancels pending selection', (
+    tester,
+  ) async {
+    final pending = Completer<TemplateItem?>();
+    final repository = RandomTemplatesRepository(
+      randomTemplateCompleter: pending,
+    );
+    final navigator = _RecordingNavigator();
+    await _pumpDiscoveryPage(
+      tester,
+      repository: _FakeDiscoveryRepository(_discoveryFixture()),
+      navigator: navigator,
+      randomRepository: repository,
+    );
+    final text = AppLocalizations.of(
+      tester.element(find.byType(TemplatesDiscoveryPage)),
+    );
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('discovery-random-launcher')),
+    );
+    await tester.tap(find.byKey(const ValueKey('discovery-random-launcher')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(text.randomTemplateFindAction));
+    await tester.pump();
+    expect(repository.fetchRandomTemplateCalls, 1);
+    expect(find.text(text.randomTemplateFinding), findsOneWidget);
+    Navigator.of(tester.element(find.text(text.randomTemplateFinding))).pop();
+    await tester.pumpAndSettle();
+    expect(repository.cancelPendingRandomTemplateRequestCalls, 1);
+    pending.complete(_mischiefCard);
+    await tester.pumpAndSettle();
+    expect(navigator.pushes, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('discovery ignores background random result and allows retry', (
+    tester,
+  ) async {
+    final pending = Completer<TemplateItem?>();
+    final repository = RandomTemplatesRepository(
+      randomTemplateCompleter: pending,
+    );
+    final navigator = _RecordingNavigator();
+    await _pumpDiscoveryPage(
+      tester,
+      repository: _FakeDiscoveryRepository(_discoveryFixture()),
+      navigator: navigator,
+      randomRepository: repository,
+    );
+    final text = AppLocalizations.of(
+      tester.element(find.byType(TemplatesDiscoveryPage)),
+    );
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('discovery-random-launcher')),
+    );
+    await tester.tap(find.byKey(const ValueKey('discovery-random-launcher')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(text.randomTemplateFindAction));
+    await tester.pump();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    pending.complete(_mischiefCard);
+    await tester.pumpAndSettle();
+    expect(repository.cancelPendingRandomTemplateRequestCalls, 1);
+    expect(navigator.pushes, isEmpty);
+    expect(find.text(text.randomTemplateNoMatches), findsOneWidget);
+    await tester.tap(find.text(text.randomTemplateFindAction));
+    await tester.pumpAndSettle();
+    expect(repository.fetchRandomTemplateCalls, 2);
+    expect(navigator.pushes, hasLength(1));
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final fails in [false, true]) {
+    testWidgets(
+      'discovery random shows ${fails ? 'retry on error' : 'empty state'}',
+      (tester) async {
+        final repository = RandomTemplatesRepository(throwOnRandom: fails);
+        await _pumpDiscoveryPage(
+          tester,
+          repository: _FakeDiscoveryRepository(_discoveryFixture()),
+          navigator: _RecordingNavigator(),
+          randomRepository: repository,
+        );
+        final text = AppLocalizations.of(
+          tester.element(find.byType(TemplatesDiscoveryPage)),
+        );
+        await tester.ensureVisible(
+          find.byKey(const ValueKey('discovery-random-launcher')),
+        );
+        await tester.tap(
+          find.byKey(const ValueKey('discovery-random-launcher')),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(text.randomTemplateFindAction));
+        await tester.pumpAndSettle();
+        expect(
+          find.text(
+            fails
+                ? text.randomTemplateLoadFailed
+                : text.randomTemplateNoMatches,
+          ),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   testWidgets('discovery supports compact viewport at 200 percent text scale', (
     tester,
@@ -163,20 +409,55 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('discovery pauses preview playback while a rail is scrolling', (
+  testWidgets('visible discovery video survives scrolling in all directions', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
     addTearDown(() => tester.binding.setSurfaceSize(null));
+    final originalPlatform = VideoPlayerPlatform.instance;
+    final fakePlatform = FakeVideoPlayerPlatform();
+    VideoPlayerPlatform.instance = fakePlatform;
+    VisibilityDetectorController.instance.updateInterval = Duration.zero;
+    MediaLifecyclePolicy.reset();
+    addTearDown(() {
+      VideoPlayerPlatform.instance = originalPlatform;
+      VisibilityDetectorController.instance.updateInterval = const Duration(
+        milliseconds: 500,
+      );
+      MediaLifecyclePolicy.reset();
+    });
+    const previewUrl = 'https://cdn.example.com/templates/scroll-video.mp4';
+    final video = videoTemplate(
+      id: 'scroll-video',
+      previewUrl: previewUrl,
+      thumbnailUrl: previewUrl,
+      feedLoopLowUrl: previewUrl,
+    );
     final playbackManager = TemplateFeedPlaybackManager();
     addTearDown(playbackManager.dispose);
 
     await _pumpDiscoveryPage(
       tester,
-      repository: _FakeDiscoveryRepository(_horizontalDiscoveryFixture()),
+      repository: _FakeDiscoveryRepository(
+        _horizontalDiscoveryFixture(video: video),
+      ),
       navigator: _RecordingNavigator(),
       playbackManager: playbackManager,
+      networkTransport: NetworkTransportKind.cellular,
+      previewControllerFactory: (url) async =>
+          VideoPlayerController.networkUrl(Uri.parse(url)),
     );
+    final media = find.byWidgetPredicate(
+      (widget) =>
+          widget is VisibilityDetector &&
+          widget.key.toString().contains('scroll-video'),
+    );
+    await tester.ensureVisible(media);
+    await tester.pump();
+    await _pumpUntil(tester, () => fakePlatform.playCalls > 0);
+    final controller = tester
+        .widget<VideoPlayer>(find.byType(VideoPlayer))
+        .controller;
     final rail = find.byKey(const ValueKey('discovery-rail-Pet Mischief'));
     final horizontalScroll = find.descendant(
       of: rail,
@@ -187,13 +468,38 @@ void main() {
     );
     expect(horizontalScroll, findsOneWidget);
 
-    await tester.drag(horizontalScroll, const Offset(-120, 0));
-    expect(playbackManager.isFastScrolling, isTrue);
-
-    await tester.pump(const Duration(milliseconds: 139));
-    expect(playbackManager.isFastScrolling, isTrue);
-    await tester.pump(const Duration(milliseconds: 1));
-    expect(playbackManager.isFastScrolling, isFalse);
+    final verticalScroll = find.byWidgetPredicate(
+      (widget) =>
+          widget is Scrollable && widget.axisDirection == AxisDirection.down,
+    );
+    for (final movement in [
+      (horizontalScroll, const Offset(-30, 0)),
+      (horizontalScroll, const Offset(30, 0)),
+      (verticalScroll, const Offset(0, -30)),
+      (verticalScroll, const Offset(0, 30)),
+    ]) {
+      final position = tester.state<ScrollableState>(movement.$1).position;
+      final previousPixels = position.pixels;
+      final gesture = await tester.startGesture(tester.getCenter(media));
+      await gesture.moveBy(movement.$2);
+      await gesture.moveBy(movement.$2);
+      await tester.pump(const Duration(milliseconds: 600));
+      expect(position.pixels, isNot(previousPixels));
+      expect(find.byType(VideoPlayer), findsOneWidget);
+      expect(fakePlatform.disposeCalls, 0);
+      expect(controller.value.isPlaying, isTrue);
+      await gesture.up();
+      await tester.pump(const Duration(milliseconds: 600));
+      expect(
+        tester.widget<VideoPlayer>(find.byType(VideoPlayer)).controller,
+        same(controller),
+      );
+      expect(fakePlatform.createCalls, 1);
+      expect(playbackManager.activeVideoControllersCount, 1);
+    }
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+    expect(MediaLifecyclePolicy.activeVideoPreviews, 0);
     expect(tester.takeException(), isNull);
   });
 
@@ -236,6 +542,7 @@ void main() {
         previewControllerFactory: (url) async =>
             VideoPlayerController.networkUrl(Uri.parse(url)),
       );
+      await tester.drag(find.byType(CustomScrollView), const Offset(0, -210));
       await tester.pump();
       final detector = tester.widget<VisibilityDetector>(
         find.byWidgetPredicate(
@@ -277,6 +584,8 @@ void main() {
       expect(fakePlatform.disposeCalls, 0);
       expect(find.byType(VideoPlayer), findsOneWidget);
       expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
     },
   );
 
@@ -310,10 +619,24 @@ void main() {
     await tester.pump();
 
     final searchRect = tester.getRect(
-      find.byKey(const ValueKey('discovery-search-launcher')),
+      find.byKey(const ValueKey('discovery-catalog-launcher')),
     );
     expect(searchRect.top, greaterThanOrEqualTo(topInset));
     expect(searchRect.top, lessThanOrEqualTo(topInset + 8));
+    expect(
+      tester
+          .getSize(find.byKey(const ValueKey('discovery-random-launcher')))
+          .height,
+      greaterThanOrEqualTo(48),
+    );
+    expect(
+      find.byKey(const ValueKey('discovery-random-launcher')).hitTestable(),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('discovery-catalog-launcher')).hitTestable(),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 
@@ -389,6 +712,8 @@ void main() {
     });
 
     expect(repository.fetchCalls, 2);
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -210));
+    await tester.pump();
     expect(find.byType(TemplateCategoryCarousel), findsOneWidget);
     expect(find.byType(TemplateDiscoveryRail), findsNWidgets(2));
     expect(tester.takeException(), isNull);
@@ -521,12 +846,16 @@ TemplateDiscovery _scrollableDiscoveryFixture() {
   );
 }
 
-TemplateDiscovery _horizontalDiscoveryFixture() {
+TemplateDiscovery _horizontalDiscoveryFixture({required TemplateItem video}) {
   return TemplateDiscovery(
-    sections: const [
+    sections: [
       TemplateDiscoverySection(
         category: 'Pet Mischief',
-        items: [_mischiefCard, _framesCard, _mischiefCard, _framesCard],
+        items: [video, _mischiefCard, _framesCard],
+      ),
+      const TemplateDiscoverySection(
+        category: 'Pawsome Frames',
+        items: [_framesCard],
       ),
     ],
     generatedAtUtc: DateTime.utc(2026, 9, 4),
@@ -558,10 +887,13 @@ Future<void> _pumpDiscoveryPage(
   TemplateFeedPlaybackManager? playbackManager,
   NetworkTransportKind networkTransport = NetworkTransportKind.unknown,
   TemplatePreviewControllerFactory? previewControllerFactory,
+  TemplatesRepository? randomRepository,
 }) async {
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        if (randomRepository != null)
+          templatesRepositoryProvider.overrideWithValue(randomRepository),
         templateDiscoveryRepositoryProvider.overrideWithValue(repository),
         appLaunchControllerProvider.overrideWith(_GuestAppLaunchController.new),
         walletControllerProvider.overrideWith(_IdleWalletController.new),

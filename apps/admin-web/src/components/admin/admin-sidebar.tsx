@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { useMemo, type RefObject } from "react";
+import { useMemo, useState, type RefObject } from "react";
 
 import { getAdminChromeCopy } from "@/components/admin/admin-chrome.content";
 import {
@@ -11,8 +11,13 @@ import {
   DollarIcon,
   ImageIcon,
   LogoutIcon,
+  MailIcon,
   PawIcon,
   PromoCodeIcon,
+  RoleKeyIcon,
+  ShieldCheckIcon,
+  SparklesIcon,
+  HeadphonesIcon,
   SupportIcon,
   TemplatesIcon,
   UsersIcon,
@@ -44,18 +49,20 @@ const iconMap = {
   economy: DollarIcon,
   gamification: PawIcon,
   "promo-codes": PromoCodeIcon,
-  support: SupportIcon,
-  moderation: ChartIcon,
+  support: HeadphonesIcon,
+  moderation: ShieldCheckIcon,
   audit: ClockIcon,
   users: UsersIcon,
-  generations: ChartIcon,
+  "email-broadcasts": MailIcon,
+  generations: SparklesIcon,
   feedback: SupportIcon,
-  "role-management": UsersIcon,
+  "role-management": RoleKeyIcon,
   templates: TemplatesIcon,
   "image-templates": ImageIcon,
   "template-analytics": ChartIcon,
   "video-templates": VideoIcon,
   "template-categories": TemplatesIcon,
+  "template-discovery": SparklesIcon,
   "template-daily-featured": TemplatesIcon,
 };
 
@@ -90,33 +97,58 @@ export function AdminSidebar({
   const brandCaption = copy.sidebar.brandCaption;
   const navigationLabel = copy.sidebar.navigationLabel;
   const isDrawerDialog = isDrawerMode && isOpen;
+  const [groupDisclosure, setGroupDisclosure] = useState<{
+    path: string;
+    expanded: boolean;
+  } | null>(null);
 
   function renderNavEntry(item: AdminNavEntry) {
     if (item.type === "group") {
       const Icon = iconMap[item.key];
-      const groupCurrent = matchesAdminPath(currentPath, getTargetPath(item.href));
+      const groupCurrent = currentPath === getTargetPath(item.href);
       const groupActive = item.items.some((child) =>
         matchesAdminPath(currentPath, getTargetPath(child.href))
       );
       const groupSelected = groupCurrent || groupActive;
+      const groupExpanded =
+        groupDisclosure?.path === currentPath ? groupDisclosure.expanded : groupSelected;
+      const childrenId = `admin-nav-${item.key}`;
 
       return (
         <div key={item.key} className={styles.navGroup}>
-          <Link
-            href={item.href}
-            className={`${styles.navItem}${groupSelected ? ` ${styles.navItemActive}` : ""}`}
-            aria-current={groupCurrent ? "page" : undefined}
-            onClick={onNavigate}
-            title={isCollapsed ? item.label : undefined}
-          >
-            <Icon className={styles.navIcon} />
-            <span className={styles.navLabel}>{item.label}</span>
-            <CaretDownIcon
-              className={`${styles.groupCaret}${groupSelected ? ` ${styles.groupCaretOpen}` : ""}`}
-            />
-          </Link>
+          <div className={styles.navGroupHeader}>
+            <Link
+              href={item.href}
+              className={`${styles.navItem}${groupCurrent ? ` ${styles.navItemActive}` : groupActive ? ` ${styles.navItemBranchActive}` : ""}`}
+              aria-current={groupCurrent ? "page" : undefined}
+              onClick={onNavigate}
+              title={isCollapsed ? item.label : undefined}
+              aria-label={item.label}
+            >
+              <Icon className={styles.navIcon} />
+              <span className={styles.navLabel}>{item.label}</span>
+            </Link>
+            <button
+              type="button"
+              className={styles.groupToggle}
+              aria-label={item.label}
+              aria-expanded={groupExpanded}
+              aria-controls={childrenId}
+              onClick={() => setGroupDisclosure({ path: currentPath, expanded: !groupExpanded })}
+            >
+              <CaretDownIcon
+                className={`${styles.groupCaret}${groupExpanded ? ` ${styles.groupCaretOpen}` : ""}`}
+              />
+            </button>
+          </div>
 
-          <div className={styles.navChildren} role="group" aria-label={item.label}>
+          <div
+            id={childrenId}
+            className={styles.navChildren}
+            role="group"
+            aria-label={item.label}
+            hidden={!groupExpanded}
+          >
             {item.items.map((child) => {
               const childActive = matchesAdminPath(currentPath, getTargetPath(child.href));
 
@@ -148,6 +180,11 @@ export function AdminSidebar({
         aria-current={active ? "page" : undefined}
         onClick={onNavigate}
         title={isCollapsed ? item.label : undefined}
+        aria-label={
+          item.key === "support" && supportUnreadCount > 0
+            ? `${item.label}, ${copy.sidebar.supportUnreadLabel(supportUnreadCount)}`
+            : item.label
+        }
       >
         <Icon className={styles.navIcon} />
         <span className={styles.navLabel}>{item.label}</span>
@@ -196,7 +233,9 @@ export function AdminSidebar({
       <nav className={styles.nav} aria-label={navigationLabel}>
         {navSections.map((section) => (
           <div key={section.key} className={styles.navSection}>
-            <p className={styles.navSectionTitle}>{section.label}</p>
+            {section.items.length > 1 ? (
+              <p className={styles.navSectionTitle}>{section.label}</p>
+            ) : null}
             <div className={styles.navSectionItems}>
               {section.items.map((item) => renderNavEntry(item))}
             </div>
@@ -210,6 +249,7 @@ export function AdminSidebar({
           className={styles.logoutButton}
           onClick={onLogout}
           disabled={logoutDisabled}
+          aria-label={logoutLabel}
         >
           <LogoutIcon className={styles.navIcon} />
           <span className={styles.navLabel}>{logoutLabel}</span>

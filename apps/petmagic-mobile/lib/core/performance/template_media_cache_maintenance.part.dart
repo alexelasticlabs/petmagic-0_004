@@ -3,6 +3,12 @@ part of 'template_media_cache.dart';
 final class _TemplateMediaCacheMaintenance {
   const _TemplateMediaCacheMaintenance._();
 
+  static String cacheKeyForMedia(String url, {int? mediaVersion}) {
+    final normalized = persistentSafeMediaCacheKeyUrl(url);
+    if (mediaVersion == null || mediaVersion <= 0) return normalized;
+    return 'v$mediaVersion|$normalized';
+  }
+
   static Future<void> removeThumbnailFile(
     String url, {
     int? mediaVersion,
@@ -12,8 +18,11 @@ final class _TemplateMediaCacheMaintenance {
       mediaVersion: mediaVersion,
     );
     _invalidateThumbnailCacheUrl(cacheKey);
-    TemplateMediaCache._thumbnailFetchesByUrl.remove(cacheKey);
-    await TemplateMediaCache.thumbnailCache.removeFile(cacheKey);
+    await _removeCacheManagerFile(
+      TemplateMediaCache.thumbnailCache,
+      cacheKey,
+      stage: 'thumbnail_explicit_remove',
+    );
   }
 
   static Future<void> removePreviewFile(String url, {int? mediaVersion}) {
@@ -22,13 +31,19 @@ final class _TemplateMediaCacheMaintenance {
       mediaVersion: mediaVersion,
     );
     _invalidatePreviewCacheUrl(cacheKey);
-    TemplateMediaCache._previewFetchesByUrl.remove(cacheKey);
-    return TemplateMediaCache.previewVideoCache.removeFile(cacheKey);
+    return _removeCacheManagerFile(
+      TemplateMediaCache.previewVideoCache,
+      cacheKey,
+      stage: 'preview_explicit_remove',
+    );
   }
 
   static void releaseMemoryReferences() {
     TemplateMediaCache._thumbnailFilesByUrl.clear();
     TemplateMediaCache._previewFilesByUrl.clear();
+    TemplateMediaCache.thumbnailCache.store.emptyMemoryCache();
+    TemplateMediaCache.previewVideoCache.store.emptyMemoryCache();
+    TemplateMediaCacheBudget.releaseMemoryReferences();
   }
 
   @visibleForTesting
@@ -59,12 +74,24 @@ final class _TemplateMediaCacheMaintenance {
     );
   }
 
-  static Future<void> clearAll() async {
+  static Future<void> clearAll() {
+    final clearing = TemplateMediaCache._cacheClearInProgress;
+    if (clearing != null) return clearing;
+    late final Future<void> clear;
+    clear = _clearAll().whenComplete(() {
+      if (identical(TemplateMediaCache._cacheClearInProgress, clear)) {
+        TemplateMediaCache._cacheClearInProgress = null;
+      }
+    });
+    TemplateMediaCache._cacheClearInProgress = clear;
+    return clear;
+  }
+
+  static Future<void> _clearAll() async {
     TemplateMediaCache._cacheGeneration++;
+    TemplateMediaCacheBudget.releaseMemoryReferences();
     TemplateMediaCache._thumbnailFilesByUrl.clear();
     TemplateMediaCache._previewFilesByUrl.clear();
-    TemplateMediaCache._thumbnailFetchesByUrl.clear();
-    TemplateMediaCache._previewFetchesByUrl.clear();
     TemplateMediaCache._thumbnailInvalidationByUrl.clear();
     TemplateMediaCache._previewInvalidationByUrl.clear();
     TemplateMediaCache._latestThumbnailFetchGenerationByUrl.clear();
@@ -73,14 +100,14 @@ final class _TemplateMediaCacheMaintenance {
     TemplateMediaCache._blockedPreviewCacheUrls.clear();
 
     try {
-      await TemplateMediaCache.thumbnailCache.emptyCache();
+      await _emptyCacheManager(TemplateMediaCache.thumbnailCache);
     } catch (error, stackTrace) {
       _logCacheFailure('clear_thumbnail_cache', error, stackTrace);
       // Keep best-effort semantics for logout cleanup.
     }
 
     try {
-      await TemplateMediaCache.previewVideoCache.emptyCache();
+      await _emptyCacheManager(TemplateMediaCache.previewVideoCache);
     } catch (error, stackTrace) {
       _logCacheFailure('clear_preview_cache', error, stackTrace);
       // Keep best-effort semantics for logout cleanup.
@@ -90,6 +117,7 @@ final class _TemplateMediaCacheMaintenance {
   static Future<File?> _getRememberedFile(
     _RememberedFilesByUrl filesByUrl,
     String url, {
+    required CacheManager cacheManager,
     required int maxEntries,
   }) async {
     final rememberedFile = filesByUrl.remove(url);
@@ -116,7 +144,51 @@ final class _TemplateMediaCacheMaintenance {
       validTill: rememberedFile.validTill,
       maxEntries: maxEntries,
     );
+    await _recordAccess(
+      rememberedFile.file,
+      cacheManager: cacheManager,
+      cacheKey: url,
+    );
     return rememberedFile.file;
+  }
+
+  static Future<void> _emptyCacheManager(CacheManager cacheManager) =>
+      _TemplateMediaCacheStorage.empty(cacheManager);
+
+  static Future<File> waitForInvalidatedFetch(
+    Future<File> previous,
+    Future<File> Function() retry,
+  ) async {
+    try {
+      await previous;
+    } catch (error) {
+      // Let the old cache-manager stream and its invalidation cleanup finish.
+      AppLogger.debug(
+        feature: 'Performance.MediaCache',
+        operation: 'invalidated_fetch_settled',
+        context: {'errorType': error.runtimeType.toString()},
+      );
+    }
+    return retry();
+  }
+
+  static Future<void> _recordAccess(
+    File file, {
+    required CacheManager cacheManager,
+    required String cacheKey,
+  }) async {
+    final touched = await TemplateMediaCacheBudget.recordAccess(
+      file,
+      onFailure: _logCacheFailure,
+    );
+    if (!touched) return;
+    try {
+      // Refresh persisted recency for the cache manager's count/age eviction.
+      // Its normal memory lookup does not update the repository's touched time.
+      await cacheManager.getFileFromCache(cacheKey, ignoreMemCache: true);
+    } catch (error, stackTrace) {
+      _logCacheFailure('cache_access_metadata', error, stackTrace);
+    }
   }
 
   static void _rememberFile(
@@ -201,12 +273,53 @@ final class _TemplateMediaCacheMaintenance {
     CacheManager cacheManager,
     String url, {
     required String stage,
+  }) => _TemplateMediaCacheStorage.remove(cacheManager, url, stage: stage);
+
+  static Future<File?> getCachedThumbnailFile(
+    String url, {
+    int? mediaVersion,
   }) async {
-    try {
-      await cacheManager.removeFile(url);
-    } catch (error, stackTrace) {
-      _logCacheFailure(stage, error, stackTrace);
+    final clearing = TemplateMediaCache._cacheClearInProgress;
+    if (clearing != null) await clearing;
+    final cacheKey = TemplateMediaCache.cacheKeyForMedia(
+      url,
+      mediaVersion: mediaVersion,
+    );
+    if (TemplateMediaCache._blockedThumbnailCacheUrls.contains(cacheKey)) {
+      return null;
     }
+    final remembered = await _getRememberedFile(
+      TemplateMediaCache._thumbnailFilesByUrl,
+      cacheKey,
+      cacheManager: TemplateMediaCache.thumbnailCache,
+      maxEntries: TemplateMediaCache._maxThumbnailFileReferences,
+    );
+    if (remembered != null) return remembered;
+    final cached = await TemplateMediaCache.thumbnailCache.getFileFromCache(
+      cacheKey,
+    );
+    if (cached == null ||
+        !cached.validTill.isAfter(DateTime.now()) ||
+        !await cached.file.exists()) {
+      return null;
+    }
+    _rememberFile(
+      TemplateMediaCache._thumbnailFilesByUrl,
+      cacheKey,
+      cached.file,
+      validTill: cached.validTill,
+      maxEntries: TemplateMediaCache._maxThumbnailFileReferences,
+    );
+    await _recordAccess(
+      cached.file,
+      cacheManager: TemplateMediaCache.thumbnailCache,
+      cacheKey: cacheKey,
+    );
+    TemplateMediaCacheBudget.ensureThumbnailBudget(
+      cached.file.parent,
+      onFailure: _logCacheFailure,
+    );
+    return cached.file;
   }
 
   static void _logCacheFailure(
@@ -228,6 +341,8 @@ final class _TemplateMediaCacheMaintenance {
     String url, {
     int? mediaVersion,
   }) async {
+    final clearing = TemplateMediaCache._cacheClearInProgress;
+    if (clearing != null) await clearing;
     final cacheKey = TemplateMediaCache.cacheKeyForMedia(
       url,
       mediaVersion: mediaVersion,
@@ -239,6 +354,7 @@ final class _TemplateMediaCacheMaintenance {
     final rememberedFile = await _getRememberedFile(
       TemplateMediaCache._previewFilesByUrl,
       cacheKey,
+      cacheManager: TemplateMediaCache.previewVideoCache,
       maxEntries: TemplateMediaCache._maxPreviewFileReferences,
     );
     if (rememberedFile != null) {
@@ -261,6 +377,15 @@ final class _TemplateMediaCacheMaintenance {
       file,
       validTill: cachedFile.validTill,
       maxEntries: TemplateMediaCache._maxPreviewFileReferences,
+    );
+    await _recordAccess(
+      file,
+      cacheManager: TemplateMediaCache.previewVideoCache,
+      cacheKey: cacheKey,
+    );
+    TemplateMediaCacheBudget.ensurePreviewBudget(
+      file.parent,
+      onFailure: _logCacheFailure,
     );
     return file;
   }

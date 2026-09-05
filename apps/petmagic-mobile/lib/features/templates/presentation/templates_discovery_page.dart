@@ -12,11 +12,19 @@ import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/application/profile_controller.dart';
 import 'package:petmagic_mobile/features/templates/application/template_discovery_controller.dart';
+import 'package:petmagic_mobile/features/templates/application/template_catalog_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_discovery_models.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_feed_media_preload_queue.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_feed_playback_manager.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_preview_page.dart';
+import 'package:petmagic_mobile/features/templates/presentation/template_entitlement_provider.dart';
+import 'package:petmagic_mobile/features/templates/presentation/widgets/random_template_sheet.dart';
+import 'package:petmagic_mobile/features/templates/presentation/widgets/create_with_pet_block.dart';
+import 'package:petmagic_mobile/features/templates/presentation/widgets/discovery_collection_style.dart';
+import 'package:petmagic_mobile/features/templates/presentation/widgets/discovery_section_reveal.dart';
+import 'package:petmagic_mobile/features/templates/presentation/widgets/discovery_atmosphere.dart';
+import 'package:petmagic_mobile/features/templates/presentation/widgets/discovery_motion.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/template_card_playback_coordinator.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/template_category_carousel.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/template_discovery_rail.dart';
@@ -32,6 +40,7 @@ import 'package:petmagic_mobile/shared/widgets/petmagic_unavailable_view.dart';
 part 'templates_discovery_access.part.dart';
 part 'templates_discovery_chrome.part.dart';
 part 'templates_discovery_playback.part.dart';
+part 'templates_discovery_random.part.dart';
 
 class TemplatesDiscoveryPage extends ConsumerStatefulWidget {
   const TemplatesDiscoveryPage({this.previewControllerFactory, super.key});
@@ -46,10 +55,7 @@ class TemplatesDiscoveryPage extends ConsumerStatefulWidget {
 
 class _TemplatesDiscoveryPageState extends ConsumerState<TemplatesDiscoveryPage>
     with WidgetsBindingObserver {
-  static const _scrollIdlePlaybackDelay = Duration(milliseconds: 140);
-
   late final TemplateDiscoveryController _discoveryController;
-  Timer? _playbackScrollIdleTimer;
   bool _isAppResumed = true;
   bool? _isTabActive;
   bool _isVerticalScrolling = false;
@@ -57,6 +63,14 @@ class _TemplatesDiscoveryPageState extends ConsumerState<TemplatesDiscoveryPage>
   String? _localeTag;
   Future<void>? _walletAccessRefreshInFlight;
   Future<void>? _profileAccessRefreshInFlight;
+  TemplatesRepository? _randomRepository;
+  bool _randomSheetOpen = false;
+  int _randomRequestEpoch = 0;
+  final _activeCollection = ValueNotifier<int>(0);
+
+  void _setRandomSheetOpen(bool open) {
+    if (mounted) setState(() => _randomSheetOpen = open);
+  }
 
   @override
   void initState() {
@@ -97,6 +111,7 @@ class _TemplatesDiscoveryPageState extends ConsumerState<TemplatesDiscoveryPage>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _isAppResumed = state == AppLifecycleState.resumed;
     if (!_isAppResumed) {
+      _cancelRandomRequest();
       ref
           .read(templateDiscoveryPlaybackManagerProvider)
           .disposeAll(reason: 'discovery_app_background');
@@ -109,7 +124,8 @@ class _TemplatesDiscoveryPageState extends ConsumerState<TemplatesDiscoveryPage>
 
   @override
   void dispose() {
-    _playbackScrollIdleTimer?.cancel();
+    _activeCollection.dispose();
+    _cancelRandomRequest();
     WidgetsBinding.instance.removeObserver(this);
     _discoveryController.setScreenVisible(false);
     super.dispose();
@@ -120,6 +136,9 @@ class _TemplatesDiscoveryPageState extends ConsumerState<TemplatesDiscoveryPage>
       return;
     }
     _isTabActive = active;
+    if (!active) {
+      _cancelRandomRequest();
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         if (!active) {
@@ -142,21 +161,8 @@ class _TemplatesDiscoveryPageState extends ConsumerState<TemplatesDiscoveryPage>
   }
 
   bool _handleUserScroll(UserScrollNotification notification) {
-    final playbackManager = ref.read(templateDiscoveryPlaybackManagerProvider);
-    _playbackScrollIdleTimer?.cancel();
-    if (notification.direction == ScrollDirection.idle) {
-      _playbackScrollIdleTimer = Timer(_scrollIdlePlaybackDelay, () {
-        _playbackScrollIdleTimer = null;
-        if (mounted) {
-          playbackManager.updateScrollVelocity(0);
-        }
-      });
-    } else {
-      playbackManager.updateScrollVelocity(
-        TemplateFeedPlaybackManager.defaultFastScrollVelocityThreshold + 1,
-      );
-    }
-
+    // Card visibility and network budgets own video playback. A scroll gesture
+    // alone must not tear down an already visible preview.
     if (notification.metrics.axis == Axis.vertical) {
       final scrolling = notification.direction != ScrollDirection.idle;
       if (_isVerticalScrolling != scrolling && mounted) {
@@ -210,14 +216,8 @@ class _TemplatesDiscoveryPageState extends ConsumerState<TemplatesDiscoveryPage>
     final colors = context.petMagicColors;
     final bottomInset = petMagicScrollableBottomInset(context);
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [colors.backgroundTop, colors.backgroundBottom],
-        ),
-      ),
+    return DiscoveryAtmosphere(
+      collectionIndex: _activeCollection,
       child: RefreshIndicator.adaptive(
         onRefresh: () async {
           await controller.loadInitial(forceRefresh: true);
@@ -261,27 +261,14 @@ class _TemplatesDiscoveryPageState extends ConsumerState<TemplatesDiscoveryPage>
                           ),
                         ),
                         const SizedBox(height: PetMagicSpacing.lg),
-                        Text(
-                          text.discoverHomeTitle,
-                          style: Theme.of(context).textTheme.titleLarge
-                              ?.copyWith(
-                                color: colors.textStrong,
-                                fontSize: 22,
-                                height: 1.05,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: -0.6,
-                              ),
+                        DiscoveryIntroduction(
+                          title: text.discoverHomeTitle,
+                          subtitle: text.discoverHomeSubtitle,
                         ),
-                        const SizedBox(height: 5),
-                        Text(
-                          text.discoverHomeSubtitle,
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(
-                                color: colors.textSoft,
-                                fontSize: 11.5,
-                                height: 1.3,
-                                fontWeight: FontWeight.w600,
-                              ),
+                        const CreateWithPetBlockSlot(
+                          selectedPetId: null,
+                          selectedPetPhotoId: null,
+                          padding: EdgeInsets.only(top: 12),
                         ),
                         if (state.sections.isNotEmpty) ...[
                           const SizedBox(height: PetMagicSpacing.sm),
@@ -290,6 +277,11 @@ class _TemplatesDiscoveryPageState extends ConsumerState<TemplatesDiscoveryPage>
                             eyebrowLabel: text.discoverCategoryEyebrow,
                             openLabel: text.discoverOpenCategoryAction,
                             autoplayEnabled: !_isVerticalScrolling,
+                            onActiveCategoryChanged: (index) =>
+                                _activeCollection.value =
+                                    discoveryCollectionIndex(
+                                      state.sections[index].category,
+                                    ),
                             onCategoryPressed: _openCategory,
                           ),
                         ],
@@ -300,9 +292,16 @@ class _TemplatesDiscoveryPageState extends ConsumerState<TemplatesDiscoveryPage>
                 SliverPersistentHeader(
                   pinned: true,
                   delegate: _DiscoverySearchHeaderDelegate(
-                    label: text.searchTemplates,
-                    onPressed: () => context.appNavigator.push<void>(
-                      const TemplatesDestination(autofocusSearch: true),
+                    randomLabel: text.randomTemplateAction,
+                    catalogLabel: text.generationStatusAllTemplatesAction,
+                    actionHeight:
+                        (MediaQuery.textScalerOf(context).scale(13) * 2 + 16)
+                            .clamp(48.0, 88.0),
+                    onRandomPressed: _randomSheetOpen || state.isInitialLoading
+                        ? null
+                        : _openRandomTemplate,
+                    onCatalogPressed: () => context.appNavigator.push<void>(
+                      const TemplatesDestination(),
                     ),
                   ),
                 ),

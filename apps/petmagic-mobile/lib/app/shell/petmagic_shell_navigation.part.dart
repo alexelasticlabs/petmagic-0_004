@@ -3,10 +3,12 @@ part of 'petmagic_shell.dart';
 class _FloatingBottomNav extends ConsumerWidget {
   const _FloatingBottomNav({
     required this.currentIndex,
+    required this.isAuthenticated,
     required this.onItemSelected,
   });
 
   final int currentIndex;
+  final bool isAuthenticated;
   final ValueChanged<int> onItemSelected;
 
   @override
@@ -14,64 +16,68 @@ class _FloatingBottomNav extends ConsumerWidget {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final isLight = Theme.of(context).brightness == Brightness.light;
-    final isDegraded = PerformanceGuard.isDegradedMode(context);
     final disableGlass = PerformanceGuard.shouldDisableGlassEffects(context);
-    final blurSigma = switch ((defaultTargetPlatform, isDegraded)) {
-      (TargetPlatform.android, true) => 0.0,
-      (TargetPlatform.android, false) => 10.0,
-      (_, true) => 10.0,
-      _ => 18.0,
-    };
-    final bottomPadding = MediaQuery.viewPaddingOf(context).bottom;
-    final unreadCount = ref.watch(
-      generationHistoryControllerProvider.select((state) => state.unreadCount),
-    );
+    final unreadCount = isAuthenticated
+        ? ref.watch(
+            generationHistoryControllerProvider.select(
+              (state) => state.unreadCount,
+            ),
+          )
+        : 0;
     final items = [
-      _NavItem(0, Icons.explore_outlined, text.navDiscover),
+      _NavItem(
+        0,
+        Icons.auto_awesome_outlined,
+        Icons.auto_awesome_rounded,
+        text.navDiscover,
+      ),
       _NavItem(
         1,
         Icons.photo_library_outlined,
+        Icons.photo_library_rounded,
         text.navCreations,
         badgeCount: unreadCount,
+        requiresSignIn: !isAuthenticated,
       ),
-      _NavItem(2, Icons.card_giftcard_rounded, text.navRewards),
-      _NavItem(3, Icons.person_outline_rounded, text.navProfile),
+      _NavItem(
+        2,
+        Icons.emoji_events_outlined,
+        Icons.emoji_events_rounded,
+        text.navRewards,
+        requiresSignIn: !isAuthenticated,
+      ),
+      _NavItem(
+        3,
+        isAuthenticated ? Icons.person_outline_rounded : Icons.login_rounded,
+        isAuthenticated ? Icons.person_rounded : Icons.login_rounded,
+        isAuthenticated ? text.navProfile : text.profileSignInAction,
+      ),
     ];
+    const radius = BorderRadius.all(Radius.circular(24));
     final navSurface = DecoratedBox(
+      key: const ValueKey('bottom-nav-surface'),
       decoration: BoxDecoration(
-        color: isLight
-            ? colors.surfaceGlass.withValues(alpha: isDegraded ? 0.94 : 0.78)
-            : Color.alphaBlend(
-                Colors.black.withValues(alpha: isDegraded ? 0.40 : 0.30),
-                colors.surfaceGlass.withValues(alpha: isDegraded ? 0.78 : 0.56),
-              ),
-        borderRadius: BorderRadius.circular(18),
+        color: colors.surfaceGlass.withValues(
+          alpha: disableGlass ? 1 : (isLight ? 0.94 : 0.92),
+        ),
+        borderRadius: radius,
         border: Border.all(
-          color: isLight
-              ? Colors.white.withValues(alpha: 0.74)
-              : Colors.white.withValues(alpha: 0.11),
-          width: isLight ? 1.1 : 1,
+          color: colors.border.withValues(alpha: isLight ? 0.75 : 0.9),
         ),
       ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(3, 1, 3, 1),
-        child: SizedBox(
-          height: _bottomNavHeight,
+      child: SizedBox(
+        height: petMagicBottomNavHeight(context),
+        child: Padding(
+          padding: const EdgeInsets.all(6),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               for (final item in items)
                 Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 2,
-                      vertical: 2,
-                    ),
-                    child: _BottomNavButton(
-                      item: item,
-                      selected: currentIndex == item.index,
-                      onTap: () => onItemSelected(item.index),
-                    ),
+                  child: _BottomNavButton(
+                    item: item,
+                    selected: currentIndex == item.index,
+                    onTap: () => onItemSelected(item.index),
                   ),
                 ),
             ],
@@ -88,70 +94,34 @@ class _FloatingBottomNav extends ConsumerWidget {
             16,
             0,
             16,
-            bottomPadding + _bottomNavOuterGap,
+            MediaQuery.viewPaddingOf(context).bottom +
+                kPetMagicBottomNavOuterGap,
           ),
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Positioned.fill(
-                top: 1,
-                bottom: 1,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(18),
-                    boxShadow: disableGlass
-                        ? [
-                            BoxShadow(
-                              color: colors.shadow.withValues(
-                                alpha: isLight ? 0.14 : 0.18,
-                              ),
-                              blurRadius: 8,
-                              offset: const Offset(0, 3),
-                            ),
-                          ]
-                        : isDegraded
-                        ? [
-                            BoxShadow(
-                              color: colors.shadow.withValues(
-                                alpha: isLight ? 0.20 : 0.24,
-                              ),
-                              blurRadius: 12,
-                              offset: const Offset(0, 4),
-                            ),
-                          ]
-                        : [
-                            BoxShadow(
-                              color: colors.shadow.withValues(
-                                alpha: isLight ? 0.30 : 0.38,
-                              ),
-                              blurRadius: isLight ? 24 : 22,
-                              offset: const Offset(0, 8),
-                            ),
-                            BoxShadow(
-                              color: Colors.black.withValues(
-                                alpha: isLight ? 0.08 : 0.18,
-                              ),
-                              blurRadius: 34,
-                              offset: const Offset(0, 14),
-                            ),
-                          ],
-                  ),
-                ),
-              ),
-              if (disableGlass)
-                navSurface
-              else
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(18),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(
-                      sigmaX: blurSigma,
-                      sigmaY: blurSigma,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: radius,
+                boxShadow: [
+                  BoxShadow(
+                    color: colors.shadow.withValues(
+                      alpha: isLight ? 0.08 : 0.2,
                     ),
-                    child: navSurface,
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
                   ),
-                ),
-            ],
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: radius,
+                child: disableGlass
+                    ? navSurface
+                    : BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                        child: navSurface,
+                      ),
+              ),
+            ),
           ),
         ),
       ),
@@ -168,87 +138,118 @@ class _BottomNavButton extends StatelessWidget {
 
   final _NavItem item;
   final bool selected;
-  final VoidCallback? onTap;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final isLight = Theme.of(context).brightness == Brightness.light;
-    final inactiveColor = Color.lerp(colors.textMuted, colors.textSoft, 0.62)!;
-
+    final foreground = selected ? colors.accentInk : colors.textMuted;
+    final label = item.badgeCount > 0
+        ? '${item.label}, ${text.generationStatusUnreadCount(item.badgeCount)}'
+        : item.label;
+    final largeText = MediaQuery.textScalerOf(context).scale(11) > 14.3;
     return Semantics(
+      key: ValueKey('bottom-nav-item-${item.index}'),
       selected: selected,
       button: true,
-      label: item.label,
+      label: label,
+      hint: item.requiresSignIn ? text.authSignInRequired : null,
       onTap: onTap,
       child: ExcludeSemantics(
-        child: PressableScale(
-          borderRadius: BorderRadius.circular(12),
-          onTap: onTap,
-          haptic: PressableScaleHaptic.selection,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 160),
-            curve: Curves.easeOutCubic,
-            padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 2),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              color: selected
-                  ? colors.accent.withValues(alpha: isLight ? 0.26 : 0.1)
-                  : Colors.transparent,
-              border: selected
-                  ? Border.all(
-                      color: colors.accent.withValues(
-                        alpha: isLight ? 0.48 : 0.08,
-                      ),
-                      width: isLight ? 1.05 : 1,
-                    )
-                  : null,
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                SizedBox(
-                  width: 24,
-                  height: 18,
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    alignment: Alignment.center,
-                    children: [
-                      Icon(
-                        item.icon,
-                        color: selected ? colors.accent : inactiveColor,
-                        size: 17,
-                      ),
-                      if (item.badgeCount > 0)
-                        Positioned(
-                          right: 1,
-                          top: 0,
-                          child: Container(
-                            width: 7,
-                            height: 7,
-                            decoration: BoxDecoration(
-                              color: colors.accent,
-                              shape: BoxShape.circle,
+        child: Tooltip(
+          message: item.requiresSignIn
+              ? '${item.label} · ${text.authSignInRequired}'
+              : label,
+          child: PressableScale(
+            borderRadius: BorderRadius.circular(18),
+            onTap: onTap,
+            haptic: PressableScaleHaptic.selection,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  AnimatedContainer(
+                    duration: PerformanceGuard.shouldReduceMotion(context)
+                        ? Duration.zero
+                        : const Duration(milliseconds: 180),
+                    curve: Curves.easeOutCubic,
+                    width: 48,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(14),
+                      color: selected
+                          ? colors.accent.withValues(
+                              alpha: isLight ? 0.15 : 0.16,
+                            )
+                          : Colors.transparent,
+                    ),
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      alignment: Alignment.center,
+                      children: [
+                        Icon(
+                          selected ? item.selectedIcon : item.icon,
+                          color: foreground,
+                          size: 22,
+                        ),
+                        if (item.requiresSignIn)
+                          PositionedDirectional(
+                            end: 1,
+                            top: 0,
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: colors.surfaceGlass,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.all(2),
+                                child: Icon(
+                                  Icons.lock_rounded,
+                                  size: 9,
+                                  color: colors.textMuted,
+                                ),
+                              ),
+                            ),
+                          )
+                        else if (item.badgeCount > 0)
+                          PositionedDirectional(
+                            end: 5,
+                            top: 1,
+                            child: Container(
+                              key: const ValueKey('bottom-nav-unread'),
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: colors.accent,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: colors.surfaceGlass,
+                                  width: 1.5,
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 1),
-                Text(
-                  item.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: selected ? colors.accent : inactiveColor,
-                    fontSize: 10,
-                    fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-                    letterSpacing: 0.05,
+                  const SizedBox(height: 3),
+                  Text(
+                    item.label,
+                    maxLines: largeText ? 2 : 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: foreground,
+                      fontSize: 11,
+                      height: 1.2,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -258,10 +259,19 @@ class _BottomNavButton extends StatelessWidget {
 }
 
 class _NavItem {
-  const _NavItem(this.index, this.icon, this.label, {this.badgeCount = 0});
+  const _NavItem(
+    this.index,
+    this.icon,
+    this.selectedIcon,
+    this.label, {
+    this.badgeCount = 0,
+    this.requiresSignIn = false,
+  });
 
   final int index;
   final IconData icon;
+  final IconData selectedIcon;
   final String label;
   final int badgeCount;
+  final bool requiresSignIn;
 }

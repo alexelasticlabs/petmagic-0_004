@@ -11,6 +11,7 @@ const moderatorSections = new Set<AdminSectionKey>([
   "video-templates",
   "template-analytics",
   "template-categories",
+  "template-discovery",
 ]);
 
 function matchesAdminPath(currentPath: string, targetPath: string): boolean {
@@ -86,6 +87,10 @@ export function canAccessAdminPath(
     return canAccessAdminSection(roles, "users");
   }
 
+  if (matchesAdminPath(currentPath, "/email-broadcasts")) {
+    return canAccessAdminSection(roles, "email-broadcasts");
+  }
+
   if (matchesAdminPath(currentPath, "/generations")) {
     return canAccessAdminSection(roles, "generations");
   }
@@ -116,6 +121,10 @@ export function canAccessAdminPath(
 
   if (matchesAdminPath(currentPath, "/templates/categories")) {
     return canAccessAdminSection(roles, "template-categories");
+  }
+
+  if (matchesAdminPath(currentPath, "/templates/discovery")) {
+    return canAccessAdminSection(roles, "template-discovery");
   }
 
   if (matchesAdminPath(currentPath, "/templates/daily-featured")) {

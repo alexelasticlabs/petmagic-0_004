@@ -46,7 +46,7 @@ export function SupportAssignmentControl({
   const [reason, setReason] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const reasonInputRef = useRef<HTMLTextAreaElement>(null);
-  const handledClaimRequestIdRef = useRef(claimRequestId);
+  const [handledClaimRequestId, setHandledClaimRequestId] = useState(claimRequestId);
   const isAdmin = sessionUserRoles.includes("Admin");
   const isModerator = sessionUserRoles.includes("Moderator");
   const copy =
@@ -209,21 +209,15 @@ export function SupportAssignmentControl({
     setErrorMessage(null);
   };
 
-  useEffect(() => {
-    if (claimRequestId === handledClaimRequestIdRef.current) {
-      return;
+  if (claimRequestId !== handledClaimRequestId) {
+    setHandledClaimRequestId(claimRequestId);
+    if (canOpenEditor && sessionUserId) {
+      setSelectedOperatorId(sessionUserId);
+      setEditorOpen(true);
+      setReason(copy.claimReason);
+      setErrorMessage(null);
     }
-
-    handledClaimRequestIdRef.current = claimRequestId;
-    if (!canOpenEditor || !sessionUserId) {
-      return;
-    }
-
-    setSelectedOperatorId(sessionUserId);
-    setEditorOpen(true);
-    setReason(copy.claimReason);
-    setErrorMessage(null);
-  }, [claimRequestId, canOpenEditor, copy.claimReason, sessionUserId]);
+  }
 
   useEffect(() => {
     if (!editorOpen || !reasonInputRef.current) {

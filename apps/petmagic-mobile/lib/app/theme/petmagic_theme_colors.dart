@@ -171,6 +171,12 @@ extension PetMagicTheme on BuildContext {
 }
 
 extension PetMagicSemanticTokens on PetMagicColors {
+  /// Ink on page surfaces, not on filled accent buttons or dark media overlays.
+  Color get accentInk =>
+      backgroundTop.computeLuminance() > 0.5 ? const Color(0xFF006C43) : accent;
+  Color get goldInk =>
+      backgroundTop.computeLuminance() > 0.5 ? const Color(0xFF805000) : gold;
+
   Color get background => backgroundBottom;
   Color get surfaceVariant => surfaceStrong;
   Color get cardBackground => surface;

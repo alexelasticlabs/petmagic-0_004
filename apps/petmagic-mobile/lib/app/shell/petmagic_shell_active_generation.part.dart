@@ -58,7 +58,10 @@ class _ActiveGenerationBanner extends StatelessWidget {
           16,
           0,
           16,
-          bottomPadding + _bottomNavOuterGap + _bottomNavHeight + 10,
+          bottomPadding +
+              kPetMagicBottomNavOuterGap +
+              petMagicBottomNavHeight(context) +
+              10,
         ),
         child: PressableScale(
           borderRadius: BorderRadius.circular(16),

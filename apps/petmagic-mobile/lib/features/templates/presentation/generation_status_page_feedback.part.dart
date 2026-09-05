@@ -37,17 +37,17 @@ class _FeedbackCard extends StatelessWidget {
           children: [
             _RatingButton(
               label: excellentLabel,
-              emoji: '😍',
+              icon: Icons.favorite_rounded,
               onTap: isSubmitting ? null : () => onRatingSelected(3),
             ),
             _RatingButton(
               label: okayLabel,
-              emoji: '🙂',
+              icon: Icons.sentiment_satisfied_alt_rounded,
               onTap: isSubmitting ? null : () => onRatingSelected(2),
             ),
             _RatingButton(
               label: badLabel,
-              emoji: '😕',
+              icon: Icons.sentiment_dissatisfied_rounded,
               onTap: isSubmitting ? null : () => onRatingSelected(1),
             ),
           ],
@@ -88,12 +88,12 @@ class _FeedbackSubmittedCard extends StatelessWidget {
 class _RatingButton extends StatelessWidget {
   const _RatingButton({
     required this.label,
-    required this.emoji,
+    required this.icon,
     required this.onTap,
   });
 
   final String label;
-  final String emoji;
+  final IconData icon;
   final VoidCallback? onTap;
 
   @override
@@ -101,7 +101,7 @@ class _RatingButton extends StatelessWidget {
     final colors = context.petMagicColors;
     return ActionChip(
       onPressed: onTap,
-      avatar: Text(emoji),
+      avatar: Icon(icon, size: 18, color: colors.accentInk),
       label: Text(label),
       side: BorderSide(color: colors.border.withValues(alpha: 0.8)),
       backgroundColor: colors.surfaceGlass,

@@ -4,13 +4,10 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
+import { AdminDetailsDrawer } from "@/components/admin/admin-details-drawer";
+import { MailIcon, RefreshIcon } from "@/components/admin/admin-icons";
 import { AdminPagination } from "@/components/admin/admin-pagination";
-import {
-  AdminMetricStrip,
-  AdminStateCard,
-  AdminStatusBadge,
-} from "@/components/admin/admin-primitives";
-import { AdminInspector, AdminQueueLayout } from "@/components/admin/admin-queue-layout";
+import { AdminStateCard, AdminStatusBadge } from "@/components/admin/admin-primitives";
 import { ConfirmationDialog } from "@/components/admin/confirmation-dialog";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
@@ -55,13 +52,18 @@ function normalizeStatus(value: string | undefined): BroadcastStatusFilter {
 }
 
 function isTerminalStatus(status: AdminEmailBroadcastStatus) {
-  return status === "completed" || status === "partially-failed" || status === "failed";
+  return (
+    status === "legacy" ||
+    status === "completed" ||
+    status === "partially-failed" ||
+    status === "failed"
+  );
 }
 
 function statusColor(status: AdminEmailBroadcastStatus) {
   if (status === "completed") return "var(--success)";
   if (status === "partially-failed" || status === "failed") return "var(--danger)";
-  if (status === "processing") return "var(--primary)";
+  if (status === "processing") return "var(--accent)";
   return "var(--warning)";
 }
 
@@ -75,7 +77,15 @@ function progressPercent(
   );
 }
 
-export function UsersEmailBroadcastsWorkspace({ locale }: { locale: Locale }) {
+export function UsersEmailBroadcastsWorkspace({
+  locale,
+  onCreate,
+  queuedCount,
+}: {
+  locale: Locale;
+  onCreate: () => void;
+  queuedCount: number | null;
+}) {
   const copy = getUsersEmailBroadcastsText(locale);
   const pathname = usePathname();
   const router = useRouter();
@@ -179,7 +189,8 @@ export function UsersEmailBroadcastsWorkspace({ locale }: { locale: Locale }) {
     const progress = progressPercent(detail);
     const retryableCount = Math.max(0, detail.retryableFailedCount);
     return (
-      <AdminInspector
+      <AdminDetailsDrawer
+        open={!retryConfirmationOpen}
         title={sanitizeSensitiveText(detail.subject, 120) || copy.subjectUnavailable}
         description={`${shortIdentifier(detail.broadcastId)} · ${statusLabel(detail.status)}`}
         closeLabel={copy.closeInspector}
@@ -254,22 +265,23 @@ export function UsersEmailBroadcastsWorkspace({ locale }: { locale: Locale }) {
             </div>
           ) : null}
         </dl>
-        <p className={styles.safeNote}>{copy.safeDataDescription}</p>
-      </AdminInspector>
+      </AdminDetailsDrawer>
     );
   }
 
   const inspector = selectedBroadcastId ? (
     detailQuery.isLoading ? (
-      <AdminInspector
+      <AdminDetailsDrawer
+        open={!retryConfirmationOpen}
         title={copy.inspectorLabel}
         closeLabel={copy.closeInspector}
         onClose={() => replaceUrl({ selected: null })}
       >
         <AdminStateCard className={styles.inspectorState} title={copy.loading} />
-      </AdminInspector>
+      </AdminDetailsDrawer>
     ) : detailQuery.isError || !detailQuery.data ? (
-      <AdminInspector
+      <AdminDetailsDrawer
+        open={!retryConfirmationOpen}
         title={copy.inspectorLabel}
         closeLabel={copy.closeInspector}
         onClose={() => replaceUrl({ selected: null })}
@@ -284,7 +296,7 @@ export function UsersEmailBroadcastsWorkspace({ locale }: { locale: Locale }) {
             </Button>
           }
         />
-      </AdminInspector>
+      </AdminDetailsDrawer>
     ) : (
       renderInspector(detailQuery.data)
     )
@@ -292,126 +304,234 @@ export function UsersEmailBroadcastsWorkspace({ locale }: { locale: Locale }) {
 
   return (
     <section className={styles.section} aria-labelledby="email-broadcasts-title">
-      <div className={styles.sectionHeader}>
-        <div>
-          <h2 id="email-broadcasts-title">{copy.title}</h2>
-          <p>{copy.description}</p>
-        </div>
-        <div className={styles.filter}>
-          <Select
-            value={status}
-            ariaLabel={copy.statusFilter}
-            showSelectedDescription={false}
-            options={[
-              { value: "all", label: copy.statusAll },
-              { value: "queued", label: copy.statusQueued },
-              { value: "processing", label: copy.statusProcessing },
-              { value: "completed", label: copy.statusCompleted },
-              { value: "partially-failed", label: copy.statusPartiallyFailed },
-              { value: "failed", label: copy.statusFailed },
-              { value: "legacy", label: copy.statusLegacy },
-            ]}
-            onChange={(nextStatus) =>
-              replaceUrl({
-                filters: {
-                  broadcastStatus: nextStatus === "all" ? null : nextStatus,
-                  broadcastPage: null,
-                },
-                selected: null,
-                tab: "broadcasts",
-              })
-            }
-          />
-        </div>
+      <nav className={styles.navigation} aria-label={copy.workspaceLabel}>
+        <span className={styles.activeTab} aria-current="page">
+          {copy.history}
+        </span>
+        <button type="button" className={styles.newTab} onClick={onCreate}>
+          {copy.newCampaign}
+        </button>
+        <Button variant="primary" onClick={onCreate}>
+          <span aria-hidden="true">+</span>
+          {copy.create}
+        </Button>
+      </nav>
+      {queuedCount !== null ? (
+        <p className={styles.safeNote} role="status">
+          {copy.queued(queuedCount)}
+        </p>
+      ) : null}
+      <div className={styles.metricsSection}>
+        <p className={styles.metricsCaption}>{copy.pageTotals}</p>
+        <dl className={styles.metrics}>
+          {[
+            [copy.campaigns, items.length],
+            [copy.recipients, totals.recipients],
+            [copy.sent, totals.sent],
+            [copy.failed, totals.failed],
+          ].map(([label, value]) => (
+            <div key={label} data-error={label === copy.failed && totals.failed > 0}>
+              <dt>{label}</dt>
+              <dd>
+                {broadcastsQuery.isLoading || broadcastsQuery.isError
+                  ? "—"
+                  : value.toLocaleString(locale)}
+              </dd>
+            </div>
+          ))}
+        </dl>
       </div>
-
-      <AdminQueueLayout
-        queueLabel={copy.queueLabel}
-        workspaceLabel={copy.workspaceLabel}
-        inspector={inspector}
-        queue={
-          <div className={styles.queue}>
-            {broadcastsQuery.isLoading ? (
-              <AdminStateCard className={styles.queueState} title={copy.loading} />
-            ) : broadcastsQuery.isError ? (
-              <AdminStateCard
-                className={styles.queueState}
-                tone="danger"
-                title={copy.loadFailed}
-                action={
-                  <Button size="sm" onClick={() => void broadcastsQuery.refetch()}>
-                    {copy.retryLoad}
-                  </Button>
-                }
-              />
-            ) : items.length === 0 ? (
-              <AdminStateCard className={styles.queueState} title={copy.empty} />
-            ) : (
-              <ul className={styles.queueList} aria-busy={broadcastsQuery.isFetching || undefined}>
-                {items.map((item) => (
-                  <li key={item.broadcastId}>
-                    <button
-                      type="button"
-                      className={styles.queueItem}
-                      data-selected={selectedBroadcastId === item.broadcastId ? "true" : "false"}
-                      aria-label={`${copy.openBroadcast}: ${sanitizeSensitiveText(item.subject, 120) || shortIdentifier(item.broadcastId)}`}
-                      aria-pressed={selectedBroadcastId === item.broadcastId}
-                      onClick={() => replaceUrl({ selected: item.broadcastId, tab: "broadcasts" })}
-                    >
-                      <span className={styles.queueItemHeader}>
-                        <span className={styles.queueItemTitle}>
-                          {sanitizeSensitiveText(item.subject, 120) || copy.subjectUnavailable}
-                        </span>
-                        <AdminStatusBadge color={statusColor(item.status)}>
-                          {statusLabel(item.status)}
-                        </AdminStatusBadge>
-                      </span>
-                      <span className={styles.queueItemMeta}>
-                        <span>{audienceLabel(item.audience)}</span>
-                        <span>{progressPercent(item)}%</span>
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <div className={styles.queueFooter}>
-              <AdminPagination
-                page={page}
-                totalPages={totalPages}
-                disabled={broadcastsQuery.isFetching}
-                labels={{
-                  navigation: copy.pagination,
-                  previous: copy.previous,
-                  next: copy.next,
-                  page: copy.page,
-                }}
-                onPageChange={(nextPage) =>
+      <div className={styles.historyPanel}>
+        <header className={styles.sectionHeader}>
+          <div>
+            <h2 id="email-broadcasts-title">{copy.title}</h2>
+            <p>{copy.description}</p>
+          </div>
+          <div className={styles.actions}>
+            <div className={styles.filter}>
+              <Select
+                value={status}
+                ariaLabel={copy.statusFilter}
+                showSelectedDescription={false}
+                options={[
+                  { value: "all", label: copy.statusAll },
+                  { value: "queued", label: copy.statusQueued },
+                  { value: "processing", label: copy.statusProcessing },
+                  { value: "completed", label: copy.statusCompleted },
+                  { value: "partially-failed", label: copy.statusPartiallyFailed },
+                  { value: "failed", label: copy.statusFailed },
+                  { value: "legacy", label: copy.statusLegacy },
+                ]}
+                onChange={(nextStatus) =>
                   replaceUrl({
-                    filters: { broadcastPage: nextPage > 1 ? String(nextPage) : null },
+                    filters: {
+                      broadcastStatus: nextStatus === "all" ? null : nextStatus,
+                      broadcastPage: null,
+                    },
                     selected: null,
-                    tab: "broadcasts",
+                    tab: null,
                   })
                 }
               />
             </div>
+            <Button
+              variant="ghost"
+              disabled={broadcastsQuery.isFetching || detailQuery.isFetching}
+              onClick={() => {
+                void broadcastsQuery.refetch();
+                if (selectedBroadcastId) void detailQuery.refetch();
+              }}
+            >
+              <RefreshIcon />
+              {copy.refresh}
+            </Button>
           </div>
-        }
-      >
-        <div className={styles.workspace}>
-          <h3>{copy.safeDataTitle}</h3>
-          <p>{copy.safeDataDescription}</p>
-          <AdminMetricStrip
-            className={styles.metrics}
-            items={[
-              { label: copy.recipients, value: totals.recipients.toLocaleString(locale) },
-              { label: copy.sent, value: totals.sent.toLocaleString(locale) },
-              { label: copy.failed, value: totals.failed.toLocaleString(locale) },
-            ]}
-          />
-          <p className={styles.safeNote}>{copy.selectionHint}</p>
+        </header>
+        <div className={styles.tableHeading} aria-hidden="true">
+          <span>{copy.campaign}</span>
+          <span>{copy.audience}</span>
+          <span>{copy.sending}</span>
+          <span>{copy.created}</span>
+          <span />
         </div>
-      </AdminQueueLayout>
+        {broadcastsQuery.isLoading ? (
+          <AdminStateCard className={styles.queueState} title={copy.loading} />
+        ) : broadcastsQuery.isError ? (
+          <AdminStateCard
+            className={styles.queueState}
+            tone="danger"
+            title={copy.loadFailed}
+            action={
+              <Button onClick={() => void broadcastsQuery.refetch()}>{copy.retryLoad}</Button>
+            }
+          />
+        ) : items.length === 0 ? (
+          <div className={styles.emptyState}>
+            <span className={styles.emptyIcon}>
+              <MailIcon />
+            </span>
+            <h3>{status === "all" && page === 1 ? copy.emptyTitle : copy.empty}</h3>
+            <p>
+              {status === "all" && page === 1
+                ? copy.emptyDescription
+                : copy.filteredEmptyDescription}
+            </p>
+            {status === "all" && page === 1 ? (
+              <Button variant="ghost" onClick={onCreate}>
+                {copy.create}
+                <span aria-hidden="true">→</span>
+              </Button>
+            ) : (
+              <Button
+                onClick={() =>
+                  replaceUrl({
+                    filters: { broadcastStatus: null, broadcastPage: null },
+                    selected: null,
+                  })
+                }
+              >
+                {copy.resetFilter}
+              </Button>
+            )}
+          </div>
+        ) : (
+          <ul
+            className={styles.queueList}
+            aria-label={copy.queueLabel}
+            aria-busy={broadcastsQuery.isFetching || undefined}
+          >
+            {items.map((item) => (
+              <li key={item.broadcastId}>
+                <button
+                  type="button"
+                  className={styles.queueItem}
+                  data-selected={selectedBroadcastId === item.broadcastId}
+                  aria-label={
+                    copy.openBroadcast +
+                    ": " +
+                    (sanitizeSensitiveText(item.subject, 120) || shortIdentifier(item.broadcastId))
+                  }
+                  aria-haspopup="dialog"
+                  onClick={() => replaceUrl({ selected: item.broadcastId, tab: null })}
+                >
+                  <span className={styles.campaignCell}>
+                    <span className={styles.rowIcon}>
+                      <MailIcon />
+                    </span>
+                    <span className={styles.campaignTitle}>
+                      <strong>
+                        {sanitizeSensitiveText(item.subject, 120) || copy.subjectUnavailable}
+                      </strong>
+                      <AdminStatusBadge color={statusColor(item.status)}>
+                        {statusLabel(item.status)}
+                      </AdminStatusBadge>
+                    </span>
+                  </span>
+                  <span className={styles.audienceCell}>
+                    <span>{audienceLabel(item.audience)}</span>
+                    <small>
+                      {copy.recipients}: {item.recipientCount.toLocaleString(locale)}
+                    </small>
+                  </span>
+                  <span className={styles.deliveryCell}>
+                    <span>
+                      {copy.sent}: <strong>{item.sentCount.toLocaleString(locale)}</strong>
+                    </span>
+                    <span className={styles.progress} aria-hidden="true">
+                      <span
+                        style={{
+                          width: progressPercent(item) + "%",
+                          background: statusColor(item.status),
+                        }}
+                      />
+                    </span>
+                    {item.failedCount > 0 ? (
+                      <small className={styles.failureCount}>
+                        {copy.failed}: {item.failedCount}
+                      </small>
+                    ) : (
+                      <small>{progressPercent(item)}%</small>
+                    )}
+                  </span>
+                  <span className={styles.dateCell}>
+                    {formatDateTime(item.createdAtUtc, locale)}
+                  </span>
+                  <span className={styles.rowArrow} aria-hidden="true">
+                    →
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {totalPages > 1 ? (
+          <div className={styles.queueFooter}>
+            <AdminPagination
+              page={page}
+              totalPages={totalPages}
+              disabled={broadcastsQuery.isFetching}
+              labels={{
+                navigation: copy.pagination,
+                previous: copy.previous,
+                next: copy.next,
+                page: copy.page,
+              }}
+              onPageChange={(nextPage) =>
+                replaceUrl({
+                  filters: { broadcastPage: nextPage > 1 ? String(nextPage) : null },
+                  selected: null,
+                  tab: null,
+                })
+              }
+            />
+          </div>
+        ) : null}
+      </div>
+      <p className={styles.selectionHint}>
+        <MailIcon />
+        {copy.selectionHint}
+      </p>
+      {inspector}
 
       <ConfirmationDialog
         open={retryConfirmationOpen && Boolean(detailQuery.data)}

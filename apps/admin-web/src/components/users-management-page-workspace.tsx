@@ -1,6 +1,5 @@
 "use client";
 
-import { UsersEmailBroadcastsWorkspace } from "@/components/users-email-broadcasts-workspace";
 import { UsersManagementSummaryGrid } from "@/components/users-management-page.chrome";
 import type { UsersManagementPageText } from "@/components/users-management-page.content";
 import type {
@@ -129,8 +128,6 @@ export function UsersManagementPageWorkspace({
         users={users}
         usersPageTotalCount={usersPageTotalCount}
       />
-
-      <UsersEmailBroadcastsWorkspace locale={locale} />
     </>
   );
 }

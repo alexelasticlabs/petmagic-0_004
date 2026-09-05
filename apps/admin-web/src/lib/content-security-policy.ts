@@ -121,7 +121,8 @@ export function buildNonceContentSecurityPolicy(
   nodeEnv = process.env.NODE_ENV,
   configuredMediaOrigins = process.env.ADMIN_MEDIA_ORIGINS,
   allowLocalApiBaseUrlInProduction = shouldAllowLocalApiBaseUrlInProduction(),
-  configuredTemplateR2PublicBaseUrl = process.env.TEMPLATES_R2_PUBLIC_BASE_URL
+  configuredTemplateR2PublicBaseUrl = process.env.TEMPLATES_R2_PUBLIC_BASE_URL,
+  configuredR2AccountId = process.env.TEMPLATES_R2_ACCOUNT_ID
 ): string {
   if (!/^[A-Za-z0-9+/=_-]+$/.test(nonce)) {
     throw new Error("CSP nonce contains unsupported characters.");
@@ -138,6 +139,14 @@ export function buildNonceContentSecurityPolicy(
     nodeEnv
   );
   const remoteOrigins = Array.from(new Set([...apiOrigins, ...mediaOrigins]));
+  // Private generation media uses path-style S3 signed URLs, not the public CDN.
+  const r2AccountId = configuredR2AccountId?.trim();
+  if (r2AccountId) {
+    if (!/^[a-f0-9]{32}$/i.test(r2AccountId)) {
+      throw new Error("TEMPLATES_R2_ACCOUNT_ID must be a 32-character hexadecimal account ID.");
+    }
+    remoteOrigins.push(`https://${r2AccountId}.r2.cloudflarestorage.com`);
+  }
   const connectSrc = ["'self'", ...remoteOrigins].join(" ");
   const imgSrc = ["'self'", "data:", "blob:", ...remoteOrigins].join(" ");
   const mediaSrc = ["'self'", "blob:", ...remoteOrigins].join(" ");

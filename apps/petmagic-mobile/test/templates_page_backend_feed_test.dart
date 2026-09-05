@@ -1194,6 +1194,7 @@ class _RemoteBackedTemplatesRepository implements TemplatesRepository {
     String templateId, {
     bool forceRefresh = false,
     String? analyticsSource,
+    int? minimumVersion,
   }) async {
     return (await _dataSource.fetchTemplate(templateId)).toDomain();
   }

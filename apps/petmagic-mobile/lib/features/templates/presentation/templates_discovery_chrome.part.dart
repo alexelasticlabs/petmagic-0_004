@@ -2,18 +2,23 @@ part of 'templates_discovery_page.dart';
 
 class _DiscoverySearchHeaderDelegate extends SliverPersistentHeaderDelegate {
   const _DiscoverySearchHeaderDelegate({
-    required this.label,
-    required this.onPressed,
+    required this.catalogLabel,
+    required this.randomLabel,
+    required this.onCatalogPressed,
+    required this.onRandomPressed,
+    required this.actionHeight,
   });
 
-  final String label;
-  final VoidCallback onPressed;
+  final String catalogLabel;
+  final String randomLabel;
+  final VoidCallback onCatalogPressed;
+  final VoidCallback? onRandomPressed;
+  final double actionHeight;
 
   @override
-  double get minExtent => 62;
-
+  double get minExtent => actionHeight + 12;
   @override
-  double get maxExtent => 62;
+  double get maxExtent => minExtent;
 
   @override
   Widget build(
@@ -22,81 +27,130 @@ class _DiscoverySearchHeaderDelegate extends SliverPersistentHeaderDelegate {
     bool overlapsContent,
   ) {
     final colors = context.petMagicColors;
-    return SizedBox.expand(
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: Color.alphaBlend(
-            colors.backgroundTop.withValues(alpha: 0.94),
-            colors.backgroundBottom,
+    return AnimatedContainer(
+      key: const ValueKey('discovery-toolbar-surface'),
+      duration: discoveryMotionDuration(context, PetMagicMotion.fast),
+      foregroundDecoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(
+            color: overlapsContent
+                ? colors.border.withValues(alpha: 0.65)
+                : Colors.transparent,
           ),
-          boxShadow: overlapsContent
-              ? [
-                  BoxShadow(
-                    color: colors.shadow.withValues(alpha: 0.12),
-                    blurRadius: 12,
-                    offset: const Offset(0, 5),
-                  ),
-                ]
-              : null,
         ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(
-            PetMagicSpacing.sm,
-            7,
-            PetMagicSpacing.sm,
-            7,
-          ),
-          child: Semantics(
-            container: true,
-            button: true,
-            label: label,
-            onTap: onPressed,
-            child: ExcludeSemantics(
-              child: PetMagicInteractiveSurface(
-                key: const ValueKey('discovery-search-launcher'),
-                onTap: onPressed,
-                borderRadius: BorderRadius.circular(PetMagicRadii.pill),
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: colors.surfaceGlass,
-                    borderRadius: BorderRadius.circular(PetMagicRadii.pill),
-                    border: Border.all(color: colors.border),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 17),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.search_rounded,
-                          color: colors.textSoft,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 9),
-                        Expanded(
-                          child: Text(
-                            label,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(
-                                  color: colors.textSoft,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                ),
+      ),
+      decoration: BoxDecoration(
+        color: overlapsContent ? colors.backgroundTop : Colors.transparent,
+        boxShadow: overlapsContent
+            ? [
+                BoxShadow(
+                  color: colors.shadow.withValues(alpha: 0.055),
+                  blurRadius: 14,
+                  offset: const Offset(0, 4),
+                ),
+              ]
+            : const [],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: PetMagicSpacing.sm,
+          vertical: 6,
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: Semantics(
+                button: true,
+                label: catalogLabel,
+                onTap: onCatalogPressed,
+                child: ExcludeSemantics(
+                  child: PetMagicInteractiveSurface(
+                    key: const ValueKey('discovery-catalog-launcher'),
+                    onTap: onCatalogPressed,
+                    borderRadius: BorderRadius.circular(18),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: colors.surfaceGlass,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: colors.border),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.grid_view_rounded,
+                            size: 19,
+                            color: colors.accentInk,
                           ),
-                        ),
-                        Icon(
-                          Icons.arrow_forward_rounded,
-                          color: colors.accent,
-                          size: 18,
-                        ),
-                      ],
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              catalogLabel,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.labelLarge
+                                  ?.copyWith(
+                                    color: colors.textStrong,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 13,
+                                  ),
+                            ),
+                          ),
+                          Icon(
+                            Icons.chevron_right_rounded,
+                            size: 19,
+                            color: colors.textMuted,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
-          ),
+            const SizedBox(width: 8),
+            Tooltip(
+              message: randomLabel,
+              excludeFromSemantics: true,
+              child: Semantics(
+                button: true,
+                enabled: onRandomPressed != null,
+                label: randomLabel,
+                onTap: onRandomPressed,
+                child: ExcludeSemantics(
+                  child: PetMagicInteractiveSurface(
+                    key: const ValueKey('discovery-random-launcher'),
+                    onTap: onRandomPressed,
+                    enabled: onRandomPressed != null,
+                    borderRadius: BorderRadius.circular(18),
+                    child: Container(
+                      width: 52,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(18),
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            colors.accent.withValues(alpha: 0.24),
+                            colors.accent.withValues(alpha: 0.08),
+                          ],
+                        ),
+                        border: Border.all(
+                          color: colors.accent.withValues(alpha: 0.4),
+                        ),
+                      ),
+                      child: Icon(
+                        Icons.shuffle_rounded,
+                        color: colors.accentInk,
+                        size: 24,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -104,7 +158,11 @@ class _DiscoverySearchHeaderDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   bool shouldRebuild(covariant _DiscoverySearchHeaderDelegate oldDelegate) =>
-      oldDelegate.label != label || oldDelegate.onPressed != onPressed;
+      oldDelegate.catalogLabel != catalogLabel ||
+      oldDelegate.randomLabel != randomLabel ||
+      oldDelegate.actionHeight != actionHeight ||
+      oldDelegate.onCatalogPressed != onCatalogPressed ||
+      oldDelegate.onRandomPressed != onRandomPressed;
 }
 
 class _DiscoveryStateView extends StatelessWidget {

@@ -4,8 +4,6 @@ import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/pets/application/pets_contract.dart';
 import 'package:petmagic_mobile/shared/files/persistent_media_url.dart';
 
-const int _petShortcutAvatarCacheWidth = 64;
-
 class PetShortcutAvatar extends StatelessWidget {
   const PetShortcutAvatar({
     super.key,
@@ -23,6 +21,9 @@ class PetShortcutAvatar extends StatelessWidget {
     final colors = context.petMagicColors;
     final iconData = icon ?? Icons.pets_rounded;
     final url = normalizePetMediaUrl(avatarUrl);
+    final cacheWidth = (size * MediaQuery.devicePixelRatioOf(context))
+        .ceil()
+        .clamp(64, 192);
 
     if (url != null && url.isNotEmpty) {
       return ClipOval(
@@ -32,9 +33,11 @@ class PetShortcutAvatar extends StatelessWidget {
           width: size,
           height: size,
           fit: BoxFit.cover,
-          memCacheWidth: _petShortcutAvatarCacheWidth,
-          maxWidthDiskCache: _petShortcutAvatarCacheWidth,
+          memCacheWidth: cacheWidth,
+          maxWidthDiskCache: cacheWidth,
           filterQuality: FilterQuality.medium,
+          placeholder: (_, _) =>
+              _PetShortcutIcon(iconData: iconData, size: size),
           errorWidget: (_, _, _) =>
               _PetShortcutIcon(iconData: iconData, size: size),
         ),
@@ -43,7 +46,7 @@ class PetShortcutAvatar extends StatelessWidget {
 
     return _PetShortcutIcon(
       iconData: iconData,
-      color: colors.accent,
+      color: colors.accentInk,
       size: size,
     );
   }

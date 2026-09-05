@@ -68,6 +68,52 @@ void main() {
   });
 
   group('TemplatePreviewPage', () {
+    testWidgets(
+      'warms both neighbours and defers quality changes during a swipe',
+      (tester) async {
+        final fixtures = _previewFixtures();
+        await _pumpPreviewHost(
+          tester,
+          session: TemplatePreviewSession(
+            items: fixtures.feed,
+            initialIndex: 1,
+          ),
+          repository: _TrackingTemplatesRepository(
+            feedItems: fixtures.feed,
+            details: fixtures.details,
+          ),
+        );
+        List<TemplateMediaFrame> frames() => tester
+            .widgetList<TemplateMediaFrame>(
+              find.byType(TemplateMediaFrame, skipOffstage: false),
+            )
+            .toList();
+        expect(frames(), hasLength(3));
+        expect(frames().every((frame) => frame.prepareOffscreen), isTrue);
+        final registry = frames().first.playbackRegistry;
+        expect(registry, isNotNull);
+        expect(
+          frames().every((frame) => frame.playbackRegistry == registry),
+          isTrue,
+        );
+        expect(frames().every((frame) => frame.playWhenActive), isTrue);
+
+        final gesture = await tester.startGesture(const Offset(300, 300));
+        await gesture.moveBy(const Offset(-80, 0));
+        await tester.pump();
+        expect(frames().every((frame) => !frame.allowDetailUpgrade), isTrue);
+        expect(frames().every((frame) => frame.prepareOffscreen), isTrue);
+        await gesture.cancel();
+        await tester.pumpAndSettle();
+        expect(frames().every((frame) => frame.allowDetailUpgrade), isTrue);
+        expect(
+          frames().every((frame) => frame.playbackRegistry == registry),
+          isTrue,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
     testWidgets('opens on the requested session index', (tester) async {
       final fixtures = _previewFixtures();
       final repository = _TrackingTemplatesRepository(
@@ -90,9 +136,29 @@ void main() {
         findsOneWidget,
       );
       expect(repository.fetchTemplateIds, ['second']);
-      expect(repository.forceRefreshValues, [isTrue]);
+      expect(repository.forceRefreshValues, [isFalse]);
       expect(repository.analyticsSources, ['catalog']);
     });
+
+    testWidgets(
+      'requires detail at least as new as the selected feed version',
+      (tester) async {
+        final feed = _template('updated', title: 'Updated', version: 3);
+        final cached = _template('updated', title: 'Cached', version: 2);
+        final repository = _TrackingTemplatesRepository(
+          feedItems: [feed],
+          details: {'updated': cached},
+        );
+        await _pumpPreviewHost(
+          tester,
+          session: TemplatePreviewSession.single(feed),
+          repository: repository,
+        );
+        expect(repository.minimumVersions, [3]);
+        expect(repository.forceRefreshValues, [false]);
+        expect(repository.analyticsSources, ['catalog']);
+      },
+    );
 
     testWidgets('attributes a featured detail view once', (tester) async {
       final featured = _template('featured', title: 'Featured');
@@ -282,38 +348,48 @@ void main() {
       expect(repository.fetchCalls, 2);
     });
 
-    testWidgets('details loading is visible while back remains available', (
-      tester,
-    ) async {
-      final template = _template('slow-details', title: 'Slow details');
-      final repository = _DelayedTemplatesRepository(feedItem: template);
-      await _pumpPreviewHost(
-        tester,
-        session: TemplatePreviewSession.single(template),
-        repository: repository,
-      );
+    testWidgets(
+      'shows description inline and distinguishes result from waiting',
+      (tester) async {
+        final feed = _template(
+          'video-info',
+          title: 'Dance',
+          templateType: TemplateType.video,
+        );
+        final repository = _DelayedTemplatesRepository(feedItem: feed);
+        await _pumpPreviewHost(
+          tester,
+          session: TemplatePreviewSession.single(feed),
+          repository: repository,
+          locale: const Locale('ru'),
+        );
+        expect(find.text('Dance description'), findsOneWidget);
+        expect(find.text('Видео · длительность не указана'), findsOneWidget);
+        expect(find.text('Создание обычно занимает 2-4 мин'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('template-preview-details')),
+          findsNothing,
+        );
+        repository.detail.complete(
+          _template(
+            'video-info',
+            title: 'Dance',
+            templateType: TemplateType.video,
+            referenceVideoDurationSeconds: 5,
+            description: 'Ваш питомец повторит движения из ролика.',
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('Результат: видео ≈ 5 с'), findsOneWidget);
+        expect(
+          find.text('Ваш питомец повторит движения из ролика.'),
+          findsOneWidget,
+        );
+        expect(find.byType(TemplateDetailContent), findsNothing);
+      },
+    );
 
-      await tester.tap(find.byKey(const ValueKey('template-preview-details')));
-      await tester.pump();
-
-      expect(
-        find.byKey(const ValueKey('template-preview-icon-loading')),
-        findsOneWidget,
-      );
-      final backButton = tester.widget<IconButton>(
-        find.descendant(
-          of: find.byKey(const ValueKey('template-preview-back')),
-          matching: find.byType(IconButton),
-        ),
-      );
-      expect(backButton.onPressed, isNotNull);
-
-      repository.detail.complete(template);
-      await tester.pumpAndSettle();
-      expect(find.byType(TemplateDetailContent), findsOneWidget);
-    });
-
-    testWidgets('back during detail loading never opens a late sheet', (
+    testWidgets('back during detail hydration never opens a late sheet', (
       tester,
     ) async {
       final template = _template('closing-details', title: 'Closing details');
@@ -329,13 +405,9 @@ void main() {
           routeResult = result;
         },
       );
-
-      await tester.tap(find.byKey(const ValueKey('template-preview-details')));
-      await tester.pump();
       await tester.tap(find.byKey(const ValueKey('template-preview-back')));
       repository.detail.complete(template);
       await tester.pumpAndSettle();
-
       expect(find.byType(TemplatePreviewPage), findsNothing);
       expect(find.byType(TemplateDetailContent), findsNothing);
       expect(resultCallbacks, 1);
@@ -623,13 +695,10 @@ void main() {
 
       await tester.tap(find.byKey(const ValueKey('template-preview-cta')));
       await tester.pump();
-      final detailsButton = tester.widget<IconButton>(
-        find.descendant(
-          of: find.byKey(const ValueKey('template-preview-details')),
-          matching: find.byType(IconButton),
-        ),
+      expect(
+        find.byKey(const ValueKey('template-preview-details')),
+        findsNothing,
       );
-      expect(detailsButton.onPressed, isNull);
 
       repository.detail.complete(resolved);
       await tester.pumpAndSettle();
@@ -679,13 +748,14 @@ void main() {
       expect(repository.analyticsSources, ['catalog']);
     });
 
-    testWidgets('closes premium details before opening premium route', (
+    testWidgets('expanded description keeps premium CTA in the same viewer', (
       tester,
     ) async {
       final premium = _template(
         'premium-details',
         title: 'Premium details',
         isPremium: true,
+        description: List.filled(10, 'Your pet in a magical scene.').join(' '),
       );
       final repository = _TrackingTemplatesRepository(
         feedItems: [premium],
@@ -700,26 +770,238 @@ void main() {
         isAuthenticated: true,
         appNavigator: navigator,
       );
-
-      await tester.tap(find.byKey(const ValueKey('template-preview-details')));
-      await tester.pumpAndSettle();
-      expect(find.byType(TemplateDetailContent), findsOneWidget);
-      final text = AppLocalizations.of(
-        tester.element(find.byType(TemplateDetailContent)),
+      await tester.tap(
+        find.byKey(const ValueKey('template-preview-description-toggle')),
       );
-
-      final unlockAction = find.descendant(
-        of: find.byType(TemplateDetailContent),
-        matching: find.text(text.templateUnlockPremiumAction),
-      );
-      await tester.ensureVisible(unlockAction);
       await tester.pumpAndSettle();
-      await tester.tap(unlockAction);
-      await tester.pumpAndSettle();
-
+      expect(find.byTooltip('Show less'), findsOneWidget);
       expect(find.byType(TemplateDetailContent), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('template-preview-cta')));
+      await tester.pumpAndSettle();
       expect(navigator.pushes.whereType<PremiumDestination>(), hasLength(1));
     });
+
+    testWidgets('description expansion resets on swipe and keeps CTA visible', (
+      tester,
+    ) async {
+      final items = [
+        _template(
+          'long-first',
+          title: 'First',
+          description: List.filled(
+            18,
+            'A detailed story about your pet.',
+          ).join(' '),
+        ),
+        _template(
+          'long-second',
+          title: 'Second',
+          description: List.filled(12, 'A different magical story.').join(' '),
+        ),
+      ];
+      final repository = _TrackingTemplatesRepository(
+        feedItems: items,
+        details: {for (final item in items) item.templateId: item},
+      );
+      await _pumpPreviewHost(
+        tester,
+        session: TemplatePreviewSession(items: items, initialIndex: 0),
+        repository: repository,
+        viewSize: const Size(320, 568),
+        textScale: 2,
+      );
+      final toggle = find.byKey(
+        const ValueKey('template-preview-description-toggle'),
+      );
+      await tester.ensureVisible(toggle);
+      await tester.tap(toggle);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      final cta = find.byKey(const ValueKey('template-preview-cta'));
+      expect(cta.hitTestable(), findsOneWidget);
+      // Swipe on the visible description, away from the independently scrollable rail.
+      final visibleDescription = tester
+          .getRect(find.text(items.first.shortDescription))
+          .intersect(
+            tester.getRect(
+              find.byKey(const ValueKey('template-preview-information')),
+            ),
+          );
+      await tester.flingFrom(
+        Offset(visibleDescription.right - 24, visibleDescription.center.dy),
+        const Offset(-250, 0),
+        1000,
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('template-preview-summary:long-second')),
+        findsOneWidget,
+      );
+      expect(find.byTooltip('Show less'), findsNothing);
+      expect(cta.hitTestable(), findsOneWidget);
+    });
+
+    testWidgets(
+      'panel anchors do not move across premium, video and long text',
+      (tester) async {
+        final items = [
+          _template(
+            'premium-layout',
+            title: 'A much longer title that takes two lines',
+            isPremium: true,
+            description: List.filled(15, 'A story about your pet.').join(' '),
+          ),
+          _template(
+            'video-layout',
+            title: 'Dance',
+            templateType: TemplateType.video,
+            description: 'Dance with me.',
+            referenceVideoDurationSeconds: 5,
+          ),
+          _template('image-layout', title: 'Boss', description: ''),
+        ];
+        await _pumpPreviewHost(
+          tester,
+          session: TemplatePreviewSession(items: items, initialIndex: 0),
+          repository: _TrackingTemplatesRepository(
+            feedItems: items,
+            details: {for (final item in items) item.templateId: item},
+          ),
+          hasPremiumAccess: false,
+        );
+        final rail = find.byKey(
+          const ValueKey('template-preview-thumbnail-rail'),
+        );
+        final cta = find.byKey(const ValueKey('template-preview-cta'));
+        final info = find.byKey(const ValueKey('template-preview-information'));
+        final railRect = tester.getRect(rail);
+        final ctaRect = tester.getRect(cta);
+        final infoRect = tester.getRect(info);
+        await tester.tap(
+          find.byKey(const ValueKey('template-preview-description-toggle')),
+        );
+        await tester.pumpAndSettle();
+        expect(tester.getRect(rail), railRect);
+        expect(tester.getRect(cta), ctaRect);
+        expect(tester.widget<FilledButton>(cta).onPressed, isNotNull);
+        for (final id in ['video-layout', 'image-layout', 'premium-layout']) {
+          await tester.tap(
+            find.byKey(ValueKey('template-preview-thumbnail:$id')),
+          );
+          await tester.pump(const Duration(milliseconds: 100));
+          expect(tester.getRect(rail), railRect);
+          expect(tester.getRect(cta), ctaRect);
+          await tester.pumpAndSettle();
+          expect(tester.getRect(info), infoRect);
+          expect(tester.getRect(rail), railRect);
+          expect(tester.widget<FilledButton>(cta).onPressed, isNotNull);
+          expect(tester.takeException(), isNull);
+        }
+      },
+    );
+
+    testWidgets(
+      'description tap and cancelled drag never strand action or swipes',
+      (tester) async {
+        final fixtures = _previewFixtures();
+        await _pumpPreviewHost(
+          tester,
+          session: TemplatePreviewSession(
+            items: fixtures.feed,
+            initialIndex: 0,
+          ),
+          repository: _TrackingTemplatesRepository(
+            feedItems: fixtures.feed,
+            details: fixtures.details,
+          ),
+        );
+        final info = find.byKey(const ValueKey('template-preview-information'));
+        final cta = find.byKey(const ValueKey('template-preview-cta'));
+        await tester.tap(
+          find.text(fixtures.details['first']!.shortDescription),
+        );
+        await tester.pumpAndSettle();
+        expect(tester.widget<FilledButton>(cta).onPressed, isNotNull);
+        final gesture = await tester.startGesture(tester.getCenter(info));
+        await gesture.moveBy(const Offset(-30, 0));
+        await tester.pump();
+        await gesture.cancel();
+        await tester.pumpAndSettle();
+        expect(tester.widget<FilledButton>(cta).onPressed, isNotNull);
+        await tester.drag(info, const Offset(0, -40));
+        await tester.pumpAndSettle();
+        expect(tester.widget<FilledButton>(cta).onPressed, isNotNull);
+        for (final id in ['second', 'third']) {
+          await tester.fling(info, const Offset(-260, 0), 900);
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(ValueKey('template-preview-summary:$id')),
+            findsOneWidget,
+          );
+          expect(tester.widget<FilledButton>(cta).onPressed, isNotNull);
+        }
+      },
+    );
+
+    testWidgets(
+      'accessibility navigation does not disable autoplay or motion; mute follows selection',
+      (tester) async {
+        final fixtures = _previewFixtures();
+        await _pumpPreviewHost(
+          tester,
+          session: TemplatePreviewSession(
+            items: fixtures.feed,
+            initialIndex: 0,
+          ),
+          repository: _TrackingTemplatesRepository(
+            feedItems: fixtures.feed,
+            details: fixtures.details,
+          ),
+          accessibleNavigation: true,
+        );
+        final frame = tester.widget<TemplateMediaFrame>(
+          find.byType(TemplateMediaFrame).first,
+        );
+        expect(frame.autoplay, isTrue);
+        expect(frame.muted, isFalse);
+        expect(
+          tester
+              .widget<AnimatedSwitcher>(
+                find.byKey(const ValueKey('template-preview-summary-switcher')),
+              )
+              .duration,
+          isNot(Duration.zero),
+        );
+        frame.onMutedChanged!(true);
+        await tester.pump();
+        await tester.tap(
+          find.byKey(const ValueKey('template-preview-thumbnail:second')),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 120));
+        final page = tester
+            .widget<PageView>(find.byType(PageView))
+            .controller!
+            .page!;
+        expect(page, greaterThan(0));
+        expect(page, lessThan(1));
+        await tester.pumpAndSettle();
+        expect(
+          tester
+              .widgetList<TemplateMediaFrame>(find.byType(TemplateMediaFrame))
+              .every((frame) => frame.muted),
+          isTrue,
+        );
+        final infoRect = tester.getRect(
+          find.byKey(const ValueKey('template-preview-information')),
+        );
+        expect(infoRect.height, lessThanOrEqualTo(180));
+        final railRect = tester.getRect(
+          find.byKey(const ValueKey('template-preview-thumbnail-rail')),
+        );
+        expect(railRect.top, greaterThan(600));
+      },
+    );
 
     testWidgets(
       'reduced motion commits thumbnail selection without animation',
@@ -743,6 +1025,12 @@ void main() {
           find.byKey(const ValueKey('template-preview-summary-switcher')),
         );
         expect(switcher.duration, Duration.zero);
+        expect(
+          tester
+              .widget<TemplateMediaFrame>(find.byType(TemplateMediaFrame).first)
+              .autoplay,
+          isTrue,
+        );
 
         await tester.tap(
           find.byKey(const ValueKey('template-preview-thumbnail:third')),
@@ -764,6 +1052,7 @@ Future<void> _pumpPreviewHost(
   required TemplatesRepository repository,
   ValueChanged<Object?>? onResult,
   bool disableAnimations = false,
+  bool accessibleNavigation = false,
   Size viewSize = const Size(430, 932),
   double textScale = 1,
   Locale locale = const Locale('en'),
@@ -792,6 +1081,7 @@ Future<void> _pumpPreviewHost(
           return MediaQuery(
             data: mediaQuery.copyWith(
               disableAnimations: disableAnimations,
+              accessibleNavigation: accessibleNavigation,
               textScaler: TextScaler.linear(textScale),
             ),
             child: AppNavigationScope(
@@ -870,21 +1160,25 @@ class _TrackingTemplatesRepository extends FakeTemplatesRepository {
   final List<String> fetchTemplateIds = [];
   final List<bool> forceRefreshValues = [];
   final List<String?> analyticsSources = [];
+  final List<int?> minimumVersions = [];
 
   @override
   Future<TemplateItem> fetchTemplate(
     String templateId, {
     bool forceRefresh = false,
     String? analyticsSource,
+    int? minimumVersion,
   }) async {
     fetchTemplateIds.add(templateId);
     forceRefreshValues.add(forceRefresh);
     analyticsSources.add(analyticsSource);
+    minimumVersions.add(minimumVersion);
     return details[templateId] ??
         super.fetchTemplate(
           templateId,
           forceRefresh: forceRefresh,
           analyticsSource: analyticsSource,
+          minimumVersion: minimumVersion,
         );
   }
 }
@@ -930,12 +1224,15 @@ TemplateItem _template(
   bool isPremium = false,
   String? detailPreviewUrl,
   String? mediaKind,
+  String? description,
+  double? referenceVideoDurationSeconds,
 }) {
   return TemplateItem(
     templateId: id,
     templateType: templateType,
     title: title,
-    shortDescription: '$title description',
+    shortDescription: description ?? '$title description',
+    referenceVideoDurationSeconds: referenceVideoDurationSeconds,
     petPhotoRequirements: const ['Clear face'],
     category: 'Magic',
     tags: const ['test'],
@@ -959,6 +1256,7 @@ class _DelayedTemplatesRepository extends FakeTemplatesRepository {
     String templateId, {
     bool forceRefresh = false,
     String? analyticsSource,
+    int? minimumVersion,
   }) {
     analyticsSources.add(analyticsSource);
     return detail.future;
@@ -975,6 +1273,7 @@ class _FailingTemplatesRepository extends FakeTemplatesRepository {
     String templateId, {
     bool forceRefresh = false,
     String? analyticsSource,
+    int? minimumVersion,
   }) async {
     fetchCalls++;
     throw StateError('detail unavailable');

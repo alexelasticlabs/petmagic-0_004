@@ -167,6 +167,74 @@ class TemplateItem {
 
   bool get isVideo => templateType == TemplateType.video;
 
+  /// Detail responses may omit the feed derivatives for the same media version.
+  TemplateItem withFeedMediaFrom(TemplateItem previous) {
+    final effectiveVersion = mediaVersion ?? version;
+    if (templateId != previous.templateId ||
+        effectiveVersion <= 0 ||
+        effectiveVersion != (previous.mediaVersion ?? previous.version)) {
+      return this;
+    }
+
+    String? restoreMissingUrl(String? detailUrl, String? feedUrl) =>
+        detailUrl?.trim().isNotEmpty == true
+        ? detailUrl
+        : feedUrl?.trim().isNotEmpty == true
+        ? feedUrl
+        : detailUrl;
+
+    final thumbnail = restoreMissingUrl(thumbnailUrl, previous.thumbnailUrl);
+    final animated = restoreMissingUrl(
+      animatedPreviewUrl,
+      previous.animatedPreviewUrl,
+    );
+    final low = restoreMissingUrl(feedLoopLowUrl, previous.feedLoopLowUrl);
+    final medium = restoreMissingUrl(
+      feedLoopMediumUrl,
+      previous.feedLoopMediumUrl,
+    );
+    final inheritedMediaVersion = mediaVersion ?? previous.mediaVersion;
+    if (thumbnail == thumbnailUrl &&
+        animated == animatedPreviewUrl &&
+        low == feedLoopLowUrl &&
+        medium == feedLoopMediumUrl &&
+        inheritedMediaVersion == mediaVersion) {
+      return this;
+    }
+
+    return TemplateItem(
+      templateId: templateId,
+      templateType: templateType,
+      title: title,
+      shortDescription: shortDescription,
+      petPhotoRequirements: petPhotoRequirements,
+      category: category,
+      tags: tags,
+      isPremium: isPremium,
+      tokenCost: tokenCost,
+      effectivePromoBadge: effectivePromoBadge,
+      thumbnailUrl: thumbnail,
+      animatedPreviewUrl: animated,
+      feedLoopLowUrl: low,
+      feedLoopMediumUrl: medium,
+      detailPreviewUrl: detailPreviewUrl,
+      mediaKind: mediaKind,
+      durationMs: durationMs,
+      sizeBytes: sizeBytes,
+      mediaVersion: inheritedMediaVersion,
+      previewAsset: previewAsset,
+      musicDescription: musicDescription,
+      referenceVideoDurationSeconds: referenceVideoDurationSeconds,
+      supportsGenerationResultInput: supportsGenerationResultInput,
+      requiredInputMediaType: requiredInputMediaType,
+      recommendedAfterImageGeneration: recommendedAfterImageGeneration,
+      supportsGenerateSimilar: supportsGenerateSimilar,
+      defaultVariationStrength: defaultVariationStrength,
+      version: version,
+      updatedAtUtc: updatedAtUtc,
+    );
+  }
+
   bool get detailPreviewIsVideo {
     final detailUrl = detailPreviewUrl?.trim() ?? '';
     if (detailUrl.isEmpty) {

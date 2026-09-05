@@ -17,6 +17,7 @@ describe("admin-rbac", () => {
     "/audit",
     "/dashboard",
     "/economy",
+    "/email-broadcasts",
     "/feedback",
     "/gamification",
     "/generations",
@@ -31,6 +32,7 @@ describe("admin-rbac", () => {
     "/templates/analytics",
     "/templates/categories",
     "/templates/daily-featured",
+    "/templates/discovery",
     "/templates/image",
     "/templates/image/analytics/template-1",
     "/templates/image/editor",
@@ -62,6 +64,7 @@ describe("admin-rbac", () => {
     expect(canAccessAdminSection(["Moderator"], "audit")).toBe(false);
     expect(canAccessAdminPath(["Moderator"], "/support/abc")).toBe(true);
     expect(canAccessAdminPath(["Moderator"], "/feedback")).toBe(true);
+    expect(canAccessAdminPath(["Moderator"], "/email-broadcasts")).toBe(false);
     expect(canAccessAdminPath(["Moderator"], "/moderation")).toBe(true);
     expect(canAccessAdminPath(["Moderator"], "/templates/video")).toBe(true);
     expect(canAccessAdminPath(["Moderator"], "/templates/daily-featured")).toBe(false);

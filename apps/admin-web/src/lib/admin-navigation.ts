@@ -11,6 +11,7 @@ export type AdminSectionKey =
   | "moderation"
   | "audit"
   | "users"
+  | "email-broadcasts"
   | "generations"
   | "feedback"
   | "role-management"
@@ -19,6 +20,7 @@ export type AdminSectionKey =
   | "video-templates"
   | "template-analytics"
   | "template-categories"
+  | "template-discovery"
   | "template-daily-featured";
 
 export type AdminNavLink = {
@@ -93,6 +95,12 @@ export function getAdminNavItems(
     { type: "link", key: "users", href: `/${locale}/users`, label: text.navUsers },
     {
       type: "link",
+      key: "email-broadcasts",
+      href: `/${locale}/email-broadcasts`,
+      label: text.navEmailBroadcasts,
+    },
+    {
+      type: "link",
       key: "generations",
       href: `/${locale}/generations`,
       label: text.navGenerations,
@@ -115,6 +123,12 @@ export function getAdminNavItems(
       href: `/${locale}/templates`,
       label: text.navTemplates,
       items: [
+        {
+          type: "link",
+          key: "template-discovery",
+          href: `/${locale}/templates/discovery`,
+          label: text.navTemplateDiscovery,
+        },
         {
           type: "link",
           key: "video-templates",
@@ -238,6 +252,10 @@ export function getAdminPageMeta(
     return copy.users;
   }
 
+  if (matchesAdminPath(currentPath, "/email-broadcasts")) {
+    return copy.emailBroadcasts;
+  }
+
   if (matchesAdminPath(currentPath, "/generations")) {
     return copy.generations;
   }
@@ -282,6 +300,10 @@ export function getAdminPageMeta(
 
   if (matchesAdminPath(currentPath, "/templates/categories")) {
     return copy.templateCategories;
+  }
+
+  if (matchesAdminPath(currentPath, "/templates/discovery")) {
+    return copy.templateDiscovery;
   }
 
   if (matchesAdminPath(currentPath, "/templates/daily-featured")) {

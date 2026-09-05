@@ -10,7 +10,6 @@ import {
   adminTableStyles,
 } from "@/components/admin/admin-primitives";
 import styles from "@/components/generations-page.module.css";
-import { TemplateSecureMedia } from "@/components/templates/template-secure-media";
 import { getAdminErrorMessage } from "@/lib/admin-error-message";
 import { adminQueryKeys } from "@/lib/admin-query-keys";
 import {
@@ -24,6 +23,7 @@ import { type Locale } from "@/lib/i18n";
 import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 import { getGenerationsPageIntlLocale, type GenerationsPageText } from "./generations-page.content";
+import { GenerationMedia, generationMediaKind } from "./generations-page.media";
 
 export type StatusFilter = AdminGenerationStatus | "All";
 
@@ -289,8 +289,11 @@ export function GenerationRow({
       : item.watermarkedMediaPath
         ? text.watermarkApplied
         : text.watermarkPending;
-  const compareState = item.canCompareBeforeAfter ? text.compareReady : text.compareUnavailable;
-  const hasPreviewMedia = Boolean(item.inputPreviewUrl || item.resultPreviewUrl);
+  const resultUrl = item.resultMediaUrl || item.resultPreviewUrl;
+  const compareState =
+    item.inputPreviewUrl && resultUrl ? text.compareReady : text.compareUnavailable;
+  const hasPreviewMedia = Boolean(item.inputPreviewUrl || resultUrl);
+  const [mediaRevision, setMediaRevision] = useState(0);
   const feedbackQuery = useQuery({
     queryKey: adminQueryKeys.feedback({ generationId: item.generationId, take: 5 }),
     queryFn: ({ signal }) =>
@@ -309,7 +312,7 @@ export function GenerationRow({
 
   return (
     <>
-      <tr className={styles.generationRow}>
+      <tr className={styles.generationRow} data-expanded={isExpanded || undefined}>
         <td className={adminTableStyles.mono} data-label={text.job}>
           <TechnicalId value={item.generationId} text={text} />
           <div>
@@ -322,7 +325,7 @@ export function GenerationRow({
               aria-label={toggleDetailsLabel}
               title={toggleDetailsLabel}
             >
-              {isExpanded ? text.hideDetails : text.showDetails}
+              {isExpanded ? text.hideDetails : `${text.before} / ${text.after}`}
             </button>
             {item.canCancel ? (
               <button
@@ -406,13 +409,10 @@ export function GenerationRow({
           {modelText ? <div className={adminTableStyles.mono}>{modelText}</div> : null}
         </td>
         <td className={adminTableStyles.numeric} data-label={text.cost}>
-          {item.tokenCost}
-        </td>
-        <td className={adminTableStyles.numeric} data-label={text.attempts}>
-          {item.attemptCount}
-        </td>
-        <td className={adminTableStyles.numeric} data-label={text.usdLabel}>
-          {formatMoney(item.providerCostUsd, locale)}
+          <strong>
+            {item.tokenCost} {text.creditsLabel}
+          </strong>
+          <div className={styles.secondaryText}>{formatMoney(item.providerCostUsd, locale)}</div>
         </td>
         <td data-label={text.failure}>
           <span className={styles.failure} aria-label={failureText} title={failureText}>
@@ -453,13 +453,10 @@ export function GenerationRow({
           </span>
         </td>
         <td data-label={text.created}>{formatDateTime(item.createdAtUtc, locale)}</td>
-        <td data-label={text.completedAt}>
-          {item.completedAtUtc ? formatDateTime(item.completedAtUtc, locale) : "-"}
-        </td>
       </tr>
       {isExpanded ? (
         <tr className={styles.detailsRow}>
-          <td colSpan={12} className={styles.detailsCell}>
+          <td colSpan={9} className={styles.detailsCell}>
             <div className={styles.detailsPanel} id={detailsPanelId}>
               {detailLoading ? <p role="status">{text.loadingTitle}</p> : null}
               {detailError ? (
@@ -474,104 +471,122 @@ export function GenerationRow({
                   }
                 />
               ) : null}
-              {hasPreviewMedia ? (
+              <div className={styles.detailsToolbar}>
+                <strong>
+                  {text.before} / {text.after}
+                </strong>
+                <button
+                  type="button"
+                  className={styles.button}
+                  disabled={detailLoading}
+                  onClick={() => {
+                    setMediaRevision((value) => value + 1);
+                    onRetryDetail();
+                  }}
+                >
+                  {text.refreshMedia}
+                </button>
+              </div>
+              {hasPreviewMedia || !detailLoading ? (
                 <div className={styles.previewGrid}>
-                  {item.inputPreviewUrl ? (
-                    <section className={styles.previewCard}>
-                      <header>
-                        <strong>{text.before}</strong>
-                      </header>
-                      <TemplateSecureMedia
-                        className={styles.previewImage}
-                        url={item.inputPreviewUrl}
-                        kind="image"
-                        alt={text.before}
-                        width={512}
-                        height={512}
-                        logContext={{
-                          surface: "generations-before-preview",
-                          templateId: item.templateId,
-                        }}
-                      />
-                    </section>
-                  ) : null}
-                  {item.resultPreviewUrl ? (
-                    <section className={styles.previewCard}>
-                      <header>
-                        <strong>{text.after}</strong>
-                      </header>
-                      <TemplateSecureMedia
-                        className={styles.previewImage}
-                        url={item.resultPreviewUrl}
-                        kind="image"
-                        alt={text.after}
-                        width={512}
-                        height={512}
-                        logContext={{
-                          surface: "generations-after-preview",
-                          templateId: item.templateId,
-                        }}
-                      />
-                    </section>
-                  ) : null}
+                  <GenerationMedia
+                    key={`before-${item.inputPreviewUrl}-${mediaRevision}`}
+                    url={item.inputPreviewUrl}
+                    kind={generationMediaKind(item.inputPreviewUrl ?? "")}
+                    title={text.before}
+                    emptyText={text.mediaMissingBefore}
+                    text={text}
+                  />
+                  <GenerationMedia
+                    key={`after-${resultUrl}-${mediaRevision}`}
+                    url={resultUrl}
+                    kind={generationMediaKind(
+                      resultUrl ?? "",
+                      item.resultMediaType === "video" ? "video" : "image"
+                    )}
+                    title={text.after}
+                    emptyText={text.mediaMissingAfter}
+                    text={text}
+                  />
                 </div>
               ) : null}
-              <div className={styles.detailsGrid}>
-                <div>
-                  <span>{text.sourceType}</span>
-                  <strong>{formatInputSourceType(item.inputSourceType, text)}</strong>
+              <details className={styles.technicalDetails}>
+                <summary>{text.technicalDetails}</summary>
+                <div className={styles.detailsGrid}>
+                  <div>
+                    <span>{text.cost}</span>
+                    <strong>
+                      {item.tokenCost} {text.creditsLabel}
+                    </strong>
+                  </div>
+                  <div>
+                    <span>{text.attempts}</span>
+                    <strong>{item.attemptCount}</strong>
+                  </div>
+                  <div>
+                    <span>{text.usdLabel}</span>
+                    <strong>{formatMoney(item.providerCostUsd, locale)}</strong>
+                  </div>
+                  <div>
+                    <span>{text.completedAt}</span>
+                    <strong>{formatDateTime(item.completedAtUtc, locale)}</strong>
+                  </div>
+                  <div>
+                    <span>{text.sourceType}</span>
+                    <strong>{formatInputSourceType(item.inputSourceType, text)}</strong>
+                  </div>
+                  <div>
+                    <span>{text.compareState}</span>
+                    <strong>{compareState}</strong>
+                  </div>
+                  <div>
+                    <span>{text.pet}</span>
+                    <strong>{item.petId ? formatShortId(item.petId) : "-"}</strong>
+                  </div>
+                  <div>
+                    <span>{text.petPhoto}</span>
+                    <strong>{item.petPhotoId ? formatShortId(item.petPhotoId) : "-"}</strong>
+                  </div>
+                  <div>
+                    <span>{text.inputAsset}</span>
+                    <strong>
+                      {item.inputMediaAssetId ? formatShortId(item.inputMediaAssetId) : "-"}
+                    </strong>
+                  </div>
+                  <div>
+                    <span>{text.resultAsset}</span>
+                    <strong>
+                      {item.resultMediaAssetId ? formatShortId(item.resultMediaAssetId) : "-"}
+                    </strong>
+                  </div>
+                  <div>
+                    <span>{text.diagnosticsTitle}</span>
+                    <strong>{watermarkState}</strong>
+                  </div>
+                  <div>
+                    <span>{text.refundState}</span>
+                    <strong>{text.refundStateOptions[item.refundState]}</strong>
+                  </div>
+                  <div>
+                    <span>{text.refundAttempts}</span>
+                    <strong>
+                      {item.refundAttemptCount} / {item.refundAttemptLimit}
+                    </strong>
+                  </div>
+                  <div>
+                    <span>{text.refundLastAttempt}</span>
+                    <strong>
+                      {item.refundLastAttemptedAtUtc
+                        ? formatDateTime(item.refundLastAttemptedAtUtc, locale)
+                        : "-"}
+                    </strong>
+                  </div>
+                  <div>
+                    <span>{text.refundLastError}</span>
+                    <strong>{formatSafeText(item.refundLastErrorCode)}</strong>
+                  </div>
                 </div>
-                <div>
-                  <span>{text.compareState}</span>
-                  <strong>{compareState}</strong>
-                </div>
-                <div>
-                  <span>{text.pet}</span>
-                  <strong>{item.petId ? formatShortId(item.petId) : "-"}</strong>
-                </div>
-                <div>
-                  <span>{text.petPhoto}</span>
-                  <strong>{item.petPhotoId ? formatShortId(item.petPhotoId) : "-"}</strong>
-                </div>
-                <div>
-                  <span>{text.inputAsset}</span>
-                  <strong>
-                    {item.inputMediaAssetId ? formatShortId(item.inputMediaAssetId) : "-"}
-                  </strong>
-                </div>
-                <div>
-                  <span>{text.resultAsset}</span>
-                  <strong>
-                    {item.resultMediaAssetId ? formatShortId(item.resultMediaAssetId) : "-"}
-                  </strong>
-                </div>
-                <div>
-                  <span>{text.diagnosticsTitle}</span>
-                  <strong>{watermarkState}</strong>
-                </div>
-                <div>
-                  <span>{text.refundState}</span>
-                  <strong>{text.refundStateOptions[item.refundState]}</strong>
-                </div>
-                <div>
-                  <span>{text.refundAttempts}</span>
-                  <strong>
-                    {item.refundAttemptCount} / {item.refundAttemptLimit}
-                  </strong>
-                </div>
-                <div>
-                  <span>{text.refundLastAttempt}</span>
-                  <strong>
-                    {item.refundLastAttemptedAtUtc
-                      ? formatDateTime(item.refundLastAttemptedAtUtc, locale)
-                      : "-"}
-                  </strong>
-                </div>
-                <div>
-                  <span>{text.refundLastError}</span>
-                  <strong>{formatSafeText(item.refundLastErrorCode)}</strong>
-                </div>
-              </div>
+              </details>
               <section className={styles.feedbackPanel}>
                 <header>
                   <strong>{text.feedbackTab}</strong>

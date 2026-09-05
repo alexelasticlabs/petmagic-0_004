@@ -70,13 +70,13 @@ class _RandomTemplateChip extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (icon != null) ...[
-                Icon(icon, size: 15, color: colors.accent),
+                Icon(icon, size: 15, color: colors.accentInk),
                 const SizedBox(width: 5),
               ],
               Text(
                 label,
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: selected ? colors.accent : colors.textSoft,
+                  color: selected ? colors.accentInk : colors.textSoft,
                   fontWeight: FontWeight.w800,
                 ),
               ),
@@ -134,7 +134,11 @@ class _RandomTemplateStatusMessage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 10),
-              TextButton(onPressed: onAction, child: Text(actionLabel)),
+              TextButton(
+                onPressed: onAction,
+                style: TextButton.styleFrom(foregroundColor: colors.accentInk),
+                child: Text(actionLabel),
+              ),
             ],
           ),
         ),

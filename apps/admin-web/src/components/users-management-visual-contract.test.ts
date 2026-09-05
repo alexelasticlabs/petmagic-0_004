@@ -132,8 +132,8 @@ describe("users management visual contract", () => {
     const contentSource = readFileSync(usersContentPath, "utf8");
 
     expect(usersSource).toContain("UsersBulkEmailDialog");
-    expect(usersSource).toContain("useSyncToastToAdminNotifications");
-    expect(usersSource).toContain('source: "users-bulk-email"');
+    expect(usersSource).toContain("/email-broadcasts?compose=1");
+    expect(usersSource).not.toContain("<UsersEmailBroadcastsWorkspace");
     expect(tableSource).toContain("user.isActive && user.emailConfirmed");
     expect(tableSource).toContain("selectAllRef.current.indeterminate");
     expect(tableSource).toContain("onTogglePageSelection(eligibleUserIds");
@@ -146,9 +146,7 @@ describe("users management visual contract", () => {
     expect(dialogSource).toContain("`bulk-email:${createAdminCorrelationId()}`");
     expect(dialogSource).toContain("markCampaignPayloadChanged");
     expect(dialogSource).toContain("copy.reviewDescription");
-    expect(contentSource).toContain(
-      "backend создаст отдельные задания отправки и запишет действие в audit trail"
-    );
+    expect(contentSource).toContain("Перед отправкой проверьте аудиторию и текст письма");
     expect(dialogStylesSource).toContain("@media (max-width: 680px)");
     expect(dialogStylesSource).toContain("grid-template-columns: minmax(0, 1fr);");
   });

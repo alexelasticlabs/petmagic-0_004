@@ -488,6 +488,9 @@ public sealed partial class TemplatesServiceTests
         Assert.Equal("generation_result", item.InputSourceType);
         Assert.Equal(inputMediaId, item.InputMediaAssetId);
         Assert.Equal("https://cdn.example.com/input-preview.jpg?signed=1", item.InputPreviewUrl);
+        Assert.True(item.CanCompareBeforeAfter);
+        Assert.Equal("image", item.ResultMediaType);
+        Assert.Equal("https://cdn.example.com/result-watermarked-storage.jpg?signed=1", item.ResultMediaUrl);
         Assert.Equal(resultMediaId, item.ResultMediaAssetId);
         Assert.Equal("https://cdn.example.com/result-watermarked-preview.jpg?signed=1", item.ResultPreviewUrl);
         Assert.Equal("https://cdn.example.com/child-watermarked-output.jpg?signed=1", item.WatermarkedMediaPath);
@@ -636,6 +639,8 @@ public sealed partial class TemplatesServiceTests
         var item = Assert.Single(page.Value.Items);
         Assert.Null(item.InputPreviewUrl);
         Assert.Null(item.ResultPreviewUrl);
+        Assert.Null(item.ResultMediaUrl);
+        Assert.False(item.CanCompareBeforeAfter);
         Assert.Null(item.WatermarkedMediaPath);
         var serialized = JsonSerializer.Serialize(item);
         Assert.DoesNotContain("templates-media/private", serialized, StringComparison.OrdinalIgnoreCase);

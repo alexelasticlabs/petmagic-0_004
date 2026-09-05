@@ -178,7 +178,7 @@ const usersManagementPageText: Record<Locale, UsersManagementPageText> = {
         "Рассылка доступна только активным пользователям с подтверждённой почтой",
       composerTitle: "Подготовить email-рассылку",
       composerDescription:
-        "Сообщение будет поставлено в очередь backend и отправлено подходящим получателям.",
+        "Выберите получателей, укажите тему и текст письма. Перед отправкой вы сможете всё проверить.",
       audienceLabel: "Аудитория",
       audienceAllActive: "Все активные",
       audienceAllActiveHint: "Все активные пользователи с подтверждённой почтой.",
@@ -186,19 +186,19 @@ const usersManagementPageText: Record<Locale, UsersManagementPageText> = {
       audiencePremiumHint: "Активные Premium-пользователи с подтверждённой почтой.",
       audienceSelected: "Выбранные пользователи",
       audienceSelectedHint: (count) => `${count} выбранных получателей.`,
-      noSelectedUsers: "Сначала выберите хотя бы одного доступного пользователя в таблице.",
+      noSelectedUsers: "Найдите и выберите получателей ниже.",
       subjectLabel: "Тема письма",
       subjectPlaceholder: "Кратко опишите цель сообщения",
       bodyLabel: "Текст письма",
-      bodyPlaceholder: "Введите текст без секретов, токенов и внутренних технических данных",
+      bodyPlaceholder: "Введите текст сообщения для получателей",
       policyConfirmation:
         "Я проверил аудиторию и подтверждаю, что содержание соответствует цели рассылки.",
       operationalWarning:
-        "Массовая отправка — чувствительное действие. Не включайте секреты и соблюдайте требования к пользовательским согласиям.",
+        "Письмо получат только активные пользователи с подтверждённым email. Перед отправкой проверьте аудиторию.",
       reviewAction: "Проверить",
       reviewTitle: "Проверить рассылку",
       reviewDescription:
-        "После подтверждения backend создаст отдельные задания отправки и запишет действие в audit trail.",
+        "Перед отправкой проверьте аудиторию и текст письма. После подтверждения рассылка начнётся автоматически.",
       reviewAudienceLabel: "Аудитория",
       reviewSubjectLabel: "Тема",
       reviewBodyLabel: "Текст",
@@ -283,7 +283,7 @@ const usersManagementPageText: Record<Locale, UsersManagementPageText> = {
       unavailableRecipientLabel: "Only active users with confirmed email can receive this message",
       composerTitle: "Prepare email campaign",
       composerDescription:
-        "The message will be queued by the backend for every eligible recipient.",
+        "Choose recipients and compose your message. You can review everything before sending.",
       audienceLabel: "Audience",
       audienceAllActive: "All active users",
       audienceAllActiveHint: "All active users with confirmed email.",
@@ -291,11 +291,11 @@ const usersManagementPageText: Record<Locale, UsersManagementPageText> = {
       audiencePremiumHint: "Active Premium users with confirmed email.",
       audienceSelected: "Selected users",
       audienceSelectedHint: (count) => `${count} selected recipients.`,
-      noSelectedUsers: "Select at least one eligible user in the table first.",
+      noSelectedUsers: "Find and select recipients below.",
       subjectLabel: "Email subject",
       subjectPlaceholder: "Summarize the purpose of the message",
       bodyLabel: "Email body",
-      bodyPlaceholder: "Enter content without secrets, tokens, or internal technical details",
+      bodyPlaceholder: "Enter your message for the recipients",
       policyConfirmation:
         "I reviewed the audience and confirm that this content matches the campaign purpose.",
       operationalWarning:
@@ -303,7 +303,7 @@ const usersManagementPageText: Record<Locale, UsersManagementPageText> = {
       reviewAction: "Review",
       reviewTitle: "Review email campaign",
       reviewDescription:
-        "After confirmation, the backend creates individual delivery jobs and records the action in the audit trail.",
+        "Review the audience and message. Sending starts automatically after confirmation.",
       reviewAudienceLabel: "Audience",
       reviewSubjectLabel: "Subject",
       reviewBodyLabel: "Body",

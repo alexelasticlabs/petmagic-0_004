@@ -43,7 +43,7 @@ void main() {
       final text = AppLocalizations.of(context);
 
       expect(find.byType(ProtectedAuthGate), findsOneWidget);
-      expect(find.text(text.authSignInRequired), findsOneWidget);
+      expect(find.text(text.authRequiredTitle), findsOneWidget);
       expect(find.text(text.profileSettingsPasswordTitle), findsNothing);
       expect(_TrackedPasswordChangeController.resetCalls, 0);
     },

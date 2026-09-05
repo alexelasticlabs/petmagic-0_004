@@ -29,6 +29,7 @@ import 'package:petmagic_mobile/shared/navigation/petmagic_navigation_layout.dar
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_unavailable_view.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_async_state_view.dart';
 import 'package:share_plus/share_plus.dart';
 
 export 'package:petmagic_mobile/features/pets/application/pet_profile_providers.dart';
@@ -181,6 +182,7 @@ class _MyPetsPageState extends ConsumerState<MyPetsPage>
                 title: text.petsEmptyTitle,
                 subtitle: text.petsEmptySubtitle,
                 actionLabel: text.petsAddAction,
+                actionIcon: Icons.add_rounded,
                 onAction: () => _showPetForm(context, ref),
               );
             }

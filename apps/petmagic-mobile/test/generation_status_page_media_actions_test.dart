@@ -65,7 +65,10 @@ void main() {
     await tester.tap(find.byIcon(Icons.more_vert_rounded));
     await tester.pumpAndSettle();
 
-    final shareAction = find.text(text.supportChatShareAction);
+    final shareAction = find.descendant(
+      of: find.byType(BottomSheet),
+      matching: find.text(text.supportChatShareAction),
+    );
     expect(shareAction, findsOneWidget);
     await tester.tap(shareAction);
     await mediaActions.shareStarted.future;
@@ -126,7 +129,12 @@ void main() {
 
       await tester.tap(find.byIcon(Icons.more_vert_rounded));
       await tester.pumpAndSettle();
-      await tester.tap(find.text(text.generationStatusSaveAction));
+      await tester.tap(
+        find.descendant(
+          of: find.byType(BottomSheet),
+          matching: find.text(text.generationStatusSaveAction),
+        ),
+      );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
 
@@ -137,7 +145,12 @@ void main() {
 
       await tester.tap(find.byIcon(Icons.more_vert_rounded));
       await tester.pumpAndSettle();
-      await tester.tap(find.text(text.supportChatShareAction));
+      await tester.tap(
+        find.descendant(
+          of: find.byType(BottomSheet),
+          matching: find.text(text.supportChatShareAction),
+        ),
+      );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
 
@@ -217,7 +230,12 @@ void main() {
 
       await tester.tap(find.byIcon(Icons.more_vert_rounded));
       await tester.pumpAndSettle();
-      await tester.tap(find.text(text.generationStatusSaveAction));
+      await tester.tap(
+        find.descendant(
+          of: find.byType(BottomSheet),
+          matching: find.text(text.generationStatusSaveAction),
+        ),
+      );
       await tester.pump();
 
       expect(repository.fetchDownloadCalls, 0);
@@ -228,7 +246,12 @@ void main() {
 
       await tester.tap(find.byIcon(Icons.more_vert_rounded));
       await tester.pumpAndSettle();
-      await tester.tap(find.text(text.supportChatShareAction));
+      await tester.tap(
+        find.descendant(
+          of: find.byType(BottomSheet),
+          matching: find.text(text.supportChatShareAction),
+        ),
+      );
       await tester.pump();
 
       expect(mediaActions.sharedFileNames, [
@@ -305,7 +328,12 @@ void main() {
 
       await tester.tap(find.byIcon(Icons.more_vert_rounded));
       await tester.pumpAndSettle();
-      await tester.tap(find.text(text.generationStatusSaveAction));
+      await tester.tap(
+        find.descendant(
+          of: find.byType(BottomSheet),
+          matching: find.text(text.generationStatusSaveAction),
+        ),
+      );
       await tester.pump();
 
       expect(repository.fetchDownloadCalls, 1);
@@ -316,7 +344,12 @@ void main() {
 
       await tester.tap(find.byIcon(Icons.more_vert_rounded));
       await tester.pumpAndSettle();
-      await tester.tap(find.text(text.supportChatShareAction));
+      await tester.tap(
+        find.descendant(
+          of: find.byType(BottomSheet),
+          matching: find.text(text.supportChatShareAction),
+        ),
+      );
       await tester.pump();
 
       expect(repository.fetchShareCalls, 1);
@@ -442,8 +475,20 @@ void main() {
       await tester.pumpAndSettle();
 
       final removeAction = find.text(text.generationStatusRemoveWatermark);
-      expect(find.text(text.generationStatusShareWithWatermark), findsOne);
-      expect(find.text(text.generationStatusSaveWithWatermark), findsOne);
+      expect(
+        find.descendant(
+          of: find.byType(BottomSheet),
+          matching: find.text(text.generationStatusShareWithWatermark),
+        ),
+        findsOne,
+      );
+      expect(
+        find.descendant(
+          of: find.byType(BottomSheet),
+          matching: find.text(text.generationStatusSaveWithWatermark),
+        ),
+        findsOne,
+      );
       expect(find.text(text.generationStatusUpgradePremium), findsOne);
 
       await tester.tap(removeAction);

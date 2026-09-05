@@ -480,7 +480,7 @@ describe("admin action hardening", () => {
     expect(sidebarSource).toContain("logoutDisabled?: boolean;");
     expect(sidebarSource).toContain("logoutDisabled = false,");
     expect(sidebarSource).toContain("disabled={logoutDisabled}");
-    expect(sidebarSource).toContain('import { useMemo, type RefObject } from "react";');
+    expect(sidebarSource).toContain('import { useMemo, useState, type RefObject } from "react";');
     expect(sidebarSource).toContain(
       "const navItems = useMemo(() => getAdminNavItems(locale, roles), [locale, roles]);"
     );

@@ -2,18 +2,20 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/templates/application/template_catalog_repository.dart';
 import 'package:petmagic_mobile/shared/auth/auth_required_sheet.dart';
 import 'package:petmagic_mobile/shared/navigation/app_navigation_context.dart';
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 import 'package:petmagic_mobile/shared/widgets/pawspark_icon.dart';
-import 'package:petmagic_mobile/shared/widgets/premium_crown_icon.dart';
+import 'package:petmagic_mobile/features/templates/presentation/template_preview_prefetcher.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_entitlement_provider.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/template_flow_sheets.dart';
@@ -23,6 +25,8 @@ part 'template_preview_viewer.part.dart';
 part 'template_preview_viewer_actions.part.dart';
 part 'template_preview_viewer_pagination.part.dart';
 part 'template_preview_viewer_widgets.part.dart';
+part 'template_preview_description.part.dart';
+part 'template_preview_rail.part.dart';
 
 enum TemplatePreviewSource {
   catalog,

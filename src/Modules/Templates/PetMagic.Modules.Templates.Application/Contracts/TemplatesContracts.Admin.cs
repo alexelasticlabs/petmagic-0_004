@@ -584,7 +584,9 @@ public sealed record AdminTemplateGenerationListItemResponse(
     Guid? PetPhotoId = null,
     bool CanCancel = false,
     bool CanRetry = false,
-    bool GamificationLegacyReviewRequired = false);
+    bool GamificationLegacyReviewRequired = false,
+    string? ResultMediaUrl = null,
+    string? ResultMediaType = null);
 
 public sealed record AdminTemplateGenerationListPageResponse(
     IReadOnlyList<AdminTemplateGenerationListItemResponse> Items,

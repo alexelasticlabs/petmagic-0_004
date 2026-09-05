@@ -2,6 +2,70 @@ type IconProps = {
   className?: string;
 };
 
+export function SparklesIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <path
+        d="m10 4 2.5 6.5L19 13l-6.5 2.5L10 22l-2.5-6.5L1 13l6.5-2.5L10 4Z"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinejoin="round"
+      />
+      <path d="M19 2v6m-3-3h6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function ShieldCheckIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <path
+        d="m12 3 8 3v5c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-3Z"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinejoin="round"
+      />
+      <path
+        d="m8.5 11.5 2.5 2.5 4.5-5"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function RoleKeyIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <circle cx="8" cy="9" r="5" stroke="currentColor" strokeWidth="1.7" />
+      <path
+        d="m11.5 12.5 8 8H22v-3h-3v-3h-3M6.5 7.5h.01"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function HeadphonesIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <path
+        d="M4 13V11a8 8 0 0 1 16 0v6c0 3-2 4-5 4h-2"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+      />
+      <rect x="3" y="11" width="4" height="7" rx="2" stroke="currentColor" strokeWidth="1.7" />
+      <rect x="17" y="11" width="4" height="7" rx="2" stroke="currentColor" strokeWidth="1.7" />
+    </svg>
+  );
+}
+
 export function BrandMark({ className }: IconProps) {
   return (
     <svg viewBox="0 0 32 36" fill="none" className={className} aria-hidden="true">

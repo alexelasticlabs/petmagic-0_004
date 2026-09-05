@@ -1,17 +1,26 @@
 part of 'template_preview_page.dart';
 
-class _TemplatePreviewPageState extends ConsumerState<TemplatePreviewPage> {
-  static const _pageAnimationDuration = Duration(milliseconds: 280);
-  static const _contentAnimationDuration = Duration(milliseconds: 180);
-  static const _thumbnailExtent = 64.0;
-  static const _thumbnailSpacing = 6.0;
+class _TemplatePreviewPageState extends ConsumerState<TemplatePreviewPage>
+    with WidgetsBindingObserver {
+  static const _pageAnimationDuration = Duration(milliseconds: 460);
+  static const _contentAnimationDuration = Duration(milliseconds: 320);
+  static const _thumbnailExtent = 62.0;
+  static const _thumbnailSpacing = 8.0;
 
   late final TemplatePreviewSession _session;
   late final PageController _pageController;
   final ScrollController _thumbnailController = ScrollController();
+  final ScrollController _informationController = ScrollController(
+    keepScrollOffset: false,
+  );
   final Map<String, Future<TemplateItem?>> _detailRequests = {};
   final Set<String> _detailResolvedIds = {};
   final Set<String> _detailAttemptedIds = {};
+  late final TemplatePreviewPrefetcher _prefetcher;
+  final TemplatePreviewPlaybackRegistry _playbackRegistry =
+      TemplatePreviewPlaybackRegistry();
+  bool _isAppResumed = true;
+  bool _isRouteVisible = false;
 
   late List<TemplateItem> _items;
   late int _selectedIndex;
@@ -20,7 +29,6 @@ class _TemplatePreviewPageState extends ConsumerState<TemplatePreviewPage> {
   int _selectionDirection = 1;
   bool _isPageSettling = false;
   bool _isResolvingAction = false;
-  bool _isOpeningDetails = false;
   bool _isDetailsOpen = false;
   bool _isUnlockingPremium = false;
   bool _isLoadingMore = false;
@@ -28,6 +36,8 @@ class _TemplatePreviewPageState extends ConsumerState<TemplatePreviewPage> {
   bool _paginationExhausted = false;
   bool _isClosing = false;
   bool _reduceMotion = false;
+  double? _informationDragDistance;
+  bool _isMuted = false;
 
   TemplateItem get _selectedTemplate => _items[_selectedIndex];
 
@@ -36,6 +46,17 @@ class _TemplatePreviewPageState extends ConsumerState<TemplatePreviewPage> {
   @override
   void initState() {
     super.initState();
+    final lifecycleState = WidgetsBinding.instance.lifecycleState;
+    _isAppResumed =
+        lifecycleState == null || lifecycleState == AppLifecycleState.resumed;
+    _prefetcher = TemplatePreviewPrefetcher(
+      canPrefetch: () => _canPrefetchPreview,
+      policy: () => _previewPrefetchPolicy,
+      onReady: () {
+        if (mounted && _canPrefetchPreview) setState(() {});
+      },
+    );
+    WidgetsBinding.instance.addObserver(this);
     _session = widget.session ?? TemplatePreviewSession.single(widget.template);
     _items = List<TemplateItem>.of(_session.items);
     _selectedIndex = _session.initialIndex;
@@ -51,6 +72,7 @@ class _TemplatePreviewPageState extends ConsumerState<TemplatePreviewPage> {
       _ensureSelectedThumbnailVisible(animate: false);
       unawaited(_resolveTemplateDetails(_selectedIndex));
       unawaited(_loadMoreIfNeeded(_selectedIndex));
+      _schedulePreviewPrefetch();
     });
   }
 
@@ -58,19 +80,75 @@ class _TemplatePreviewPageState extends ConsumerState<TemplatePreviewPage> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     final mediaQuery = MediaQuery.of(context);
-    _reduceMotion =
-        mediaQuery.disableAnimations || mediaQuery.accessibleNavigation;
+    _reduceMotion = mediaQuery.disableAnimations;
+    _isRouteVisible =
+        TickerMode.valuesOf(context).enabled &&
+        (ModalRoute.isCurrentOf(context) ?? true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _schedulePreviewPrefetch();
+    });
+  }
+
+  bool get _canPrefetchPreview {
+    if (!mounted || !_isAppResumed || !_isRouteVisible || _isClosing) {
+      return false;
+    }
+    final network = ref.read(networkStatusControllerProvider);
+    return network.hasInternet;
+  }
+
+  TemplatePreviewPrefetchPolicy get _previewPrefetchPolicy {
+    final network = ref.read(networkStatusControllerProvider);
+    if (!network.hasInternet) return TemplatePreviewPrefetchPolicy.disabled;
+    return switch (network.transport) {
+      NetworkTransportKind.wifi ||
+      NetworkTransportKind.ethernet => TemplatePreviewPrefetchPolicy.wifi,
+      NetworkTransportKind.cellular => TemplatePreviewPrefetchPolicy.cellular,
+      _ => TemplatePreviewPrefetchPolicy.disabled,
+    };
+  }
+
+  void _schedulePreviewPrefetch() {
+    _prefetcher.schedule(
+      _items,
+      _selectedIndex,
+      direction: _selectionDirection,
+    );
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _isAppResumed = state == AppLifecycleState.resumed;
+    if (_isAppResumed) {
+      _schedulePreviewPrefetch();
+    } else {
+      _prefetcher.cancelPending();
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _prefetcher.dispose();
+    _playbackRegistry.dispose();
     _pageController.dispose();
     _thumbnailController.dispose();
+    _informationController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final preferLowResolution = ref.watch(
+      networkStatusControllerProvider.select(
+        (network) =>
+            network.transport != NetworkTransportKind.wifi &&
+            network.transport != NetworkTransportKind.ethernet,
+      ),
+    );
+    ref.listen(networkStatusControllerProvider, (_, _) {
+      _schedulePreviewPrefetch();
+    });
     final livePremiumAccess =
         widget.hasPremiumAccess || ref.watch(templatePremiumAccessProvider);
     final template = _selectedTemplate;
@@ -93,10 +171,8 @@ class _TemplatePreviewPageState extends ConsumerState<TemplatePreviewPage> {
               child: PageView.builder(
                 key: const ValueKey('template-preview-page-view'),
                 controller: _pageController,
-                physics:
-                    _items.length > 1 &&
-                        !_isResolvingAction &&
-                        !_isOpeningDetails
+                allowImplicitScrolling: true,
+                physics: _items.length > 1 && !_isResolvingAction
                     ? const BouncingScrollPhysics()
                     : const NeverScrollableScrollPhysics(),
                 itemCount: _items.length,
@@ -105,14 +181,52 @@ class _TemplatePreviewPageState extends ConsumerState<TemplatePreviewPage> {
                   final item = _items[index];
                   return KeyedSubtree(
                     key: ValueKey('template-preview-page:${item.templateId}'),
-                    child: TemplateMediaFrame(
-                      template: item,
-                      expand: true,
-                      isActive:
-                          index == _mediaIndex &&
-                          !_isOpeningDetails &&
-                          !_isDetailsOpen,
-                      autoplay: !_reduceMotion,
+                    child: AnimatedBuilder(
+                      animation: _pageController,
+                      builder: (context, child) {
+                        final offset =
+                            _reduceMotion || !_pageController.hasClients
+                            ? 0.0
+                            : ((_pageController.page ??
+                                          _selectedIndex.toDouble()) -
+                                      index)
+                                  .clamp(-1.0, 1.0);
+                        final distance = offset.abs();
+                        return ClipRect(
+                          child: Transform.translate(
+                            offset: Offset(
+                              offset * MediaQuery.sizeOf(context).width * 0.1,
+                              0,
+                            ),
+                            child: Transform.scale(
+                              scale: 1 + 0.22 * distance,
+                              child: Opacity(
+                                opacity: 1 - 0.24 * distance,
+                                child: child,
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                      child: RepaintBoundary(
+                        child: TemplateMediaFrame(
+                          template: item,
+                          expand: true,
+                          immersive: true,
+                          preferLowResolution: preferLowResolution,
+                          muted: _isMuted,
+                          onMutedChanged: (muted) =>
+                              setState(() => _isMuted = muted),
+                          isActive: index == _mediaIndex && _canPresentMedia,
+                          playWhenActive: true,
+                          allowDetailUpgrade: !_isPageSettling,
+                          playbackRegistry: _playbackRegistry,
+                          prepareOffscreen:
+                              _canPresentMedia &&
+                              (index - _selectedIndex).abs() <= 1,
+                          autoplay: true,
+                        ),
+                      ),
                     ),
                   );
                 },
@@ -134,32 +248,20 @@ class _TemplatePreviewPageState extends ConsumerState<TemplatePreviewPage> {
                           ).backButtonTooltip,
                           onPressed: _isClosing ? null : _closeViewer,
                         ),
-                        const Spacer(),
-                        _TemplatePreviewIconButton(
-                          key: const ValueKey('template-preview-details'),
-                          icon: Icons.info_outline_rounded,
-                          tooltip: AppLocalizations.of(
-                            context,
-                          ).templateFlowCheckDetailsSubtitle,
-                          isLoading: _isOpeningDetails,
-                          onPressed: _isInteractionLocked ? null : _showDetails,
-                        ),
+                        if (template.isPremium) ...[
+                          const SizedBox(width: 10),
+                          Flexible(
+                            child: _TemplatePreviewPremiumBadge(
+                              isLocked: isPremiumLocked,
+                            ),
+                          ),
+                          if (template.detailPreviewIsVideo)
+                            const SizedBox(width: 110),
+                        ],
                       ],
                     ),
-                    const Spacer(),
-                    if (_items.length > 1 ||
-                        _isLoadingMore ||
-                        _paginationFailed) ...[
-                      _buildThumbnailRail(colors),
-                      const SizedBox(height: 14),
-                    ],
-                    _TemplatePreviewSummary(
-                      template: template,
-                      isPremiumLocked: isPremiumLocked,
-                      reduceMotion: _reduceMotion,
-                      direction: _selectionDirection,
-                    ),
-                    const SizedBox(height: 16),
+                    Expanded(child: _buildInformationPanel(template, colors)),
+                    const SizedBox(height: 8),
                     _buildPrimaryAction(
                       template: template,
                       isPremiumLocked: isPremiumLocked,
@@ -174,186 +276,14 @@ class _TemplatePreviewPageState extends ConsumerState<TemplatePreviewPage> {
     );
   }
 
-  Widget _buildThumbnailRail(PetMagicColors colors) {
-    return SizedBox(
-      height: 82,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final edgePadding = ((constraints.maxWidth - _thumbnailExtent) / 2)
-              .clamp(4.0, double.infinity)
-              .toDouble();
-          return ListView.separated(
-            key: const ValueKey('template-preview-thumbnail-rail'),
-            controller: _thumbnailController,
-            scrollDirection: Axis.horizontal,
-            physics: const BouncingScrollPhysics(),
-            padding: EdgeInsets.symmetric(horizontal: edgePadding),
-            itemCount:
-                _items.length + (_isLoadingMore || _paginationFailed ? 1 : 0),
-            separatorBuilder: (_, _) =>
-                const SizedBox(width: _thumbnailSpacing),
-            itemBuilder: (context, index) {
-              if (index == _items.length) {
-                return SizedBox(
-                  width: _thumbnailExtent,
-                  child: _TemplatePreviewPaginationStatus(
-                    isLoading: _isLoadingMore,
-                    onRetry: _retryPagination,
-                  ),
-                );
-              }
-              final template = _items[index];
-              final selected = index == _selectedIndex;
-              final text = AppLocalizations.of(context);
-              return SizedBox(
-                width: _thumbnailExtent,
-                child: Semantics(
-                  button: true,
-                  selected: selected,
-                  enabled: !_isInteractionLocked,
-                  label: template.title,
-                  hint: template.isVideo ? text.videoLabel : text.imageLabel,
-                  value: '${index + 1} / ${_items.length}',
-                  onTap: _isInteractionLocked
-                      ? null
-                      : () => _selectThumbnail(index),
-                  child: ExcludeSemantics(
-                    child: GestureDetector(
-                      key: ValueKey(
-                        'template-preview-thumbnail:${template.templateId}',
-                      ),
-                      behavior: HitTestBehavior.opaque,
-                      onTap: _isInteractionLocked
-                          ? null
-                          : () => _selectThumbnail(index),
-                      child: AnimatedBuilder(
-                        animation: _pageController,
-                        builder: (context, child) {
-                          final emphasis = _thumbnailEmphasis(index);
-                          final borderColor = Color.lerp(
-                            Colors.white.withValues(alpha: 0.28),
-                            colors.accent,
-                            emphasis,
-                          )!;
-                          return Transform.scale(
-                            scale: 0.9 + (0.1 * emphasis),
-                            child: Container(
-                              margin: const EdgeInsets.symmetric(vertical: 3),
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(15),
-                                border: Border.all(
-                                  color: borderColor,
-                                  width: 1 + (1.2 * emphasis),
-                                ),
-                                boxShadow: emphasis <= 0.01
-                                    ? null
-                                    : [
-                                        BoxShadow(
-                                          color: colors.accent.withValues(
-                                            alpha: 0.26 * emphasis,
-                                          ),
-                                          blurRadius: 4 + (8 * emphasis),
-                                          offset: Offset(0, 2 + (3 * emphasis)),
-                                        ),
-                                      ],
-                              ),
-                              child: child,
-                            ),
-                          );
-                        },
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(13),
-                          child: _TemplatePreviewThumbnail(template: template),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            },
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildPrimaryAction({
-    required TemplateItem template,
-    required bool isPremiumLocked,
-  }) {
-    final text = AppLocalizations.of(context);
-    final label = isPremiumLocked
-        ? text.templateUnlockPremiumAction
-        : template.isVideo
-        ? text.templateDetailUploadPhotoForVideoAction
-        : text.templateFlowUploadPetPhotoAction;
-
-    return SizedBox(
-      width: double.infinity,
-      child: FilledButton.icon(
-        key: const ValueKey('template-preview-cta'),
-        onPressed: _isInteractionLocked ? null : _completeWithSelectedTemplate,
-        style: FilledButton.styleFrom(
-          minimumSize: const Size.fromHeight(52),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-          ),
-          textStyle: Theme.of(
-            context,
-          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
-        ),
-        icon: AnimatedSwitcher(
-          duration: _reduceMotion ? Duration.zero : _contentAnimationDuration,
-          switchInCurve: Curves.easeOutCubic,
-          switchOutCurve: Curves.easeIn,
-          child: _isResolvingAction
-              ? const SizedBox.square(
-                  key: ValueKey('template-preview-cta-loading'),
-                  dimension: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : Icon(
-                  isPremiumLocked
-                      ? Icons.workspace_premium_rounded
-                      : Icons.add_photo_alternate_outlined,
-                  key: ValueKey(
-                    'template-preview-cta-icon:${template.templateId}',
-                  ),
-                ),
-        ),
-        label: AnimatedSwitcher(
-          duration: _reduceMotion ? Duration.zero : _contentAnimationDuration,
-          switchInCurve: Curves.easeOutCubic,
-          switchOutCurve: Curves.easeIn,
-          transitionBuilder: (child, animation) => FadeTransition(
-            opacity: animation,
-            child: SlideTransition(
-              position: Tween<Offset>(
-                begin: Offset(0.025 * _selectionDirection, 0),
-                end: Offset.zero,
-              ).animate(animation),
-              child: child,
-            ),
-          ),
-          child: Text(
-            label,
-            key: ValueKey('template-preview-cta-label:${template.templateId}'),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-          ),
-        ),
-      ),
-    );
-  }
-
   bool get _isInteractionLocked =>
       _isClosing ||
       _isPageSettling ||
       _isResolvingAction ||
-      _isOpeningDetails ||
       _isUnlockingPremium;
+
+  bool get _canPresentMedia =>
+      _isAppResumed && _isRouteVisible && !_isDetailsOpen && !_isClosing;
 
   bool get _canContinueViewerAction {
     if (!mounted || _isClosing) {
@@ -396,7 +326,8 @@ class _TemplatePreviewPageState extends ConsumerState<TemplatePreviewPage> {
   }
 
   bool _handlePageScrollNotification(ScrollNotification notification) {
-    if (notification.metrics.axis != Axis.horizontal) {
+    if (notification.depth != 0 ||
+        notification.metrics.axis != Axis.horizontal) {
       return false;
     }
     if (notification is ScrollStartNotification) {
@@ -429,12 +360,23 @@ class _TemplatePreviewPageState extends ConsumerState<TemplatePreviewPage> {
       return;
     }
     unawaited(
-      _pageController.animateToPage(
-        index,
-        duration: _pageAnimationDuration,
-        curve: Curves.easeOutCubic,
-      ),
+      _pageController
+          .animateToPage(
+            index,
+            duration: _pageAnimationDuration,
+            curve: Curves.easeOutCubic,
+          )
+          .whenComplete(_reconcilePageSelection),
     );
+  }
+
+  void _reconcilePageSelection() {
+    if (!mounted ||
+        !_pageController.hasClients ||
+        _pageController.position.isScrollingNotifier.value) {
+      return;
+    }
+    _commitSelection(_pageController.page?.round() ?? _selectedIndex);
   }
 
   void _commitSelection(int index) {
@@ -443,11 +385,15 @@ class _TemplatePreviewPageState extends ConsumerState<TemplatePreviewPage> {
     }
     _candidateIndex = null;
     if (index == _selectedIndex) {
-      if (_isPageSettling) {
-        setState(() => _isPageSettling = false);
+      if (_isPageSettling || _mediaIndex != index) {
+        setState(() {
+          _mediaIndex = index;
+          _isPageSettling = false;
+        });
       }
       return;
     }
+    if (_informationController.hasClients) _informationController.jumpTo(0);
     setState(() {
       _selectionDirection = index > _selectedIndex ? 1 : -1;
       _selectedIndex = index;
@@ -458,6 +404,7 @@ class _TemplatePreviewPageState extends ConsumerState<TemplatePreviewPage> {
     _ensureSelectedThumbnailVisible();
     unawaited(_resolveTemplateDetails(index));
     unawaited(_loadMoreIfNeeded(index));
+    _schedulePreviewPrefetch();
   }
 
   void _ensureSelectedThumbnailVisible({bool animate = true}) {

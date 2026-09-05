@@ -91,6 +91,64 @@ void main() {
     },
   );
 
+  testWidgets('switching light and dark theme keeps the same video playing', (
+    tester,
+  ) async {
+    const url = 'https://cdn.example.com/theme-preview.mp4';
+    final manager = TemplateFeedPlaybackManager()
+      ..configure(
+        feedKind: TemplateFeedKind.mixed,
+        environment: const TemplateFeedPlaybackEnvironment(
+          networkClass: TemplateFeedNetworkClass.cellular,
+        ),
+      );
+    addTearDown(manager.dispose);
+    final template = videoTemplate(
+      previewUrl: url,
+      thumbnailUrl: url,
+      feedLoopLowUrl: url,
+    );
+    Future<VideoPlayerController> create(String url) async =>
+        VideoPlayerController.networkUrl(Uri.parse(url));
+    VideoPlayerController? original;
+    for (final brightness in [
+      Brightness.light,
+      Brightness.dark,
+      Brightness.light,
+    ]) {
+      await tester.pumpWidget(
+        _DiscoveryMediaHost(
+          manager: manager,
+          template: template,
+          previewControllerFactory: create,
+          brightness: brightness,
+        ),
+      );
+      await tester.pump();
+      if (original == null) _showDiscoveryMedia(tester);
+      await pumpUntil(
+        tester,
+        () => find.byType(VideoPlayer).evaluate().isNotEmpty,
+        timeout: const Duration(seconds: 1),
+      );
+      final controller = tester
+          .widget<VideoPlayer>(find.byType(VideoPlayer))
+          .controller;
+      original ??= controller;
+      expect(identical(controller, original), isTrue);
+      expect(controller.value.isPlaying, isTrue);
+      expect(fakePlatform.createCalls, 1);
+      expect(fakePlatform.disposeCalls, 0);
+    }
+    _hideDiscoveryMedia(tester);
+    await pumpUntil(
+      tester,
+      () => fakePlatform.disposeCalls == 1,
+      timeout: const Duration(seconds: 1),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('mixed discovery keeps static fallback on a slow connection', (
     tester,
   ) async {
@@ -289,6 +347,17 @@ void main() {
     final semantics = tester.ensureSemantics();
     try {
       expect(find.semantics.byLabel('Retry'), findsOneWidget);
+      final retryContext = tester.element(find.text('Retry'));
+      final retryColor = TextButtonTheme.of(
+        retryContext,
+      ).style!.foregroundColor!.resolve({})!;
+      expect(
+        PetMagicPalettes.contrastRatio(
+          retryColor,
+          retryContext.petMagicColors.surface,
+        ),
+        greaterThanOrEqualTo(4.5),
+      );
       await tester.tap(find.text('Retry'));
       await pumpUntil(
         tester,
@@ -311,9 +380,11 @@ class _DiscoveryMediaHost extends StatelessWidget {
     required this.manager,
     required this.template,
     required this.previewControllerFactory,
+    this.brightness = Brightness.light,
   });
 
   final TemplateFeedPlaybackManager manager;
+  final Brightness brightness;
   final TemplateItem template;
   final Future<VideoPlayerController> Function(String previewUrl)
   previewControllerFactory;
@@ -321,7 +392,9 @@ class _DiscoveryMediaHost extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      theme: AppTheme.light(),
+      theme: brightness == Brightness.light
+          ? AppTheme.light()
+          : AppTheme.dark(),
       locale: const Locale('en'),
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,

@@ -1140,6 +1140,10 @@ export type AdminTemplateGenerationListItem = {
 
   canCompareBeforeAfter: boolean;
 
+  resultMediaUrl?: string | null;
+
+  resultMediaType?: "image" | "video" | string | null;
+
   parentTemplateTitle?: string | null;
 
   parentTemplateType?: TemplateType | null;

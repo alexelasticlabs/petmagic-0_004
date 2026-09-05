@@ -142,6 +142,7 @@ export type Dictionary = {
   navModeration: string;
   navAudit: string;
   navUsers: string;
+  navEmailBroadcasts: string;
   navGenerations: string;
   navFeedback: string;
   navRoleManagement: string;
@@ -150,6 +151,7 @@ export type Dictionary = {
   navVideoTemplates: string;
   navTemplateAnalytics: string;
   navTemplateCategories: string;
+  navTemplateDiscovery: string;
   navTemplateDailyFeatured: string;
   navPromoCodes: string;
   navSectionOverview: string;

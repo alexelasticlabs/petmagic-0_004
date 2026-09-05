@@ -134,7 +134,7 @@ const adminChromeCopy: Record<Locale, AdminChromeCopy> = {
     },
     sidebar: {
       brandTitle: "PetMagic Admin",
-      brandCaption: "Операционная админ-зона",
+      brandCaption: "Администрирование",
       closeNavigationLabel: "Закрыть навигацию",
       navigationLabel: "Навигация админ-панели",
       supportUnreadLabel: (count) => `${count} новых сообщений в поддержке`,
@@ -263,7 +263,7 @@ const adminChromeCopy: Record<Locale, AdminChromeCopy> = {
     },
     sidebar: {
       brandTitle: "PetMagic Admin",
-      brandCaption: "Operational admin workspace",
+      brandCaption: "Administration",
       closeNavigationLabel: "Close navigation",
       navigationLabel: "Admin navigation",
       supportUnreadLabel: (count) => `${count} new support messages`,

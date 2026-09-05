@@ -17,6 +17,7 @@ import 'package:petmagic_mobile/features/templates/presentation/widgets/template
 import 'package:petmagic_mobile/shared/files/persistent_media_url.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
 import 'package:petmagic_mobile/shared/widgets/pawspark_icon.dart';
+import 'pet_shortcut_avatar.dart';
 
 part 'pet_generation_launch_sheet_media.part.dart';
 part 'pet_generation_launch_sheet_content.part.dart';

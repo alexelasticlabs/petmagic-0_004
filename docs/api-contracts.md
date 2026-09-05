@@ -252,6 +252,30 @@ Compatibility rules:
 - `POST /api/admin/gamification/users/{userId}/streak/reset` is `AdminOnly`, requires `{ "reason": "..." }` (1–500 characters), and records the actor, previous streak state, target user and reason in the admin audit log. The legacy `DELETE /api/admin/gamification/users/{userId}/streak` route remains only for compatibility and requires the same reason in `X-Admin-Audit-Reason`; requests without a reason are rejected.
 - `GET /api/admin/templates/categories/diagnostics` is `AdminOnly` and reports active templates whose string category no longer maps to a non-archived canonical category. Every issue includes `issueKind`: `empty_category`, `archived_category`, or `missing_category`; rows are ordered by normalized category, title, then template id.
 
+### Discovery Composer
+
+Admin route: `/{locale}/templates/discovery`. Contracts live in
+`TemplatesContracts.DiscoveryAdmin.cs` and `apps/admin-web/src/lib/api-client.discovery.ts`.
+
+| Method | Path below `/api/admin/templates/discovery` | Behavior |
+| --- | --- | --- |
+| GET | `/` | Published revision, active draft, `pageVersion` |
+| GET | `/revisions?skip=0&take=20` | Bounded version history |
+| POST | `/drafts` | Create from current published revision or automatic catalog; optional `sourceRevisionId` restores a previously published revision into a new draft |
+| PUT | `/drafts/{id}` | Save `{expectedVersion, document}` |
+| POST | `/drafts/{id}/validate` | Production visibility, media, category, locale and content diagnostics |
+| GET | `/drafts/{id}/preview?locale=ru` | Shared public projection of the saved revision; never includes QA-only templates |
+| POST | `/drafts/{id}/publish` | `{expectedVersion, expectedPageVersion, reason}` with required `Idempotency-Key` |
+| POST | `/drafts/{id}/discard` | `{expectedVersion, expectedPageVersion}`; retains history |
+
+- Read/preview/validation require `ModeratorOrAdmin`; all writes require `AdminOnly`. Responses use `private, no-store`.
+- One active draft and one published pointer are protected by optimistic concurrency. Version conflicts return HTTP 409 `discovery.conflict`; invalid documents return HTTP 400 with bounded `issues` and `validationErrors`.
+- Editorial documents have `schemaVersion: 1`, up to 24 sections, 12 cards per section and 7 supported content locales. Section array order is display order. Each section references a stable `categoryId` and uses `Latest`, `Manual`, or `Hybrid` selection; a chosen cover occupies the first card slot. Page autoplay is bounded to 5000–30000 ms.
+- Saved drafts may have content diagnostics. Publish requires non-empty production-visible sections, valid category/template references and English fallback copy. Publication, receipt, audit outbox and feed invalidation commit atomically. Published revisions are immutable. Restoring a historical version creates a new draft, which must pass validation and be published separately.
+- `GET /api/templates/discovery` reads the published document, reapplying `TemplateVisibilityPolicy` on every projection. If no published document exists or its schema is unreadable, the automatic discovery algorithm remains available. Templates/categories archived after publication are omitted; automatic/hybrid sections refill from eligible templates.
+- The public response retains legacy `category` (string), `items`, and `generatedAtUtc`. Optional V2 additions are `revision`, `page`, `schemaVersion: 2`, plus section `sectionId`, `categoryId`, `title`, `subtitle`, `showInCarousel`, and `showAsRail`. Feed cards retain the existing minimal DTO.
+- Legacy mobile receives category ordering, enabled sections, selected covers and pinned card ordering immediately. Consuming page copy, autoplay settings and per-surface visibility requires the planned mobile V2 update. Existing request limits (`sectionLimit`, `itemsPerSection`) still cap delivery; admin preview resolves the configured maximum. Deploy backend/schema before admin; mobile may be updated independently.
+
 ## Admin System Status
 
 Endpoint: `GET /api/admin/system/status`

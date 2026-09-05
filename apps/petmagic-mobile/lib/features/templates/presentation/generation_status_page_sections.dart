@@ -231,13 +231,29 @@ class _CompletedStatus extends StatelessWidget {
     final text = AppLocalizations.of(context);
     return Row(
       children: [
-        Icon(Icons.check_circle_rounded, color: colors.accent, size: 20),
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: colors.accent.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(
+            Icons.auto_awesome_rounded,
+            color: colors.accentInk,
+            size: 20,
+          ),
+        ),
         const SizedBox(width: 8),
-        Text(
-          statusTitle(text, generation),
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-            color: colors.accent,
-            fontWeight: FontWeight.w800,
+        Expanded(
+          child: Semantics(
+            liveRegion: true,
+            child: Text(
+              statusTitle(text, generation),
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                color: colors.accentInk,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
           ),
         ),
       ],

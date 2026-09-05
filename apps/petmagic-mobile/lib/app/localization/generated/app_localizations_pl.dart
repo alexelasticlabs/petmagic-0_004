@@ -9,6 +9,29 @@ class AppLocalizationsPl extends AppLocalizations {
   AppLocalizationsPl([String locale = 'pl']) : super(locale);
 
   @override
+  String templatePreviewVideoResult(String duration) {
+    return 'Wynik: film ≈ $duration s';
+  }
+
+  @override
+  String get templatePreviewVideoDurationUnknown =>
+      'Film · czas trwania niepodany';
+
+  @override
+  String get templatePreviewImageResult => 'Wynik: zdjęcie';
+
+  @override
+  String templatePreviewCreationTime(String eta) {
+    return 'Tworzenie zwykle zajmuje $eta';
+  }
+
+  @override
+  String get templatePreviewDescriptionMore => 'Więcej o szablonie';
+
+  @override
+  String get templatePreviewDescriptionLess => 'Zwiń';
+
+  @override
   String get navDiscover => 'Odkrywaj';
 
   @override
@@ -3184,11 +3207,11 @@ class AppLocalizationsPl extends AppLocalizations {
       'Nie sprzedajemy danych osobowych. Udostępniamy je tylko podmiotom przetwarzającym potrzebnym do działania PetMagic.';
 
   @override
-  String get authRequiredTitle => 'Zaloguj się, aby odblokować tę akcję';
+  String get authRequiredTitle => 'Zaloguj się do PetMagic';
 
   @override
   String get authRequiredMessage =>
-      'Goście mogą eksplorować aplikację, ale działania szablonów, nagrody i funkcje tokenów wymagają konta PetMagic.';
+      'Twórz zdjęcia i filmy swojego zwierzaka, zapisuj wyniki i zdobywaj nagrody z kontem PetMagic. Szablony możesz przeglądać bez logowania.';
 
   @override
   String get authRequiredContinueBrowsing => 'Kontynuuj przeglądanie';

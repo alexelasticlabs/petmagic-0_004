@@ -51,7 +51,7 @@ type ReadinessFilter = "all" | "ready" | "missing_preview";
 type SortMode = "newest" | "title" | "tokens";
 
 const TEMPLATE_CATALOG_SEARCH_MAX_LENGTH = 120;
-const TEMPLATE_CATALOG_PAGE_SIZE = 24;
+const TEMPLATE_CATALOG_PAGE_SIZES = [24, 48, 96] as const;
 
 function useDebouncedValue(value: string, delayMs: number) {
   const [debounced, setDebounced] = useState(value);
@@ -102,6 +102,7 @@ export function TemplatesCatalogView({
   const [sortMode, setSortMode] = useState<SortMode>("newest");
   const [filtersExpanded, setFiltersExpanded] = useState(false);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(TEMPLATE_CATALOG_PAGE_SIZES[0]);
   const debouncedSearch = useDebouncedValue(search, 300);
   const effectiveStatusFilter =
     archiveFilter === "active" && statusFilter === "Archived" ? "all" : statusFilter;
@@ -120,8 +121,8 @@ export function TemplatesCatalogView({
       visibility: visibilityFilter === "all" ? undefined : visibilityFilter,
       readiness: readinessFilter === "all" ? undefined : readinessFilter,
       sort: sortMode,
-      skip: (page - 1) * TEMPLATE_CATALOG_PAGE_SIZE,
-      take: TEMPLATE_CATALOG_PAGE_SIZE,
+      skip: (page - 1) * pageSize,
+      take: pageSize,
     }),
     [
       accessFilter,
@@ -130,6 +131,7 @@ export function TemplatesCatalogView({
       debouncedSearch,
       effectiveStatusFilter,
       page,
+      pageSize,
       readinessFilter,
       sortMode,
       templateType,
@@ -505,12 +507,6 @@ export function TemplatesCatalogView({
     void refresh().catch(() => undefined);
   }
 
-  const visiblePageNumbers = useMemo(() => {
-    const end = totalCount > 0 ? Math.min(totalPages, Math.max(currentPage, 1)) : currentPage;
-    const start = Math.max(1, end - 4);
-    return Array.from({ length: end - start + 1 }, (_, index) => start + index);
-  }, [currentPage, totalCount, totalPages]);
-
   if (!canViewTemplates || isLoading) {
     return (
       <AdminPage className={styles.catalogPage}>
@@ -534,6 +530,90 @@ export function TemplatesCatalogView({
       </AdminPage>
     );
   }
+
+  const pagination =
+    templates.length || currentPage > 1 ? (
+      <div className={styles.paginationBar}>
+        <span role="status">{copy.pageSummary(currentPage, shownStart, shownEnd, totalCount)}</span>
+        <div className={styles.paginationActions}>
+          <label className={styles.pageSizeControl}>
+            <span>{copy.pageSizeLabel}</span>
+            <select
+              value={pageSize}
+              disabled={isCatalogInteractionLocked}
+              onChange={(event) => {
+                setPageSize(Number(event.target.value));
+                resetCatalogContext();
+              }}
+            >
+              {TEMPLATE_CATALOG_PAGE_SIZES.map((size) => (
+                <option key={size} value={size}>
+                  {size}
+                </option>
+              ))}
+            </select>
+          </label>
+          {totalPages > 1 ? (
+            <>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                disabled={currentPage <= 1 || isCatalogInteractionLocked}
+                aria-label={copy.previousPageLabel}
+                title={copy.previousPageLabel}
+                onClick={() => resetCatalogContext(Math.max(1, currentPage - 1))}
+              >
+                <CaretDownIcon className={`${styles.pageIcon} ${styles.pageIconPrevious}`} />
+              </Button>
+              <form
+                className={styles.pageJump}
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (isCatalogInteractionLocked) return;
+                  const nextPage = Number(new FormData(event.currentTarget).get("page"));
+                  if (Number.isInteger(nextPage) && nextPage >= 1 && nextPage <= totalPages) {
+                    resetCatalogContext(nextPage);
+                  }
+                }}
+              >
+                <input
+                  key={`${currentPage}-${pageSize}`}
+                  name="page"
+                  type="number"
+                  min={1}
+                  max={totalPages}
+                  defaultValue={currentPage}
+                  aria-label={copy.pageNumberLabel}
+                  disabled={isCatalogInteractionLocked}
+                  required
+                />
+                <span>/ {totalPages}</span>
+                <Button
+                  type="submit"
+                  variant="secondary"
+                  size="sm"
+                  disabled={isCatalogInteractionLocked}
+                >
+                  {copy.goToPage}
+                </Button>
+              </form>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                disabled={currentPage >= totalPages || !hasMore || isCatalogInteractionLocked}
+                aria-label={copy.nextPageLabel}
+                title={copy.nextPageLabel}
+                onClick={() => resetCatalogContext(currentPage + 1)}
+              >
+                <CaretDownIcon className={`${styles.pageIcon} ${styles.pageIconNext}`} />
+              </Button>
+            </>
+          ) : null}
+        </div>
+      </div>
+    ) : null;
 
   return (
     <AdminPage className={styles.catalogPage}>
@@ -586,6 +666,14 @@ export function TemplatesCatalogView({
       ) : null}
 
       <div className={styles.catalogShell}>
+        <TemplatesCatalogRail
+          copy={copy}
+          locale={locale}
+          summary={summary}
+          onShowDrafts={showDraftTemplates}
+          onShowMissingPreview={showTemplatesMissingPreview}
+          onShowQaOnly={showQaOnlyTemplates}
+        />
         <div className={styles.catalogMain}>
           <div className={styles.filtersDock} aria-label={copy.filtersLabel}>
             <div className={styles.filterLeadRow}>
@@ -766,6 +854,7 @@ export function TemplatesCatalogView({
               </div>
             </AdminFilterBar>
           </div>
+          {totalCount > TEMPLATE_CATALOG_PAGE_SIZES[0] || currentPage > 1 ? pagination : null}
           {isCatalogRefreshing ? (
             <AdminStateCard tone="info" className={styles.empty} title={text.loading} />
           ) : hasError && !templates.length ? null : !templates.length ? (
@@ -816,57 +905,8 @@ export function TemplatesCatalogView({
               text={text}
             />
           )}
-          {templates.length || currentPage > 1 ? (
-            <div className={styles.paginationBar}>
-              <span>{copy.pageSummary(currentPage, shownStart, shownEnd, totalCount)}</span>
-              <div className={styles.paginationActions}>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  disabled={currentPage <= 1 || isCatalogFetching}
-                  aria-label={copy.previousPageLabel}
-                  title={copy.previousPageLabel}
-                  onClick={() => resetCatalogContext(Math.max(1, currentPage - 1))}
-                >
-                  <CaretDownIcon className={`${styles.pageIcon} ${styles.pageIconPrevious}`} />
-                </Button>
-                {visiblePageNumbers.map((pageNumber) => (
-                  <Button
-                    key={pageNumber}
-                    type="button"
-                    variant={pageNumber === currentPage ? "primary" : "secondary"}
-                    size="sm"
-                    disabled={isCatalogFetching}
-                    aria-current={pageNumber === currentPage ? "page" : undefined}
-                    onClick={() => resetCatalogContext(pageNumber)}
-                  >
-                    {pageNumber}
-                  </Button>
-                ))}
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  disabled={currentPage >= totalPages || !hasMore || isCatalogFetching}
-                  aria-label={copy.nextPageLabel}
-                  title={copy.nextPageLabel}
-                  onClick={() => resetCatalogContext(currentPage + 1)}
-                >
-                  <CaretDownIcon className={`${styles.pageIcon} ${styles.pageIconNext}`} />
-                </Button>
-              </div>
-            </div>
-          ) : null}
+          {pagination}
         </div>
-        <TemplatesCatalogRail
-          copy={copy}
-          locale={locale}
-          summary={summary}
-          onShowDrafts={showDraftTemplates}
-          onShowMissingPreview={showTemplatesMissingPreview}
-          onShowQaOnly={showQaOnlyTemplates}
-        />
       </div>
       <TemplatesCatalogDialogs
         copy={copy}

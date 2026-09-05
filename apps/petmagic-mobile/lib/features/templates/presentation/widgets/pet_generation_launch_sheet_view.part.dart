@@ -4,6 +4,15 @@ extension _PetGenerationLaunchSheetView on _PetGenerationLaunchSheetState {
   Widget _buildLaunchSheet(BuildContext context) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
+    final pets = ref.watch(petsProvider).asData?.value ?? const <PetProfile>[];
+    PetProfile? pet;
+    for (final candidate in pets) {
+      if (candidate.id == widget.petId) {
+        pet = candidate;
+        break;
+      }
+    }
+    final petName = pet?.name ?? widget.petName;
     final photosAsync = ref.watch(petPhotosProvider(widget.petId));
     final selectedPhotoForStart = photosAsync.maybeWhen(
       data: (photos) => _selectedPhoto(_mergePhotos(photos)),
@@ -77,7 +86,7 @@ extension _PetGenerationLaunchSheetView on _PetGenerationLaunchSheetState {
               ),
               const SizedBox(height: 6),
               _PetLaunchHeader(
-                title: _petLaunchTitle(text, widget.petName),
+                title: _petLaunchTitle(text, petName),
                 subtitle: _petLaunchSubtitle(text),
               ),
               const SizedBox(height: 18),
@@ -87,7 +96,12 @@ extension _PetGenerationLaunchSheetView on _PetGenerationLaunchSheetState {
               ),
               const SizedBox(height: 12),
               _PetLaunchPetCard(
-                petName: widget.petName,
+                petName: petName,
+                avatarUrl:
+                    pet?.avatarUrl ??
+                    (selectedPhotoForStart == null
+                        ? null
+                        : _petPhotoDisplayUrl(selectedPhotoForStart)),
                 balance: widget.gate.balance,
               ),
               const SizedBox(height: 16),

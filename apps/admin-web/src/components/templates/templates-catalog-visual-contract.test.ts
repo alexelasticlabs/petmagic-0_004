@@ -36,20 +36,20 @@ describe("templates catalog visual contract", () => {
     expect(cssSource).not.toContain("__gNhzuG__");
   });
 
-  it("uses the media-led card layout from the approved catalog direction", () => {
+  it("keeps compact previews and full-width card actions", () => {
     const catalogSource = readTemplatesCatalogViewLibrarySource();
     const cssSource = readFileSync(catalogCssPath, "utf8");
     const letterSpacingRules = cssSource.match(/letter-spacing:\s*[^;]+;/g) ?? [];
 
     expect(letterSpacingRules.every((rule) => rule === "letter-spacing: 0;")).toBe(true);
     expect(cssSource).toContain("grid-template-columns: repeat(3, minmax(0, 1fr));");
-    expect(cssSource).toContain("grid-template-columns: minmax(0, 43%) minmax(0, 57%);");
-    expect(cssSource).toContain("grid-template-rows: minmax(17.25rem, auto) auto;");
+    expect(cssSource).toContain("grid-template-columns: 7rem minmax(0, 1fr);");
+    expect(cssSource).toContain("grid-template-rows: minmax(10.75rem, 1fr) auto auto;");
     expect(cssSource).toContain("grid-column: 1 / -1;");
     expect(cssSource).toContain("grid-template-columns: repeat(2, minmax(0, 1fr));");
     expect(cssSource).toContain("border-right: 1px solid var(--border-soft);");
     expect(cssSource).toContain("@media (max-width: 560px)");
-    expect(cssSource).toContain("aspect-ratio: 16 / 9;");
+    expect(cssSource).toContain("grid-template-columns: 6rem minmax(0, 1fr);");
     expect(cssSource).toContain("grid-template-columns: repeat(3, minmax(0, 1fr)) auto;");
     expect(catalogSource).toContain("className={styles.cardSecondaryAction}");
     expect(catalogSource).toContain("copy.testAction");
@@ -83,28 +83,6 @@ describe("templates catalog visual contract", () => {
     expect(cssSource).toContain("cursor: not-allowed;");
     expect(cssSource).toContain("opacity: 0.68;");
     expect(cssSource).toContain("transform: none;");
-  });
-
-  it("keeps card metric icon layout in the catalog stylesheet", () => {
-    const catalogSource = readTemplatesCatalogViewLibrarySource();
-    const cssSource = readFileSync(catalogCssPath, "utf8");
-
-    expect(catalogSource).toContain("DollarIcon");
-    expect(catalogSource).toContain("ImageIcon");
-    expect(catalogSource).toContain("PlayCircleIcon");
-    expect(catalogSource).toContain("CancelCircleIcon");
-    expect(catalogSource).toContain("className={styles.cardMetricIcon}");
-    expect(catalogSource).not.toContain("<svg");
-    expect(catalogSource).not.toContain('strokeWidth="1.7"');
-    expect(catalogSource).not.toContain("M12 2l2.4 7.4H22");
-    expect(catalogSource).not.toContain(
-      'style={{ width: "0.85rem", height: "0.85rem", opacity: 0.7, flexShrink: 0 }}'
-    );
-    expect(cssSource).toContain(".cardMetricIcon {");
-    expect(cssSource).toContain("width: 0.72rem;");
-    expect(cssSource).toContain("height: 0.72rem;");
-    expect(cssSource).toContain("opacity: 0.62;");
-    expect(cssSource).toContain("flex-shrink: 0;");
   });
 
   it("shows an operator-facing fallback instead of a blank card when preview media fails", () => {

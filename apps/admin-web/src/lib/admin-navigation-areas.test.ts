@@ -28,7 +28,7 @@ describe("admin navigation areas", () => {
       },
       { area: "content-studio", items: ["templates"] },
       { area: "revenue-risk", items: ["economy"] },
-      { area: "growth-rewards", items: ["promo-codes", "gamification"] },
+      { area: "growth-rewards", items: ["email-broadcasts", "promo-codes", "gamification"] },
     ]);
     expect(areas.flatMap((area) => area.items).find((item) => item.key === "dashboard")?.href).toBe(
       "/en/dashboard"

@@ -12,6 +12,19 @@ internal sealed partial class TemplatesService
         PublicTemplatesDiscoveryQuery query,
         CancellationToken cancellationToken)
     {
+        var published = await (from page in dbContext.TemplateDiscoveryPages.AsNoTracking()
+                               join revision in dbContext.TemplateDiscoveryRevisions.AsNoTracking()
+                                   on page.PublishedRevisionId equals revision.Id
+                               where page.Id == Entities.TemplateDiscoveryPage.HomeId
+                               select new { revision.DocumentJson, revision.Number })
+            .SingleOrDefaultAsync(cancellationToken);
+        if (published is not null && TemplateDiscoveryDocument.Read(published.DocumentJson) is { } document)
+        {
+            return Result.Success(await new TemplateDiscoveryResolver(dbContext).ResolveAsync(
+                document, published.Number, query.Locale, cancellationToken,
+                query.SectionLimit, query.ItemsPerSection, query.IncludeQaOnly));
+        }
+
         var itemsPerSection = Math.Clamp(
             query.ItemsPerSection,
             1,

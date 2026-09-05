@@ -1,16 +1,19 @@
 "use client";
 
-import { useQueryClient } from "@tanstack/react-query";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { MailIcon } from "@/components/admin/admin-icons";
-import { useSyncToastToAdminNotifications } from "@/components/admin/admin-notifications";
 import { AdminCard, AdminStateCard } from "@/components/admin/admin-primitives";
 import { AdminSelectionTray } from "@/components/admin/admin-selection-tray";
+import {
+  maximumPersistedSelectionCount,
+  readPersistedSelection,
+  selectionStoragePrefix,
+  toSelectedUserEntity,
+  type SelectedUserEntity,
+} from "@/components/email-recipient-selection";
 import { Button } from "@/components/ui/button";
-import { Toast } from "@/components/ui/toast";
-import { UsersBulkEmailDialog } from "@/components/users-bulk-email-dialog";
 import type { UsersManagementPageText } from "@/components/users-management-page.content";
 import styles from "@/components/users-management-page.module.css";
 import type {
@@ -21,50 +24,8 @@ import type {
 } from "@/components/users-management-page.types";
 import { UsersManagementUsersFilters } from "@/components/users-management-users-card.filters";
 import { UsersManagementUsersTable } from "@/components/users-management-users-card.table";
-import { adminQueryKeys } from "@/lib/admin-query-keys";
-import { updateAdminUrlState } from "@/lib/admin-url-state";
 import { useAuthSession, type UserListItem } from "@/lib/api-client";
 import type { Dictionary, Locale } from "@/lib/i18n";
-import { maskEmail, sanitizeSensitiveText } from "@/lib/sensitive-display";
-
-type SelectedUserEntity = {
-  id: string;
-  label: string;
-  eligible: boolean;
-};
-
-const selectionStoragePrefix = "petmagic.admin.users.email-selection:v1";
-const maximumPersistedSelectionCount = 500;
-
-function toSelectedUserEntity(user: UserListItem): SelectedUserEntity {
-  return {
-    id: user.userId,
-    label: sanitizeSensitiveText(user.displayName?.trim() || maskEmail(user.email), 96),
-    eligible: user.isActive && user.emailConfirmed,
-  };
-}
-
-function readPersistedSelection(storageKey: string): Map<string, SelectedUserEntity> {
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem(storageKey) ?? "[]") as unknown;
-    if (!Array.isArray(parsed)) return new Map();
-    const selected = new Map<string, SelectedUserEntity>();
-    for (const value of parsed.slice(0, maximumPersistedSelectionCount)) {
-      if (!value || typeof value !== "object") continue;
-      const item = value as Partial<SelectedUserEntity>;
-      const id = typeof item.id === "string" ? item.id.trim().slice(0, 100) : "";
-      if (!id) continue;
-      selected.set(id, {
-        id,
-        label: sanitizeSensitiveText(typeof item.label === "string" ? item.label : "—", 96),
-        eligible: item.eligible === true,
-      });
-    }
-    return selected;
-  } catch {
-    return new Map();
-  }
-}
 
 type UsersManagementUsersCardProps = {
   currentPage: number;
@@ -117,10 +78,7 @@ export function UsersManagementUsersCard({
   users,
   usersPageTotalCount,
 }: UsersManagementUsersCardProps) {
-  const pathname = usePathname();
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const queryClient = useQueryClient();
   const session = useAuthSession();
   const hasUsers = users.length > 0;
   const isInitialRefresh = isUsersRefreshing && !hasUsers && !error;
@@ -131,11 +89,6 @@ export function UsersManagementUsersCard({
   const [selectedUsers, setSelectedUsers] = useState<ReadonlyMap<string, SelectedUserEntity>>(() =>
     selectionStorageKey ? readPersistedSelection(selectionStorageKey) : new Map()
   );
-  const [bulkEmailDialogOpen, setBulkEmailDialogOpen] = useState(false);
-  const [bulkEmailToast, setBulkEmailToast] = useState<{
-    type: "success" | "error";
-    message: string;
-  } | null>(null);
   const selectedUserIds = useMemo(() => new Set(selectedUsers.keys()), [selectedUsers]);
   const selectedUserList = useMemo(() => {
     const currentPageUsers = new Map(users.map((user) => [user.userId, user]));
@@ -160,22 +113,6 @@ export function UsersManagementUsersCard({
       // Selection persistence is an enhancement; browser storage failures must not block admin work.
     }
   }, [selectedUserList, selectionStorageKey]);
-
-  useSyncToastToAdminNotifications(bulkEmailToast, {
-    category: "users",
-    source: "users-bulk-email",
-    title: ui.notificationTitle,
-    href: `/${locale}/users`,
-  });
-
-  useEffect(() => {
-    if (!bulkEmailToast) {
-      return;
-    }
-
-    const timer = window.setTimeout(() => setBulkEmailToast(null), 2600);
-    return () => window.clearTimeout(timer);
-  }, [bulkEmailToast]);
 
   function toggleUserSelection(userId: string, selected: boolean) {
     setSelectedUsers((current) => {
@@ -220,7 +157,7 @@ export function UsersManagementUsersCard({
             type="button"
             variant="secondary"
             size="sm"
-            onClick={() => setBulkEmailDialogOpen(true)}
+            onClick={() => router.push(`/${locale}/email-broadcasts?compose=1`)}
           >
             <MailIcon className={styles.bulkEmailIcon} />
             {ui.bulkEmail.openLabel}
@@ -337,38 +274,12 @@ export function UsersManagementUsersCard({
           variant="primary"
           size="sm"
           disabled={selectedUserIdList.length === 0}
-          onClick={() => setBulkEmailDialogOpen(true)}
+          onClick={() => router.push(`/${locale}/email-broadcasts?compose=1`)}
         >
           <MailIcon className={styles.bulkEmailIcon} />
           {ui.bulkEmail.openLabel}
         </Button>
       </AdminSelectionTray>
-
-      {bulkEmailDialogOpen ? (
-        <UsersBulkEmailDialog
-          locale={locale}
-          selectedUserIds={selectedUserIdList}
-          onClose={() => setBulkEmailDialogOpen(false)}
-          onQueued={(broadcast) => {
-            setSelectedUsers(new Map());
-            setBulkEmailToast({
-              type: "success",
-              message: ui.bulkEmail.success,
-            });
-            void queryClient.invalidateQueries({ queryKey: adminQueryKeys.emailBroadcastsRoot });
-            const nextSearchParams = updateAdminUrlState(
-              searchParams,
-              { selected: broadcast.broadcastId, tab: "broadcasts" },
-              { resetPageOnQueryChange: false }
-            );
-            router.replace(`${pathname}?${nextSearchParams.toString()}`, { scroll: false });
-          }}
-        />
-      ) : null}
-
-      {bulkEmailToast ? (
-        <Toast message={bulkEmailToast.message} type={bulkEmailToast.type} />
-      ) : null}
     </AdminCard>
   );
 }

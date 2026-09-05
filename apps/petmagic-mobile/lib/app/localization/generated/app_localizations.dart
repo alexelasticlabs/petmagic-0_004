@@ -108,6 +108,42 @@ abstract class AppLocalizations {
     Locale('ru'),
   ];
 
+  /// No description provided for @templatePreviewVideoResult.
+  ///
+  /// In en, this message translates to:
+  /// **'Result: video ≈ {duration} s'**
+  String templatePreviewVideoResult(String duration);
+
+  /// No description provided for @templatePreviewVideoDurationUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Video · duration not specified'**
+  String get templatePreviewVideoDurationUnknown;
+
+  /// No description provided for @templatePreviewImageResult.
+  ///
+  /// In en, this message translates to:
+  /// **'Result: image'**
+  String get templatePreviewImageResult;
+
+  /// No description provided for @templatePreviewCreationTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Creation usually takes {eta}'**
+  String templatePreviewCreationTime(String eta);
+
+  /// No description provided for @templatePreviewDescriptionMore.
+  ///
+  /// In en, this message translates to:
+  /// **'More about this template'**
+  String get templatePreviewDescriptionMore;
+
+  /// No description provided for @templatePreviewDescriptionLess.
+  ///
+  /// In en, this message translates to:
+  /// **'Show less'**
+  String get templatePreviewDescriptionLess;
+
   /// No description provided for @navDiscover.
   ///
   /// In en, this message translates to:
@@ -5715,13 +5751,13 @@ abstract class AppLocalizations {
   /// No description provided for @authRequiredTitle.
   ///
   /// In en, this message translates to:
-  /// **'Sign in to unlock this action'**
+  /// **'Sign in to PetMagic'**
   String get authRequiredTitle;
 
   /// No description provided for @authRequiredMessage.
   ///
   /// In en, this message translates to:
-  /// **'Guests can explore the app, but template actions, rewards and PawSpark features require a PetMagic account.'**
+  /// **'Create photos and videos of your pet, save your results and earn rewards with a PetMagic account. You can browse templates without signing in.'**
   String get authRequiredMessage;
 
   /// No description provided for @authRequiredContinueBrowsing.

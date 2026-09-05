@@ -79,14 +79,14 @@ class _PetCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 3),
                       Text(
-                        '${_typeLabel(pet.type, text)}${pet.breed == null ? '' : ' â€¢ ${pet.breed}'}',
+                        '${_typeLabel(pet.type, text)}${pet.breed == null ? '' : ' · ${pet.breed}'}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(color: colors.textSoft, fontSize: 13),
                       ),
                       const SizedBox(height: 5),
                       Text(
-                        '${text.petsStatsPhotos(pet.photosCount)} â€¢ ${text.petsStatsGenerations(pet.generationsCount)}',
+                        '${text.petsStatsPhotos(pet.photosCount)} · ${text.petsStatsGenerations(pet.generationsCount)}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -192,7 +192,7 @@ class _PetHeader extends StatelessWidget {
             ),
             const SizedBox(height: 5),
             Text(
-              '${_typeLabel(pet.type, text)}${pet.breed == null ? '' : ' â€¢ ${pet.breed}'}',
+              '${_typeLabel(pet.type, text)}${pet.breed == null ? '' : ' · ${pet.breed}'}',
               textAlign: TextAlign.center,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,

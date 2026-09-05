@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
+import { generationMediaKind, safeGenerationMediaUrl } from "./generations-page.media";
 import { readGenerationsPageLibrarySource } from "./generations-page.test-source";
 
 const generationsContentPath = fileURLToPath(
@@ -377,29 +378,26 @@ describe("generations page hardening", () => {
     );
   });
 
-  it("renders expanded generation previews through the secure media component", () => {
-    const source = readGenerationsPageLibrarySource();
-    const stylesSource = readFileSync(generationsStylesPath, "utf8");
+  it("recognizes signed video URLs while keeping image posters as images", () => {
+    expect(generationMediaKind("https://cdn.petgpt.app/result.mp4?sig=1")).toBe("video");
+    expect(generationMediaKind("https://cdn.petgpt.app/poster.webp?sig=1", "video")).toBe("image");
+    expect(generationMediaKind("https://cdn.petgpt.app/opaque?sig=1", "video")).toBe("video");
+  });
 
-    expect(source).toContain(
-      'import { TemplateSecureMedia } from "@/components/templates/template-secure-media";'
-    );
-    expect(source).toContain(
-      "const hasPreviewMedia = Boolean(item.inputPreviewUrl || item.resultPreviewUrl);"
-    );
-    expect(source).toContain("{hasPreviewMedia ? (");
-    expect(source).not.toContain("<div className={styles.previewFallback}");
-    expect(source).not.toContain('import Image from "next/image";');
-    expect(source).toContain("url={item.inputPreviewUrl}");
-    expect(source).toContain('surface: "generations-before-preview"');
-    expect(source).toContain("url={item.resultPreviewUrl}");
-    expect(source).toContain('surface: "generations-after-preview"');
-    expect(source).toContain("templateId: item.templateId");
-    expect(source).not.toContain("src={item.inputPreviewUrl}");
-    expect(source).not.toContain("src={item.resultPreviewUrl}");
-    expect(stylesSource).toContain(".generationTable > thead > tr > th + th,");
-    expect(stylesSource).toContain(".generationRow > td + td {");
-    expect(stylesSource).toContain("border-inline-start: 1px solid var(--border-soft);");
+  it("preserves signed media but blocks unsafe media and new-tab URLs", () => {
+    const signed =
+      "https://" + "a".repeat(32) + ".r2.cloudflarestorage.com/private/result.mp4?signature=1";
+    expect(safeGenerationMediaUrl(signed)).toBe(signed);
+    for (const value of [
+      "javascript:alert(1)",
+      "data:text/html,test",
+      "https://127.0.0.1/test",
+      "https://user:password@cdn.petgpt.app/test",
+      "http://cdn.petgpt.app/test",
+      "invalid",
+    ]) {
+      expect(safeGenerationMediaUrl(value)).toBeNull();
+    }
   });
 
   it("keeps clean watermark grant refresh non-blocking after success", () => {

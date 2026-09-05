@@ -1,4 +1,5 @@
 import 'dart:collection';
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -7,10 +8,13 @@ import 'package:petmagic_mobile/core/config/app_config.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/performance/bounded_http_file_service.dart';
 import 'package:petmagic_mobile/core/performance/media_cache_tracking.dart';
+import 'package:petmagic_mobile/core/performance/media_prefetch_budget.dart';
 import 'package:petmagic_mobile/core/performance/template_media_cache_budget.dart';
 import 'package:petmagic_mobile/shared/files/persistent_media_url.dart';
 
 part 'template_media_cache_maintenance.part.dart';
+part 'template_media_cache_storage.part.dart';
+part 'template_media_cache_downloads.part.dart';
 
 typedef _RememberedFilesByUrl = LinkedHashMap<String, _RememberedCacheFile>;
 typedef _InvalidationCountsByUrl = LinkedHashMap<String, int>;
@@ -21,9 +25,8 @@ class TemplateMediaCache {
   TemplateMediaCache._();
 
   static const int _maxThumbnailFileReferences = 300;
-  // Sized so a long feed session does not evict-and-redownload the same preview
-  // videos: ~250 clips at 1-2 MB each stays inside the dedicated byte budget
-  // (AppConfig.previewVideoCacheMaxBytes) which remains the hard disk cap.
+  // File references contain paths and expiry only. The separate byte budget
+  // evicts least recently used disk files after downloads complete.
   static const int _maxPreviewFileReferences = 250;
   static const int _maxBlockedThumbnailCacheUrls = _maxThumbnailFileReferences;
   static const int _maxBlockedPreviewCacheUrls = _maxPreviewFileReferences;
@@ -32,6 +35,7 @@ class TemplateMediaCache {
   static const int _maxThumbnailDownloadBytes = 8 * 1024 * 1024;
   static const int _maxPreviewDownloadBytes = 24 * 1024 * 1024;
   static int _cacheGeneration = 0;
+  static Future<void>? _cacheClearInProgress;
   static final _RememberedFilesByUrl _thumbnailFilesByUrl =
       _RememberedFilesByUrl();
   static final _RememberedFilesByUrl _previewFilesByUrl =
@@ -74,6 +78,7 @@ class TemplateMediaCache {
       fileService: BoundedHttpFileService(
         maxBytes: _maxPreviewDownloadBytes,
         mediaKind: 'preview',
+        maxConcurrentFetches: 3,
       ),
     ),
   );
@@ -89,14 +94,11 @@ class TemplateMediaCache {
   static int get rememberedFileReferenceCountForTesting =>
       _thumbnailFilesByUrl.length + _previewFilesByUrl.length;
 
-  static String cacheKeyForMedia(String url, {int? mediaVersion}) {
-    final normalized = persistentSafeMediaCacheKeyUrl(url);
-    if (mediaVersion == null || mediaVersion <= 0) {
-      return normalized;
-    }
-
-    return 'v$mediaVersion|$normalized';
-  }
+  static String cacheKeyForMedia(String url, {int? mediaVersion}) =>
+      _TemplateMediaCacheMaintenance.cacheKeyForMedia(
+        url,
+        mediaVersion: mediaVersion,
+      );
 
   static Future<File?> getCachedPreviewFile(String url, {int? mediaVersion}) =>
       _TemplateMediaCacheMaintenance.getCachedPreviewFile(
@@ -107,84 +109,28 @@ class TemplateMediaCache {
   static Future<File?> getCachedThumbnailFile(
     String url, {
     int? mediaVersion,
-  }) async {
-    final cacheKey = cacheKeyForMedia(url, mediaVersion: mediaVersion);
-    if (_blockedThumbnailCacheUrls.contains(cacheKey)) {
-      return null;
-    }
+  }) => _TemplateMediaCacheMaintenance.getCachedThumbnailFile(
+    url,
+    mediaVersion: mediaVersion,
+  );
 
-    final rememberedFile =
-        await _TemplateMediaCacheMaintenance._getRememberedFile(
-          _thumbnailFilesByUrl,
-          cacheKey,
-          maxEntries: _maxThumbnailFileReferences,
-        );
-    if (rememberedFile != null) {
-      return rememberedFile;
-    }
-
-    final cachedFile = await thumbnailCache.getFileFromCache(cacheKey);
-    final file = cachedFile?.file;
-    if (cachedFile == null ||
-        !cachedFile.validTill.isAfter(DateTime.now()) ||
-        file == null ||
-        !await file.exists()) {
-      return null;
-    }
-
-    _TemplateMediaCacheMaintenance._rememberFile(
-      _thumbnailFilesByUrl,
-      cacheKey,
-      file,
-      validTill: cachedFile.validTill,
-      maxEntries: _maxThumbnailFileReferences,
-    );
-    return file;
-  }
-
-  static Future<File> fetchThumbnailFile(String url, {int? mediaVersion}) {
-    final cacheKey = cacheKeyForMedia(url, mediaVersion: mediaVersion);
-    final inFlightFetch = _thumbnailFetchesByUrl[cacheKey];
-    if (inFlightFetch != null) {
-      return inFlightFetch;
-    }
-
-    late final Future<File> fetch;
-    final generation = _cacheGeneration;
-    final urlInvalidation = _thumbnailInvalidationByUrl[cacheKey] ?? 0;
-    MediaCacheTracking.rememberLatestGeneration(
-      _latestThumbnailFetchGenerationByUrl,
-      cacheKey,
-      generation,
-      maxEntries: _maxBlockedThumbnailCacheUrls,
-    );
-    fetch =
-        _fetchThumbnailFile(
-          url,
-          cacheKey: cacheKey,
-          mediaVersion: mediaVersion,
-          generation: generation,
-          urlInvalidation: urlInvalidation,
-        ).whenComplete(() {
-          if (identical(_thumbnailFetchesByUrl[cacheKey], fetch)) {
-            _thumbnailFetchesByUrl.remove(cacheKey);
-          }
-        });
-    MediaCacheTracking.rememberInFlightFetch(
-      _thumbnailFetchesByUrl,
-      cacheKey,
-      fetch,
-      maxEntries: _maxThumbnailInFlightFetches,
-    );
-    return fetch;
-  }
-
+  static Future<File> fetchThumbnailFile(
+    String url, {
+    int? mediaVersion,
+    MediaPrefetchBudget? prefetchBudget,
+  }) => _TemplateMediaCacheDownloads.fetch(
+    url,
+    preview: false,
+    mediaVersion: mediaVersion,
+    prefetchBudget: prefetchBudget,
+  );
   static Future<File> _fetchThumbnailFile(
     String url, {
     required String cacheKey,
     required int? mediaVersion,
     required int generation,
     required int urlInvalidation,
+    MediaDownloadConstraint? constraint,
   }) async {
     final cachedFile = await getCachedThumbnailFile(
       url,
@@ -202,7 +148,13 @@ class TemplateMediaCache {
       );
     }
 
-    final file = await thumbnailCache.getSingleFile(url, key: cacheKey);
+    final file = await _TemplateMediaCacheStorage.download(
+      thumbnailCache,
+      url,
+      cacheKey: cacheKey,
+      preview: false,
+      constraint: constraint,
+    );
     if (!_TemplateMediaCacheMaintenance._isCurrentFetch(
       cacheKey,
       generation: generation,
@@ -244,57 +196,23 @@ class TemplateMediaCache {
     return file;
   }
 
-  static Future<File> fetchPreviewFile(String url, {int? mediaVersion}) {
-    final cacheKey = cacheKeyForMedia(url, mediaVersion: mediaVersion);
-    final inFlightFetch = _previewFetchesByUrl[cacheKey];
-    if (inFlightFetch != null) {
-      return inFlightFetch;
-    }
-
-    late final Future<File> fetch;
-    final generation = _cacheGeneration;
-    final urlInvalidation = _previewInvalidationByUrl[cacheKey] ?? 0;
-    MediaCacheTracking.rememberLatestGeneration(
-      _latestPreviewFetchGenerationByUrl,
-      cacheKey,
-      generation,
-      maxEntries: _maxBlockedPreviewCacheUrls,
-    );
-    fetch =
-        _fetchPreviewFile(
-              url,
-              cacheKey: cacheKey,
-              mediaVersion: mediaVersion,
-              generation: generation,
-              urlInvalidation: urlInvalidation,
-            )
-            .then((file) {
-              TemplateMediaCacheBudget.schedulePreview(
-                file.parent,
-                onFailure: _TemplateMediaCacheMaintenance._logCacheFailure,
-              );
-              return file;
-            })
-            .whenComplete(() {
-              if (identical(_previewFetchesByUrl[cacheKey], fetch)) {
-                _previewFetchesByUrl.remove(cacheKey);
-              }
-            });
-    MediaCacheTracking.rememberInFlightFetch(
-      _previewFetchesByUrl,
-      cacheKey,
-      fetch,
-      maxEntries: _maxPreviewInFlightFetches,
-    );
-    return fetch;
-  }
-
+  static Future<File> fetchPreviewFile(
+    String url, {
+    int? mediaVersion,
+    MediaPrefetchBudget? prefetchBudget,
+  }) => _TemplateMediaCacheDownloads.fetch(
+    url,
+    preview: true,
+    mediaVersion: mediaVersion,
+    prefetchBudget: prefetchBudget,
+  );
   static Future<File> _fetchPreviewFile(
     String url, {
     required String cacheKey,
     required int? mediaVersion,
     required int generation,
     required int urlInvalidation,
+    MediaDownloadConstraint? constraint,
   }) async {
     final cachedFile = await getCachedPreviewFile(
       url,
@@ -312,7 +230,13 @@ class TemplateMediaCache {
       );
     }
 
-    final file = await previewVideoCache.getSingleFile(url, key: cacheKey);
+    final file = await _TemplateMediaCacheStorage.download(
+      previewVideoCache,
+      url,
+      cacheKey: cacheKey,
+      preview: true,
+      constraint: constraint,
+    );
     if (!_TemplateMediaCacheMaintenance._isCurrentFetch(
       cacheKey,
       generation: generation,
@@ -347,6 +271,10 @@ class TemplateMediaCache {
       maxEntries: _maxPreviewFileReferences,
     );
     _blockedPreviewCacheUrls.remove(cacheKey);
+    TemplateMediaCacheBudget.schedulePreview(
+      file.parent,
+      onFailure: _TemplateMediaCacheMaintenance._logCacheFailure,
+    );
     return file;
   }
 

@@ -218,11 +218,20 @@ public sealed record PublicTemplatesDiscoveryQuery(
 
 public sealed record PublicTemplatesDiscoverySectionResponse(
     string Category,
-    IReadOnlyList<FeedTemplateCardDto> Items);
+    IReadOnlyList<FeedTemplateCardDto> Items,
+    Guid? SectionId = null,
+    Guid? CategoryId = null,
+    string? Title = null,
+    string? Subtitle = null,
+    bool ShowInCarousel = true,
+    bool ShowAsRail = true);
 
 public sealed record PublicTemplatesDiscoveryResponse(
     IReadOnlyList<PublicTemplatesDiscoverySectionResponse> Sections,
-    DateTime GeneratedAtUtc);
+    DateTime GeneratedAtUtc,
+    long? Revision = null,
+    PublicDiscoveryPageSettings? Page = null,
+    int SchemaVersion = 1);
 
 public sealed record PublicRandomTemplateQuery(
     TemplateType? Type,

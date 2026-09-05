@@ -29,7 +29,7 @@ const adminNavigationAreaDefinitions: readonly AdminNavigationAreaDefinition[] =
   },
   { key: "content-studio", itemKeys: ["templates"] },
   { key: "revenue-risk", itemKeys: ["economy"] },
-  { key: "growth-rewards", itemKeys: ["promo-codes", "gamification"] },
+  { key: "growth-rewards", itemKeys: ["email-broadcasts", "promo-codes", "gamification"] },
 ];
 
 const adminNavigationAreaLabels: Record<Locale, Record<AdminNavigationAreaKey, string>> = {

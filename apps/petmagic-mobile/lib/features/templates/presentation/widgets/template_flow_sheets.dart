@@ -15,11 +15,13 @@ import 'package:petmagic_mobile/core/performance/performance_guard.dart';
 import 'package:petmagic_mobile/core/performance/media_lifecycle_policy.dart';
 import 'package:petmagic_mobile/core/performance/template_media_cache.dart';
 import 'package:petmagic_mobile/core/performance/template_preview_video_controller.dart';
+import 'package:petmagic_mobile/core/performance/template_preview_video_source.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 import 'package:petmagic_mobile/features/templates/application/template_error_key_mapper.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_entitlement_provider.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_generation_controller.dart';
+import 'package:petmagic_mobile/features/templates/presentation/template_preview_media_selection.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/generation_completed_premium_gate.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/template_preview_image.dart';
 import 'package:petmagic_mobile/features/wallet/application/wallet_controller.dart';
@@ -33,6 +35,7 @@ import 'package:petmagic_mobile/shared/widgets/premium_crown_icon.dart';
 import 'package:petmagic_mobile/shared/widgets/premium_shimmer_button.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:video_player/video_player.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 
 part 'template_flow_sheets_actions.part.dart';
@@ -44,7 +47,12 @@ part 'template_flow_sheets_generation.part.dart';
 part 'template_flow_sheets_helpers.part.dart';
 part 'template_flow_media_preview.part.dart';
 part 'template_flow_video_preview.part.dart';
+part 'template_flow_video_preview_view.part.dart';
+part 'template_flow_thumbnail.part.dart';
+part 'template_flow_preview_playback.part.dart';
 part 'template_flow_video_preview_lifecycle.part.dart';
+part 'template_flow_video_preview_source.part.dart';
+part 'template_flow_video_preview_initialize.part.dart';
 
 enum TemplateDetailAction { upload, unlockPremium }
 

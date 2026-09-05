@@ -389,6 +389,7 @@ public sealed partial class TemplatesApiIntegrationTests
             }
 
             builder.Services.AddScoped<ITemplatesService, TemplatesService>();
+            builder.Services.AddScoped<ITemplateDiscoveryAdminService, TemplateDiscoveryAdminService>();
             builder.Services.AddScoped<TemplateGenerationService>();
             builder.Services.AddScoped<ITemplateGenerationService>(serviceProvider =>
                 serviceProvider.GetRequiredService<TemplateGenerationService>());

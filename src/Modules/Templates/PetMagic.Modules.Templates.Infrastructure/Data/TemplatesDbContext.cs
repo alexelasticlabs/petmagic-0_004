@@ -7,6 +7,9 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data;
 
 public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> options) : DbContext(options)
 {
+    public DbSet<TemplateDiscoveryPage> TemplateDiscoveryPages => Set<TemplateDiscoveryPage>();
+    public DbSet<TemplateDiscoveryRevision> TemplateDiscoveryRevisions => Set<TemplateDiscoveryRevision>();
+    public DbSet<TemplateDiscoveryCommandReceipt> TemplateDiscoveryCommandReceipts => Set<TemplateDiscoveryCommandReceipt>();
     public DbSet<TemplateCategory> TemplateCategories => Set<TemplateCategory>();
 
     public DbSet<TemplateItem> TemplateItems => Set<TemplateItem>();
@@ -65,6 +68,7 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
+        TemplateDiscoveryModel.Configure(builder);
         ConfigurePushOutbox(builder, "templates_push_outbox");
 
         builder.Entity<TemplateCategory>(entity =>

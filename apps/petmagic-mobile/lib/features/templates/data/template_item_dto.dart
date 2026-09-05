@@ -74,16 +74,18 @@ class TemplateItemDto {
     final thumbnailUrl =
         _normalizeOptionalString(json['thumbnailUrl']) ??
         _normalizeOptionalString(media['thumbnailUrl']);
-    final animatedPreviewUrl = _normalizeOptionalString(
-      media['animatedPreviewUrl'],
-    );
-    final feedLoopLowUrl = _normalizeOptionalString(media['feedLoopLowUrl']);
-    final feedLoopMediumUrl = _normalizeOptionalString(
-      media['feedLoopMediumUrl'],
-    );
-    final detailPreviewUrl = _normalizeOptionalString(
-      media['detailPreviewUrl'],
-    );
+    final animatedPreviewUrl =
+        _normalizeOptionalString(json['animatedPreviewUrl']) ??
+        _normalizeOptionalString(media['animatedPreviewUrl']);
+    final feedLoopLowUrl =
+        _normalizeOptionalString(json['feedLoopLowUrl']) ??
+        _normalizeOptionalString(media['feedLoopLowUrl']);
+    final feedLoopMediumUrl =
+        _normalizeOptionalString(json['feedLoopMediumUrl']) ??
+        _normalizeOptionalString(media['feedLoopMediumUrl']);
+    final detailPreviewUrl =
+        _normalizeOptionalString(json['detailPreviewUrl']) ??
+        _normalizeOptionalString(media['detailPreviewUrl']);
     final mediaKind =
         _normalizeOptionalString(json['mediaKind']) ??
         _normalizeOptionalString(media['mediaKind']);

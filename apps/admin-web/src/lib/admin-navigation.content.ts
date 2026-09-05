@@ -7,6 +7,7 @@ type AdminPageMetaCopy = {
   gamification: { title: string; description: string };
   promoCodes: { title: string; description: string };
   users: { title: string; description: string };
+  emailBroadcasts: { title: string; description: string };
   userProfile: { title: string; description: string };
   generations: { title: string; description: string };
   feedback: { title: string; description: string };
@@ -18,6 +19,7 @@ type AdminPageMetaCopy = {
   imageTemplates: { title: string; description: string };
   videoTemplates: { title: string; description: string };
   templateCategories: { title: string; description: string };
+  templateDiscovery: { title: string; description: string };
   templateDailyFeatured: { title: string; description: string };
   templateAnalytics: { title: string; description: string };
   templates: { title: string; description: string };
@@ -26,6 +28,11 @@ type AdminPageMetaCopy = {
 
 const adminPageMetaCopy: Record<Locale, AdminPageMetaCopy> = {
   ru: {
+    templateDiscovery: { title: "Главная каталога", description: "Категории, обложки и подборки для мобильной витрины." },
+    emailBroadcasts: {
+      title: "Email-рассылки",
+      description: "Создание писем, выбор получателей и контроль отправки.",
+    },
     fallbackAdministratorName: "администратор",
     dashboard: {
       title: "Дашборд",
@@ -115,6 +122,11 @@ const adminPageMetaCopy: Record<Locale, AdminPageMetaCopy> = {
     },
   },
   en: {
+    templateDiscovery: { title: "Discovery page", description: "Categories, covers and collections for mobile discovery." },
+    emailBroadcasts: {
+      title: "Email campaigns",
+      description: "Compose messages, choose recipients, and track sending progress.",
+    },
     fallbackAdministratorName: "administrator",
     dashboard: {
       title: "Dashboard",

@@ -9,6 +9,29 @@ class AppLocalizationsRu extends AppLocalizations {
   AppLocalizationsRu([String locale = 'ru']) : super(locale);
 
   @override
+  String templatePreviewVideoResult(String duration) {
+    return 'Результат: видео ≈ $duration с';
+  }
+
+  @override
+  String get templatePreviewVideoDurationUnknown =>
+      'Видео · длительность не указана';
+
+  @override
+  String get templatePreviewImageResult => 'Результат: фото';
+
+  @override
+  String templatePreviewCreationTime(String eta) {
+    return 'Создание обычно занимает $eta';
+  }
+
+  @override
+  String get templatePreviewDescriptionMore => 'Подробнее о шаблоне';
+
+  @override
+  String get templatePreviewDescriptionLess => 'Свернуть';
+
+  @override
   String get navDiscover => 'Обзор';
 
   @override
@@ -3160,11 +3183,11 @@ class AppLocalizationsRu extends AppLocalizations {
       'Мы не продаем персональные данные. Передаем их только обработчикам, нужным для работы PetMagic.';
 
   @override
-  String get authRequiredTitle => 'Войдите, чтобы открыть это действие';
+  String get authRequiredTitle => 'Войдите в PetMagic';
 
   @override
   String get authRequiredMessage =>
-      'Гость может изучать приложение, но действия с шаблонами, наградами и PawSpark требуют аккаунт PetMagic.';
+      'Создавайте фото и видео питомца, сохраняйте результаты и получайте бонусы с аккаунтом PetMagic. Смотреть шаблоны можно без входа.';
 
   @override
   String get authRequiredContinueBrowsing => 'Продолжить просмотр';

@@ -95,7 +95,7 @@ class _TopBar extends StatelessWidget {
             style: OutlinedButton.styleFrom(
               minimumSize: const Size(0, 40),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              foregroundColor: colors.accent,
+              foregroundColor: colors.accentInk,
               side: BorderSide(color: colors.accent.withValues(alpha: 0.5)),
             ),
           )
@@ -128,7 +128,7 @@ class _GiftButton extends StatelessWidget {
       message: tooltip,
       child: _HeaderButton(
         icon: Icons.emoji_events_rounded,
-        color: colors.gold,
+        color: colors.goldInk,
         onPressed: onPressed,
       ),
     );

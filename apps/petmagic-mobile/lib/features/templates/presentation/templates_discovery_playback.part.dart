@@ -92,20 +92,29 @@ class _TemplateDiscoveryRailsState
 
     return SliverList.separated(
       itemCount: widget.sections.length,
-      separatorBuilder: (_, _) => const SizedBox(height: PetMagicSpacing.lg),
+      findItemIndexCallback: (key) {
+        final index = widget.sections.indexWhere(
+          (section) => ValueKey(section.category) == key,
+        );
+        return index < 0 ? null : index;
+      },
+      separatorBuilder: (_, _) => const SizedBox(height: PetMagicSpacing.xs),
       itemBuilder: (context, index) {
         final section = widget.sections[index];
-        return TemplateDiscoveryRail(
-          section: section,
-          sectionIndex: index,
-          moreLabel: widget.moreLabel,
-          playbackManager: playbackManager,
-          previewControllerFactory: widget.previewControllerFactory,
-          onMorePressed: () => widget.onMorePressed(section.category),
-          onTemplatePressed: (template) => widget.onTemplatePressed(
-            template,
-            section.category,
-            section.items,
+        return DiscoverySectionReveal(
+          key: ValueKey(section.category),
+          child: TemplateDiscoveryRail(
+            section: section,
+            sectionIndex: index,
+            moreLabel: widget.moreLabel,
+            playbackManager: playbackManager,
+            previewControllerFactory: widget.previewControllerFactory,
+            onMorePressed: () => widget.onMorePressed(section.category),
+            onTemplatePressed: (template) => widget.onTemplatePressed(
+              template,
+              section.category,
+              section.items,
+            ),
           ),
         );
       },

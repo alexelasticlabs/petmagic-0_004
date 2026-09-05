@@ -44,6 +44,16 @@ export type GenerationsPageText = {
   copyId: string;
   copiedId: string;
   copyIdFailed: string;
+  openMedia: string;
+  mediaLoading: string;
+  mediaError: string;
+  mediaRetryHint: string;
+  mediaMissingBefore: string;
+  mediaMissingAfter: string;
+  refreshMedia: string;
+  refreshHistory: string;
+  resetFilters: string;
+  technicalDetails: string;
   before: string;
   after: string;
   compareReady: string;
@@ -185,6 +195,16 @@ const generationsPageText: Record<Locale, GenerationsPageText> = {
     copyId: "Копировать полный ID",
     copiedId: "ID скопирован",
     copyIdFailed: "Не удалось скопировать ID",
+    openMedia: "Открыть файл ↗",
+    mediaLoading: "Загрузка медиа…",
+    mediaError: "Не удалось загрузить файл",
+    mediaRetryHint: "Обновите медиа, чтобы получить новую ссылку.",
+    mediaMissingBefore: "Исходный файл недоступен",
+    mediaMissingAfter: "Результат пока недоступен",
+    refreshMedia: "Обновить медиа",
+    refreshHistory: "Обновить историю",
+    resetFilters: "Сбросить фильтры",
+    technicalDetails: "Технические подробности",
     before: "До",
     after: "После",
     compareReady: "Доступно",
@@ -372,6 +392,16 @@ const generationsPageText: Record<Locale, GenerationsPageText> = {
     copyId: "Copy full ID",
     copiedId: "ID copied",
     copyIdFailed: "Failed to copy ID",
+    openMedia: "Open file ↗",
+    mediaLoading: "Loading media…",
+    mediaError: "Unable to load media",
+    mediaRetryHint: "Refresh media to get a new link.",
+    mediaMissingBefore: "Source media is unavailable",
+    mediaMissingAfter: "Result is not available yet",
+    refreshMedia: "Refresh media",
+    refreshHistory: "Refresh history",
+    resetFilters: "Reset filters",
+    technicalDetails: "Technical details",
     before: "Before",
     after: "After",
     compareReady: "Available",

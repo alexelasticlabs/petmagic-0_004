@@ -87,8 +87,16 @@ extension _GenerationStatusPageView on _GenerationStatusPageState {
                     _CompletedStatus(generation: generation),
                     const SizedBox(height: 12),
                     _ResultCard(
+                      key: ValueKey('result-${generation.generationId}'),
                       generation: generation,
                       onOpenViewer: () => _openFullscreenPreview(generation),
+                    ),
+                    const SizedBox(height: 12),
+                    GenerationResultQuickActions(
+                      generation: generation,
+                      busy: _isMediaActionInFlight,
+                      onSave: () => unawaited(_saveToGallery(generation)),
+                      onShare: () => unawaited(_shareResult(generation)),
                     ),
                     const SizedBox(height: 10),
                     if (!isVideoGeneration(generation) &&

@@ -8,6 +8,11 @@
   "settings": {
     "dotnet.defaultSolution": "PetMagic.slnx",
     "dart.flutterSdkPath": "D:\\dev\\sdk\\flutter",
+    "dart.analysisExcludedFolders": [
+      "tmp",
+      ".tmp",
+      "artifacts"
+    ],
     "editor.formatOnSave": true,
     "files.exclude": {
       "**/bin": true,

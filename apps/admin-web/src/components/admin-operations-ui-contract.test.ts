@@ -9,17 +9,17 @@ function readSource(relativePath: string) {
 }
 
 describe("admin operations UI contract", () => {
-  it("renders broadcast history as a safe aggregate queue and inspector", () => {
+  it("renders broadcast history with aggregate rows and a details drawer", () => {
     const source = readSource("./users-email-broadcasts-workspace.tsx");
 
-    expect(source).toContain("<AdminQueueLayout");
-    expect(source).toContain("<AdminInspector");
+    expect(source).toContain("styles.queueList");
+    expect(source).toContain("<AdminDetailsDrawer");
     expect(source).toContain("fetchAdminEmailBroadcasts(query, signal)");
     expect(source).toContain("fetchAdminEmailBroadcast(selectedBroadcastId!, signal)");
     expect(source).toContain("retryFailedAdminEmailBroadcast(selectedBroadcastId!)");
     expect(source).toContain("retryableFailedCount");
     expect(source).toContain("refetchInterval");
-    expect(source).toContain('selected: item.broadcastId, tab: "broadcasts"');
+    expect(source).toContain("selected: item.broadcastId, tab: null");
     expect(source).not.toContain("detail.body");
     expect(source).not.toContain("recipientEmail");
     expect(source).not.toContain("providerPayload");
@@ -27,14 +27,15 @@ describe("admin operations UI contract", () => {
 
   it("keeps user selection persistent, actor scoped, removable, and eligibility aware", () => {
     const usersSource = readSource("./users-management-users-card.tsx");
+    const selectionSource = readSource("./email-recipient-selection.ts");
     const traySource = readSource("./admin/admin-selection-tray.tsx");
 
-    expect(usersSource).toContain(
-      'const selectionStoragePrefix = "petmagic.admin.users.email-selection:v1"'
+    expect(selectionSource).toContain(
+      'export const selectionStoragePrefix = "petmagic.admin.users.email-selection:v1"'
     );
     expect(usersSource).toContain("`${selectionStoragePrefix}:${session.user.userId}`");
     expect(usersSource).toContain("window.localStorage.setItem(");
-    expect(usersSource).toContain("eligible: user.isActive && user.emailConfirmed");
+    expect(selectionSource).toContain("eligible: user.isActive && user.emailConfirmed");
     expect(usersSource).toContain("<AdminSelectionTray");
     expect(usersSource).toContain("onRemove={(userId)");
     expect(usersSource).toContain("onClear={() => setSelectedUsers(new Map())}");

@@ -636,6 +636,61 @@ public sealed partial class TemplatesServiceTests
         Assert.Equal("templates.reference_duration_required", activation.Error.Code);
     }
 
+    [Theory]
+    [InlineData(true, null, "templates.invalid_preprocessing_model")]
+    [InlineData(true, "", "templates.invalid_preprocessing_model")]
+    [InlineData(true, "  ", "templates.invalid_preprocessing_model")]
+    [InlineData(false, null, "templates.invalid_kling_model")]
+    [InlineData(false, "", "templates.invalid_kling_model")]
+    [InlineData(false, "  ", "templates.invalid_kling_model")]
+    public async Task ChangeStatusAsync_ShouldRejectActivation_WhenVideoModelIsMissing(
+        bool missingPreprocessingModel,
+        string? missingModel,
+        string expectedError)
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var created = await service.CreateVideoAsync(
+            new CreateVideoTemplateCommand(
+                "Video draft",
+                "Missing model validation",
+                "Dance",
+                ["dance"],
+                false,
+                40,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                string.Empty,
+                CreatePreviewAsset(),
+                CreateReferenceAsset(9.8),
+                "openai/gpt-image-2/edit",
+                "keep pet",
+                "fal-ai/kling-video/v3/standard/motion-control",
+                "dance",
+                true,
+                PetPhotoRequirements: ["One pet"]),
+            CancellationToken.None);
+        Assert.True(created.IsSuccess);
+
+        var template = await dbContext.TemplateItems.SingleAsync(x => x.Id == created.Value.TemplateId);
+        if (missingPreprocessingModel)
+        {
+            template.PreprocessingModel = missingModel;
+        }
+        else
+        {
+            template.KlingModel = missingModel;
+        }
+        await dbContext.SaveChangesAsync();
+
+        var activation = await service.ChangeStatusAsync(
+            new ChangeTemplateStatusCommand(template.Id, TemplateStatus.Active.ToString()),
+            CancellationToken.None);
+
+        Assert.True(activation.IsFailure);
+        Assert.Equal(expectedError, activation.Error.Code);
+        Assert.Equal(TemplateStatus.Draft, template.Status);
+    }
+
     [Fact]
     public async Task UpdateImageAsync_ShouldDeletePreviousPreview_WhenPreviewUrlChanges()
     {

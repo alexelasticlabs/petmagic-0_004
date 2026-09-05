@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'discovery_collection_style.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/lifecycle/app_lifecycle_signal.dart';
@@ -105,10 +106,7 @@ class _TemplateDiscoveryMediaState extends State<TemplateDiscoveryMedia> {
   Widget build(BuildContext context) {
     final template = widget.template;
     final imageUrl = resolveTemplateDiscoveryImageUrl(template);
-    final fallback = _DiscoveryMediaFallback(
-      category: widget.category,
-      paletteIndex: widget.paletteIndex,
-    );
+    final fallback = _DiscoveryMediaFallback(category: widget.category);
     final controller = _playback.videoController;
     final showVideo = controller != null && controller.value.isInitialized;
     final videoLoadFailed = _playback.videoLoadFailed;
@@ -135,11 +133,22 @@ class _TemplateDiscoveryMediaState extends State<TemplateDiscoveryMedia> {
             ),
           ),
         if (videoLoadFailed)
-          PetMagicImageError(
-            title: AppLocalizations.of(context).templateFlowPreviewUnavailable,
-            retryLabel: AppLocalizations.of(context).retryAction,
-            onRetry: _playback.retryPreviewLoad,
-            icon: Icons.videocam_off_rounded,
+          TextButtonTheme(
+            data: TextButtonThemeData(
+              style: Theme.of(context).textButtonTheme.style?.copyWith(
+                foregroundColor: WidgetStatePropertyAll(
+                  context.petMagicColors.accentInk,
+                ),
+              ),
+            ),
+            child: PetMagicImageError(
+              title: AppLocalizations.of(
+                context,
+              ).templateFlowPreviewUnavailable,
+              retryLabel: AppLocalizations.of(context).retryAction,
+              onRetry: _playback.retryPreviewLoad,
+              icon: Icons.videocam_off_rounded,
+            ),
           ),
       ],
     );
@@ -192,24 +201,14 @@ String? resolveTemplateDiscoveryImageUrl(TemplateItem? template) {
 }
 
 class _DiscoveryMediaFallback extends StatelessWidget {
-  const _DiscoveryMediaFallback({
-    required this.category,
-    required this.paletteIndex,
-  });
+  const _DiscoveryMediaFallback({required this.category});
 
   final String category;
-  final int paletteIndex;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
-    final palette = <Color>[
-      colors.accent,
-      colors.purple,
-      colors.blue,
-      colors.gold,
-    ];
-    final accent = palette[paletteIndex.abs() % palette.length];
+    final accent = DiscoveryCollectionStyle.of(context, category).accent;
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -242,7 +241,9 @@ class _DiscoveryMediaFallback extends StatelessWidget {
             child: Icon(
               Icons.pets_rounded,
               size: 54,
-              color: Colors.white.withValues(alpha: 0.74),
+              color: Theme.of(context).brightness == Brightness.light
+                  ? colors.textStrong.withValues(alpha: 0.72)
+                  : Colors.white.withValues(alpha: 0.74),
             ),
           ),
           Center(
@@ -251,7 +252,9 @@ class _DiscoveryMediaFallback extends StatelessWidget {
               child: Icon(
                 Icons.auto_awesome_rounded,
                 size: 24,
-                color: Colors.white.withValues(alpha: 0.88),
+                color: Theme.of(context).brightness == Brightness.light
+                    ? colors.textStrong.withValues(alpha: 0.8)
+                    : Colors.white.withValues(alpha: 0.88),
               ),
             ),
           ),

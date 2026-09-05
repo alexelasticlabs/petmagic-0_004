@@ -5,27 +5,46 @@ class TemplateMediaFrame extends StatelessWidget {
     required this.template,
     this.expand = false,
     this.isActive = true,
+    this.prepareOffscreen = false,
+    this.playWhenActive = false,
+    this.allowDetailUpgrade = true,
+    this.playbackRegistry,
     this.autoplay = true,
+    this.immersive = false,
+    this.preferLowResolution = true,
+    this.muted = true,
+    this.onMutedChanged,
+    this.controllerFactory,
     super.key,
   });
 
   final TemplateItem template;
   final bool expand;
   final bool isActive;
+  final bool prepareOffscreen;
+
+  /// The pager already knows the visible selection; bypass detector batching.
+  final bool playWhenActive;
+  final bool allowDetailUpgrade;
+  final TemplatePreviewPlaybackRegistry? playbackRegistry;
   final bool autoplay;
+  final bool immersive;
+  final bool preferLowResolution;
+  final bool muted;
+  final ValueChanged<bool>? onMutedChanged;
+  final Future<VideoPlayerController> Function(String)? controllerFactory;
 
   @override
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
-    final asset = template.previewAsset;
-    final safeAssetUrl = parseSafeGenerationMediaUri(asset?.url)?.toString();
-    final safeDetailPreviewUrl = parseSafeGenerationMediaUri(
-      template.detailPreviewUrl,
-    )?.toString();
-    final safeThumbnailUrl = parseSafeGenerationMediaUri(
-      template.thumbnailUrl,
-    )?.toString();
+    final selection = TemplatePreviewMediaSelection(
+      template,
+      expand: expand,
+      preferLowResolution: preferLowResolution,
+    );
+    final safeThumbnailUrl = selection.thumbnailUrl;
     final ratio = template.isVideo ? 9 / 16 : 3 / 4;
+    final mediaFit = expand && !immersive ? BoxFit.contain : BoxFit.cover;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -33,25 +52,9 @@ class TemplateMediaFrame extends StatelessWidget {
           constraints.maxWidth,
           MediaQuery.devicePixelRatioOf(context),
         );
-        final preferredMediaUrl = expand
-            ? safeDetailPreviewUrl ?? safeAssetUrl
-            : safeAssetUrl;
-        final usesDetailMedia =
-            expand &&
-            safeDetailPreviewUrl != null &&
-            preferredMediaUrl == safeDetailPreviewUrl;
-        final preferredMediaIsVideo = usesDetailMedia
-            ? template.detailPreviewIsVideo
-            : preferredMediaUrl != null && preferredMediaUrl == safeAssetUrl
-            ? isVideoPreview(asset)
-            : isVideoUrl(preferredMediaUrl);
-        final imageUrl = usesDetailMedia && !preferredMediaIsVideo
-            ? safeDetailPreviewUrl
-            : safeThumbnailUrl != null && !isVideoUrl(safeThumbnailUrl)
-            ? safeThumbnailUrl
-            : preferredMediaUrl != null && !preferredMediaIsVideo
-            ? preferredMediaUrl
-            : null;
+        final preferredMediaUrl = selection.mediaUrl;
+        final preferredMediaIsVideo = selection.isVideo;
+        final imageUrl = selection.imageUrl;
 
         Widget media;
         if (preferredMediaUrl == null && imageUrl == null) {
@@ -66,21 +69,31 @@ class TemplateMediaFrame extends StatelessWidget {
         } else if (preferredMediaIsVideo && preferredMediaUrl != null) {
           media = _NetworkVideoPreview(
             url: preferredMediaUrl,
+            fallbackUrls: selection.videoFallbackUrls,
             playbackIdentity: template.templateId,
             posterUrl: imageUrl,
             posterCacheWidth: cacheWidth,
             mediaVersion: template.mediaVersion,
             isActive: isActive,
             autoplay: autoplay,
+            muted: muted,
+            onMutedChanged: onMutedChanged,
+            immersiveControls: immersive,
+            prepareWhileVisible: immersive,
+            prepareOffscreen: prepareOffscreen,
+            playWhenActive: playWhenActive,
+            allowDetailUpgrade: allowDetailUpgrade,
+            playbackRegistry: playbackRegistry,
+            controllerFactory: controllerFactory,
             useSharedPreviewCache: true,
-            fit: expand ? BoxFit.contain : BoxFit.cover,
+            fit: mediaFit,
             showPlaybackControl: true,
             playbackControlAlignment: expand
                 ? Alignment.centerRight
                 : Alignment.bottomRight,
           );
         } else if (imageUrl != null) {
-          final usesDetailCache = expand && imageUrl == safeDetailPreviewUrl;
+          final usesDetailCache = selection.usesDetailImageCache;
           final sharpFallbackUrl =
               expand &&
                   safeThumbnailUrl != null &&
@@ -105,7 +118,7 @@ class TemplateMediaFrame extends StatelessWidget {
               : TemplatePreviewImage(
                   key: const ValueKey('template-preview-foreground-fallback'),
                   imageUrl: sharpFallbackUrl,
-                  fit: BoxFit.contain,
+                  fit: mediaFit,
                   alignment: Alignment.center,
                   cacheWidth: cacheWidth,
                   mediaVersion: template.mediaVersion,
@@ -122,7 +135,7 @@ class TemplateMediaFrame extends StatelessWidget {
                 );
           final foreground = TemplatePreviewImage(
             imageUrl: imageUrl,
-            fit: expand ? BoxFit.contain : BoxFit.cover,
+            fit: mediaFit,
             alignment: Alignment.center,
             cacheWidth: cacheWidth,
             mediaVersion: template.mediaVersion,
@@ -147,7 +160,7 @@ class TemplateMediaFrame extends StatelessWidget {
                     ),
                   ),
           );
-          if (!expand) {
+          if (!expand || immersive) {
             media = foreground;
           } else {
             final backdropUrl = safeThumbnailUrl ?? imageUrl;

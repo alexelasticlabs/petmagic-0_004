@@ -209,7 +209,7 @@ void main() {
       ProfilePage.routePath,
     );
     expect(find.byType(ProtectedAuthGate), findsOneWidget);
-    expect(find.text(text.authSignInRequired), findsOneWidget);
+    expect(find.text(text.authRequiredTitle), findsOneWidget);
     expect(find.text(text.authRequiredMessage), findsOneWidget);
     expect(find.text('Auth route'), findsNothing);
     expect(walletController.syncSnapshotCalls, 0);

@@ -170,6 +170,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          appLaunchControllerProvider.overrideWith(
+            AuthenticatedWalletAppLaunchController.new,
+          ),
           templateGenerationControllerProvider.overrideWith(
             IdleWalletTemplateGenerationController.new,
           ),
@@ -224,7 +227,7 @@ void main() {
     final text = AppLocalizations.of(rewardsContext);
 
     expect(find.byType(ProtectedAuthGate), findsOneWidget);
-    expect(find.text(text.authSignInRequired), findsOneWidget);
+    expect(find.text(text.authRequiredTitle), findsOneWidget);
     expect(find.text(text.authRequiredMessage), findsOneWidget);
   });
 
@@ -433,6 +436,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          appLaunchControllerProvider.overrideWith(
+            AuthenticatedWalletAppLaunchController.new,
+          ),
           templateGenerationControllerProvider.overrideWith(
             IdleWalletTemplateGenerationController.new,
           ),
@@ -469,68 +475,75 @@ void main() {
     expect(find.text('Wallet route'), findsOneWidget);
   });
 
-  testWidgets('bottom navigation blurs over iOS home indicator area', (
-    tester,
-  ) async {
-    await tester.binding.setSurfaceSize(const Size(390, 844));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
+  testWidgets(
+    'bottom navigation fades smoothly through the home indicator area',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
 
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          templateGenerationControllerProvider.overrideWith(
-            IdleWalletTemplateGenerationController.new,
-          ),
-          generationHistoryControllerProvider.overrideWith(
-            IdleWalletGenerationHistoryController.new,
-          ),
-        ],
-        child: MediaQuery(
-          data: const MediaQueryData(viewPadding: EdgeInsets.only(bottom: 34)),
-          child: MaterialApp(
-            theme: AppTheme.dark(),
-            locale: const Locale('ru'),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
-            supportedLocales: const [
-              Locale('ru'),
-              Locale('en'),
-              Locale('de'),
-              Locale('es'),
-              Locale('fr'),
-              Locale('it'),
-              Locale('pl'),
-            ],
-            home: const PetMagicShell(
-              location: WalletPage.routePath,
-              child: Scaffold(body: Text('Wallet route')),
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appLaunchControllerProvider.overrideWith(
+              AuthenticatedWalletAppLaunchController.new,
+            ),
+            templateGenerationControllerProvider.overrideWith(
+              IdleWalletTemplateGenerationController.new,
+            ),
+            generationHistoryControllerProvider.overrideWith(
+              IdleWalletGenerationHistoryController.new,
+            ),
+          ],
+          child: MediaQuery(
+            data: const MediaQueryData(
+              viewPadding: EdgeInsets.only(bottom: 34),
+            ),
+            child: MaterialApp(
+              theme: AppTheme.dark(),
+              locale: const Locale('ru'),
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: const [
+                Locale('ru'),
+                Locale('en'),
+                Locale('de'),
+                Locale('es'),
+                Locale('fr'),
+                Locale('it'),
+                Locale('pl'),
+              ],
+              home: const PetMagicShell(
+                location: WalletPage.routePath,
+                child: Scaffold(body: Text('Wallet route')),
+              ),
             ),
           ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    final solidSafeAreaBand = find.byWidgetPredicate((widget) {
-      return widget is Positioned &&
-          widget.left == 0 &&
-          widget.right == 0 &&
-          widget.bottom == 0 &&
-          widget.height == 44;
-    });
-
-    expect(solidSafeAreaBand, findsNothing);
-    expect(
-      find.byWidgetPredicate((widget) {
+      final solidSafeAreaBand = find.byWidgetPredicate((widget) {
         return widget is Positioned &&
             widget.left == 0 &&
             widget.right == 0 &&
             widget.bottom == 0 &&
-            widget.height == 150;
-      }),
-      findsOneWidget,
-    );
-    expect(find.byType(BackdropFilter), findsAtLeastNWidgets(2));
-  });
+            widget.height == 44;
+      });
+
+      expect(solidSafeAreaBand, findsNothing);
+      final backdrop = find.byKey(const ValueKey('bottom-nav-backdrop'));
+      expect(backdrop, findsOneWidget);
+      expect(tester.getBottomRight(backdrop).dy, 844);
+      expect(
+        find.descendant(of: backdrop, matching: find.byType(BackdropFilter)),
+        findsNothing,
+      );
+      final decoration =
+          tester.widget<DecoratedBox>(backdrop).decoration as BoxDecoration;
+      final gradient = decoration.gradient! as LinearGradient;
+      expect(gradient.colors.first.a, 0);
+      expect(gradient.colors.last, PetMagicPalettes.dark.backgroundBottom);
+    },
+  );
 
   testWidgets('rewards page redeems promo codes with friendly errors', (
     tester,

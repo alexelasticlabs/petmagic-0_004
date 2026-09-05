@@ -63,11 +63,11 @@ class AppConfig {
 
   static const mediaCacheMaxBytes = int.fromEnvironment(
     'PETMAGIC_MEDIA_CACHE_MAX_BYTES',
-    defaultValue: 120 * 1024 * 1024,
+    defaultValue: 64 * 1024 * 1024,
   );
   static const previewVideoCacheMaxBytes = int.fromEnvironment(
     'PETMAGIC_PREVIEW_VIDEO_CACHE_MAX_BYTES',
-    defaultValue: 400 * 1024 * 1024,
+    defaultValue: 192 * 1024 * 1024,
   );
   static const mediaCacheStalePeriodHours = int.fromEnvironment(
     'PETMAGIC_MEDIA_CACHE_STALE_HOURS',
@@ -114,7 +114,7 @@ class AppConfig {
 
   static int get mediaCacheMaxBytesSafe {
     if (mediaCacheMaxBytes <= 0) {
-      return 120 * 1024 * 1024;
+      return 64 * 1024 * 1024;
     }
 
     return mediaCacheMaxBytes;
@@ -122,7 +122,7 @@ class AppConfig {
 
   static int get previewVideoCacheMaxBytesSafe {
     if (previewVideoCacheMaxBytes <= 0) {
-      return 400 * 1024 * 1024;
+      return 192 * 1024 * 1024;
     }
 
     return previewVideoCacheMaxBytes;

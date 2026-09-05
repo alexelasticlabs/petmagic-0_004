@@ -1,0 +1,50 @@
+{
+  "version": "0.2",
+  "language": "en",
+  "useGitignore": true,
+  "dictionaries": [
+    "csharp",
+    "dotnet",
+    "dart",
+    "flutter",
+    "sql",
+    "fonts",
+    "docker",
+    "node",
+    "npm"
+  ],
+  "words": [
+    "Antiforgery",
+    "ASPNETCORE",
+    "bytedance",
+    "Comfortaa",
+    "Cupertino",
+    "HEALTHCHECK",
+    "kling",
+    "netcore",
+    "Npgsql",
+    "petmagic",
+    "psql",
+    "riverpod",
+    "seedream",
+    "Serilog",
+    "signalr",
+    "whsec",
+    "wwwroot"
+  ],
+  "ignorePaths": [
+    "**/node_modules/**",
+    "**/bin/**",
+    "**/obj/**",
+    "**/.next*/**",
+    "**/.dart_tool/**",
+    "**/build/**",
+    "**/pubspec.lock",
+    "**/package-lock.json",
+    "apps/petmagic-mobile/lib/app/localization/generated/**",
+    "apps/petmagic-mobile/third_party/**",
+    "tmp/**",
+    ".tmp/**",
+    "artifacts/**"
+  ]
+}

@@ -72,7 +72,7 @@ class _RandomTemplateSheetContent extends StatelessWidget {
                               children: [
                                 Icon(
                                   Icons.casino_rounded,
-                                  color: colors.accent,
+                                  color: colors.accentInk,
                                   size: 22,
                                 ),
                                 const SizedBox(width: 8),

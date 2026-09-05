@@ -19,6 +19,7 @@ abstract interface class TemplatesRepository {
     String templateId, {
     bool forceRefresh = false,
     String? analyticsSource,
+    int? minimumVersion,
   });
 
   Future<TemplateItem?> fetchRandomTemplate({

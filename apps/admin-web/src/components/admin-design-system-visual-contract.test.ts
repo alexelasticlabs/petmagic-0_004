@@ -22,7 +22,7 @@ describe("admin design system visual contract", () => {
   it("keeps navigation flat with a visible active rail and keyboard focus", () => {
     expect(shellStyles).toMatch(/\.navItem\s*\{[\s\S]*?background:\s*transparent;/);
     expect(shellStyles).toContain(".navItemActive::before {");
-    expect(shellStyles).toContain("width: 3px;");
+    expect(shellStyles).toMatch(/\.navItemActive::before\s*\{[^}]*width:\s*2px;/);
     expect(shellStyles).toContain(".navItem:focus-visible,");
   });
 

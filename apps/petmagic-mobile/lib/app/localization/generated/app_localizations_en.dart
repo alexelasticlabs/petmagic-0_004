@@ -9,6 +9,29 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String templatePreviewVideoResult(String duration) {
+    return 'Result: video ≈ $duration s';
+  }
+
+  @override
+  String get templatePreviewVideoDurationUnknown =>
+      'Video · duration not specified';
+
+  @override
+  String get templatePreviewImageResult => 'Result: image';
+
+  @override
+  String templatePreviewCreationTime(String eta) {
+    return 'Creation usually takes $eta';
+  }
+
+  @override
+  String get templatePreviewDescriptionMore => 'More about this template';
+
+  @override
+  String get templatePreviewDescriptionLess => 'Show less';
+
+  @override
   String get navDiscover => 'Discover';
 
   @override
@@ -3153,11 +3176,11 @@ class AppLocalizationsEn extends AppLocalizations {
       'We do not sell personal data. We share it only with processors needed to run PetMagic.';
 
   @override
-  String get authRequiredTitle => 'Sign in to unlock this action';
+  String get authRequiredTitle => 'Sign in to PetMagic';
 
   @override
   String get authRequiredMessage =>
-      'Guests can explore the app, but template actions, rewards and PawSpark features require a PetMagic account.';
+      'Create photos and videos of your pet, save your results and earn rewards with a PetMagic account. You can browse templates without signing in.';
 
   @override
   String get authRequiredContinueBrowsing => 'Continue browsing';

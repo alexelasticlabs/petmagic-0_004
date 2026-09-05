@@ -4,28 +4,50 @@ class _NetworkVideoPreview extends StatefulWidget {
   const _NetworkVideoPreview({
     required this.url,
     required this.playbackIdentity,
+    this.fallbackUrls = const [],
     this.posterUrl,
     this.posterCacheWidth,
     this.mediaVersion,
     this.isActive = true,
     this.autoplay = true,
+    this.muted = true,
+    this.onMutedChanged,
+    this.immersiveControls = false,
+    this.prepareWhileVisible = false,
+    this.prepareOffscreen = false,
+    this.playWhenActive = false,
+    this.allowDetailUpgrade = true,
+    this.playbackRegistry,
     this.useSharedPreviewCache = false,
     this.fit = BoxFit.cover,
     this.showPlaybackControl = true,
     this.playbackControlAlignment = Alignment.bottomRight,
+    this.placeholder,
+    this.controllerFactory,
   });
 
   final String url;
   final String playbackIdentity;
+  final List<String> fallbackUrls;
   final String? posterUrl;
   final int? posterCacheWidth;
   final int? mediaVersion;
   final bool isActive;
   final bool autoplay;
+  final bool muted;
+  final ValueChanged<bool>? onMutedChanged;
+  final bool immersiveControls;
+  final bool prepareWhileVisible;
+  final bool prepareOffscreen;
+  final bool playWhenActive;
+  final bool allowDetailUpgrade;
+  final TemplatePreviewPlaybackRegistry? playbackRegistry;
   final bool useSharedPreviewCache;
   final BoxFit fit;
   final bool showPlaybackControl;
   final Alignment playbackControlAlignment;
+  final Widget? placeholder;
+  final Future<VideoPlayerController> Function(String)? controllerFactory;
 
   @override
   State<_NetworkVideoPreview> createState() => _NetworkVideoPreviewState();
@@ -35,8 +57,7 @@ class _NetworkVideoPreviewState extends State<_NetworkVideoPreview>
     with WidgetsBindingObserver {
   static const double _loadVisibilityFraction = 0.18;
   static const double _playVisibilityFraction = 0.58;
-  static const int _maxSlotRetryAttempts = 6;
-  static const Duration _slotRetryDelay = Duration(milliseconds: 180);
+  static const int _maxRejectedSources = 3;
 
   final Key _visibilityKey = UniqueKey();
 
@@ -50,15 +71,34 @@ class _NetworkVideoPreviewState extends State<_NetworkVideoPreview>
   bool _isAppResumed = true;
   bool _manualPaused = false;
   bool _manualStarted = false;
-  bool _slotRetryScheduled = false;
-  int _slotRetryAttempts = 0;
+  bool _waitingForSlot = false;
+  bool _waitingForDetailSlot = false;
+  late final VoidCallback _slotReleaseListener = _resumeAfterSlotRelease;
+  final Set<String> _rejectedSourceUrls = {};
   int _initializeRequestVersion = 0;
+  int _playbackSyncVersion = 0;
+  String? _sourceUrl;
+  int _upgradeVersion = 0;
+  bool _upgradeInFlight = false;
+  _TemplateVideoPreviewControllerLease? _upgradeLease;
+  VideoPlayerController? _handoverController;
+  int _handoverVersion = 0;
+  bool get _canPrepare =>
+      widget.isActive || widget.prepareWhileVisible || widget.prepareOffscreen;
+  bool get _canLoad =>
+      _isAppResumed &&
+      _canPrepare &&
+      (_isVisibleEnoughToLoad ||
+          widget.prepareOffscreen ||
+          widget.playWhenActive && widget.isActive);
 
-  void _notifyControllerDisposed() {
+  void _refreshVideoPreview() {
     if (mounted) {
       setState(() {});
     }
   }
+
+  void _setVideoPreviewState(VoidCallback update) => setState(update);
 
   @override
   void initState() {
@@ -67,38 +107,95 @@ class _NetworkVideoPreviewState extends State<_NetworkVideoPreview>
     _isAppResumed =
         lifecycleState == null || lifecycleState == AppLifecycleState.resumed;
     WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted &&
+          (widget.prepareOffscreen ||
+              widget.playWhenActive && widget.isActive)) {
+        unawaited(_initialize());
+      }
+    });
   }
 
   @override
   void didUpdateWidget(covariant _NetworkVideoPreview oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.playbackIdentity != widget.playbackIdentity ||
+        oldWidget.mediaVersion != widget.mediaVersion ||
+        oldWidget.playbackRegistry != widget.playbackRegistry) {
+      oldWidget.playbackRegistry?._withdraw(
+        oldWidget.playbackIdentity,
+        oldWidget.mediaVersion,
+        _controller,
+      );
+    }
+    if (oldWidget.playbackIdentity != widget.playbackIdentity ||
+        oldWidget.mediaVersion != widget.mediaVersion) {
+      _rejectedSourceUrls.clear();
+    }
+    if (!widget.allowDetailUpgrade && oldWidget.allowDetailUpgrade) {
+      unawaited(_cancelUpgrade());
+    }
+    if (oldWidget.url != widget.url &&
+        oldWidget.playbackIdentity == widget.playbackIdentity &&
+        oldWidget.mediaVersion == widget.mediaVersion &&
+        oldWidget.useSharedPreviewCache == widget.useSharedPreviewCache &&
+        _controller?.value.isInitialized == true) {
+      // Detail hydration must not remove an already playing feed derivative.
+      _initializeRequestVersion++;
+      _controllerInitInFlight = false;
+      if (widget.isActive && !oldWidget.isActive) {
+        _manualPaused = false;
+        _manualStarted = false;
+      }
+      if (!_canLoad) {
+        unawaited(_disposeVideoController());
+      } else {
+        unawaited(_syncPlaybackState());
+        unawaited(_cancelUpgrade().then((_) => _upgradeToDetail()));
+      }
+      return;
+    }
+    if (oldWidget.playbackIdentity != widget.playbackIdentity ||
         oldWidget.url != widget.url ||
         oldWidget.mediaVersion != widget.mediaVersion ||
         oldWidget.useSharedPreviewCache != widget.useSharedPreviewCache) {
       _failedToLoad = false;
-      _slotRetryAttempts = 0;
-      _slotRetryScheduled = false;
       if (oldWidget.playbackIdentity != widget.playbackIdentity) {
         _manualPaused = false;
         _manualStarted = false;
       }
       unawaited(_disposeVideoController());
-      if (_isAppResumed && widget.isActive && _isVisibleEnoughToLoad) {
+      if (_canLoad) {
         unawaited(_initialize());
       }
       return;
     }
 
     if (oldWidget.isActive != widget.isActive) {
-      if (!widget.isActive) {
+      if (!widget.isActive) unawaited(_cancelUpgrade());
+      if (widget.isActive) {
+        _manualPaused = false;
+        _manualStarted = false;
+      }
+      if (!_canPrepare) {
         unawaited(_disposeVideoController());
-      } else if (_isAppResumed && _isVisibleEnoughToLoad) {
+      } else if (_controller == null && _canLoad) {
         unawaited(_initialize());
+      } else {
+        unawaited(_syncPlaybackState());
       }
     }
-    if (oldWidget.autoplay != widget.autoplay) {
+    if (oldWidget.autoplay != widget.autoplay ||
+        oldWidget.muted != widget.muted ||
+        oldWidget.playWhenActive != widget.playWhenActive) {
       unawaited(_syncPlaybackState());
+    }
+    if (!_canLoad) {
+      unawaited(_disposeVideoController());
+    } else if (_controller == null && !_failedToLoad) {
+      unawaited(_initialize());
+    } else if (widget.isActive) {
+      unawaited(_upgradeToDetail());
     }
   }
 
@@ -113,8 +210,7 @@ class _NetworkVideoPreviewState extends State<_NetworkVideoPreview>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _isAppResumed = true;
-      if (_isVisibleEnoughToLoad &&
-          widget.isActive &&
+      if (_canLoad &&
           _controller == null &&
           !_controllerInitInFlight &&
           !_failedToLoad) {
@@ -134,7 +230,9 @@ class _NetworkVideoPreviewState extends State<_NetworkVideoPreview>
 
   void _handleVisibilityChanged(VisibilityInfo info) {
     final visibleFraction = info.visibleFraction;
-    final shouldLoad = visibleFraction >= _loadVisibilityFraction;
+    final shouldLoad =
+        visibleFraction >=
+        (widget.prepareWhileVisible ? 0.01 : _loadVisibilityFraction);
     final shouldPlay = visibleFraction >= _playVisibilityFraction;
     if (shouldLoad == _isVisibleEnoughToLoad && shouldPlay == _shouldPlay) {
       return;
@@ -143,13 +241,12 @@ class _NetworkVideoPreviewState extends State<_NetworkVideoPreview>
     _isVisibleEnoughToLoad = shouldLoad;
     _shouldPlay = shouldPlay;
 
-    if (!shouldLoad) {
+    if (!shouldLoad && !widget.prepareOffscreen) {
       unawaited(_disposeVideoController());
       return;
     }
 
-    if (_isAppResumed &&
-        widget.isActive &&
+    if (_canLoad &&
         _controller == null &&
         !_controllerInitInFlight &&
         !_failedToLoad) {
@@ -158,198 +255,40 @@ class _NetworkVideoPreviewState extends State<_NetworkVideoPreview>
     }
 
     unawaited(_syncPlaybackState());
-  }
-
-  Future<void> _initialize() async {
-    if (!_isAppResumed ||
-        !widget.isActive ||
-        !_isVisibleEnoughToLoad ||
-        _controllerInitInFlight) {
-      return;
-    }
-
-    final requestVersion = ++_initializeRequestVersion;
-    final url = widget.url;
-    _controllerInitInFlight = true;
-    if (mounted) {
-      setState(() => _failedToLoad = false);
-    }
-
-    final safeUri = parseSafeGenerationMediaUri(url);
-    if (safeUri == null) {
-      if (mounted) {
-        setState(() {
-          _controllerInitInFlight = false;
-          _failedToLoad = true;
-        });
-      }
-      return;
-    }
-
-    final pendingDispose = _pendingControllerDispose;
-    if (pendingDispose != null) {
-      await pendingDispose;
-      if (!_isCurrentVideoRequestToken(requestVersion, url)) {
-        return;
-      }
-    }
-
-    VideoPlayerController? controller;
-    _TemplateVideoPreviewControllerLease? lease;
-    try {
-      lease = _TemplateVideoPreviewControllerLease.tryAcquire(
-        useSharedPreviewCache: widget.useSharedPreviewCache,
-      );
-      if (lease == null) {
-        _controllerInitInFlight = false;
-        _scheduleSlotRetry(requestVersion);
-        return;
-      }
-      _slotRetryAttempts = 0;
-      _slotRetryScheduled = false;
-
-      controller = await _createVideoController(url, safeUri);
-      lease.attach(controller);
-      if (!_isCurrentVideoRequestToken(requestVersion, url)) {
-        await lease.dispose();
-        return;
-      }
-
-      _controller = controller;
-      _controllerLease = lease;
-      if (!_isCurrentVideoRequest(requestVersion, url, controller)) {
-        await lease.dispose();
-        return;
-      }
-
-      await controller.setVolume(0);
-      if (!_isCurrentVideoRequest(requestVersion, url, controller)) {
-        await lease.dispose();
-        return;
-      }
-
-      await controller.setLooping(true);
-      if (!_isCurrentVideoRequest(requestVersion, url, controller)) {
-        await lease.dispose();
-        return;
-      }
-
-      await controller.initialize();
-      if (!_isCurrentVideoRequest(requestVersion, url, controller)) {
-        await lease.dispose();
-        return;
-      }
-
-      await _syncPlaybackState();
-      if (!_isCurrentVideoRequest(requestVersion, url, controller)) {
-        await lease.dispose();
-        return;
-      }
-      setState(() {
-        _failedToLoad = false;
-      });
-    } catch (error, stackTrace) {
-      AppLogger.warn(
-        feature: 'Templates.FlowMediaPreview',
-        operation: 'initialize_video_preview',
-        message: 'Template flow media preview failed to initialize.',
-        error: error,
-        stackTrace: stackTrace,
-        context: {
-          'useSharedPreviewCache': widget.useSharedPreviewCache,
-          'shouldAutoplay': _shouldPlay,
-        },
-      );
-      final isCurrentRequest = _isCurrentVideoRequest(
-        requestVersion,
-        url,
-        controller,
-      );
-      final ownsCurrentController = identical(_controllerLease, lease);
-      if (ownsCurrentController) {
-        _controller = null;
-        _controllerLease = null;
-      }
-      if (lease != null) {
-        await (ownsCurrentController
-            ? _trackControllerDispose(lease, pauseFirst: true)
-            : lease.dispose());
-      }
-      if (isCurrentRequest &&
-          _isCurrentVideoRequestToken(requestVersion, url)) {
-        setState(() {
-          _failedToLoad = true;
-        });
-      }
-    } finally {
-      if (mounted && requestVersion == _initializeRequestVersion) {
-        _controllerInitInFlight = false;
-      }
-    }
-  }
-
-  Future<VideoPlayerController> _createVideoController(
-    String url,
-    Uri safeUri,
-  ) async {
-    if (!widget.useSharedPreviewCache) {
-      return VideoPlayerController.networkUrl(safeUri);
-    }
-
-    return createCachedTemplatePreviewVideoController(
-      url,
-      mediaVersion: widget.mediaVersion,
-      fallbackUri: safeUri,
-    );
-  }
-
-  void _scheduleSlotRetry(int requestVersion) {
-    if (_slotRetryScheduled || !mounted) {
-      return;
-    }
-    if (_slotRetryAttempts >= _maxSlotRetryAttempts) {
-      setState(() => _failedToLoad = true);
-      return;
-    }
-
-    _slotRetryAttempts++;
-    _slotRetryScheduled = true;
-    Future<void>.delayed(_slotRetryDelay).then((_) {
-      _slotRetryScheduled = false;
-      if (!_isCurrentVideoRequestToken(requestVersion, widget.url) ||
-          !_isAppResumed ||
-          !widget.isActive ||
-          !_isVisibleEnoughToLoad ||
-          _controller != null ||
-          _failedToLoad) {
-        return;
-      }
-      unawaited(_initialize());
-    });
+    if (shouldLoad) unawaited(_upgradeToDetail());
   }
 
   void _retryInitialization() {
-    if (!_isAppResumed || !widget.isActive || !_isVisibleEnoughToLoad) {
+    if (!_canLoad) {
       return;
     }
     setState(() => _failedToLoad = false);
-    _slotRetryAttempts = 0;
-    _slotRetryScheduled = false;
+    _rejectedSourceUrls.clear();
     unawaited(_initialize());
   }
 
   Future<void> _syncPlaybackState() async {
+    final syncVersion = ++_playbackSyncVersion;
     final controller = _controller;
-    if (controller == null || !controller.value.isInitialized) {
+    if (controller == null ||
+        identical(controller, _handoverController) ||
+        !controller.value.isInitialized) {
       return;
     }
 
     final shouldPlay =
         _isAppResumed &&
         widget.isActive &&
-        _shouldPlay &&
+        (widget.playWhenActive || _shouldPlay) &&
         (_manualStarted || (widget.autoplay && !_manualPaused));
     try {
+      await controller.setVolume(widget.muted || !widget.isActive ? 0 : 1);
+      if (!mounted ||
+          syncVersion != _playbackSyncVersion ||
+          !identical(controller, _controller) ||
+          !_isAppResumed) {
+        return;
+      }
       if (shouldPlay && !controller.value.isPlaying) {
         await controller.play();
       } else if (!shouldPlay && controller.value.isPlaying) {
@@ -392,104 +331,5 @@ class _NetworkVideoPreviewState extends State<_NetworkVideoPreview>
   }
 
   @override
-  Widget build(BuildContext context) {
-    final controller = _controller;
-    final text = AppLocalizations.of(context);
-    final posterUrl = widget.posterUrl;
-    final hasPoster = posterUrl != null;
-    final isInitialized =
-        widget.isActive && (controller?.value.isInitialized ?? false);
-    final poster = hasPoster
-        ? TemplatePreviewImage(
-            imageUrl: posterUrl,
-            fit: BoxFit.cover,
-            alignment: Alignment.center,
-            cacheWidth: widget.posterCacheWidth,
-            mediaVersion: widget.mediaVersion,
-            placeholder: _EmptyMediaBox(label: text.templateFlowLoadingPreview),
-            errorBuilder: (_) => _TemplatePreviewPlaceholder(
-              isVideo: true,
-              title: _templatePreviewMissingTitle(text),
-              subtitle: _templatePreviewMissingSubtitle(text, isVideo: true),
-            ),
-          )
-        : _EmptyMediaBox(label: text.templateFlowLoadingVideo);
-
-    final child = Stack(
-      fit: StackFit.expand,
-      children: [
-        poster,
-        if (_failedToLoad && !hasPoster)
-          _TemplatePreviewPlaceholder(
-            isVideo: true,
-            title: _templatePreviewMissingTitle(text),
-            subtitle: _templatePreviewMissingSubtitle(text, isVideo: true),
-          ),
-        if (widget.isActive && !_failedToLoad && !isInitialized)
-          Center(
-            child: Semantics(
-              label: text.templateFlowLoadingVideo,
-              child: const CircularProgressIndicator.adaptive(),
-            ),
-          ),
-        if (widget.isActive && _failedToLoad)
-          Center(
-            child: IconButton.filledTonal(
-              tooltip: text.retryAction,
-              onPressed: _retryInitialization,
-              icon: const Icon(Icons.refresh_rounded),
-            ),
-          ),
-        if (isInitialized) ...[
-          FittedBox(
-            fit: widget.fit,
-            child: SizedBox(
-              width: controller!.value.size.width,
-              height: controller.value.size.height,
-              child: VideoPlayer(controller),
-            ),
-          ),
-          if (widget.showPlaybackControl)
-            Align(
-              alignment: widget.playbackControlAlignment,
-              child: Padding(
-                padding: const EdgeInsets.all(10),
-                child: IconButton.filledTonal(
-                  tooltip: controller.value.isPlaying
-                      ? text.mediaPauseAction
-                      : text.mediaPlayAction,
-                  onPressed: () async {
-                    if (controller.value.isPlaying) {
-                      _manualPaused = true;
-                      _manualStarted = false;
-                      await controller.pause();
-                    } else {
-                      _manualPaused = false;
-                      _manualStarted = true;
-                      if (_shouldPlay) {
-                        await controller.play();
-                      }
-                    }
-                    if (mounted) {
-                      setState(() {});
-                    }
-                  },
-                  icon: Icon(
-                    controller.value.isPlaying
-                        ? Icons.pause_rounded
-                        : Icons.play_arrow_rounded,
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ],
-    );
-
-    return VisibilityDetector(
-      key: _visibilityKey,
-      onVisibilityChanged: _handleVisibilityChanged,
-      child: child,
-    );
-  }
+  Widget build(BuildContext context) => _buildVideoPreview(context);
 }

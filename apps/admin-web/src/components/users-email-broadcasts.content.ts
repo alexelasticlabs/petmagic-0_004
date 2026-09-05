@@ -1,6 +1,19 @@
 import type { Locale } from "@/lib/i18n";
 
 export type UsersEmailBroadcastsText = {
+  history: string;
+  newCampaign: string;
+  campaigns: string;
+  campaign: string;
+  sending: string;
+  filteredEmptyDescription: string;
+  create: string;
+  refresh: string;
+  emptyTitle: string;
+  emptyDescription: string;
+  resetFilter: string;
+  pageTotals: string;
+  queued: (count: number) => string;
   title: string;
   description: string;
   queueLabel: string;
@@ -53,9 +66,25 @@ export type UsersEmailBroadcastsText = {
 
 const content: Record<Locale, UsersEmailBroadcastsText> = {
   ru: {
-    title: "История email-рассылок",
-    description:
-      "Статус доставки и безопасный повтор только неуспешных отправок. Адреса, текст письма и данные провайдера здесь не отображаются.",
+    history: "История",
+    newCampaign: "Новая рассылка",
+    campaigns: "Рассылок",
+    campaign: "Рассылка",
+    sending: "Отправка",
+    filteredEmptyDescription: "Попробуйте выбрать другой статус или сбросить фильтр.",
+    create: "Создать рассылку",
+    refresh: "Обновить",
+    emptyTitle: "Первое письмо начинается здесь",
+    emptyDescription:
+      "Подготовьте сообщение и выберите получателей. После отправки здесь появятся результаты.",
+    resetFilter: "Сбросить фильтр",
+    pageTotals: "Показатели на текущей странице",
+    queued: (count) =>
+      count > 0
+        ? `Рассылка создана. Получателей: ${count}. Статус отправки обновляется автоматически.`
+        : "Рассылка создана без отправок: в выбранной аудитории нет подходящих получателей.",
+    title: "История отправок",
+    description: "Результаты отправки и повтор неуспешных писем.",
     queueLabel: "Очередь email-рассылок",
     workspaceLabel: "Сводка email-рассылок",
     inspectorLabel: "Инспектор email-рассылки",
@@ -78,23 +107,22 @@ const content: Record<Locale, UsersEmailBroadcastsText> = {
     audiencePremium: "Premium-пользователи",
     audienceSelected: "Выбранные пользователи",
     recipients: "Получателей",
-    sent: "Доставлено",
+    sent: "Отправлено",
     pending: "Ожидает",
     failed: "Ошибок",
     retryable: "Можно повторить",
     created: "Создана",
     updated: "Обновлена",
     completed: "Завершена",
-    progress: "Прогресс доставки",
-    safeDataTitle: "Безопасная операционная сводка",
+    progress: "Прогресс отправки",
+    safeDataTitle: "Выберите рассылку",
     safeDataDescription:
-      "Выберите рассылку в очереди. Инспектор показывает только агрегаты и не раскрывает адреса получателей, тело письма или provider payload.",
-    selectionHint:
-      "Выбранная рассылка сохраняется в URL — ссылку можно безопасно открыть повторно.",
+      "В деталях доступны аудитория, прогресс, время отправки и повтор неуспешных писем.",
+    selectionHint: "Отправка выполняется только активным пользователям с подтверждённым email.",
     retryFailed: "Повторить ошибки",
     retryTitle: "Повторить неуспешные отправки?",
     retryDescription: (count) =>
-      `Backend повторно поставит в очередь только ${count} неуспешных отправок. Успешные доставки не будут затронуты.`,
+      `Повторно будет поставлено в очередь только ${count} неуспешных отправок. Успешные доставки не будут затронуты.`,
     retryConfirm: "Повторить неуспешные",
     retryCancel: "Отмена",
     retrySucceeded: (count) => `Повторно поставлено в очередь: ${count}.`,
@@ -107,9 +135,25 @@ const content: Record<Locale, UsersEmailBroadcastsText> = {
     subjectUnavailable: "Без темы",
   },
   en: {
-    title: "Email broadcast history",
-    description:
-      "Delivery progress and a safe retry for failed dispatches only. Recipient addresses, email body, and provider data are never shown here.",
+    history: "History",
+    newCampaign: "New campaign",
+    campaigns: "Campaigns",
+    campaign: "Campaign",
+    sending: "Sending",
+    filteredEmptyDescription: "Choose another status or clear the filter.",
+    create: "Create campaign",
+    refresh: "Refresh",
+    emptyTitle: "Your first message starts here",
+    emptyDescription:
+      "Compose a message, choose an audience, and review it before sending. History and results will appear here.",
+    resetFilter: "Clear filter",
+    pageTotals: "On this page",
+    queued: (count) =>
+      count > 0
+        ? `Campaign created for ${count} recipients. Sending progress refreshes automatically.`
+        : "No messages queued: no eligible recipients were found in this audience.",
+    title: "Sending history",
+    description: "Sending results and retries for failed messages.",
     queueLabel: "Email broadcast queue",
     workspaceLabel: "Email broadcast overview",
     inspectorLabel: "Email broadcast inspector",
@@ -132,22 +176,22 @@ const content: Record<Locale, UsersEmailBroadcastsText> = {
     audiencePremium: "Premium users",
     audienceSelected: "Selected users",
     recipients: "Recipients",
-    sent: "Delivered",
+    sent: "Sent",
     pending: "Pending",
     failed: "Failed",
     retryable: "Retryable",
     created: "Created",
     updated: "Updated",
     completed: "Completed",
-    progress: "Delivery progress",
-    safeDataTitle: "Safe operational summary",
+    progress: "Sending progress",
+    safeDataTitle: "Select a campaign",
     safeDataDescription:
-      "Select a broadcast from the queue. The inspector exposes aggregates only—never recipient addresses, email body, or provider payload.",
-    selectionHint: "The selected broadcast is stored in the URL so the safe view can be reopened.",
+      "View the audience, progress, timestamps, and retry options for failed messages.",
+    selectionHint: "Messages are sent only to active users with confirmed email.",
     retryFailed: "Retry failures",
     retryTitle: "Retry failed dispatches?",
     retryDescription: (count) =>
-      `The backend will requeue only ${count} failed dispatches. Successful deliveries are not affected.`,
+      `Only ${count} failed dispatches will be requeued. Successful deliveries are not affected.`,
     retryConfirm: "Retry failed dispatches",
     retryCancel: "Cancel",
     retrySucceeded: (count) => `${count} dispatches were requeued.`,

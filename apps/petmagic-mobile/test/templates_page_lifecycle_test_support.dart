@@ -517,6 +517,7 @@ class RandomTemplatesRepository implements TemplatesRepository {
     String templateId, {
     bool forceRefresh = false,
     String? analyticsSource,
+    int? minimumVersion,
   }) async {
     fetchTemplateCalls++;
     fetchTemplateAnalyticsSources.add(analyticsSource);

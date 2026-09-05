@@ -47,6 +47,7 @@ export default defineConfig({
           NEXT_PUBLIC_API_BASE_URL: "https://api.petmagic.test",
           NEXT_PUBLIC_E2E_DISABLE_SUPPORT_REALTIME: "1",
           ADMIN_MEDIA_ORIGINS: "https://cdn.petgpt.app",
+          TEMPLATES_R2_ACCOUNT_ID: "a".repeat(32),
         },
       },
 });

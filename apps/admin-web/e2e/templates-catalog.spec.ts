@@ -386,8 +386,8 @@ function createAnalyticsOverview(templateIds: readonly string[]) {
   };
 }
 
-function filterCatalog(url: URL) {
-  let templates = [...catalogTemplates];
+function filterCatalog(url: URL, dataset = catalogTemplates) {
+  let templates = [...dataset];
   const type = url.searchParams.get("type");
   const status = url.searchParams.get("status");
   const category = url.searchParams.get("category");
@@ -436,7 +436,16 @@ function filterCatalog(url: URL) {
     take,
     totalCount: templates.length,
     hasMore: skip + take < templates.length,
-    summary: catalogSummary,
+    summary: {
+      ...catalogSummary,
+      totalTemplates: dataset.length,
+      imageTemplates: dataset.filter((template) => template.templateType === "Image").length,
+      videoTemplates: dataset.filter((template) => template.templateType === "Video").length,
+      activeTemplates: dataset.filter((template) => template.status === "Active").length,
+      draftTemplates: dataset.filter((template) => template.status === "Draft").length,
+      qaOnlyTemplates: dataset.filter((template) => template.isQaOnly).length,
+      missingPreviewTemplates: dataset.filter((template) => !template.previewAsset).length,
+    },
   };
 }
 
@@ -458,7 +467,11 @@ function validateBearer(route: Route, state: CatalogApiState) {
   }
 }
 
-async function installStrictCatalogMocks(page: Page, state: CatalogApiState) {
+async function installStrictCatalogMocks(
+  page: Page,
+  state: CatalogApiState,
+  dataset = catalogTemplates
+) {
   await page.route(`${apiOrigin}/api/admin/support/tickets/metrics`, async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -622,14 +635,14 @@ async function installStrictCatalogMocks(page: Page, state: CatalogApiState) {
         (type !== null && type !== "Video" && type !== "Image") ||
         url.searchParams.get("status") !== "not_archived" ||
         url.searchParams.get("sort") !== "newest" ||
-        url.searchParams.get("skip") !== "0" ||
-        url.searchParams.get("take") !== "24"
+        !/^\d+$/.test(url.searchParams.get("skip") ?? "") ||
+        !["24", "48", "96"].includes(url.searchParams.get("take") ?? "")
       ) {
         state.contractViolations.push(
           `${url.pathname}${url.search} violated the unified catalog query contract.`
         );
       }
-      await fulfillJson(route, filterCatalog(url));
+      await fulfillJson(route, filterCatalog(url, dataset));
       return;
     }
 
@@ -660,8 +673,8 @@ async function expectCatalogCardGeometry(page: Page, expectedCount: number) {
 
   const geometry = await cards.evaluateAll((elements) =>
     elements.map((card) => {
-      const [media, body, actions] = Array.from(card.children) as HTMLElement[];
-      if (!media || !body || !actions) {
+      const [media, body, metrics, actions] = Array.from(card.children) as HTMLElement[];
+      if (!media || !body || !metrics || !actions) {
         throw new Error("Template card anatomy is incomplete.");
       }
 
@@ -703,8 +716,9 @@ async function expectCatalogCardGeometry(page: Page, expectedCount: number) {
     expect(item.media.left).toBeGreaterThanOrEqual(item.card.left - 1);
     expect(item.media.right).toBeLessThanOrEqual(item.body.left + 1);
     expect(item.body.right).toBeLessThanOrEqual(item.card.right + 1);
-    expect(item.media.width / item.card.width).toBeGreaterThan(0.39);
-    expect(item.media.width / item.card.width).toBeLessThan(0.46);
+    expect(item.media.width).toBeGreaterThanOrEqual(95);
+    expect(item.media.width).toBeLessThanOrEqual(113);
+    expect(item.actions.top - item.card.top).toBeLessThan(320);
     expect(item.actions.left).toBeGreaterThanOrEqual(item.card.left - 1);
     expect(item.actions.right).toBeLessThanOrEqual(item.card.right + 1);
     expect(item.actions.top).toBeGreaterThanOrEqual(item.media.bottom - 1);
@@ -737,32 +751,34 @@ async function expectTemplatesDesktopLayout(page: Page) {
   const sidebar = page.locator("#admin-sidebar");
   const catalogCards = main.locator("article");
   const catalogGrid = catalogCards.first().locator("..");
-  const rightRail = main.getByRole("complementary", {
+  const publishingBar = main.getByRole("complementary", {
     name: "Контроль публикации",
     exact: true,
   });
-  const catalogWorkspace = rightRail.locator("..");
+  const catalogWorkspace = publishingBar.locator("..");
   const [sidebarBox, mainBox, workspaceBox, gridBox, railBox] = await Promise.all([
     expectNonZeroBoundingBox(sidebar, "admin sidebar"),
     expectNonZeroBoundingBox(main, "admin workspace"),
     expectNonZeroBoundingBox(catalogWorkspace, "templates workspace"),
     expectNonZeroBoundingBox(catalogGrid, "template grid"),
-    expectNonZeroBoundingBox(rightRail, "templates right rail"),
+    expectNonZeroBoundingBox(publishingBar, "publishing bar"),
   ]);
 
   expectBoxInsideViewportHorizontally(sidebarBox, viewport, "admin sidebar");
   expectBoxInsideViewportHorizontally(mainBox, viewport, "admin workspace");
-  expectBoxInsideViewportHorizontally(railBox, viewport, "templates right rail");
+  expectBoxInsideViewportHorizontally(railBox, viewport, "publishing bar");
   expect(sidebarBox.width, "expanded desktop sidebar width").toBeGreaterThanOrEqual(230);
   expect(sidebarBox.width, "expanded desktop sidebar width").toBeLessThanOrEqual(250);
   expect(mainBox.x, "admin workspace starts after sidebar").toBeGreaterThanOrEqual(
     sidebarBox.x + sidebarBox.width - 1
   );
   expectBoxContains(workspaceBox, gridBox, "template grid within workspace");
-  expectBoxContains(workspaceBox, railBox, "right rail within workspace");
-  expectBoxesNotToIntersect(gridBox, railBox, "template grid and right rail");
+  expectBoxContains(workspaceBox, railBox, "publishing bar within workspace");
+  expectBoxesNotToIntersect(gridBox, railBox, "template grid and publishing bar");
   await expectNoHorizontalElementOverflow(catalogGrid, "template grid");
-  await expectNoHorizontalElementOverflow(rightRail, "templates right rail");
+  await expectNoHorizontalElementOverflow(publishingBar, "publishing bar");
+  expect(railBox.y + railBox.height).toBeLessThan(gridBox.y);
+  expect(gridBox.width).toBeGreaterThan(workspaceBox.width * 0.98);
   await expectVisibleColumnCount(catalogCards, 3);
   await expectCatalogCardGeometry(page, 3);
 }
@@ -1140,4 +1156,198 @@ test("unified templates catalog supports publishing filters and responsive cards
   expect(apiState.contractViolations).toEqual([]);
   expect(apiState.unexpectedRequests).toEqual([]);
   expect(runtimeErrors).toEqual([]);
+});
+
+test("catalog of 1000 templates stays paged and supports direct navigation and search", async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(60_000);
+  const state: CatalogApiState = {
+    catalogRequests: [],
+    contractViolations: [],
+    unexpectedRequests: [],
+  };
+  const authViolations: string[] = [];
+  const runtimeErrors: string[] = [];
+  const dataset: CatalogTemplate[] = Array.from({ length: 1000 }, (_, index) => ({
+    ...catalogTemplates[0],
+    templateId: `aaaaaaaa-aaaa-aaaa-aaaa-${String(index + 1).padStart(12, "0")}`,
+    title: `Studio Portrait ${String(index + 1).padStart(4, "0")}`,
+  }));
+  await page.setViewportSize({ width: 1838, height: 1135 });
+  await installStrictAuthMocks(page, authViolations);
+  await loginAsAdmin(page);
+  await installStrictCatalogMocks(page, state, dataset);
+  page.on("pageerror", (error) => runtimeErrors.push(error.message));
+  page.on("console", (message) => {
+    if (message.type() === "error") runtimeErrors.push(message.text());
+  });
+  await page.goto("/ru/templates/image");
+  const main = page.locator("#admin-main");
+  const cards = main.locator("article");
+  await expect(cards).toHaveCount(24);
+  await expect(main.getByRole("status").first()).toContainText("1-24 из 1000");
+  await expectVisibleColumnCount(cards, 4);
+  await expectNoHorizontalDocumentOverflow(page);
+  await page.screenshot({ path: testInfo.outputPath("templates-1000-desktop.png") });
+  await page.locator('button[aria-controls="admin-sidebar"]').click();
+  await expect
+    .poll(() =>
+      cards
+        .first()
+        .locator("..")
+        .evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(" ").length)
+    )
+    .toBe(5);
+  await expectNoHorizontalDocumentOverflow(page);
+  await page.screenshot({ path: testInfo.outputPath("templates-1000-wide.png") });
+
+  await main.getByRole("spinbutton", { name: "Номер страницы" }).first().fill("42");
+  await main.getByRole("button", { name: "Перейти", exact: true }).first().click();
+  await expect(cards).toHaveCount(16);
+  await expect(cards.first()).toContainText("Studio Portrait 0985");
+  await expect(
+    main.getByRole("button", { name: "Следующая страница шаблонов" }).first()
+  ).toBeDisabled();
+  expect(hasCatalogQuery(state.catalogRequests, { skip: "984", take: "24" })).toBe(true);
+  await main.getByRole("combobox", { name: "На странице" }).first().selectOption("96");
+  await expect(cards).toHaveCount(96);
+  await expect(cards.first()).toContainText("Studio Portrait 0001");
+  expect(hasCatalogQuery(state.catalogRequests, { skip: "0", take: "96" })).toBe(true);
+  await main.getByRole("spinbutton", { name: "Номер страницы" }).first().fill("8");
+  await main.getByRole("button", { name: "Перейти", exact: true }).first().click();
+  await expect(cards.first()).toContainText("Studio Portrait 0673");
+  await main.getByRole("textbox", { name: "Поиск шаблонов" }).fill("0999");
+  await expect(cards).toHaveCount(1);
+  await expect(cards.first()).toContainText("Studio Portrait 0999");
+  expect(hasCatalogQuery(state.catalogRequests, { search: "0999", skip: "0", take: "96" })).toBe(
+    true
+  );
+  await main.getByRole("button", { name: "Список", exact: true }).click();
+  await expect(
+    main.getByRole("table").getByRole("row", { name: /Studio Portrait 0999/ })
+  ).toBeVisible();
+  await main.getByRole("button", { name: "Карточки", exact: true }).click();
+  for (const width of [1024, 768, 390, 320]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expectNoHorizontalDocumentOverflow(page);
+    await expect(cards.first()).toBeVisible();
+  }
+  await page.screenshot({ path: testInfo.outputPath("templates-compact-320.png"), fullPage: true });
+  await expect(page.locator("nextjs-portal")).toHaveCount(0);
+  expect(authViolations).toEqual([]);
+  expect(state.contractViolations).toEqual([]);
+  expect(state.unexpectedRequests).toEqual([]);
+  expect(runtimeErrors).toEqual([]);
+});
+
+test("catalog metrics, action menus and full previews stay usable at narrow widths", async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(60_000);
+  const state: CatalogApiState = {
+    catalogRequests: [],
+    contractViolations: [],
+    unexpectedRequests: [],
+  };
+  const authViolations: string[] = [];
+  const errors: string[] = [];
+  await page.setViewportSize({ width: 1838, height: 1135 });
+  await installStrictAuthMocks(page, authViolations);
+  await loginAsAdmin(page);
+  const dataset = Array.from({ length: 24 }, (_, index) => ({
+    ...catalogTemplates[index % 3],
+    templateId:
+      index < 3
+        ? catalogTemplates[index].templateId
+        : `aaaaaaaa-aaaa-aaaa-aaaa-${String(index).padStart(12, "0")}`,
+    title:
+      index === 0
+        ? "Очень длинное название портрета питомца для проверки карточки"
+        : `Portrait ${index}`,
+    category: index === 0 ? "Кинематографические портреты" : "Portrait",
+    estimatedCostUsd: 1234567.89,
+  }));
+  await installStrictCatalogMocks(page, state, dataset);
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto("/ru/templates");
+  const cards = page.locator("#admin-main article");
+  await expect(cards).toHaveCount(24);
+  await page.locator('button[aria-controls="admin-sidebar"]').click();
+  const card = cards.filter({
+    has: page.getByRole("heading", { name: dataset[0].title, exact: true }),
+  });
+  await card.getByRole("button", { name: "Действия", exact: true }).click();
+  const menu = card.getByRole("menu", { name: "Действия", exact: true });
+  await expect(menu).toBeVisible();
+  expect(
+    await menu.evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      return element.contains(document.elementFromPoint(rect.x + rect.width / 2, rect.y + 20));
+    })
+  ).toBe(true);
+  const glyph = card
+    .getByRole("button", { name: "Действия", exact: true })
+    .locator('span[aria-hidden="true"]');
+  expect(
+    await glyph.evaluate((element) => {
+      const button = element.closest("button")!.getBoundingClientRect();
+      const rect = element.getBoundingClientRect();
+      return rect.left >= button.left && rect.right <= button.right;
+    })
+  ).toBe(true);
+  await page.keyboard.press("Escape");
+  const preview = card.getByRole("button", {
+    name: `Открыть превью: ${dataset[0].title}`,
+    exact: true,
+  });
+  await preview.click();
+  const dialog = page.getByRole("dialog", { name: dataset[0].title, exact: true });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator("img")).toHaveCSS("object-fit", "contain");
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(preview).toBeFocused();
+  for (const width of [1838, 1024, 768, 390, 320]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expectNoHorizontalDocumentOverflow(page);
+    const clipped = await cards.evaluateAll((elements) =>
+      elements.flatMap((element) =>
+        Array.from(
+          element.querySelectorAll<HTMLElement>(
+            '[class*="cardMetricLabel"], [class*="cardMetric"] strong'
+          )
+        )
+          .filter(
+            (metric) =>
+              metric.scrollWidth > metric.clientWidth + 1 ||
+              metric.scrollHeight > metric.clientHeight + 1
+          )
+          .map((metric) => metric.textContent)
+      )
+    );
+    expect(clipped, `clipped metrics at ${width}px`).toEqual([]);
+  }
+  await page.screenshot({ path: testInfo.outputPath("catalog-long-content-320.png") });
+  await page.getByRole("button", { name: "Быстрые переходы", exact: true }).click();
+  await expect(page.getByRole("menuitem", { name: "Категории", exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.setViewportSize({ width: 1838, height: 1135 });
+  await page.getByRole("button", { name: "Список", exact: true }).click();
+  const statuses = page.locator('[class*="listStatusBadge"]');
+  await expect(statuses).toHaveCount(24);
+  expect(
+    await statuses.evaluateAll((elements) =>
+      elements.flatMap((element) => {
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        return range.getClientRects().length > 1 ? [element.textContent] : [];
+      })
+    )
+  ).toEqual([]);
+  await expect(page.locator("nextjs-portal")).toHaveCount(0);
+  expect(errors).toEqual([]);
+  expect(authViolations).toEqual([]);
+  expect(state.contractViolations).toEqual([]);
+  expect(state.unexpectedRequests).toEqual([]);
 });

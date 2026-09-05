@@ -27,6 +27,7 @@ await withE2eBuildIsolation(
   async ({ environment }) => {
     const e2eEnvironment = {
       ...environment,
+      TEMPLATES_R2_ACCOUNT_ID: "a".repeat(32),
       PLAYWRIGHT_PORT: String(port),
       PLAYWRIGHT_EXTERNAL_SERVER: "1",
       NEXT_PUBLIC_API_BASE_URL: "https://api.petmagic.test",

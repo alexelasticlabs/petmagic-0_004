@@ -322,7 +322,7 @@ function buildTemplateAsset(
     return undefined;
   }
 
-  const size = parseOptionalNumber(fileSizeBytes);
+  const size = parseOptionalFileSizeBytes(fileSizeBytes);
   const duration = parseOptionalDecimal(durationSeconds);
 
   return {
@@ -408,10 +408,14 @@ export function normalizeTemplateText(raw: string, maxLength: number): string {
   return raw.replace(/\s+/g, " ").trim().slice(0, maxLength);
 }
 
-function parseOptionalNumber(raw: string): number | undefined {
-  const normalized = normalizeIntegerString(raw);
-  const value = Number.parseInt(normalized, 10);
-  return normalized && Number.isSafeInteger(value) && value > 0 ? value : undefined;
+function parseOptionalFileSizeBytes(raw: string): number | undefined {
+  const normalized = raw.trim();
+  if (!/^\d+$/.test(normalized)) {
+    return undefined;
+  }
+
+  const value = Number(normalized);
+  return Number.isSafeInteger(value) && value > 0 ? value : undefined;
 }
 
 export function normalizeTemplateIntegerInput(raw: string): string {
@@ -420,10 +424,6 @@ export function normalizeTemplateIntegerInput(raw: string): string {
 
 export function normalizeTemplateTextInput(raw: string, maxLength: number): string {
   return raw.slice(0, maxLength);
-}
-
-function normalizeIntegerString(raw: string): string {
-  return normalizeTemplateIntegerInput(raw);
 }
 
 function inferFileName(url: string): string {

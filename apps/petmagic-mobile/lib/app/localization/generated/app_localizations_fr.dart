@@ -9,6 +9,29 @@ class AppLocalizationsFr extends AppLocalizations {
   AppLocalizationsFr([String locale = 'fr']) : super(locale);
 
   @override
+  String templatePreviewVideoResult(String duration) {
+    return 'Résultat : vidéo ≈ $duration s';
+  }
+
+  @override
+  String get templatePreviewVideoDurationUnknown =>
+      'Vidéo · durée non précisée';
+
+  @override
+  String get templatePreviewImageResult => 'Résultat : image';
+
+  @override
+  String templatePreviewCreationTime(String eta) {
+    return 'La création prend généralement $eta';
+  }
+
+  @override
+  String get templatePreviewDescriptionMore => 'En savoir plus sur ce modèle';
+
+  @override
+  String get templatePreviewDescriptionLess => 'Réduire';
+
+  @override
   String get navDiscover => 'Découvrir';
 
   @override
@@ -3213,11 +3236,11 @@ class AppLocalizationsFr extends AppLocalizations {
       'Nous ne vendons pas les données personnelles. Nous les partageons seulement avec les sous-traitants nécessaires à PetMagic.';
 
   @override
-  String get authRequiredTitle => 'Connectez-vous pour débloquer cette action';
+  String get authRequiredTitle => 'Connectez-vous à PetMagic';
 
   @override
   String get authRequiredMessage =>
-      'Les invités peuvent explorer l\'application, mais les actions de modèles, les récompenses et les fonctionnalités de jetons nécessitent un compte PetMagic.';
+      'Créez des photos et des vidéos de votre animal, enregistrez vos résultats et obtenez des récompenses avec un compte PetMagic. Vous pouvez explorer les modèles sans vous connecter.';
 
   @override
   String get authRequiredContinueBrowsing => 'Continuer la navigation';
