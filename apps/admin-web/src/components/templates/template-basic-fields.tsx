@@ -107,7 +107,7 @@ export function TemplateBasicFields({
   ];
 
   return (
-    <div className={styles.formGrid}>
+    <div className={`${styles.formGrid} ${styles.basicGrid}`}>
       <label className={styles.fieldBlock}>
         <span className={styles.fieldHeader}>
           <span>{text.titleLabel}</span>
@@ -174,7 +174,7 @@ export function TemplateBasicFields({
               ),
             }))
           }
-          rows={3}
+          rows={2}
           placeholder={text.petPhotoRequirementsHint}
         />
       </label>
@@ -225,7 +225,6 @@ export function TemplateBasicFields({
             onClick={() => setForm((current) => ({ ...current, isPremium: false }))}
           >
             <span className={styles.accessOptionTitle}>{text.editorAllUsersAccess}</span>
-            <span className={styles.accessOptionHint}>{text.editorAccessFreeHint}</span>
           </button>
 
           <button
@@ -240,12 +239,14 @@ export function TemplateBasicFields({
             onClick={() => setForm((current) => ({ ...current, isPremium: true }))}
           >
             <span className={styles.accessOptionTitle}>{text.premiumLabel}</span>
-            <span className={styles.accessOptionHint}>{text.editorAccessPremiumHint}</span>
           </button>
         </div>
+        <span className={styles.accessOptionHint}>
+          {form.isPremium ? text.editorAccessPremiumHint : text.editorAccessFreeHint}
+        </span>
       </div>
 
-      <div className={styles.split}>
+      <div className={`${styles.split} ${styles.priceField}`}>
         <label className={styles.fieldBlock}>
           <span className={styles.fieldHeader}>
             <span>{text.tokenCostLabel}</span>
@@ -273,33 +274,32 @@ export function TemplateBasicFields({
             required={requireCompleteDetails}
           />
         </label>
-
-        {showMusicDescription ? (
-          <label className={styles.fieldBlock}>
-            <span className={styles.fieldHeader}>
-              <span>{text.musicDescriptionLabel}</span>
-            </span>
-            <input
-              value={form.musicDescription}
-              maxLength={TEMPLATE_MUSIC_DESCRIPTION_MAX_LENGTH}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  musicDescription: normalizeTemplateTextInput(
-                    event.target.value,
-                    TEMPLATE_MUSIC_DESCRIPTION_MAX_LENGTH
-                  ),
-                }))
-              }
-            />
-          </label>
-        ) : null}
       </div>
 
       <details className={styles.advancedSettings}>
         <summary>{text.editorAdvancedSettings}</summary>
         <p className={styles.sectionDescription}>{text.editorAdvancedHint}</p>
         <div className={styles.formGrid}>
+          {showMusicDescription ? (
+            <label className={styles.fieldBlock}>
+              <span className={styles.fieldHeader}>
+                <span>{text.musicDescriptionLabel}</span>
+              </span>
+              <input
+                value={form.musicDescription}
+                maxLength={TEMPLATE_MUSIC_DESCRIPTION_MAX_LENGTH}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    musicDescription: normalizeTemplateTextInput(
+                      event.target.value,
+                      TEMPLATE_MUSIC_DESCRIPTION_MAX_LENGTH
+                    ),
+                  }))
+                }
+              />
+            </label>
+          ) : null}
           <label className={styles.fieldBlock}>
             <span className={styles.fieldHeader}>
               <span>{text.promoBadgeLabel}</span>

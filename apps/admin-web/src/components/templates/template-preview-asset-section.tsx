@@ -1,6 +1,7 @@
 import { type DragEvent, useEffect, useRef, useState } from "react";
 
 import assetStyles from "@/components/templates/template-editor-assets.module.css";
+import { TemplateEditorMediaInspector } from "@/components/templates/template-editor-media-inspector";
 import styles from "@/components/templates/template-editor.module.css";
 import { inferTemplateMediaKind } from "@/components/templates/template-media-utils";
 import { TemplateSecureMedia } from "@/components/templates/template-secure-media";
@@ -143,7 +144,7 @@ export function TemplatePreviewAssetSection({
   }
 
   return (
-    <div id="template-preview" className={styles.formSection}>
+    <div id="template-preview" className={assetStyles.assetSection}>
       <h3>{text.previewAssetTitle}</h3>
       <input
         ref={fileInputRef}
@@ -195,16 +196,8 @@ export function TemplatePreviewAssetSection({
         }}
         onDrop={handlePreviewDrop}
       >
-        <div className={assetStyles.assetPreviewOverlay}>
-          <span className={assetStyles.assetPreviewBadge}>
-            {previewKind === "video" ? text.previewAssetVideoBadge : text.previewAssetCoverBadge}
-          </span>
-          <span
-            className={`${assetStyles.assetPreviewState} ${hasPreview && !previewFile ? assetStyles.assetPreviewStateReady : assetStyles.assetPreviewStateMissing}`}
-          >
-            {previewStateLabel}
-          </span>
-        </div>
+        <span className={assetStyles.aspectLabel}>2:3</span>
+
         {hasPreview ? (
           previewKind === "video" ? (
             <TemplateSecureMedia
@@ -223,7 +216,7 @@ export function TemplatePreviewAssetSection({
               url={effectivePreviewUrl}
               kind="image"
               alt={previewFileLabel || text.previewAssetTitle}
-              width={480}
+              width={400}
               height={600}
               className={assetStyles.assetPreviewMedia}
               logContext={{
@@ -236,13 +229,13 @@ export function TemplatePreviewAssetSection({
           <div className={assetStyles.assetPreviewPlaceholder}>
             <span className={assetStyles.assetPreviewPlaceholderTitle}>{text.uploadPreview}</span>
             <span className={assetStyles.assetPreviewPlaceholderHint}>
-              {text.mediaDropzoneHint}
+              {text.editorPortraitFormat}
             </span>
           </div>
         )}
       </div>
 
-      <div className={styles.formGrid}>
+      <div className={assetStyles.assetControls}>
         <div className={assetStyles.uploadPanel}>
           <div className={assetStyles.uploadPanelHeader}>
             <div>
@@ -256,49 +249,62 @@ export function TemplatePreviewAssetSection({
             </span>
           </div>
           <div className={assetStyles.uploadActions}>
+            {hasPreview ? (
+              <TemplateEditorMediaInspector
+                url={effectivePreviewUrl}
+                kind={previewKind}
+                title={text.previewAssetTitle}
+                text={text}
+                disabled={isBusy}
+              />
+            ) : null}
             <Button type="button" variant="secondary" disabled={isBusy} onClick={openFilePicker}>
               {hasPreview ? text.editorReplaceFile : text.editorChooseFile}
             </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              className={`${styles.primaryButton} ${assetStyles.uploadPrimaryButton}`}
-              disabled={!previewFile || isBusy}
-              onClick={onUploadPreview}
-            >
-              {uploadingKind === "Preview" ? text.uploadingMedia : text.uploadAction}
-            </Button>
-            <Button
-              type="button"
-              variant="danger"
-              className={`${styles.dangerButton} ${assetStyles.uploadDangerButton}`}
-              disabled={isBusy || (!previewFile && !hasPreview)}
-              onClick={() => {
-                setSelectionError(null);
-                setPreviewFile(null);
-                if (fileInputRef.current) {
-                  fileInputRef.current.value = "";
-                }
-                setForm((current) => ({
-                  ...current,
-                  previewUrl: "",
-                  previewUrlSource: "none",
-                  previewFileName: "",
-                  previewContentType: "",
-                  previewFileSizeBytes: "",
-                  previewDurationSeconds: "",
-                  thumbnailAsset: null,
-                  animatedPreviewAsset: null,
-                  feedLoopLowAsset: null,
-                  feedLoopMediumAsset: null,
-                  detailPreviewAsset: null,
-                }));
-              }}
-            >
-              {text.clearAsset}
-            </Button>
+            {previewFile ? (
+              <Button
+                type="button"
+                variant="secondary"
+                className={`${styles.primaryButton} ${assetStyles.uploadPrimaryButton}`}
+                disabled={!previewFile || isBusy}
+                onClick={onUploadPreview}
+              >
+                {uploadingKind === "Preview" ? text.uploadingMedia : text.uploadAction}
+              </Button>
+            ) : null}
+            {hasPreview || previewFile ? (
+              <Button
+                type="button"
+                variant="danger"
+                className={`${styles.dangerButton} ${assetStyles.uploadDangerButton}`}
+                disabled={isBusy || (!previewFile && !hasPreview)}
+                onClick={() => {
+                  setSelectionError(null);
+                  setPreviewFile(null);
+                  if (fileInputRef.current) {
+                    fileInputRef.current.value = "";
+                  }
+                  setForm((current) => ({
+                    ...current,
+                    previewUrl: "",
+                    previewUrlSource: "none",
+                    previewFileName: "",
+                    previewContentType: "",
+                    previewFileSizeBytes: "",
+                    previewDurationSeconds: "",
+                    thumbnailAsset: null,
+                    animatedPreviewAsset: null,
+                    feedLoopLowAsset: null,
+                    feedLoopMediumAsset: null,
+                    detailPreviewAsset: null,
+                  }));
+                }}
+              >
+                {text.clearAsset}
+              </Button>
+            ) : null}
           </div>
-          {previewFile ? <p className={styles.muted}>{text.editorUploadOnSaveHint}</p> : null}
+
           {selectionError ? (
             <p role="alert" className={assetStyles.assetSelectionError}>
               {selectionError}
@@ -306,6 +312,7 @@ export function TemplatePreviewAssetSection({
           ) : null}
         </div>
         <p className={styles.muted}>{text.editorPreviewFormats}</p>
+        <p className={styles.muted}>{text.editorUploadOnSaveHint}</p>
       </div>
     </div>
   );

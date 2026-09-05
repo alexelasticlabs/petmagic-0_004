@@ -73,9 +73,9 @@ export function TemplateEditorNavigation({
   isDirty: boolean;
 }) {
   const sections = [
-    { id: "template-basics", label: text.editorSectionBasics },
+    { id: "template-basics", label: text.editorNavigationBasics },
     { id: "template-media", label: text.editorSectionMedia },
-    { id: "template-ai", label: text.editorSectionAi },
+    { id: "template-ai", label: text.editorNavigationModels },
   ];
   return (
     <div className={styles.editorNavigation}>

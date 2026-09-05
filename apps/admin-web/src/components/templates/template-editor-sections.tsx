@@ -1,6 +1,7 @@
 import { type DragEvent, useEffect, useRef, useState } from "react";
 
 import assetStyles from "@/components/templates/template-editor-assets.module.css";
+import { TemplateEditorMediaInspector } from "@/components/templates/template-editor-media-inspector";
 import styles from "@/components/templates/template-editor.module.css";
 import { normalizeTemplateTextInput } from "@/components/templates/template-form-mappers";
 import { TemplateSecureMedia } from "@/components/templates/template-secure-media";
@@ -126,7 +127,7 @@ export function TemplateReferenceAssetSection({
   }
 
   return (
-    <div id="template-reference" className={styles.formSection}>
+    <div id="template-reference" className={assetStyles.assetSection}>
       <h3>{text.referenceMotionTitle}</h3>
       <input
         ref={fileInputRef}
@@ -178,14 +179,8 @@ export function TemplateReferenceAssetSection({
         }}
         onDrop={handleReferenceDrop}
       >
-        <div className={assetStyles.assetPreviewOverlay}>
-          <span className={assetStyles.assetPreviewBadge}>{text.referenceMotionSourceBadge}</span>
-          <span
-            className={`${assetStyles.assetPreviewState} ${hasReference && !referenceFile ? assetStyles.assetPreviewStateReady : assetStyles.assetPreviewStateMissing}`}
-          >
-            {referenceStateLabel}
-          </span>
-        </div>
+        <span className={assetStyles.aspectLabel}>2:3</span>
+
         {hasReference ? (
           <TemplateSecureMedia
             url={effectiveReferenceUrl}
@@ -202,13 +197,13 @@ export function TemplateReferenceAssetSection({
           <div className={assetStyles.assetPreviewPlaceholder}>
             <span className={assetStyles.assetPreviewPlaceholderTitle}>{text.uploadReference}</span>
             <span className={assetStyles.assetPreviewPlaceholderHint}>
-              {text.mediaDropzoneHint}
+              {text.editorPortraitFormat}
             </span>
           </div>
         )}
       </div>
 
-      <div className={styles.formGrid}>
+      <div className={assetStyles.assetControls}>
         <div className={assetStyles.uploadPanel}>
           <div className={assetStyles.uploadPanelHeader}>
             <div>
@@ -222,44 +217,57 @@ export function TemplateReferenceAssetSection({
             </span>
           </div>
           <div className={assetStyles.uploadActions}>
+            {hasReference ? (
+              <TemplateEditorMediaInspector
+                url={effectiveReferenceUrl}
+                kind={"video"}
+                title={text.referenceMotionTitle}
+                text={text}
+                disabled={isBusy}
+              />
+            ) : null}
             <Button type="button" variant="secondary" disabled={isBusy} onClick={openFilePicker}>
               {hasReference ? text.editorReplaceFile : text.editorChooseFile}
             </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              className={`${styles.primaryButton} ${assetStyles.uploadPrimaryButton}`}
-              disabled={!referenceFile || isBusy}
-              onClick={onUploadReference}
-            >
-              {uploadingKind === "ReferenceMotion" ? text.uploadingMedia : text.uploadAction}
-            </Button>
-            <Button
-              type="button"
-              variant="danger"
-              className={`${styles.dangerButton} ${assetStyles.uploadDangerButton}`}
-              disabled={isBusy || (!referenceFile && !hasReference)}
-              onClick={() => {
-                setSelectionError(null);
-                setReferenceFile(null);
-                if (fileInputRef.current) {
-                  fileInputRef.current.value = "";
-                }
-                setForm((current) => ({
-                  ...current,
-                  referenceUrl: "",
-                  referenceUrlSource: "none",
-                  referenceFileName: "",
-                  referenceContentType: "",
-                  referenceFileSizeBytes: "",
-                  referenceDurationSeconds: "",
-                }));
-              }}
-            >
-              {text.clearAsset}
-            </Button>
+            {referenceFile ? (
+              <Button
+                type="button"
+                variant="secondary"
+                className={`${styles.primaryButton} ${assetStyles.uploadPrimaryButton}`}
+                disabled={!referenceFile || isBusy}
+                onClick={onUploadReference}
+              >
+                {uploadingKind === "ReferenceMotion" ? text.uploadingMedia : text.uploadAction}
+              </Button>
+            ) : null}
+            {hasReference || referenceFile ? (
+              <Button
+                type="button"
+                variant="danger"
+                className={`${styles.dangerButton} ${assetStyles.uploadDangerButton}`}
+                disabled={isBusy || (!referenceFile && !hasReference)}
+                onClick={() => {
+                  setSelectionError(null);
+                  setReferenceFile(null);
+                  if (fileInputRef.current) {
+                    fileInputRef.current.value = "";
+                  }
+                  setForm((current) => ({
+                    ...current,
+                    referenceUrl: "",
+                    referenceUrlSource: "none",
+                    referenceFileName: "",
+                    referenceContentType: "",
+                    referenceFileSizeBytes: "",
+                    referenceDurationSeconds: "",
+                  }));
+                }}
+              >
+                {text.clearAsset}
+              </Button>
+            ) : null}
           </div>
-          {referenceFile ? <p className={styles.muted}>{text.editorUploadOnSaveHint}</p> : null}
+
           {selectionError ? (
             <p role="alert" className={assetStyles.assetSelectionError}>
               {selectionError}
@@ -267,6 +275,7 @@ export function TemplateReferenceAssetSection({
           ) : null}
         </div>
         <p className={styles.muted}>{text.editorReferenceFormats}</p>
+        <p className={styles.muted}>{text.editorUploadOnSaveHint}</p>
       </div>
     </div>
   );
@@ -281,7 +290,7 @@ function getReferenceSelectionError(text: Dictionary, reason: "size" | "type"): 
 }
 
 function isSupportedReferenceMotionFile(file: File): boolean {
-  const normalizedType = file.type.trim().toLowerCase();
+  const normalizedType = file.type.split(";", 1)[0].trim().toLowerCase();
 
   if (normalizedType === "video/mp4" || normalizedType === "application/mp4") {
     return true;
@@ -314,7 +323,6 @@ export function TemplateVideoModelSection({
         <div className={styles.modelCard}>
           <div className={styles.modelCardHeader}>
             <p className={styles.modelCardEyebrow}>{text.preprocessingModelEyebrow}</p>
-            <p className={styles.modelCardTitle}>{text.preprocessingModelLabel}</p>
           </div>
           <label id="template-preprocessing-model" className={styles.fieldBlock}>
             <span className={styles.fieldHeader}>
@@ -324,6 +332,7 @@ export function TemplateVideoModelSection({
             <Select
               value={form.preprocessingModel}
               options={preprocessingOptions}
+              showSelectedDescription={false}
               ariaLabel={text.preprocessingModelLabel}
               onChange={(value) =>
                 setForm((current) => ({ ...current, preprocessingModel: value }))
@@ -352,7 +361,7 @@ export function TemplateVideoModelSection({
                   ),
                 }))
               }
-              rows={7}
+              rows={4}
             />
           </label>
         </div>
@@ -360,7 +369,6 @@ export function TemplateVideoModelSection({
         <div className={styles.modelCard}>
           <div className={styles.modelCardHeader}>
             <p className={styles.modelCardEyebrow}>{text.klingModelEyebrow}</p>
-            <p className={styles.modelCardTitle}>{text.klingModelLabel}</p>
           </div>
           <label id="template-motion-model" className={styles.fieldBlock}>
             <span className={styles.fieldHeader}>
@@ -370,6 +378,7 @@ export function TemplateVideoModelSection({
             <Select
               value={form.klingModel}
               options={klingOptions}
+              showSelectedDescription={false}
               ariaLabel={text.klingModelLabel}
               onChange={(value) => setForm((current) => ({ ...current, klingModel: value }))}
             />
@@ -393,7 +402,7 @@ export function TemplateVideoModelSection({
                   klingPrompt: normalizeTemplateTextInput(event.target.value, promptMaxLength),
                 }))
               }
-              rows={7}
+              rows={4}
             />
           </label>
         </div>
@@ -429,7 +438,6 @@ export function TemplateImageModelSection({
         <div className={styles.modelCard}>
           <div className={styles.modelCardHeader}>
             <p className={styles.modelCardEyebrow}>{text.imageModelEyebrow}</p>
-            <p className={styles.modelCardTitle}>{text.imageModelLabel}</p>
           </div>
           <label id="template-image-model" className={styles.fieldBlock}>
             <span className={styles.fieldHeader}>
@@ -439,6 +447,7 @@ export function TemplateImageModelSection({
             <Select
               value={form.imageModel}
               options={imageOptions}
+              showSelectedDescription={false}
               ariaLabel={text.imageModelLabel}
               onChange={(value) => setForm((current) => ({ ...current, imageModel: value }))}
             />
@@ -462,7 +471,7 @@ export function TemplateImageModelSection({
                   imagePrompt: normalizeTemplateTextInput(event.target.value, promptMaxLength),
                 }))
               }
-              rows={7}
+              rows={4}
             />
           </label>
         </div>

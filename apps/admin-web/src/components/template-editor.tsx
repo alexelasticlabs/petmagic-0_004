@@ -120,6 +120,7 @@ export function TemplateEditor({ locale, templateType, initialTemplateId }: Temp
             <div className={styles.editorMain}>
               <section id="template-basics" className={styles.sectionCard}>
                 <AdminSectionHeader
+                  className={styles.compactSectionHeader}
                   title={text.editorSectionBasics}
                   description={text.editorBasicsHint}
                   aside={
@@ -162,6 +163,7 @@ export function TemplateEditor({ locale, templateType, initialTemplateId }: Temp
 
               <section id="template-media" className={styles.sectionCard}>
                 <AdminSectionHeader
+                  className={styles.compactSectionHeader}
                   title={text.editorSectionMedia}
                   description={isVideo ? text.editorMediaHint : text.editorImageMediaHint}
                   aside={
@@ -223,6 +225,7 @@ export function TemplateEditor({ locale, templateType, initialTemplateId }: Temp
 
               <section id="template-ai" className={styles.sectionCard}>
                 <AdminSectionHeader
+                  className={styles.compactSectionHeader}
                   title={text.editorSectionAi}
                   description={text.editorAiHint}
                   aside={

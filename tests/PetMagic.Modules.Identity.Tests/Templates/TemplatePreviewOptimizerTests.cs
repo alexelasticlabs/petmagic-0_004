@@ -9,6 +9,7 @@ using PetMagic.Modules.Templates.Infrastructure.Options;
 
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Metadata.Profiles.Exif;
 
 namespace PetMagic.Modules.Identity.Tests.Templates;
 
@@ -51,6 +52,44 @@ public sealed class TemplatePreviewOptimizerTests
             Assert.Equal((640, 320), (thumbnail.Width, thumbnail.Height));
             Assert.Equal((1600, 800), (detail.Width, detail.Height));
             Assert.True(File.Exists(inputPath));
+        }
+        finally
+        {
+            File.Delete(inputPath);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task OptimizeAsync_ShouldPreserveTwoByThreePortrait_AfterOrientationAndResize(bool rotated)
+    {
+        var inputPath = Path.Combine(Path.GetTempPath(), $"petmagic-template-portrait-{Guid.NewGuid():N}.jpg");
+        using (var source = new Image<Rgba32>(rotated ? 1800 : 1200, rotated ? 1200 : 1800, Color.CornflowerBlue))
+        {
+            if (rotated)
+            {
+                source.Metadata.ExifProfile = new ExifProfile();
+                source.Metadata.ExifProfile.SetValue(ExifTag.Orientation, (ushort)6);
+            }
+            await source.SaveAsJpegAsync(inputPath);
+        }
+
+        var storage = new RecordingMediaStorage();
+        try
+        {
+            var result = await CreateOptimizer(storage).OptimizeAsync(
+                CreateOriginal(inputPath, "image/jpeg"), null, CancellationToken.None);
+            Assert.True(result.IsSuccess);
+            Assert.Equal(2, storage.Uploads.Count);
+            foreach (var upload in storage.Uploads)
+            {
+                using var output = Image.Load(upload.Content);
+                Assert.True(output.Height > output.Width);
+                Assert.InRange(Math.Abs(output.Width - output.Height * 2d / 3d), 0, 1);
+                Assert.InRange(output.Height, 1, upload.PreferredStorageKey!.EndsWith("/thumbnail.webp", StringComparison.Ordinal) ? 640 : 1600);
+                Assert.Null(output.Metadata.ExifProfile);
+            }
         }
         finally
         {

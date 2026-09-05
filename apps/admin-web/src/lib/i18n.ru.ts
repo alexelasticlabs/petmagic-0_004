@@ -1,6 +1,17 @@
 import type { Dictionary } from "./i18n.types";
 
 export const ruDictionary: Dictionary = {
+  editorNavigationBasics: "Данные",
+  editorNavigationModels: "Модели",
+  editorPortraitFormat: "Вертикальный кадр 2:3",
+  editorInspectMedia: "Открыть крупно",
+  editorCloseMedia: "Закрыть",
+  editorPreviewDurationError:
+    "Видео для превью должно длиться от 0,5 до 18 секунд. Выберите другой файл или обрежьте видео.",
+  editorMediaReadError:
+    "Не удалось прочитать медиафайл. Проверьте, что он открывается, и экспортируйте его заново в поддерживаемом формате.",
+  editorMediaRetryError:
+    "Сервер не смог обработать или сохранить файл. Выбранный файл сохранён в форме — попробуйте ещё раз.",
   editorFilePending: "Выбран · загрузится при сохранении",
   editorFileUploaded: "Загружен",
   editorChooseFile: "Выбрать файл",
@@ -478,7 +489,7 @@ export const ruDictionary: Dictionary = {
   editorQaOnlyHint: "Скрыто из продуктовой ленты; доступно только в QA-режиме вне продакшена.",
   clearAsset: "Очистить",
   videoTemplateCreatePageTitle: "Создать новый шаблон",
-  videoTemplateCreatePageHint: "Создайте шаблон для генерации видео в формате TikTok (9:16).",
+  videoTemplateCreatePageHint: "Создайте видеошаблон с превью и референсом в формате 2:3.",
   videoTemplateEditPageTitle: "Редактировать шаблон",
   videoTemplateEditPageHint:
     "Обновите медиа, AI-настройки и готовность к публикации без выхода из редактора.",
@@ -529,7 +540,7 @@ export const ruDictionary: Dictionary = {
   editorReviewIncompleteHint:
     "Перед публикацией лучше закрыть незаполненные медиа или AI-блоки, чтобы карточка выглядела завершённой.",
   editorMediaRequirements:
-    "Все видео должны быть вертикальными 9:16. Для референса движения поддерживается только MP4, потому что его длительность влияет на автоопределение ориентации персонажа.",
+    "Превью и референсы используем в вертикальном формате 2:3. Для референса движения поддерживается только MP4, потому что его длительность влияет на автоопределение ориентации персонажа.",
   supportTitle: "Поддержка",
   supportDescription: "Управляйте диалогами поддержки и отвечайте пользователям из одной очереди.",
   supportInboxTitle: "Очередь чатов",

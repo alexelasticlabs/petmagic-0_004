@@ -755,6 +755,85 @@ public sealed class AdminTemplateUploadEndpointTests
         Assert.Equal(1, metadataReader.ReleaseRetainedLocalPathCalls);
     }
 
+    [Theory]
+    [InlineData("0")]
+    [InlineData("99")]
+    [InlineData("-1")]
+    [InlineData("unknown")]
+    public async Task UploadMediaAsync_ShouldRejectUnknownAssetKind_BeforeStorage(string assetKind)
+    {
+        await using var dbContext = CreateDbContext();
+        var storage = new RecordingMediaStorage();
+        var result = await AdminTemplateEndpoints.UploadMediaAsync(
+            CreateFormFile("preview.jpg", "image/jpeg", JpegBytes()),
+            assetKind,
+            storage,
+            CreateLifecycleService(dbContext),
+            new FixedTemplateMediaUploadPolicy(2048),
+            new RecordingMediaMetadataReader(),
+            new PassthroughTemplatePreviewOptimizer(),
+            CancellationToken.None);
+
+        var (status, body) = await ExecuteAsync(result);
+        Assert.Equal(StatusCodes.Status400BadRequest, status);
+        Assert.Contains("templates.asset_kind_invalid", body);
+        Assert.Equal(0, storage.StoreCalls);
+        Assert.Empty(await dbContext.TemplateMediaRecords.ToArrayAsync());
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(0d)]
+    [InlineData(-1d)]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    public async Task UploadMediaAsync_ShouldRejectUnusableReferenceDuration_AndCleanUp(double? duration)
+    {
+        await using var dbContext = CreateDbContext();
+        var storage = new RecordingMediaStorage();
+        var result = await AdminTemplateEndpoints.UploadMediaAsync(
+            CreateFormFile("reference.mp4", "video/mp4", Mp4Bytes()),
+            "ReferenceMotion",
+            storage,
+            CreateLifecycleService(dbContext),
+            new FixedTemplateMediaUploadPolicy(2048),
+            new RecordingMediaMetadataReader(duration),
+            new UnexpectedTemplatePreviewOptimizer(),
+            CancellationToken.None,
+            durationSeconds: "7");
+
+        var (status, body) = await ExecuteAsync(result);
+        Assert.Equal(StatusCodes.Status422UnprocessableEntity, status);
+        Assert.Contains("templates.media_metadata_invalid", body);
+        Assert.Single(storage.DeletedUrls);
+        var record = await dbContext.TemplateMediaRecords.SingleAsync();
+        Assert.Equal(TemplateMediaLifecycleState.Deleted, record.LifecycleState);
+        Assert.Equal(TemplateMediaRole.ReferenceMotionAsset, record.Role);
+    }
+
+    [Theory]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    public async Task UploadMediaAsync_ShouldRejectNonFinitePreviewDuration(double duration)
+    {
+        await using var dbContext = CreateDbContext();
+        var storage = new RecordingMediaStorage();
+        var result = await AdminTemplateEndpoints.UploadMediaAsync(
+            CreateFormFile("preview.mp4", "video/mp4", Mp4Bytes()),
+            "Preview",
+            storage,
+            CreateLifecycleService(dbContext),
+            new FixedTemplateMediaUploadPolicy(2048),
+            new RecordingMediaMetadataReader(duration),
+            new UnexpectedTemplatePreviewOptimizer(),
+            CancellationToken.None);
+
+        var (status, body) = await ExecuteAsync(result);
+        Assert.Equal(StatusCodes.Status400BadRequest, status);
+        Assert.Contains("templates.preview_duration_required", body);
+        Assert.Single(storage.DeletedUrls);
+    }
+
     private static FormFile CreateFormFile(string fileName, string contentType, byte[] content)
     {
         var stream = new MemoryStream(content);
@@ -850,9 +929,11 @@ public sealed class AdminTemplateUploadEndpointTests
         bool failDeletes = false) : IMediaStorage
     {
         public List<string> DeletedUrls { get; } = [];
+        public int StoreCalls { get; private set; }
 
         public Task<Result<StoredMediaResponse>> StoreAsync(MediaUploadCommand asset, CancellationToken cancellationToken)
         {
+            StoreCalls++;
             var stored = response ?? new StoredMediaResponse(
                 "https://cdn.example.com/templates/file.bin",
                 "templates/file.bin",

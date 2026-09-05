@@ -154,7 +154,9 @@
 }
 
 .advancedSettings > .formGrid {
-  padding-top: 16px;
+  display: grid;
+  gap: 10px;
+  min-width: 0;
 }
 
 .inlineFeedback {
@@ -186,7 +188,7 @@
 
 .editorGrid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) clamp(16.8rem, 18vw, 19.5rem);
+  grid-template-columns: minmax(0, 1fr) 16rem;
   gap: clamp(0.72rem, 0.6rem + 0.24vw, 0.92rem);
   align-items: start;
 }
@@ -214,13 +216,12 @@
 .sectionCard {
   min-width: 0;
   display: grid;
-  gap: 16px;
+  gap: 12px;
   border: 1px solid var(--border-soft);
-  border-radius: 0.76rem;
-  padding: 20px;
-  scroll-margin-top: 96px;
+  border-radius: var(--radius-md);
+  padding: 14px;
+  scroll-margin-top: 88px;
   background: var(--surface-1);
-  box-shadow: none;
 }
 
 .sectionHeader {
@@ -229,6 +230,10 @@
   justify-content: space-between;
   gap: 0.72rem;
   flex-wrap: wrap;
+  min-width: 0;
+}
+
+.compactSectionHeader {
   min-width: 0;
 }
 
@@ -350,28 +355,23 @@
 }
 
 .railStats {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.45rem;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .railStatCard {
-  display: grid;
-  gap: 0.1rem;
-  border: 1px solid var(--border-soft);
-  border-radius: 0.58rem;
-  padding: 0.56rem 0.65rem;
-  background: var(--surface-2);
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
 }
 
 .railStatCardReady {
-  background: color-mix(in srgb, var(--success) 12%, var(--surface-2));
-  border-color: color-mix(in srgb, var(--success) 28%, var(--border-soft));
+  color: var(--success);
 }
 
 .railStatCardMissing {
-  background: color-mix(in srgb, var(--warning) 12%, var(--surface-2));
-  border-color: color-mix(in srgb, var(--warning) 24%, var(--border-soft));
+  color: var(--text-muted);
 }
 
 .railStatLabel {
@@ -392,12 +392,13 @@
 .previewCardWrap {
   margin: 0 auto;
   width: 100%;
-  max-width: min(100%, 18rem);
+  max-width: 13rem;
+  --phone-preview-card-aspect-ratio: 2 / 3;
 }
 
 .checklist {
   display: grid;
-  gap: 0.42rem;
+  gap: 0;
 }
 
 .checklistItem {
@@ -406,13 +407,15 @@
   cursor: pointer;
   display: grid;
   grid-template-columns: auto 1fr auto;
-  gap: 0.5rem;
+  gap: 8px;
   align-items: center;
   min-width: 0;
-  border: 1px solid var(--border-soft);
-  border-radius: 0.59rem;
-  padding: 0.52rem 0.6rem;
-  background: var(--surface-2);
+  min-height: 32px;
+  border: 0;
+  border-bottom: 1px solid var(--border-soft);
+  border-radius: 0;
+  padding: 6px 0;
+  background: transparent;
 }
 
 .checklistItemReady {
@@ -464,35 +467,38 @@
 }
 
 .checklistState {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 5rem;
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-sm);
-  padding: 0.18rem 0.45rem;
-  font-size: 0.62rem;
-  font-weight: 600;
-  white-space: normal;
-  line-height: 1.3;
+  color: var(--text-muted);
+  font-size: 0.65rem;
+  text-align: right;
+  max-width: 5rem;
+  line-height: 1.2;
 }
 
 @media (max-width: 720px) and (max-height: 700px) {
   .footerBar {
-    position: static;
+    position: sticky;
+    bottom: 8px;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    min-width: 0;
+    gap: 8px;
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-md);
+    padding: 10px 12px;
+    background: var(--surface-1);
+    box-shadow: var(--shadow-card);
   }
 }
 
 .checklistStateReady {
-  border-color: color-mix(in srgb, var(--success) 30%, var(--border-soft));
-  background: color-mix(in srgb, var(--success) 16%, var(--surface-2));
   color: var(--success);
 }
 
 .checklistStateMissing {
-  border-color: color-mix(in srgb, var(--warning) 30%, var(--border-soft));
-  background: color-mix(in srgb, var(--warning) 16%, var(--surface-2));
-  color: var(--warning);
+  color: var(--text-muted);
 }
 
 .hintList {
@@ -529,8 +535,8 @@
 .footerStatusPanel {
   display: flex;
   align-items: center;
-  gap: 0.9rem;
-  flex: 1 1 24rem;
+  gap: 12px;
+  flex: 1 1 22rem;
   min-width: 0;
 }
 
@@ -612,9 +618,10 @@
 
 .fieldBlock {
   display: grid;
-  gap: 0.45rem;
+  gap: 4px;
+  min-width: 0;
   color: var(--text-muted);
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   font-weight: 600;
 }
 
@@ -670,36 +677,28 @@
 
 .accessOption {
   position: relative;
-  min-height: 64px;
-  border: 1.5px solid var(--border-soft);
-  border-radius: 0.72rem;
-  padding: 12px 44px 12px 12px;
-  background: var(--surface-1);
+  min-width: 0;
+  min-height: 36px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  padding: 8px 30px 8px 10px;
+  background: var(--surface-2);
   color: var(--text-soft);
   text-align: left;
   cursor: pointer;
   display: grid;
-  gap: 0.22rem;
-  transition:
-    border-color 140ms ease,
-    background-color 140ms ease,
-    transform 140ms ease,
-    box-shadow 140ms ease;
+  gap: 4px;
 }
 
 .accessOption::after {
   position: absolute;
-  top: 0.88rem;
-  right: 0.88rem;
-  width: 1.22rem;
-  height: 1.22rem;
-  border: 2px solid var(--text-subtle);
-  border-radius: 999px;
+  top: 11px;
+  right: 10px;
+  width: 12px;
+  height: 12px;
+  border: 1px solid var(--text-subtle);
+  border-radius: 50%;
   content: "";
-  transition:
-    border-color 140ms ease,
-    background-color 140ms ease,
-    box-shadow 140ms ease;
 }
 
 .accessOptionFree {
@@ -714,8 +713,6 @@
 .accessOption:hover:not(.accessOptionActive) {
   border-color: var(--border-accent);
   background: var(--surface-hover);
-  transform: translateY(-1px);
-  box-shadow: 0 5px 14px color-mix(in srgb, var(--text-strong) 7%, transparent);
 }
 
 .accessOption:focus-visible {
@@ -725,9 +722,7 @@
 
 .accessOptionActive {
   border-color: var(--accent-strong);
-  box-shadow:
-    0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent),
-    0 8px 20px color-mix(in srgb, var(--accent) 14%, transparent);
+  box-shadow: inset 0 0 0 1px var(--accent-strong);
 }
 
 .accessOptionActive::after {
@@ -739,14 +734,13 @@
 .accessOptionActive::before {
   position: absolute;
   z-index: 1;
-  top: 1.17rem;
-  right: 1.17rem;
-  width: 0.42rem;
-  height: 0.23rem;
-  border-right: 2px solid var(--accent-strong);
-  border-bottom: 2px solid var(--accent-strong);
+  top: 15px;
+  right: 14px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent-strong);
   content: "";
-  transform: rotate(45deg);
 }
 
 .accessOptionActiveFree {
@@ -755,10 +749,8 @@
 
 .accessOptionActivePremium {
   border-color: var(--warning);
-  background: color-mix(in srgb, var(--warning) 18%, var(--surface-1));
-  box-shadow:
-    0 0 0 2px color-mix(in srgb, var(--warning) 22%, transparent),
-    0 8px 20px color-mix(in srgb, var(--warning) 14%, transparent);
+  background: var(--warning-soft-bg);
+  box-shadow: inset 0 0 0 1px var(--warning);
 }
 
 .accessOptionActivePremium::after {
@@ -767,7 +759,7 @@
 }
 
 .accessOptionActivePremium::before {
-  border-color: var(--warning);
+  background: var(--warning);
 }
 
 .accessOptionTitle {
@@ -803,12 +795,9 @@
 
 .modelCard {
   display: grid;
-  gap: 0.72rem;
-  border: 1px solid var(--border-soft);
-  border-radius: 0.72rem;
-  padding: 0.86rem;
-  background: var(--surface-1);
-  box-shadow: none;
+  gap: 10px;
+  min-width: 0;
+  padding: 0;
 }
 
 .modelCardHeader {
@@ -985,27 +974,8 @@
 
 .formSection {
   display: grid;
-  gap: 0.8rem;
-  border-top: 1px solid var(--border-soft);
-  padding-top: 1rem;
-}
-
-.mediaGrid .formSection,
-.sectionCard .formSection {
-  border: 1px solid var(--border-soft);
-  border-radius: 0.72rem;
-  padding: 0.82rem;
-  background: var(--surface-2);
-}
-
-.formSection:first-of-type {
-  border-top: 0;
-  padding-top: 0;
-}
-
-.mediaGrid .formSection:first-child,
-.sectionCard .formSection:first-child {
-  padding-top: 0.82rem;
+  gap: 12px;
+  min-width: 0;
 }
 
 .formSection h3 {
@@ -1018,7 +988,7 @@
 
 .formGrid {
   display: grid;
-  gap: 0.85rem;
+  gap: 10px;
 }
 
 .formGrid label {
@@ -1032,7 +1002,7 @@
   width: 100%;
   border: 1px solid var(--border-soft);
   border-radius: 0.61rem;
-  padding: 0.72rem 0.8rem;
+  padding: 6px 10px;
   background: var(--surface-2);
   color: var(--text-soft);
   font: inherit;
@@ -1063,7 +1033,7 @@
 }
 
 .fieldBlock > textarea {
-  min-height: 6rem;
+  min-height: 0;
   resize: vertical;
 }
 
@@ -1077,7 +1047,7 @@
 .split {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.85rem;
+  gap: 10px;
 }
 
 .readonly input {
@@ -1142,7 +1112,7 @@
   }
 
   .editorGrid {
-    grid-template-columns: minmax(0, 1fr) 21rem;
+    grid-template-columns: minmax(0, 1fr) 16rem;
   }
 }
 
@@ -1167,7 +1137,7 @@
   }
 
   .previewCardWrap {
-    max-width: min(100%, 20rem);
+    max-width: 13rem;
   }
 
   .layout {
@@ -1195,6 +1165,10 @@
     align-items: stretch;
   }
 
+  .footerBar {
+    position: static;
+  }
+
   .footerStatusPanel {
     flex-basis: auto;
     flex-direction: column;
@@ -1211,9 +1185,7 @@
     justify-content: center;
   }
 
-  .derivedGrid,
-  .accessOptions,
-  .railStats {
+  .derivedGrid {
     grid-template-columns: 1fr;
   }
 
@@ -1225,7 +1197,7 @@
   .railCard,
   .loadingHero,
   .loadingCard {
-    padding: 0.95rem;
+    padding: 12px;
   }
 
   .phoneMedia {
@@ -1281,7 +1253,7 @@
 
 @media (max-width: 560px) {
   .templateEditorPage {
-    gap: 0.85rem;
+    gap: 10px;
   }
 
   .pageHeader h1 {
@@ -1296,13 +1268,61 @@
   .phoneMedia {
     min-height: 27.5rem;
   }
+}
 
-  .checklistItem {
-    grid-template-columns: auto 1fr;
+.basicGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+}
+
+.basicGrid > :first-child,
+.basicGrid > .split,
+.basicGrid > details {
+  grid-column: 1 / -1;
+}
+
+.basicGrid > .priceField {
+  grid-column: auto;
+  grid-template-columns: 1fr;
+}
+
+.basicGrid .accessOptions {
+  gap: 6px;
+}
+
+@media (max-width: 720px) {
+  .basicGrid {
+    grid-template-columns: 1fr;
   }
 
-  .checklistState {
-    grid-column: 2;
-    justify-self: start;
+  .accessOptionTitle {
+    font-size: 0.8rem;
+  }
+
+  .editorNavigation {
+    gap: 8px;
+    padding-bottom: 8px;
+  }
+
+  .editorNavigation nav {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .editorNavigation button {
+    justify-content: space-between;
+    min-width: 0;
+    padding: 4px 8px;
+    gap: 4px;
+    font-size: 0.75rem;
+  }
+
+  .stepNumber {
+    display: none;
+  }
+
+  .compactSectionHeader > :last-child {
+    display: none;
   }
 }

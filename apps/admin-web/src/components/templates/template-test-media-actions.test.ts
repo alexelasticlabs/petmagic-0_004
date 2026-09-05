@@ -554,11 +554,10 @@ describe("template test media actions", () => {
     expect(sectionsSource).toContain(
       'setSelectionError(getReferenceSelectionError(text, "size"));'
     );
-    expect(previewSource).toContain("text.previewAssetVideoBadge");
-    expect(previewSource).toContain("text.previewAssetCoverBadge");
+    expect(previewSource).toContain("text.editorPortraitFormat");
     expect(previewSource).toContain("return text.previewAssetFileTooLarge;");
     expect(previewSource).toContain("return text.previewAssetFileTypeError;");
-    expect(sectionsSource).toContain("{text.referenceMotionSourceBadge}");
+    expect(sectionsSource).toContain("text.editorPortraitFormat");
     expect(sectionsSource).toContain("return text.referenceMotionFileTooLarge;");
     expect(sectionsSource).toContain("return text.referenceMotionFileTypeError;");
     expect(previewSource).not.toContain(">Video preview<");

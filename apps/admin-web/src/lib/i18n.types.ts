@@ -5,6 +5,14 @@ export type Locale = (typeof locales)[number];
 export const defaultLocale: Locale = "ru";
 
 export type Dictionary = {
+  editorNavigationBasics: string;
+  editorNavigationModels: string;
+  editorPortraitFormat: string;
+  editorInspectMedia: string;
+  editorCloseMedia: string;
+  editorPreviewDurationError: string;
+  editorMediaReadError: string;
+  editorMediaRetryError: string;
   editorFilePending: string;
   editorFileUploaded: string;
   editorChooseFile: string;

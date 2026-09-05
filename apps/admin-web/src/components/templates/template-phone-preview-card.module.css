@@ -307,7 +307,7 @@
   padding: 0.16rem 0.46rem;
   border: 1px solid color-mix(in srgb, var(--text-inverse) 9%, transparent);
   background: color-mix(in srgb, var(--surface-2) 28%, transparent);
-  color: var(--text-strong);
+  color: var(--text-inverse);
   font-size: 0.76rem;
   box-shadow: 0 8px 16px color-mix(in srgb, var(--surface-0) 15%, transparent);
 }

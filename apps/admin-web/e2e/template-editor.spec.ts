@@ -14,7 +14,7 @@ import {
 const apiOrigin = "https://api.petmagic.test";
 const templateId = "33333333-3333-3333-3333-333333333333";
 const png = Buffer.from(
-  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aL1sAAAAASUVORK5CYII=",
+  "iVBORw0KGgoAAAANSUhEUgAAAHgAAAC0CAIAAADQLH9KAAAB6UlEQVR4nO3Qha0QAAAD0e7XnXDnI8X14+4O27FFScolb4DLyUeCAv3zgv8Eo2ujjwYFjGb0FvlYUMBoRm+RjwcFjGb0FvlEUMBoRm+RTwYFjGb0FvlUUMBoRm+RTwcFjGb0FvlMUMBoRm+RzwYFjGb0FvlcUMBoRm+RzwcFjGb0FvlCUMBoRm+RLwYFjGb0FvkgKGA0o7fIl4ICRjN6i3w5KGA0o7fIV4ICRjN6i3w1KGA0o7fICQoYzegt8rWggNGM3iJfDwoYzegt8o2ggNGM3iLfDAoYzegt8q2ggNGM3iLfDgoYzegt8p2ggNGM3iLfDQoYzegt8r2ggNGM3iLfDwoYzegt8oOggNGM3iI/DAoYzegt8mFQwGhGb5EfBQWMZvQW+XFQwGhGb5GfBAWMZvQW+WlQwGhGb5GfBQWMZvQW+XlQwGhGb5FfBAWMZvQW+WVQwGhGb5FfBQWMZvQW+XVQwGhGb5HfBAWMZvQW+W1QwGhGb5HfBQWMZvQW+X1QwGhGb5E/BAWMZvQW+WNQwGhGb5E/BQWMZvQW+XNQwGhGb5G/BAWMZvQW+WtQwGhGb5G/BQWMZvQW+XtQwGhGb5F/BAWMZvQW+WdQwGhGb5F/BQWMZvQW+XdQwGhGb5H/BAWMZvSWv2auygZpNkOmAAAAAElFTkSuQmCC",
   "base64"
 );
 const previewAsset = {
@@ -414,8 +414,27 @@ test("editing preserves persisted assets and sends PUT with an empty optional pr
   expect(state.saves[0].previewAsset).toBeUndefined();
 });
 
+test("portrait media can be inspected without losing editor focus or data", async ({ page }) => {
+  await openEditor(page);
+  await page.locator("#template-title").fill("Портрет 2:3");
+  await selectPreview(page);
+  const trigger = page.locator("#template-preview").getByRole("button", { name: "Открыть крупно" });
+  await trigger.click();
+  const dialog = page.getByRole("dialog", { name: "Превью", exact: true });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator("img")).toHaveJSProperty("naturalWidth", 120);
+  await expect(dialog.locator("img")).toHaveCSS("object-fit", "contain");
+  await page.keyboard.press("Escape");
+  await expect(dialog).not.toBeVisible();
+  await expect(trigger).toBeFocused();
+  await expect(page.locator("#template-title")).toHaveValue("Портрет 2:3");
+  await trigger.click();
+  await dialog.getByRole("button", { name: "Закрыть", exact: true }).click();
+  await expect(dialog).not.toBeVisible();
+});
+
 for (const type of ["image", "video"] as const) {
-  for (const width of [1536, 390]) {
+  for (const width of [1536, 1280, 390, 320]) {
     test(`${type} editor renders and navigates at ${width}px`, async ({ page }) => {
       await page.setViewportSize({ width, height: 960 });
       await openEditor(page, type);
@@ -433,6 +452,22 @@ for (const type of ["image", "video"] as const) {
       await expect(
         page.getByText("Application error: a client-side exception has occurred")
       ).toHaveCount(0);
+      const mediaFrames = page.locator('#template-media [role="button"]');
+      for (const frame of await mediaFrames.all()) {
+        const bounds = await frame.boundingBox();
+        expect(bounds).not.toBeNull();
+        expect(bounds!.width / bounds!.height).toBeCloseTo(2 / 3, 2);
+      }
+      if (width === 1536) {
+        const basics = await page.locator("#template-basics").boundingBox();
+        expect(basics!.height).toBeLessThan(510);
+      }
+      if (width <= 720) {
+        const position = await page
+          .locator('button[type="submit"]')
+          .evaluate((button) => getComputedStyle(button.parentElement!.parentElement!).position);
+        expect(position).toBe("static");
+      }
       if (process.env.EDITOR_QA_SCREENSHOT_DIR)
         await page.screenshot({
           animations: "disabled",
@@ -447,8 +482,15 @@ for (const type of ["image", "video"] as const) {
       await expect(
         page.getByRole("button", { name: "Сохранить и активировать", exact: true })
       ).toBeDisabled();
+      await selectPreview(page);
+      await expect(page.locator("#template-preview img")).toHaveJSProperty("naturalWidth", 120);
+      await expect(page.locator("#template-preview img")).toHaveJSProperty("naturalHeight", 180);
+      await expect(page.locator("#template-preview img")).toHaveCSS("object-fit", "contain");
       await page.getByRole("button", { name: "Включить тёмную тему", exact: true }).click();
       await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+      await page
+        .locator("#template-media")
+        .evaluate((section) => section.scrollIntoView({ block: "start" }));
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
         true
       );

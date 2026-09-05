@@ -125,7 +125,8 @@ public static partial class AdminTemplateEndpoints
         }
 
 
-        if (!Enum.TryParse<TemplateAssetKind>(assetKind, true, out var parsedAssetKind))
+        if (!Enum.TryParse<TemplateAssetKind>(assetKind, true, out var parsedAssetKind)
+            || !Enum.IsDefined(parsedAssetKind))
 
         {
 
@@ -367,7 +368,7 @@ public static partial class AdminTemplateEndpoints
 
             {
 
-                if (!duration.HasValue || duration.Value <= 0)
+                if (!duration.HasValue || !double.IsFinite(duration.Value) || duration.Value <= 0)
 
                 {
 
@@ -377,7 +378,7 @@ public static partial class AdminTemplateEndpoints
 
                         storeResult.Value,
 
-                        duration,
+                        null,
 
                         MapMediaRole(kind),
 
@@ -428,6 +429,20 @@ public static partial class AdminTemplateEndpoints
 
         }
 
+
+        if (kind == TemplateAssetKind.ReferenceMotion
+            && (!duration.HasValue || !double.IsFinite(duration.Value) || duration.Value <= 0))
+        {
+            await CleanupStoredUploadAsync(
+                storeResult.Value,
+                null,
+                TemplateMediaRole.ReferenceMotionAsset,
+                mediaStorage,
+                mediaLifecycleService);
+            return ToAdminTemplateProblem(new Error(
+                "templates.media_metadata_invalid",
+                "Reference video duration metadata is invalid."));
+        }
 
         if (kind != TemplateAssetKind.Preview)
 

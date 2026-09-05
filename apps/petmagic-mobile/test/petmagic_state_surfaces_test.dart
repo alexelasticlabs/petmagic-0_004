@@ -39,7 +39,9 @@ void main() {
 
   for (final brightness in Brightness.values) {
     for (final scene in ['guest', 'empty', 'invitation']) {
-      testWidgets('$scene ${brightness.name} visual baseline', (tester) async {
+      testWidgets(
+        '$scene ${brightness.name} visual baseline',
+        (tester) async {
         _size(tester, const Size(390, 844));
         await tester.pumpWidget(
           _host(
@@ -89,8 +91,10 @@ void main() {
           find.byType(MaterialApp),
           matchesGoldenFile('goldens/state_${scene}_${brightness.name}.png'),
         );
-        expect(tester.takeException(), isNull);
-      });
+          expect(tester.takeException(), isNull);
+        },
+        tags: const ['platform-golden'],
+      );
     }
   }
 

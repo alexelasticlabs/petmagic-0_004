@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { useSyncToastToAdminNotifications } from "@/components/admin/admin-notifications";
 import { ensureAdminSession } from "@/components/admin/admin-session";
+import { getTemplateEditorErrorMessage } from "@/components/templates/template-editor-error-message";
 import { buildTemplateEditorModel } from "@/components/templates/template-editor-model";
 import { getTemplateEditorRuntimeText } from "@/components/templates/template-editor.content";
 import {
@@ -460,7 +461,7 @@ export function useTemplateEditorController({
     try {
       await uploadTemplateMediaMutation.mutateAsync({ assetKind, file });
     } catch (error) {
-      const message = resolveUploadErrorMessage(error, text.errorSavingTemplate);
+      const message = resolveUploadErrorMessage(error, text);
       setSaveError(message);
       setToast({ type: "error", message });
       clientLogger.warn("templates.media_upload_failed", {
@@ -561,8 +562,8 @@ export function useTemplateEditorController({
   };
 }
 
-function resolveUploadErrorMessage(error: unknown, fallback: string): string {
-  return getAdminErrorMessage(error, fallback);
+function resolveUploadErrorMessage(error: unknown, text: Dictionary): string {
+  return getTemplateEditorErrorMessage(error, text, text.errorSavingTemplate);
 }
 
 function applyUploadedAssetToForm(
@@ -620,8 +621,9 @@ function getTemplateSaveErrorMessage(
   text: Dictionary,
   targetStatus: EditorVisibilityStatus
 ): string {
-  return getAdminErrorMessage(
+  return getTemplateEditorErrorMessage(
     error,
+    text,
     targetStatus === "Active" ? text.errorActivatingTemplate : text.errorSavingTemplate
   );
 }

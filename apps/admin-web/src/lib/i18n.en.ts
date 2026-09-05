@@ -1,6 +1,17 @@
 import type { Dictionary } from "./i18n.types";
 
 export const enDictionary: Dictionary = {
+  editorNavigationBasics: "Details",
+  editorNavigationModels: "Models",
+  editorPortraitFormat: "Portrait frame 2:3",
+  editorInspectMedia: "Enlarge preview",
+  editorCloseMedia: "Close",
+  editorPreviewDurationError:
+    "Preview videos must be between 0.5 and 18 seconds. Choose another file or trim the video.",
+  editorMediaReadError:
+    "The media file could not be read. Check that it plays or opens, then export it again in a supported format.",
+  editorMediaRetryError:
+    "The server could not process or store the file. Your selection is still in the form — try again.",
   editorFilePending: "Selected · uploads on save",
   editorFileUploaded: "Uploaded",
   editorChooseFile: "Choose file",
@@ -472,8 +483,7 @@ export const enDictionary: Dictionary = {
   editorQaOnlyHint: "Hide from production feeds; visible only in non-production QA mode.",
   clearAsset: "Clear",
   videoTemplateCreatePageTitle: "Create new template",
-  videoTemplateCreatePageHint:
-    "Create a template for TikTok-style vertical video generation (9:16).",
+  videoTemplateCreatePageHint: "Create a video template with a portrait 2:3 preview and reference.",
   videoTemplateEditPageTitle: "Edit template",
   videoTemplateEditPageHint:
     "Update media, AI settings, and publishing readiness without leaving the editor flow.",
@@ -523,7 +533,7 @@ export const enDictionary: Dictionary = {
   editorReviewIncompleteHint:
     "Before publishing, close the remaining media or AI gaps so the card reads as complete.",
   editorMediaRequirements:
-    "All videos should stay vertical 9:16. Reference motion supports MP4 only because its duration drives the auto-detected character orientation.",
+    "Previews and references use portrait 2:3 frames. Motion references support MP4; duration is checked on the server.",
   supportTitle: "Support",
   supportDescription: "Manage support conversations and reply to users from a single inbox.",
   supportInboxTitle: "Support inbox",
