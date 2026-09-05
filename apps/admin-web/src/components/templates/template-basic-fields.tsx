@@ -116,6 +116,7 @@ export function TemplateBasicFields({
           </span>
         </span>
         <input
+          id="template-title"
           value={form.title}
           maxLength={TEMPLATE_TITLE_MAX_LENGTH}
           onChange={(event) =>
@@ -136,6 +137,7 @@ export function TemplateBasicFields({
           </span>
         </span>
         <textarea
+          id="template-description"
           value={form.shortDescription}
           maxLength={TEMPLATE_SHORT_DESCRIPTION_MAX_LENGTH}
           onChange={(event) =>
@@ -147,7 +149,7 @@ export function TemplateBasicFields({
               ),
             }))
           }
-          rows={3}
+          rows={2}
           required={requireCompleteDetails}
         />
       </label>
@@ -160,6 +162,7 @@ export function TemplateBasicFields({
           </span>
         </span>
         <textarea
+          id="template-photo-requirements"
           value={form.petPhotoRequirements}
           maxLength={PET_PHOTO_REQUIREMENTS_INPUT_MAX_LENGTH}
           onChange={(event) =>
@@ -171,13 +174,13 @@ export function TemplateBasicFields({
               ),
             }))
           }
-          rows={4}
+          rows={3}
           placeholder={text.petPhotoRequirementsHint}
         />
       </label>
 
       <div className={styles.split}>
-        <label className={styles.fieldBlock}>
+        <label id="template-category" className={styles.fieldBlock}>
           <span className={styles.fieldHeader}>
             <span>{text.categoryLabel}</span>
           </span>
@@ -185,6 +188,7 @@ export function TemplateBasicFields({
             value={form.category}
             options={categoryOptions}
             ariaLabel={text.categoryLabel}
+            showSelectedDescription={false}
             onChange={(value) => setForm((current) => ({ ...current, category: value }))}
           />
         </label>
@@ -206,18 +210,6 @@ export function TemplateBasicFields({
         </label>
       </div>
 
-      <label className={styles.fieldBlock}>
-        <span className={styles.fieldHeader}>
-          <span>{text.promoBadgeLabel}</span>
-        </span>
-        <Select
-          value={form.promoBadgeMode}
-          options={promoBadgeOptions}
-          ariaLabel={text.promoBadgeLabel}
-          onChange={(value) => setForm((current) => ({ ...current, promoBadgeMode: value }))}
-        />
-      </label>
-
       <div className={styles.accessGroup} role="group" aria-label={text.accessLabel}>
         <span className={styles.accessLabel}>{text.accessLabel}</span>
         <div className={styles.accessOptions}>
@@ -232,7 +224,7 @@ export function TemplateBasicFields({
             aria-pressed={!form.isPremium}
             onClick={() => setForm((current) => ({ ...current, isPremium: false }))}
           >
-            <span className={styles.accessOptionTitle}>{text.freeLabel}</span>
+            <span className={styles.accessOptionTitle}>{text.editorAllUsersAccess}</span>
             <span className={styles.accessOptionHint}>{text.editorAccessFreeHint}</span>
           </button>
 
@@ -253,32 +245,13 @@ export function TemplateBasicFields({
         </div>
       </div>
 
-      <div className={styles.accessGroup} role="group" aria-label={text.qaOnlyLabel}>
-        <span className={styles.accessLabel}>{text.qaOnlyLabel}</span>
-        <div className={styles.accessOptions}>
-          <button
-            type="button"
-            className={joinClassNames(
-              styles.accessOption,
-              form.isQaOnly ? styles.accessOptionActive : null
-            )}
-            aria-pressed={form.isQaOnly}
-            onClick={() => setForm((current) => ({ ...current, isQaOnly: !current.isQaOnly }))}
-          >
-            <span className={styles.accessOptionTitle}>
-              {form.isQaOnly ? text.qaOnlyLabel : text.editorVisibleToUsersHint}
-            </span>
-            <span className={styles.accessOptionHint}>{text.editorQaOnlyHint}</span>
-          </button>
-        </div>
-      </div>
-
       <div className={styles.split}>
         <label className={styles.fieldBlock}>
           <span className={styles.fieldHeader}>
             <span>{text.tokenCostLabel}</span>
           </span>
           <input
+            id="template-token-cost"
             value={form.tokenCost}
             onChange={(event) =>
               setForm((current) => ({
@@ -323,53 +296,93 @@ export function TemplateBasicFields({
         ) : null}
       </div>
 
-      <div
-        className={styles.accessGroup}
-        role="group"
-        aria-label={text.editorGenerationResultInputTitle}
-      >
-        <span className={styles.accessLabel}>{text.editorGenerationResultInputTitle}</span>
-        <div className={styles.accessOptions}>
-          <button
-            type="button"
-            className={joinClassNames(
-              styles.accessOption,
-              form.supportsGenerationResultInput ? styles.accessOptionActive : null
-            )}
-            aria-pressed={form.supportsGenerationResultInput}
-            onClick={() =>
-              setForm((current) => ({
-                ...current,
-                supportsGenerationResultInput: !current.supportsGenerationResultInput,
-              }))
-            }
-          >
-            <span className={styles.accessOptionTitle}>
-              {form.supportsGenerationResultInput
-                ? text.editorGenerationResultSupported
-                : text.editorGenerationResultUnsupported}
+      <details className={styles.advancedSettings}>
+        <summary>{text.editorAdvancedSettings}</summary>
+        <p className={styles.sectionDescription}>{text.editorAdvancedHint}</p>
+        <div className={styles.formGrid}>
+          <label className={styles.fieldBlock}>
+            <span className={styles.fieldHeader}>
+              <span>{text.promoBadgeLabel}</span>
             </span>
-            <span className={styles.accessOptionHint}>{text.editorGenerationResultInputHint}</span>
-          </button>
-        </div>
-      </div>
+            <Select
+              value={form.promoBadgeMode}
+              options={promoBadgeOptions}
+              ariaLabel={text.promoBadgeLabel}
+              onChange={(value) => setForm((current) => ({ ...current, promoBadgeMode: value }))}
+            />
+          </label>
 
-      <label className={styles.fieldBlock}>
-        <span className={styles.fieldHeader}>
-          <span>{text.editorRequiredInputMediaTypeLabel}</span>
-        </span>
-        <Select
-          value={form.requiredInputMediaType}
-          options={inputMediaTypeOptions}
-          ariaLabel={text.editorRequiredInputMediaTypeLabel}
-          onChange={(value) =>
-            setForm((current) => ({
-              ...current,
-              requiredInputMediaType: value === "Video" ? "Video" : "Image",
-            }))
-          }
-        />
-      </label>
+          <div className={styles.accessGroup} role="group" aria-label={text.qaOnlyLabel}>
+            <span className={styles.accessLabel}>{text.qaOnlyLabel}</span>
+            <div className={styles.accessOptions}>
+              <button
+                type="button"
+                className={joinClassNames(
+                  styles.accessOption,
+                  form.isQaOnly ? styles.accessOptionActive : null
+                )}
+                aria-pressed={form.isQaOnly}
+                onClick={() => setForm((current) => ({ ...current, isQaOnly: !current.isQaOnly }))}
+              >
+                <span className={styles.accessOptionTitle}>
+                  {form.isQaOnly ? text.qaOnlyLabel : text.editorAllUsersAccess}
+                </span>
+                <span className={styles.accessOptionHint}>{text.editorQaOnlyHint}</span>
+              </button>
+            </div>
+          </div>
+
+          <div
+            className={styles.accessGroup}
+            role="group"
+            aria-label={text.editorGenerationResultInputTitle}
+          >
+            <span className={styles.accessLabel}>{text.editorGenerationResultInputTitle}</span>
+            <div className={styles.accessOptions}>
+              <button
+                type="button"
+                className={joinClassNames(
+                  styles.accessOption,
+                  form.supportsGenerationResultInput ? styles.accessOptionActive : null
+                )}
+                aria-pressed={form.supportsGenerationResultInput}
+                onClick={() =>
+                  setForm((current) => ({
+                    ...current,
+                    supportsGenerationResultInput: !current.supportsGenerationResultInput,
+                  }))
+                }
+              >
+                <span className={styles.accessOptionTitle}>
+                  {form.supportsGenerationResultInput
+                    ? text.editorGenerationResultSupported
+                    : text.editorGenerationResultUnsupported}
+                </span>
+                <span className={styles.accessOptionHint}>
+                  {text.editorGenerationResultInputHint}
+                </span>
+              </button>
+            </div>
+          </div>
+
+          <label className={styles.fieldBlock}>
+            <span className={styles.fieldHeader}>
+              <span>{text.editorRequiredInputMediaTypeLabel}</span>
+            </span>
+            <Select
+              value={form.requiredInputMediaType}
+              options={inputMediaTypeOptions}
+              ariaLabel={text.editorRequiredInputMediaTypeLabel}
+              onChange={(value) =>
+                setForm((current) => ({
+                  ...current,
+                  requiredInputMediaType: value === "Video" ? "Video" : "Image",
+                }))
+              }
+            />
+          </label>
+        </div>
+      </details>
     </div>
   );
 }

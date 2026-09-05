@@ -2,7 +2,7 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useSyncToastToAdminNotifications } from "@/components/admin/admin-notifications";
 import { ensureAdminSession } from "@/components/admin/admin-session";
@@ -11,13 +11,11 @@ import { getTemplateEditorRuntimeText } from "@/components/templates/template-ed
 import {
   createFormFromTemplate,
   createInitialTemplateForm,
-  parseOptionalDecimal,
   saveImageTemplateFromForm,
   saveVideoTemplateFromForm,
 } from "@/components/templates/template-form-mappers";
 import { type TemplateFormState } from "@/components/templates/types";
 import { useAdminTemplateCategories } from "@/components/templates/use-admin-template-categories";
-import { useAdminTemplateOptions } from "@/components/templates/use-admin-template-options";
 import { getAdminErrorMessage } from "@/lib/admin-error-message";
 import { adminQueryKeys } from "@/lib/admin-query-keys";
 import {
@@ -34,6 +32,9 @@ import {
 import { clientLogger } from "@/lib/client-logger";
 import { getDictionary, type Dictionary, type Locale } from "@/lib/i18n";
 import { sanitizeSensitiveText } from "@/lib/sensitive-display";
+
+import { getTemplateActivationError, focusTemplateEditorField } from "./template-editor-readiness";
+import { useTemplateEditorLeaveGuard } from "./use-template-editor-leave-guard";
 
 type TemplateEditorControllerOptions = {
   initialTemplateId?: string;
@@ -76,16 +77,15 @@ export function useTemplateEditorController({
   const queryClient = useQueryClient();
   const session = useAuthSession();
   const canManageTemplates = session?.user.roles.includes("Admin") ?? false;
-  const { categories } = useAdminTemplateCategories({
+  const {
+    categories,
+    hasError: hasCategoriesError,
+    isLoading: isCategoriesLoading,
+    refresh: refreshCategories,
+  } = useAdminTemplateCategories({
     enabled: canManageTemplates,
     includeArchived: false,
   });
-  const {
-    hasError: hasTemplateOptionsError,
-    isLoading: isTemplateOptionsLoading,
-    refresh: refreshTemplateOptions,
-    templates,
-  } = useAdminTemplateOptions({ enabled: canManageTemplates, templateType });
   const [selectedTemplate, setSelectedTemplate] = useState<AdminTemplate | null>(null);
   const [form, setForm] = useState<TemplateFormState>(() =>
     createInitialTemplateForm(templateType)
@@ -94,11 +94,42 @@ export function useTemplateEditorController({
   const [initializationError, setInitializationError] = useState<string | null>(null);
   const [initializationRetryKey, setInitializationRetryKey] = useState(0);
   const [previewFile, setPreviewFile] = useState<File | null>(null);
+  const [localPreview, setLocalPreview] = useState<{ file: File; url: string } | null>(null);
+  const previewObjectUrl = localPreview?.file === previewFile ? localPreview.url : null;
+  useEffect(
+    () => () => {
+      if (previewObjectUrl) URL.revokeObjectURL(previewObjectUrl);
+    },
+    [previewObjectUrl]
+  );
+
+  function selectPreviewFile(file: File | null) {
+    setPreviewFile(file);
+    setLocalPreview(file ? { file, url: URL.createObjectURL(file) } : null);
+  }
   const [referenceFile, setReferenceFile] = useState<File | null>(null);
   const [uploadingKind, setUploadingKind] = useState<TemplateAssetKind | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
   const [editorStatus, setEditorStatus] = useState<EditorVisibilityStatus>("Draft");
+  const [operationPending, setOperationPending] = useState(false);
+  const operationRef = useRef(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const isVideo = templateType === "Video";
+  const initialForm = selectedTemplate
+    ? createFormFromTemplate(selectedTemplate)
+    : createInitialTemplateForm(templateType);
+  const isDirty =
+    !isInitializing &&
+    !initializationError &&
+    (JSON.stringify(form) !== JSON.stringify(initialForm) ||
+      editorStatus !== resolveEditorVisibilityStatus(selectedTemplate?.status) ||
+      previewFile !== null ||
+      referenceFile !== null);
+  const { allowNavigation, confirmDiscard } = useTemplateEditorLeaveGuard(
+    isDirty,
+    operationPending,
+    text.editorDiscardConfirm
+  );
   const runtimeText = getTemplateEditorRuntimeText(locale);
   const templateEditorActionsAdminOnly = runtimeText.actionsAdminOnly;
   const templateEditorTypeMismatch = runtimeText.templateTypeMismatch;
@@ -131,7 +162,6 @@ export function useTemplateEditorController({
       setEditorStatus(resolveEditorVisibilityStatus(savedTemplate.status));
 
       void Promise.allSettled([
-        refreshTemplateOptions(),
         queryClient.invalidateQueries({ queryKey: adminQueryKeys.templateCatalogRoot }),
         queryClient.invalidateQueries({ queryKey: adminQueryKeys.templateCategories(false) }),
         queryClient.invalidateQueries({ queryKey: adminQueryKeys.templateCategories(true) }),
@@ -207,7 +237,14 @@ export function useTemplateEditorController({
           setSelectedTemplate(templateResponse);
           setForm(createFormFromTemplate(templateResponse));
           setEditorStatus(resolveEditorVisibilityStatus(templateResponse.status));
+        } else {
+          setSelectedTemplate(null);
+          setForm(createInitialTemplateForm(templateType));
+          setEditorStatus("Draft");
         }
+        setPreviewFile(null);
+        setReferenceFile(null);
+        setSaveError(null);
 
         if (!isCancelled) {
           setIsInitializing(false);
@@ -254,6 +291,8 @@ export function useTemplateEditorController({
   ]);
 
   function resetForm() {
+    if (operationRef.current || !confirmDiscard()) return;
+    setSaveError(null);
     if (selectedTemplate) {
       setForm(createFormFromTemplate(selectedTemplate));
       setEditorStatus(resolveEditorVisibilityStatus(selectedTemplate.status));
@@ -298,6 +337,7 @@ export function useTemplateEditorController({
     }
 
     if (
+      operationRef.current ||
       saveTemplateMutation.isPending ||
       uploadTemplateMediaMutation.isPending ||
       uploadingKind !== null
@@ -308,10 +348,24 @@ export function useTemplateEditorController({
     const catalogPath = getTemplateCatalogPath(locale, templateType);
     const draftReadinessError = getDraftReadinessError(form, text);
     if (draftReadinessError) {
-      setToast({ type: "error", message: draftReadinessError });
+      setSaveError(draftReadinessError);
+      focusTemplateEditorField("template-title");
       return;
     }
 
+    if (targetStatus === "Active") {
+      const error = getTemplateActivationError(text, form, templateType, {
+        preview: Boolean(previewFile),
+        reference: Boolean(referenceFile),
+      });
+      if (error) {
+        setSaveError(error);
+        return;
+      }
+    }
+    operationRef.current = true;
+    setOperationPending(true);
+    setSaveError(null);
     try {
       let formToSave = form;
       if (previewFile) {
@@ -322,14 +376,12 @@ export function useTemplateEditorController({
         formToSave = await uploadSelectedMediaForSave("ReferenceMotion", referenceFile, formToSave);
       }
 
-      const activationReadinessError = getActivationReadinessError(
-        templateType,
-        formToSave,
-        text,
-        targetStatus
-      );
+      const activationReadinessError =
+        targetStatus === "Active"
+          ? getTemplateActivationError(text, formToSave, templateType)
+          : null;
       if (activationReadinessError) {
-        setToast({ type: "error", message: activationReadinessError });
+        setSaveError(activationReadinessError);
         return;
       }
 
@@ -339,10 +391,15 @@ export function useTemplateEditorController({
         message: targetStatus === "Active" ? text.templateActivated : text.templateSavedAsDraft,
       });
 
+      allowNavigation();
       router.push(catalogPath);
     } catch (error) {
       const message = getTemplateSaveErrorMessage(error, text, targetStatus);
+      setSaveError(message);
       setToast({ type: "error", message });
+    } finally {
+      operationRef.current = false;
+      setOperationPending(false);
     }
   }
 
@@ -355,7 +412,7 @@ export function useTemplateEditorController({
     try {
       const asset = await uploadTemplateMedia(file, assetKind);
       const nextForm = applyUploadedAssetToForm(currentForm, assetKind, asset);
-      setForm(nextForm);
+      setForm((current) => applyUploadedAssetToForm(current, assetKind, asset));
 
       if (assetKind === "Preview") {
         setPreviewFile(null);
@@ -387,7 +444,7 @@ export function useTemplateEditorController({
       return;
     }
 
-    if (uploadTemplateMediaMutation.isPending || uploadingKind !== null) {
+    if (operationRef.current || uploadTemplateMediaMutation.isPending || uploadingKind !== null) {
       return;
     }
 
@@ -396,11 +453,15 @@ export function useTemplateEditorController({
       return;
     }
 
+    operationRef.current = true;
+    setOperationPending(true);
+    setSaveError(null);
     setUploadingKind(assetKind);
     try {
       await uploadTemplateMediaMutation.mutateAsync({ assetKind, file });
     } catch (error) {
       const message = resolveUploadErrorMessage(error, text.errorSavingTemplate);
+      setSaveError(message);
       setToast({ type: "error", message });
       clientLogger.warn("templates.media_upload_failed", {
         assetKind,
@@ -410,16 +471,20 @@ export function useTemplateEditorController({
       });
     } finally {
       setUploadingKind(null);
+      operationRef.current = false;
+      setOperationPending(false);
     }
   }
 
   const mergedCategorySuggestions = getUniqueValues([
     ...categories.map((category) => category.name),
-    ...templates.map((template) => template.category),
   ]);
   const isEditMode = selectedTemplate !== null;
   const catalogPath = getTemplateCatalogPath(locale, templateType);
-  const editorModel = buildTemplateEditorModel(text, form, selectedTemplate, templateType);
+  const editorModel = buildTemplateEditorModel(text, form, selectedTemplate, templateType, {
+    preview: Boolean(previewFile),
+    reference: Boolean(referenceFile),
+  });
   const catalogLabel = isVideo ? text.navVideoTemplates : text.navImageTemplates;
   const fallbackPreviewTitle = isVideo
     ? text.videoTemplateCreatePageTitle
@@ -428,21 +493,40 @@ export function useTemplateEditorController({
     .split(",")
     .map((tag) => tag.trim())
     .filter(Boolean);
-  const isLoading = isInitializing || isTemplateOptionsLoading;
-  const isSaving = saveTemplateMutation.isPending;
+  const isLoading = isInitializing;
+  const isSaving = operationPending;
   const draftReadinessError = getDraftReadinessError(form, text);
-  const activationReadinessError = getActivationReadinessError(templateType, form, text, "Active");
+  const activationReadinessError = getTemplateActivationError(text, form, templateType, {
+    preview: Boolean(previewFile),
+    reference: Boolean(referenceFile),
+  });
   const saveReadinessHint =
     editorStatus === "Active" ? activationReadinessError : draftReadinessError;
   const isSaveReady = saveReadinessHint === null;
-  const activeToast =
-    toast ??
-    (hasTemplateOptionsError
-      ? { type: "error" as const, message: text.errorLoadingTemplates }
-      : null);
+  const activeToast = toast;
+  const saveProgress =
+    uploadingKind === "Preview"
+      ? text.editorUploadingPreview
+      : uploadingKind === "ReferenceMotion"
+        ? text.editorUploadingReference
+        : isSaving
+          ? text.editorSavingProgress
+          : null;
+  function navigateCatalog() {
+    if (operationRef.current || !confirmDiscard()) return;
+    allowNavigation();
+    router.push(catalogPath);
+  }
 
   return {
     activeToast,
+    isDirty,
+    hasCategoriesError,
+    isCategoriesLoading,
+    refreshCategories,
+    navigateCatalog,
+    saveError,
+    saveProgress,
     catalogLabel,
     catalogPath,
     editorModel,
@@ -460,6 +544,7 @@ export function useTemplateEditorController({
     isVideo,
     mergedCategorySuggestions,
     previewFile,
+    previewObjectUrl,
     previewTags,
     referenceFile,
     resetForm,
@@ -469,7 +554,7 @@ export function useTemplateEditorController({
     selectedTemplate,
     setEditorStatus,
     setForm,
-    setPreviewFile,
+    setPreviewFile: selectPreviewFile,
     setReferenceFile,
     text,
     uploadingKind,
@@ -543,81 +628,4 @@ function getTemplateSaveErrorMessage(
 
 function getDraftReadinessError(form: TemplateFormState, text: Dictionary): string | null {
   return form.title.trim() ? null : text.templateDraftTitleRequired;
-}
-
-function getActivationReadinessError(
-  templateType: TemplateType,
-  form: TemplateFormState,
-  text: Dictionary,
-  targetStatus: EditorVisibilityStatus
-): string | null {
-  if (targetStatus !== "Active") {
-    return null;
-  }
-
-  const missingLabels: string[] = [];
-
-  if (!form.title.trim()) {
-    missingLabels.push(text.titleLabel);
-  }
-
-  if (!form.shortDescription.trim()) {
-    missingLabels.push(text.shortDescriptionLabel);
-  }
-
-  if (!form.category.trim()) {
-    missingLabels.push(text.categoryLabel);
-  }
-
-  if ((parseOptionalDecimal(form.tokenCost) ?? 0) <= 0) {
-    missingLabels.push(text.tokenCostLabel);
-  }
-
-  if (!form.previewUrl.trim()) {
-    missingLabels.push(text.previewAssetTitle);
-  }
-
-  if (!form.petPhotoRequirements.trim()) {
-    missingLabels.push(text.petPhotoRequirementsLabel);
-  }
-
-  if (templateType === "Video") {
-    if (!form.referenceUrl.trim()) {
-      missingLabels.push(text.referenceMotionTitle);
-    }
-
-    if (parseOptionalDecimal(form.referenceDurationSeconds) === undefined) {
-      missingLabels.push(text.referenceDurationLabel);
-    }
-
-    if (!form.preprocessingModel.trim()) {
-      missingLabels.push(text.preprocessingModelLabel);
-    }
-
-    if (!form.preprocessingPrompt.trim()) {
-      missingLabels.push(text.preprocessingPromptLabel);
-    }
-
-    if (!form.klingModel.trim()) {
-      missingLabels.push(text.klingModelLabel);
-    }
-
-    if (!form.klingPrompt.trim()) {
-      missingLabels.push(text.klingPromptLabel);
-    }
-  } else {
-    if (!form.imageModel.trim()) {
-      missingLabels.push(text.imageModelLabel);
-    }
-
-    if (!form.imagePrompt.trim()) {
-      missingLabels.push(text.imagePromptLabel);
-    }
-  }
-
-  if (missingLabels.length === 0) {
-    return null;
-  }
-
-  return `${text.activationRequirementsMissing} ${missingLabels.join(", ")}.`;
 }

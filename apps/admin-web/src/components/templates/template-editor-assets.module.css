@@ -1,7 +1,7 @@
 .assetPreview {
   position: relative;
-  width: min(100%, 19.5rem);
-  aspect-ratio: 9 / 16;
+  width: 100%;
+  aspect-ratio: 16 / 10;
   justify-self: center;
   align-self: start;
   overflow: hidden;
@@ -82,7 +82,7 @@
   width: 100%;
   height: 100%;
   display: block;
-  object-fit: cover;
+  object-fit: contain;
   background: var(--surface-0);
 }
 
@@ -134,17 +134,7 @@
 .uploadPanel {
   display: grid;
   gap: 0.65rem;
-  border: 1px solid var(--border-soft);
-  border-radius: 0.63rem;
-  padding: 0.72rem;
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--surface-1) 96%, var(--surface-2)) 0%,
-    color-mix(in srgb, var(--surface-2) 92%, var(--surface-1)) 100%
-  );
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, var(--text-strong) 8%, transparent),
-    var(--shadow-card);
+  padding: 8px 0;
 }
 
 .uploadPanelHeader {
@@ -190,38 +180,12 @@
 .uploadPrimaryButton,
 .uploadDangerButton {
   min-width: 0;
-  min-height: 2.2rem;
+  min-height: var(--control-height-sm);
   padding: 0.56rem 0.82rem;
   border-radius: 0.58rem;
   font-size: 0.79rem;
   font-weight: 600;
   letter-spacing: 0;
-}
-
-.uploadPrimaryButton:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--success) 56%, var(--border-soft)) !important;
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--success) 28%, var(--surface-1)) 0%,
-    color-mix(in srgb, var(--success) 22%, var(--surface-2)) 100%
-  ) !important;
-  transform: translateY(-1px);
-}
-
-.uploadDangerButton:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--danger) 52%, var(--border-soft)) !important;
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--danger) 26%, var(--surface-1)) 0%,
-    color-mix(in srgb, var(--danger) 20%, var(--surface-2)) 100%
-  ) !important;
-  transform: translateY(-1px);
-}
-
-.uploadPrimaryButton:disabled,
-.uploadDangerButton:disabled {
-  opacity: 0.46;
-  box-shadow: none !important;
 }
 
 @media (max-width: 720px) {
@@ -231,6 +195,6 @@
   }
 
   .assetPreview {
-    width: min(100%, 18rem);
+    width: 100%;
   }
 }

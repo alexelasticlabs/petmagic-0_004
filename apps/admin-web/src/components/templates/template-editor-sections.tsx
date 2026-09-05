@@ -20,6 +20,7 @@ type TemplateReferenceAssetSectionProps = {
   form: TemplateFormState;
   setForm: SetTemplateFormState;
   referenceFile: File | null;
+  isBusy: boolean;
   setReferenceFile: (file: File | null) => void;
   uploadingKind: "Preview" | "ReferenceMotion" | null;
   onUploadReference: () => void;
@@ -45,6 +46,7 @@ export function TemplateReferenceAssetSection({
   form,
   setForm,
   referenceFile,
+  isBusy,
   setReferenceFile,
   uploadingKind,
   onUploadReference,
@@ -61,7 +63,14 @@ export function TemplateReferenceAssetSection({
     referenceFile?.name || form.referenceFileName || text.noFileSelected,
     120
   );
-  const referenceStateLabel = hasReference ? text.editorReady : text.editorMissing;
+  const referenceStateLabel =
+    uploadingKind === "ReferenceMotion"
+      ? text.uploadingMedia
+      : referenceFile
+        ? text.editorFilePending
+        : hasReference
+          ? text.editorFileUploaded
+          : text.editorMissing;
 
   useEffect(() => {
     return () => {
@@ -80,10 +89,12 @@ export function TemplateReferenceAssetSection({
   }
 
   function openFilePicker() {
+    if (isBusy) return;
     fileInputRef.current?.click();
   }
 
   function handleReferenceFileSelection(file: File | null) {
+    if (isBusy) return;
     if (!file || !isSupportedReferenceMotionFile(file)) {
       if (file) {
         setSelectionError(getReferenceSelectionError(text, "type"));
@@ -115,19 +126,26 @@ export function TemplateReferenceAssetSection({
   }
 
   return (
-    <div className={styles.formSection}>
+    <div id="template-reference" className={styles.formSection}>
       <h3>{text.referenceMotionTitle}</h3>
       <input
         ref={fileInputRef}
         className={assetStyles.filePickerInput}
         type="file"
+        aria-label={text.uploadReference}
+        disabled={isBusy}
         accept={referenceMotionAccept}
-        onChange={(event) => handleReferenceFileSelection(event.target.files?.[0] ?? null)}
+        onChange={(event) => {
+          handleReferenceFileSelection(event.target.files?.[0] ?? null);
+          event.target.value = "";
+        }}
       />
       <div
         className={`${assetStyles.assetPreview} ${assetStyles.assetPreviewInteractive} ${isDragActive ? assetStyles.assetPreviewDragActive : ""}`}
         role="button"
-        tabIndex={0}
+        aria-disabled={isBusy}
+        aria-label={text.uploadReference}
+        tabIndex={isBusy ? -1 : 0}
         onClick={(event) => {
           const target = event.target as HTMLElement;
           if (target.closest("video")) {
@@ -137,6 +155,7 @@ export function TemplateReferenceAssetSection({
           openFilePicker();
         }}
         onKeyDown={(event) => {
+          if (event.target !== event.currentTarget) return;
           if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
             openFilePicker();
@@ -162,7 +181,7 @@ export function TemplateReferenceAssetSection({
         <div className={assetStyles.assetPreviewOverlay}>
           <span className={assetStyles.assetPreviewBadge}>{text.referenceMotionSourceBadge}</span>
           <span
-            className={`${assetStyles.assetPreviewState} ${hasReference ? assetStyles.assetPreviewStateReady : assetStyles.assetPreviewStateMissing}`}
+            className={`${assetStyles.assetPreviewState} ${hasReference && !referenceFile ? assetStyles.assetPreviewStateReady : assetStyles.assetPreviewStateMissing}`}
           >
             {referenceStateLabel}
           </span>
@@ -190,16 +209,6 @@ export function TemplateReferenceAssetSection({
       </div>
 
       <div className={styles.formGrid}>
-        <label className={styles.fieldBlock}>
-          <span className={styles.fieldHeader}>
-            <span>{text.referenceUrlLabel}</span>
-          </span>
-          <input
-            value={hasReference ? `${referenceStateLabel}: ${referenceFileLabel}` : ""}
-            placeholder={text.noFileSelected}
-            readOnly
-          />
-        </label>
         <div className={assetStyles.uploadPanel}>
           <div className={assetStyles.uploadPanelHeader}>
             <div>
@@ -207,17 +216,20 @@ export function TemplateReferenceAssetSection({
               <p className={assetStyles.uploadPanelTitle}>{referenceFileLabel}</p>
             </div>
             <span
-              className={`${styles.inlineState} ${hasReference ? styles.inlineStateReady : styles.inlineStateAttention}`}
+              className={`${styles.inlineState} ${hasReference && !referenceFile ? styles.inlineStateReady : styles.inlineStateAttention}`}
             >
               {referenceStateLabel}
             </span>
           </div>
           <div className={assetStyles.uploadActions}>
+            <Button type="button" variant="secondary" disabled={isBusy} onClick={openFilePicker}>
+              {hasReference ? text.editorReplaceFile : text.editorChooseFile}
+            </Button>
             <Button
               type="button"
-              variant="primary"
+              variant="secondary"
               className={`${styles.primaryButton} ${assetStyles.uploadPrimaryButton}`}
-              disabled={!referenceFile || uploadingKind !== null}
+              disabled={!referenceFile || isBusy}
               onClick={onUploadReference}
             >
               {uploadingKind === "ReferenceMotion" ? text.uploadingMedia : text.uploadAction}
@@ -226,7 +238,7 @@ export function TemplateReferenceAssetSection({
               type="button"
               variant="danger"
               className={`${styles.dangerButton} ${assetStyles.uploadDangerButton}`}
-              disabled={!referenceFile && !hasReference}
+              disabled={isBusy || (!referenceFile && !hasReference)}
               onClick={() => {
                 setSelectionError(null);
                 setReferenceFile(null);
@@ -247,11 +259,14 @@ export function TemplateReferenceAssetSection({
               {text.clearAsset}
             </Button>
           </div>
+          {referenceFile ? <p className={styles.muted}>{text.editorUploadOnSaveHint}</p> : null}
           {selectionError ? (
-            <p className={assetStyles.assetSelectionError}>{selectionError}</p>
+            <p role="alert" className={assetStyles.assetSelectionError}>
+              {selectionError}
+            </p>
           ) : null}
         </div>
-        <p className={styles.muted}>{text.referenceMotionUploadHint}</p>
+        <p className={styles.muted}>{text.editorReferenceFormats}</p>
       </div>
     </div>
   );
@@ -286,10 +301,12 @@ export function TemplateVideoModelSection({
   preprocessingModels,
   klingModels,
 }: TemplateVideoModelSectionProps) {
-  const preprocessingOptions = preprocessingModels.map((model) =>
-    buildModelOption(text, model, "preprocess")
+  const preprocessingOptions = withCurrentModel(form.preprocessingModel, preprocessingModels).map(
+    (model) => buildModelOption(text, model, "preprocess")
   );
-  const klingOptions = klingModels.map((model) => buildModelOption(text, model, "motion"));
+  const klingOptions = withCurrentModel(form.klingModel, klingModels).map((model) =>
+    buildModelOption(text, model, "motion")
+  );
 
   return (
     <div className={styles.formSection}>
@@ -299,7 +316,7 @@ export function TemplateVideoModelSection({
             <p className={styles.modelCardEyebrow}>{text.preprocessingModelEyebrow}</p>
             <p className={styles.modelCardTitle}>{text.preprocessingModelLabel}</p>
           </div>
-          <label className={styles.fieldBlock}>
+          <label id="template-preprocessing-model" className={styles.fieldBlock}>
             <span className={styles.fieldHeader}>
               <span>{text.preprocessingModelLabel}</span>
               <span className={styles.fieldMeta}>fal.ai</span>
@@ -313,6 +330,9 @@ export function TemplateVideoModelSection({
               }
             />
           </label>
+          {!preprocessingModels.includes(form.preprocessingModel) ? (
+            <p className={styles.muted}>{text.editorUnknownModel}</p>
+          ) : null}
           <label className={styles.fieldBlock}>
             <span className={styles.fieldHeader}>
               <span>{text.preprocessingPromptLabel}</span>
@@ -342,7 +362,7 @@ export function TemplateVideoModelSection({
             <p className={styles.modelCardEyebrow}>{text.klingModelEyebrow}</p>
             <p className={styles.modelCardTitle}>{text.klingModelLabel}</p>
           </div>
-          <label className={styles.fieldBlock}>
+          <label id="template-motion-model" className={styles.fieldBlock}>
             <span className={styles.fieldHeader}>
               <span>{text.klingModelLabel}</span>
               <span className={styles.fieldMeta}>fal.ai</span>
@@ -354,6 +374,9 @@ export function TemplateVideoModelSection({
               onChange={(value) => setForm((current) => ({ ...current, klingModel: value }))}
             />
           </label>
+          {!klingModels.includes(form.klingModel) ? (
+            <p className={styles.muted}>{text.editorUnknownModel}</p>
+          ) : null}
           <label className={styles.fieldBlock}>
             <span className={styles.fieldHeader}>
               <span>{text.klingPromptLabel}</span>
@@ -396,7 +419,9 @@ export function TemplateImageModelSection({
   setForm,
   imageModels,
 }: TemplateImageModelSectionProps) {
-  const imageOptions = imageModels.map((model) => buildModelOption(text, model, "preprocess"));
+  const imageOptions = withCurrentModel(form.imageModel, imageModels).map((model) =>
+    buildModelOption(text, model, "preprocess")
+  );
 
   return (
     <div className={styles.formSection}>
@@ -406,7 +431,7 @@ export function TemplateImageModelSection({
             <p className={styles.modelCardEyebrow}>{text.imageModelEyebrow}</p>
             <p className={styles.modelCardTitle}>{text.imageModelLabel}</p>
           </div>
-          <label className={styles.fieldBlock}>
+          <label id="template-image-model" className={styles.fieldBlock}>
             <span className={styles.fieldHeader}>
               <span>{text.imageModelLabel}</span>
               <span className={styles.fieldMeta}>fal.ai</span>
@@ -418,6 +443,9 @@ export function TemplateImageModelSection({
               onChange={(value) => setForm((current) => ({ ...current, imageModel: value }))}
             />
           </label>
+          {!imageModels.includes(form.imageModel) ? (
+            <p className={styles.muted}>{text.editorUnknownModel}</p>
+          ) : null}
           <label className={styles.fieldBlock}>
             <span className={styles.fieldHeader}>
               <span>{text.imagePromptLabel}</span>
@@ -508,4 +536,8 @@ function buildModelOption(
     tone: "fast",
     price: priceStr ?? undefined,
   };
+}
+
+function withCurrentModel(current: string, models: readonly string[]): readonly string[] {
+  return current && !models.includes(current) ? [current, ...models] : models;
 }

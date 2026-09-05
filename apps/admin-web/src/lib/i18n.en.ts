@@ -1,6 +1,37 @@
 import type { Dictionary } from "./i18n.types";
 
 export const enDictionary: Dictionary = {
+  editorFilePending: "Selected · uploads on save",
+  editorFileUploaded: "Uploaded",
+  editorChooseFile: "Choose file",
+  editorReplaceFile: "Replace file",
+  editorUploadOnSaveHint:
+    "The file uploads automatically when you save. You can also upload it now.",
+  editorBasicsHint: "The name, description and usage requirements your users will see.",
+  editorMediaHint:
+    "The preview shows the result. The reference provides motion for video generation.",
+  editorImageMediaHint: "Add an example result for the template card.",
+  editorAiHint: "Choose a model and describe the result. The prompt can be left empty.",
+  editorAdvancedSettings: "Additional settings",
+  editorAdvancedHint: "Badge, QA visibility and generation result input.",
+  editorNavigationLabel: "Editor sections",
+  editorPreviewTitle: "In-app card",
+  editorUnsaved: "Unsaved changes",
+  editorSavedState: "No unsaved changes",
+  editorDiscardConfirm: "Unsaved changes will be lost. Continue?",
+  editorSavingProgress: "Saving template…",
+  editorUploadingPreview: "Uploading and processing preview…",
+  editorUploadingReference: "Uploading and validating reference…",
+  editorCategoryLoadError: "Categories could not be loaded. You can keep editing other fields.",
+  editorCategoryEmpty: "No categories available. Create one in Categories.",
+  editorQaPublishHint: "After saving, this template will be available to QA only.",
+  editorPreviewFormats: "JPG, PNG, WebP, GIF, MP4, MOV, WebM · up to 25 MB. Video: 0.5–18 seconds.",
+  editorReferenceFormats: "MP4 · up to 100 MB. Duration is validated on the server.",
+  editorSectionBasics: "Template details",
+  editorSectionMedia: "Media",
+  editorSectionAi: "Generation",
+  editorAllUsersAccess: "All users",
+  editorUnknownModel: "The saved model is unavailable. Choose a model from the list.",
   adminMetadataTitle: "PetMagic Admin",
   adminMetadataDescription: "PetMagic administrator workspace.",
   loginTitle: "Sign in",
@@ -450,10 +481,6 @@ export const enDictionary: Dictionary = {
   editorStepMedia: "Media and preview",
   editorStepAi: "AI settings",
   editorStepReview: "Review and publish",
-  editorBasicsHint: "Name, description, category, tags, and access rules for the template.",
-  editorMediaHint:
-    "Upload the preview video and reference motion video, then verify the computed metadata.",
-  editorAiHint: "Configure preprocessing and motion control before publishing the template.",
   editorReviewHint: "Review the final card and readiness signal before saving.",
   editorPreviewInApp: "Preview in app",
   editorPreviewRailHint:

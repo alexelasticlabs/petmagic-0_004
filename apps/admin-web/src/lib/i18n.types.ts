@@ -5,6 +5,36 @@ export type Locale = (typeof locales)[number];
 export const defaultLocale: Locale = "ru";
 
 export type Dictionary = {
+  editorFilePending: string;
+  editorFileUploaded: string;
+  editorChooseFile: string;
+  editorReplaceFile: string;
+  editorUploadOnSaveHint: string;
+  editorBasicsHint: string;
+  editorMediaHint: string;
+  editorImageMediaHint: string;
+  editorAiHint: string;
+  editorAdvancedSettings: string;
+  editorAdvancedHint: string;
+  editorNavigationLabel: string;
+  editorPreviewTitle: string;
+  editorUnsaved: string;
+  editorSavedState: string;
+  editorDiscardConfirm: string;
+  editorSavingProgress: string;
+  editorUploadingPreview: string;
+  editorUploadingReference: string;
+  editorCategoryLoadError: string;
+  editorCategoryEmpty: string;
+  editorQaPublishHint: string;
+  editorPreviewFormats: string;
+  editorReferenceFormats: string;
+  editorSectionBasics: string;
+  editorSectionMedia: string;
+  editorSectionAi: string;
+  editorAllUsersAccess: string;
+  editorUnknownModel: string;
+
   adminMetadataTitle: string;
   adminMetadataDescription: string;
   loginTitle: string;
@@ -424,9 +454,6 @@ export type Dictionary = {
   editorStepMedia: string;
   editorStepAi: string;
   editorStepReview: string;
-  editorBasicsHint: string;
-  editorMediaHint: string;
-  editorAiHint: string;
   editorReviewHint: string;
   editorPreviewInApp: string;
   editorPreviewRailHint: string;

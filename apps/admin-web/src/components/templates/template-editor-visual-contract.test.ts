@@ -26,9 +26,8 @@ describe("template editor visual contract", () => {
     expect(styles).not.toMatch(/font-size:\s*[^;]*vw/);
 
     expect(assetStyles).toContain(".uploadPanel {");
-    expect(assetStyles).toContain("background: linear-gradient(");
-    expect(assetStyles).toContain("color-mix(in srgb, var(--surface-1) 96%, var(--surface-2))");
-    expect(assetStyles).toContain("box-shadow:\n    inset 0 1px 0 color-mix");
+    expect(assetStyles).not.toMatch(/#[0-9a-fA-F]{3,8}|rgba\(/);
+    expect(assetStyles).not.toContain("!important");
   });
 
   it("keeps the medium-screen editor rail below the form after wider breakpoints", () => {

@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { type Dictionary } from "@/lib/i18n";
 import { joinClassNames } from "@/lib/join-class-names";
 
+import { focusTemplateEditorField } from "./template-editor-readiness";
+
 type EditorVisibilityStatus = "Draft" | "Active";
 
 export function TemplateEditorLoadingState() {
@@ -61,12 +63,56 @@ export function TemplateEditorHeader({
   );
 }
 
+export function TemplateEditorNavigation({
+  editorModel,
+  text,
+  isDirty,
+}: {
+  editorModel: TemplateEditorModel;
+  text: Dictionary;
+  isDirty: boolean;
+}) {
+  const sections = [
+    { id: "template-basics", label: text.editorSectionBasics },
+    { id: "template-media", label: text.editorSectionMedia },
+    { id: "template-ai", label: text.editorSectionAi },
+  ];
+  return (
+    <div className={styles.editorNavigation}>
+      <nav aria-label={text.editorNavigationLabel}>
+        {sections.map((section, index) => {
+          const items = editorModel.checklist.filter((item) => item.sectionId === section.id);
+          const ready = items.filter((item) => item.ready).length;
+          return (
+            <button
+              key={section.id}
+              type="button"
+              onClick={() => focusTemplateEditorField(section.id)}
+            >
+              <span className={styles.stepNumber}>{index + 1}</span>
+              <span>{section.label}</span>
+              <span className={styles.stepCount}>
+                {ready}/{items.length}
+              </span>
+            </button>
+          );
+        })}
+      </nav>
+      <span className={styles.dirtyIndicator}>
+        {isDirty ? text.editorUnsaved : text.editorSavedState}
+      </span>
+    </div>
+  );
+}
+
 export function TemplateEditorRail({
   editorModel,
   fallbackPreviewTitle,
   form,
   isVideo,
   previewTags,
+  previewFile,
+  previewObjectUrl,
   text,
 }: {
   editorModel: TemplateEditorModel;
@@ -74,6 +120,8 @@ export function TemplateEditorRail({
   form: TemplateFormState;
   isVideo: boolean;
   previewTags: string[];
+  previewFile: File | null;
+  previewObjectUrl: string | null;
   text: Dictionary;
 }) {
   const readyCount = editorModel.checklist.filter((item) => item.ready).length;
@@ -82,19 +130,20 @@ export function TemplateEditorRail({
   return (
     <aside className={styles.editorRail}>
       <section className={joinClassNames(styles.railCard, styles.previewRailCard)}>
+        <h2 className={styles.railTitle}>{text.editorPreviewTitle}</h2>
         <div className={styles.previewCardWrap}>
           <TemplatePreviewCard
             title={editorModel.title || fallbackPreviewTitle}
             shortDescription={editorModel.shortDescription || text.editorPreviewRailHint}
             tags={previewTags}
-            previewUrl={form.previewUrl}
-            previewContentType={form.previewContentType}
+            previewUrl={previewObjectUrl ?? form.previewUrl}
+            previewContentType={previewFile?.type || form.previewContentType}
             templateKind={isVideo ? "video" : "image"}
             templateKindLabel={isVideo ? text.templateKindVideoBadge : text.templateKindImageBadge}
             tokenCost={editorModel.tokenCost}
             category={editorModel.category || text.editorDraft}
             isPremium={form.isPremium}
-            accessLabel={form.isPremium ? text.premiumLabel : text.freeLabel}
+            accessLabel={form.isPremium ? text.premiumLabel : text.editorAllUsersAccess}
             referenceDurationSeconds={
               "referenceDuration" in editorModel ? editorModel.referenceDuration : undefined
             }
@@ -124,11 +173,17 @@ export function TemplateEditorRail({
 
         <div className={styles.checklist}>
           {editorModel.checklist.map((item) => {
-            const stateLabel = item.ready ? text.editorReady : text.editorMissing;
+            const stateLabel = item.pending
+              ? text.editorFilePending
+              : item.ready
+                ? text.editorReady
+                : text.editorMissing;
             const showDetail = item.detail !== stateLabel;
 
             return (
-              <div
+              <button
+                type="button"
+                onClick={() => focusTemplateEditorField(item.targetId)}
                 key={item.label}
                 className={joinClassNames(
                   styles.checklistItem,
@@ -142,10 +197,12 @@ export function TemplateEditorRail({
                   )}
                   aria-hidden="true"
                 />
-                <div className={styles.checklistCopy}>
-                  <div className={styles.checklistLabel}>{item.label}</div>
-                  {showDetail ? <div className={styles.checklistDetail}>{item.detail}</div> : null}
-                </div>
+                <span className={styles.checklistCopy}>
+                  <span className={styles.checklistLabel}>{item.label}</span>
+                  {showDetail ? (
+                    <span className={styles.checklistDetail}>{item.detail}</span>
+                  ) : null}
+                </span>
                 <span
                   className={joinClassNames(
                     styles.checklistState,
@@ -154,7 +211,7 @@ export function TemplateEditorRail({
                 >
                   {stateLabel}
                 </span>
-              </div>
+              </button>
             );
           })}
         </div>
@@ -172,6 +229,9 @@ export function TemplateEditorFooter({
   onReset,
   onSetEditorStatus,
   saveReadinessHint,
+  saveProgress,
+  saveError,
+  isQaOnly,
   text,
 }: {
   catalogPath: string;
@@ -182,17 +242,32 @@ export function TemplateEditorFooter({
   onReset: () => void;
   onSetEditorStatus: (status: EditorVisibilityStatus) => void;
   saveReadinessHint: string | null;
+  saveProgress: string | null;
+  saveError: string | null;
+  isQaOnly: boolean;
   text: Dictionary;
 }) {
   return (
     <div className={styles.footerBar}>
+      {saveError ? (
+        <p className={styles.saveError} role="alert">
+          {saveError}
+        </p>
+      ) : null}
+      {saveProgress ? (
+        <p className={styles.saveProgress} role="status">
+          {saveProgress}
+        </p>
+      ) : null}
       <div className={styles.footerStatusPanel}>
         <div className={styles.footerStatusCopy}>
           <span className={styles.footerStatusLabel}>{text.editorVisibilityTitle}</span>
-          <p className={styles.footerStatusHint}>
+          <p id="template-save-hint" className={styles.footerStatusHint}>
             {saveReadinessHint ??
               (editorStatus === "Active"
-                ? text.editorVisibleToUsersHint
+                ? isQaOnly
+                  ? text.editorQaPublishHint
+                  : text.editorVisibleToUsersHint
                 : text.editorHiddenFromUsersHint)}
           </p>
         </div>
@@ -254,8 +329,13 @@ export function TemplateEditorFooter({
           variant="primary"
           className={styles.primaryButton}
           disabled={isSaving || !isSaveReady}
+          aria-describedby="template-save-hint"
         >
-          {editorStatus === "Active" ? text.editorSaveAndActivate : text.editorSaveDraft}
+          {isSaving
+            ? text.editorSavingProgress
+            : editorStatus === "Active"
+              ? text.editorSaveAndActivate
+              : text.editorSaveDraft}
         </Button>
       </div>
     </div>

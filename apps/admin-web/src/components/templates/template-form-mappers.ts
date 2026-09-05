@@ -135,7 +135,10 @@ export function createFormFromTemplate(template: AdminTemplate): TemplateFormSta
     referenceFileName: template.referenceMotionAsset?.fileName ?? "",
     referenceContentType: template.referenceMotionAsset?.contentType ?? "video/mp4",
     referenceFileSizeBytes: template.referenceMotionAsset?.fileSizeBytes?.toString() ?? "",
-    referenceDurationSeconds: template.referenceMotionAsset?.durationSeconds?.toString() ?? "",
+    referenceDurationSeconds:
+      (
+        template.referenceMotionAsset?.durationSeconds ?? template.referenceVideoDurationSeconds
+      )?.toString() ?? "",
     imageModel: template.imageModel ?? IMAGE_MODELS[0],
     imagePrompt: template.imagePrompt ?? DEFAULT_IMAGE_PROMPT,
     preprocessingModel: template.preprocessingModel ?? PREPROCESSING_MODELS[0],

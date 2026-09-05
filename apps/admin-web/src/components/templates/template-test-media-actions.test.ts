@@ -418,7 +418,8 @@ describe("template test media actions", () => {
     const source = readFileSync(templateEditorControllerPath, "utf8");
 
     expect(source).not.toContain("readVideoDurationSeconds");
-    expect(source).not.toContain("URL.createObjectURL(file)");
+    // Local display URLs do not probe metadata or override server-measured duration.
+    expect(source).not.toContain('document.createElement("video")');
     expect(source).toContain("uploadTemplateMedia(file, assetKind)");
     expect(source).not.toContain("uploadTemplateMedia(file, assetKind, { durationSeconds })");
   });
@@ -465,9 +466,7 @@ describe("template test media actions", () => {
       'actionsAdminOnly: "Template management actions are available to Admin only."'
     );
     expect(source).toContain("useAdminTemplateCategories({\n    enabled: canManageTemplates");
-    expect(source).toContain(
-      "useAdminTemplateOptions({ enabled: canManageTemplates, templateType })"
-    );
+    expect(source).not.toContain("useAdminTemplateOptions(");
     expect(source).toContain("function assertCanManageTemplateEditor(): boolean");
     expect(source).toContain(
       'setToast({ type: "error", message: templateEditorActionsAdminOnly });'
@@ -534,10 +533,8 @@ describe("template test media actions", () => {
     const sectionsSource = readFileSync(templateEditorSectionsPath, "utf8");
     const stylesSource = readFileSync(templateEditorAssetStylesPath, "utf8");
 
-    expect(editorSource).toContain("<TemplatePreviewAssetSection\n                  text={text}");
-    expect(editorSource).toContain(
-      "<TemplateReferenceAssetSection\n                    text={text}"
-    );
+    expect(editorSource).toMatch(/<TemplatePreviewAssetSection\s+text=\{text\}/);
+    expect(editorSource).toMatch(/<TemplateReferenceAssetSection\s+text=\{text\}/);
     expect(previewSource).toContain("const TEMPLATE_PREVIEW_ASSET_MAX_BYTES = 25 * 1024 * 1024;");
     expect(sectionsSource).toContain(
       "const TEMPLATE_REFERENCE_MOTION_MAX_BYTES = 100 * 1024 * 1024;"

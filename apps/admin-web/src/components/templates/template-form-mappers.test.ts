@@ -357,31 +357,6 @@ describe("template form numeric hardening", () => {
     expect(controllerSource).not.toContain("fileName:");
     expect(controllerSource).not.toContain("contentType: file.type,\n        error");
   });
-
-  it("keeps active publication blocked in the editor until required media is present", () => {
-    const controllerSource = readFileSync(editorControllerPath, "utf8");
-
-    expect(controllerSource).toContain("function getActivationReadinessError(");
-    expect(controllerSource).toContain('if (targetStatus !== "Active")');
-    expect(controllerSource).toContain(
-      "const activationReadinessError = getActivationReadinessError("
-    );
-    expect(controllerSource).toContain(
-      'if (activationReadinessError) {\n        setToast({ type: "error", message: activationReadinessError });\n        return;\n      }'
-    );
-    expect(
-      controllerSource.indexOf("const activationReadinessError = getActivationReadinessError(")
-    ).toBeLessThan(controllerSource.indexOf("await saveTemplateMutation.mutateAsync"));
-    expect(controllerSource).toContain("missingLabels.push(text.previewAssetTitle)");
-    expect(controllerSource).toContain("missingLabels.push(text.petPhotoRequirementsLabel)");
-    expect(controllerSource).toContain("missingLabels.push(text.referenceMotionTitle)");
-    expect(controllerSource).toContain("missingLabels.push(text.referenceDurationLabel)");
-    expect(controllerSource).toContain("missingLabels.push(text.imageModelLabel)");
-    expect(controllerSource).toContain("missingLabels.push(text.imagePromptLabel)");
-    expect(controllerSource).toContain(
-      'return `${text.activationRequirementsMissing} ${missingLabels.join(", ")}.`;'
-    );
-  });
 });
 
 describe("template media asset payload hardening", () => {

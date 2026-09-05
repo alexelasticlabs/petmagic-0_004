@@ -11,6 +11,7 @@ import {
   TemplateEditorHeader,
   TemplateEditorLoadingState,
   TemplateEditorRail,
+  TemplateEditorNavigation,
 } from "@/components/templates/template-editor-layout";
 import { formatDuration } from "@/components/templates/template-editor-model";
 import {
@@ -41,6 +42,13 @@ type TemplateEditorProps = {
 export function TemplateEditor({ locale, templateType, initialTemplateId }: TemplateEditorProps) {
   const {
     activeToast,
+    isDirty,
+    hasCategoriesError,
+    isCategoriesLoading,
+    refreshCategories,
+    navigateCatalog,
+    saveError,
+    saveProgress,
     catalogLabel,
     catalogPath,
     editorModel,
@@ -57,11 +65,11 @@ export function TemplateEditor({ locale, templateType, initialTemplateId }: Temp
     isVideo,
     mergedCategorySuggestions,
     previewFile,
+    previewObjectUrl,
     previewTags,
     referenceFile,
     resetForm,
     retryInitialization,
-    router,
     saveReadinessHint,
     setEditorStatus,
     setForm,
@@ -81,7 +89,7 @@ export function TemplateEditor({ locale, templateType, initialTemplateId }: Temp
         <TemplateEditorHeader
           catalogLabel={catalogLabel}
           currentLabel={text.updateTemplate}
-          onNavigateCatalog={() => router.push(catalogPath)}
+          onNavigateCatalog={navigateCatalog}
         />
         <AdminStateCard
           tone="danger"
@@ -102,145 +110,174 @@ export function TemplateEditor({ locale, templateType, initialTemplateId }: Temp
       <TemplateEditorHeader
         catalogLabel={catalogLabel}
         currentLabel={isEditMode ? text.updateTemplate : text.createNewTemplate}
-        onNavigateCatalog={() => router.push(catalogPath)}
+        onNavigateCatalog={navigateCatalog}
       />
 
-      <form className={styles.editorForm} onSubmit={handleSubmit}>
-        <div className={styles.editorGrid}>
-          <div className={styles.editorMain}>
-            <section id="template-basics" className={styles.sectionCard}>
-              <AdminSectionHeader
-                title={text.editorStepBasics}
-                aside={
-                  <span
-                    className={joinClassNames(
-                      styles.inlineState,
-                      editorModel.basicInfoReady
-                        ? styles.inlineStateReady
-                        : styles.inlineStateAttention
-                    )}
-                  >
-                    {editorModel.basicInfoReady ? text.editorReady : text.editorMissing}
-                  </span>
-                }
-              />
+      <TemplateEditorNavigation editorModel={editorModel} text={text} isDirty={isDirty} />
+      <form className={styles.editorForm} onSubmit={handleSubmit} aria-busy={isSaving}>
+        <fieldset className={styles.editorFieldset} disabled={isSaving}>
+          <div className={styles.editorGrid}>
+            <div className={styles.editorMain}>
+              <section id="template-basics" className={styles.sectionCard}>
+                <AdminSectionHeader
+                  title={text.editorSectionBasics}
+                  description={text.editorBasicsHint}
+                  aside={
+                    <span
+                      className={joinClassNames(
+                        styles.inlineState,
+                        editorModel.basicInfoReady
+                          ? styles.inlineStateReady
+                          : styles.inlineStateAttention
+                      )}
+                    >
+                      {editorModel.basicInfoReady ? text.editorReady : text.editorMissing}
+                    </span>
+                  }
+                />
 
-              <TemplateBasicFields
-                text={text}
-                form={form}
-                setForm={setForm}
-                categorySuggestions={mergedCategorySuggestions}
-                requireCompleteDetails={editorStatus === "Active"}
-                showMusicDescription={isVideo}
-              />
-            </section>
-
-            <section id="template-media" className={styles.sectionCard}>
-              <AdminSectionHeader
-                title={text.editorStepMedia}
-                aside={
-                  <span
-                    className={joinClassNames(
-                      styles.inlineState,
-                      editorModel.mediaReady ? styles.inlineStateReady : styles.inlineStateAttention
-                    )}
-                  >
-                    {editorModel.mediaReady ? text.editorReady : text.editorMissing}
-                  </span>
-                }
-              />
-
-              <div className={styles.mediaGrid}>
-                <TemplatePreviewAssetSection
+                {hasCategoriesError ? (
+                  <div className={styles.inlineFeedback} role="alert">
+                    <span>{text.editorCategoryLoadError}</span>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => void refreshCategories()}
+                    >
+                      {text.adminRetryAction}
+                    </Button>
+                  </div>
+                ) : !isCategoriesLoading && mergedCategorySuggestions.length === 0 ? (
+                  <p className={styles.muted}>{text.editorCategoryEmpty}</p>
+                ) : null}
+                <TemplateBasicFields
                   text={text}
                   form={form}
                   setForm={setForm}
-                  previewFile={previewFile}
-                  setPreviewFile={setPreviewFile}
-                  uploadingKind={uploadingKind}
-                  onUploadPreview={() => void handleUpload("Preview")}
+                  categorySuggestions={mergedCategorySuggestions}
+                  requireCompleteDetails={editorStatus === "Active"}
+                  showMusicDescription={isVideo}
+                />
+              </section>
+
+              <section id="template-media" className={styles.sectionCard}>
+                <AdminSectionHeader
+                  title={text.editorSectionMedia}
+                  description={isVideo ? text.editorMediaHint : text.editorImageMediaHint}
+                  aside={
+                    <span
+                      className={joinClassNames(
+                        styles.inlineState,
+                        editorModel.mediaReady
+                          ? styles.inlineStateReady
+                          : styles.inlineStateAttention
+                      )}
+                    >
+                      {editorModel.mediaReady ? text.editorReady : text.editorMissing}
+                    </span>
+                  }
                 />
 
-                {isVideo ? (
-                  <TemplateReferenceAssetSection
+                <div className={styles.mediaGrid}>
+                  <TemplatePreviewAssetSection
                     text={text}
                     form={form}
                     setForm={setForm}
-                    referenceFile={referenceFile}
-                    setReferenceFile={setReferenceFile}
+                    previewFile={previewFile}
+                    isBusy={isSaving}
+                    setPreviewFile={setPreviewFile}
                     uploadingKind={uploadingKind}
-                    onUploadReference={() => void handleUpload("ReferenceMotion")}
+                    onUploadPreview={() => void handleUpload("Preview")}
+                  />
+
+                  {isVideo ? (
+                    <TemplateReferenceAssetSection
+                      text={text}
+                      form={form}
+                      setForm={setForm}
+                      referenceFile={referenceFile}
+                      isBusy={isSaving}
+                      setReferenceFile={setReferenceFile}
+                      uploadingKind={uploadingKind}
+                      onUploadReference={() => void handleUpload("ReferenceMotion")}
+                    />
+                  ) : null}
+                </div>
+
+                {isVideo && "referenceDuration" in editorModel ? (
+                  <AdminMetricStrip
+                    className={styles.derivedGrid}
+                    items={[
+                      {
+                        label: text.referenceDurationLabel,
+                        value: formatDuration(editorModel.referenceDuration),
+                      },
+                      {
+                        label: text.characterOrientationLabel,
+                        value: editorModel.characterOrientation || text.editorMissing,
+                      },
+                    ]}
                   />
                 ) : null}
-              </div>
+              </section>
 
-              {isVideo && "referenceDuration" in editorModel ? (
-                <AdminMetricStrip
-                  className={styles.derivedGrid}
-                  items={[
-                    {
-                      label: text.referenceDurationLabel,
-                      value: formatDuration(editorModel.referenceDuration),
-                    },
-                    {
-                      label: text.characterOrientationLabel,
-                      value: editorModel.characterOrientation || text.editorMissing,
-                    },
-                  ]}
+              <section id="template-ai" className={styles.sectionCard}>
+                <AdminSectionHeader
+                  title={text.editorSectionAi}
+                  description={text.editorAiHint}
+                  aside={
+                    <span
+                      className={joinClassNames(
+                        styles.inlineState,
+                        editorModel.aiReady ? styles.inlineStateReady : styles.inlineStateAttention
+                      )}
+                    >
+                      {editorModel.aiReady ? text.editorReady : text.editorMissing}
+                    </span>
+                  }
                 />
-              ) : null}
-            </section>
 
-            <section id="template-ai" className={styles.sectionCard}>
-              <AdminSectionHeader
-                title={text.editorStepAi}
-                aside={
-                  <span
-                    className={joinClassNames(
-                      styles.inlineState,
-                      editorModel.aiReady ? styles.inlineStateReady : styles.inlineStateAttention
-                    )}
-                  >
-                    {editorModel.aiReady ? text.editorReady : text.editorMissing}
-                  </span>
-                }
-              />
+                {isVideo ? (
+                  <TemplateVideoModelSection
+                    text={text}
+                    form={form}
+                    setForm={setForm}
+                    preprocessingModels={PREPROCESSING_MODELS}
+                    klingModels={KLING_MODELS}
+                  />
+                ) : (
+                  <TemplateImageModelSection
+                    text={text}
+                    form={form}
+                    setForm={setForm}
+                    imageModels={IMAGE_MODELS}
+                  />
+                )}
+              </section>
+            </div>
 
-              {isVideo ? (
-                <TemplateVideoModelSection
-                  text={text}
-                  form={form}
-                  setForm={setForm}
-                  preprocessingModels={PREPROCESSING_MODELS}
-                  klingModels={KLING_MODELS}
-                />
-              ) : (
-                <TemplateImageModelSection
-                  text={text}
-                  form={form}
-                  setForm={setForm}
-                  imageModels={IMAGE_MODELS}
-                />
-              )}
-            </section>
+            <TemplateEditorRail
+              editorModel={editorModel}
+              fallbackPreviewTitle={fallbackPreviewTitle}
+              form={form}
+              isVideo={isVideo}
+              previewTags={previewTags}
+              previewFile={previewFile}
+              previewObjectUrl={previewObjectUrl}
+              text={text}
+            />
           </div>
-
-          <TemplateEditorRail
-            editorModel={editorModel}
-            fallbackPreviewTitle={fallbackPreviewTitle}
-            form={form}
-            isVideo={isVideo}
-            previewTags={previewTags}
-            text={text}
-          />
-        </div>
+        </fieldset>
 
         <TemplateEditorFooter
           catalogPath={catalogPath}
           editorStatus={editorStatus}
           isSaveReady={isSaveReady}
           isSaving={isSaving}
-          onCancel={(path) => router.push(path)}
+          onCancel={navigateCatalog}
+          saveProgress={saveProgress}
+          saveError={saveError}
+          isQaOnly={form.isQaOnly}
           onReset={resetForm}
           onSetEditorStatus={setEditorStatus}
           saveReadinessHint={saveReadinessHint}
