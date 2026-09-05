@@ -28,6 +28,8 @@ const _avatar = 'https://cdn.petgpt.app/luna-fixture.png';
 void main() {
   configureWidgetTestHarness();
   late Directory cache;
+  late CacheManager avatarCache;
+  late BaseCacheManager originalImageCacheManager;
   setUpAll(() async {
     cache = await Directory.systemTemp.createTemp(
       'petmagic-personal-creation-',
@@ -37,10 +39,20 @@ void main() {
           const MethodChannel('plugins.flutter.io/path_provider'),
           (_) async => cache.path,
         );
+    originalImageCacheManager = CachedNetworkImageProvider.defaultCacheManager;
+    avatarCache = CacheManager(
+      Config(
+        'petmagic-personal-creation-test',
+        repo: JsonCacheInfoRepository.withFile(
+          File('${cache.path}${Platform.pathSeparator}avatar-cache.json'),
+        ),
+      ),
+    );
+    CachedNetworkImageProvider.defaultCacheManager = avatarCache;
     final photo = await rootBundle.load(
       'assets/rewards/profile-premium-dog.png',
     );
-    await DefaultCacheManager().putFile(
+    await avatarCache.putFile(
       _avatar,
       photo.buffer.asUint8List(),
       key: _avatar,
@@ -53,7 +65,7 @@ void main() {
     );
     final frame = await codec.getNextFrame();
     final bytes = await frame.image.toByteData(format: ui.ImageByteFormat.png);
-    await DefaultCacheManager().putFile(
+    await avatarCache.putFile(
       _avatar,
       bytes!.buffer.asUint8List(),
       key: 'resized_w64_$_avatar',
@@ -63,7 +75,8 @@ void main() {
     codec.dispose();
   });
   tearDownAll(() async {
-    await DefaultCacheManager().dispose();
+    CachedNetworkImageProvider.defaultCacheManager = originalImageCacheManager;
+    await avatarCache.dispose();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(
           const MethodChannel('plugins.flutter.io/path_provider'),
