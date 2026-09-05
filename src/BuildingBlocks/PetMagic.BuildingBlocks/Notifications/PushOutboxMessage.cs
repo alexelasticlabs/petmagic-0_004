@@ -5,7 +5,9 @@ public enum PushOutboxStatus
     Queued = 1,
     Processing = 2,
     Sent = 3,
-    DeadLetter = 4
+    DeadLetter = 4,
+    // Reviewed without delivery. Retain payload/error history and never retry or purge as Sent.
+    Dismissed = 5
 }
 
 public enum PushDeliveryDisposition

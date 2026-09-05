@@ -58,6 +58,14 @@ Mobile should treat payload data as routing/state hints and not as a source of b
 - If mobile cannot route immediately, bootstrap stores pending route until auth/legal state is ready.
 - If a transient notification is missed, user-visible state must be fetched from `/api/economy/wallet`, `/api/economy/premium/status`, generation history or support conversation.
 
+## Reviewed dead letters
+
+`PushOutboxStatus.Dismissed` (5) records an operator-reviewed delivery that will not be sent.
+Only stale dead letters whose cause has been investigated may be dismissed, with an audit entry
+recording the reason and original status. Preserve the payload, attempts, error code and null
+`SentAtUtc`; dismissal is not successful delivery. Workers neither claim dismissed records nor
+delete them during sent-message retention. Health and active problem lists exclude them.
+
 ## Inbox decision
 
 There is no persistent unified notification inbox for wallet, premium or support. This is intentional for the current release gate, but it must remain documented as a product limitation. If product requires notification history, add a dedicated notification entity/API/read-state instead of overloading FCM token tables.

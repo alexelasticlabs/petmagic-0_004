@@ -108,7 +108,8 @@ public sealed class AdminOperationsProblemService(IServiceScopeFactory scopeFact
         var rows = await query
             .AsNoTracking()
             .Where(message => (message.Kind == AuditOutboxKind) == isAudit
-                && message.Status != PushOutboxStatus.Sent)
+                && message.Status != PushOutboxStatus.Sent
+                && message.Status != PushOutboxStatus.Dismissed)
             .OrderByDescending(message => message.Status == PushOutboxStatus.DeadLetter)
             .ThenBy(message => message.CreatedAtUtc)
             .Take(Take)
