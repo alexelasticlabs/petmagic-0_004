@@ -1,5 +1,9 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 
+import { captureFigmaState, installFigmaCaptureRouting } from "./figma-capture";
+
+test.beforeEach(async ({ page }) => installFigmaCaptureRouting(page));
+
 const apiOrigin = "https://api.petmagic.test";
 const adminUserId = "11111111-1111-4111-8111-111111111111";
 const missingTemplateId = "22222222-2222-4222-8222-222222222222";
@@ -219,6 +223,7 @@ test("Admin runs diagnostics manually and category CRUD only marks the result st
   await expect(page.getByText("Результат мог устареть", { exact: true })).toBeVisible();
   expect(api.getDiagnosticsRequests()).toBe(1);
 
+  await captureFigmaState(page, "templates-categories-current");
   await page.screenshot({
     path: testInfo.outputPath("category-diagnostics-desktop.png"),
     fullPage: true,

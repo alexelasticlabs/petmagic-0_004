@@ -335,6 +335,40 @@ void main() {
     },
   );
 
+  test('fetchTemplate normalizes analytics source into query', () async {
+    RequestOptions? capturedOptions;
+    final dio = Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
+      ..httpClientAdapter = _FakeHttpClientAdapter((options) async {
+        capturedOptions = options;
+        return ResponseBody.fromString(
+          jsonEncode({
+            'templateId': 'template-detail-source',
+            'templateType': 'Image',
+            'title': 'Sourced detail',
+            'shortDescription': 'Single public template',
+            'category': 'Portrait',
+            'tags': ['detail'],
+            'isPremium': false,
+            'tokenCost': 12,
+            'thumbnailUrl': 'https://cdn.petmagic.test/detail-thumb.jpg',
+          }),
+          200,
+          headers: {
+            Headers.contentTypeHeader: [Headers.jsonContentType],
+          },
+        );
+      });
+    final dataSource = TemplatesRemoteDataSource(dio);
+
+    await dataSource.fetchTemplate(
+      'template-detail-source',
+      analyticsSource: ' discovery ',
+    );
+
+    expect(capturedOptions?.path, '/api/templates/template-detail-source');
+    expect(capturedOptions?.queryParameters, {'source': 'discovery'});
+  });
+
   test('fetchTemplate encodes reserved template id path segment', () async {
     const templateId = 'template/detail 1?#fragment';
     RequestOptions? capturedOptions;

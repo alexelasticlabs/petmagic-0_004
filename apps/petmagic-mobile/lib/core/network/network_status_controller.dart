@@ -8,24 +8,75 @@ import 'package:petmagic_mobile/core/network/api_base_url_health_checker.dart';
 
 enum NetworkBannerPhase { hidden, offline, restored }
 
+enum NetworkTransportKind {
+  unknown,
+  wifi,
+  ethernet,
+  cellular,
+  constrained,
+  offline,
+}
+
 class NetworkStatusState {
   const NetworkStatusState({
     this.bannerPhase = NetworkBannerPhase.hidden,
     this.hasInternet = true,
+    this.transport = NetworkTransportKind.unknown,
   });
 
   final NetworkBannerPhase bannerPhase;
   final bool hasInternet;
+  final NetworkTransportKind transport;
 
   NetworkStatusState copyWith({
     NetworkBannerPhase? bannerPhase,
     bool? hasInternet,
+    NetworkTransportKind? transport,
   }) {
     return NetworkStatusState(
       bannerPhase: bannerPhase ?? this.bannerPhase,
       hasInternet: hasInternet ?? this.hasInternet,
+      transport: transport ?? this.transport,
     );
   }
+}
+
+NetworkTransportKind classifyNetworkTransport(
+  List<ConnectivityResult> results, {
+  required bool hasInternet,
+}) {
+  if (!hasInternet) {
+    return NetworkTransportKind.offline;
+  }
+
+  final transports = results
+      .where((result) => result != ConnectivityResult.none)
+      .toSet();
+  if (transports.isEmpty) {
+    // The reachability probe can succeed while the platform briefly reports
+    // no route. Do not assume that such an unconfirmed route is unmetered.
+    return NetworkTransportKind.unknown;
+  }
+
+  // Prefer the most constrained reported route. connectivity_plus can expose
+  // multiple transports at once (for example mobile + satellite or Wi-Fi +
+  // VPN), so a mobile/constrained route must never be promoted to Wi-Fi.
+  if (transports.contains(ConnectivityResult.satellite) ||
+      transports.contains(ConnectivityResult.bluetooth)) {
+    return NetworkTransportKind.constrained;
+  }
+  if (transports.contains(ConnectivityResult.mobile)) {
+    return NetworkTransportKind.cellular;
+  }
+  if (transports.contains(ConnectivityResult.wifi)) {
+    return NetworkTransportKind.wifi;
+  }
+  if (transports.contains(ConnectivityResult.ethernet)) {
+    return NetworkTransportKind.ethernet;
+  }
+
+  // VPN and other do not reveal whether the underlying route is metered.
+  return NetworkTransportKind.unknown;
 }
 
 final networkStatusControllerProvider =
@@ -44,6 +95,7 @@ class NetworkStatusController extends Notifier<NetworkStatusState> {
   Timer? _offlineProbeTimer;
   Timer? _restoreBannerTimer;
   bool _lastKnownInternet = true;
+  NetworkTransportKind _lastKnownTransport = NetworkTransportKind.unknown;
   bool _started = false;
   int _connectivityEvaluationGeneration = 0;
   Duration _currentOfflineProbeInterval = _offlineProbeInterval;
@@ -159,24 +211,29 @@ class NetworkStatusController extends Notifier<NetworkStatusState> {
 
     _applyConnectionState(
       hasInternet: hasInternet,
+      transport: classifyNetworkTransport(results, hasInternet: hasInternet),
       source: hasReportedRoute ? source : '${source}_route_unconfirmed',
     );
   }
 
   void _applyConnectionState({
     required bool hasInternet,
+    required NetworkTransportKind transport,
     required String source,
   }) {
     if (!ref.mounted) {
       return;
     }
 
-    if (hasInternet == _lastKnownInternet) {
+    final internetChanged = hasInternet != _lastKnownInternet;
+    final transportChanged = transport != _lastKnownTransport;
+    if (!internetChanged && !transportChanged) {
       return;
     }
 
     final wasOffline = !_lastKnownInternet;
     _lastKnownInternet = hasInternet;
+    _lastKnownTransport = transport;
 
     if (!hasInternet) {
       _restoreBannerTimer?.cancel();
@@ -185,6 +242,7 @@ class NetworkStatusController extends Notifier<NetworkStatusState> {
       _startOfflineProbe();
       state = state.copyWith(
         hasInternet: false,
+        transport: NetworkTransportKind.offline,
         bannerPhase: NetworkBannerPhase.offline,
       );
       AppLogger.warn(
@@ -199,9 +257,8 @@ class NetworkStatusController extends Notifier<NetworkStatusState> {
     _stopOfflineProbe();
     state = state.copyWith(
       hasInternet: true,
-      bannerPhase: wasOffline
-          ? NetworkBannerPhase.restored
-          : NetworkBannerPhase.hidden,
+      transport: transport,
+      bannerPhase: wasOffline ? NetworkBannerPhase.restored : state.bannerPhase,
     );
 
     if (wasOffline) {
@@ -212,6 +269,13 @@ class NetworkStatusController extends Notifier<NetworkStatusState> {
         context: {'source': source},
       );
       _scheduleRestoreBannerHide();
+    } else if (transportChanged) {
+      AppLogger.debug(
+        feature: 'Network',
+        operation: 'transport_changed',
+        message: 'Active network transport changed.',
+        context: {'source': source, 'transport': transport.name},
+      );
     }
   }
 

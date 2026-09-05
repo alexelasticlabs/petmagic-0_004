@@ -381,7 +381,10 @@ class _GenerationResultView extends StatelessWidget {
                 child: outputUrl.isEmpty
                     ? _EmptyMediaBox(label: text.templateFlowResultUnavailable)
                     : template.isVideo
-                    ? _NetworkVideoPreview(url: outputUrl)
+                    ? _NetworkVideoPreview(
+                        url: outputUrl,
+                        playbackIdentity: outputUrl,
+                      )
                     : CachedNetworkImage(
                         imageUrl: outputUrl,
                         cacheKey: persistentSafeGenerationMediaUrl(outputUrl),

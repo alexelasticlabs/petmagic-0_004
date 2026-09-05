@@ -84,7 +84,7 @@ class TemplateDetailContent extends StatelessWidget {
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(20),
-                    child: _AdaptiveTemplateMediaFrame(template: template),
+                    child: TemplateMediaFrame(template: template),
                   ),
                 ),
               ),

@@ -1,5 +1,9 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 
+import { captureFigmaState, installFigmaCaptureRouting } from "./figma-capture";
+
+test.beforeEach(async ({ page }) => installFigmaCaptureRouting(page));
+
 const apiOrigin = "https://api.petmagic.test";
 const adminUserId = "11111111-1111-4111-8111-111111111111";
 const criticalId = "22222222-2222-4222-8222-222222222222";
@@ -204,6 +208,7 @@ test("notification inbox, collapsed rail and mobile sheet stay compact", async (
   );
   await expect(page.getByRole("list", { name: "Operational notifications" })).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Operational notifications" })).toBeVisible();
+  await captureFigmaState(page, "notifications-current");
   await page.screenshot({
     path: testInfo.outputPath("notifications-desktop-dark.png"),
     fullPage: true,

@@ -16,8 +16,13 @@ class _TemplateFeedSlivers extends ConsumerStatefulWidget {
   final TemplateType? selectedType;
   final String? selectedCategory;
   final String? searchQuery;
-  final ValueChanged<TemplateItem> onTemplateSelected;
-  final ValueChanged<TemplateOfTheDayItem> onTemplateOfTheDaySelected;
+  final void Function(TemplateItem template, List<TemplateItem> previewItems)
+  onTemplateSelected;
+  final void Function(
+    TemplateOfTheDayItem featured,
+    List<TemplateItem> previewItems,
+  )
+  onTemplateOfTheDaySelected;
 
   @override
   ConsumerState<_TemplateFeedSlivers> createState() =>
@@ -177,6 +182,9 @@ class _TemplateFeedSliversState extends ConsumerState<_TemplateFeedSlivers> {
             template.templateId != featuredEntry.template.templateId)
           _TemplateGridEntry(template: template),
     ];
+    final previewItems = List<TemplateItem>.unmodifiable(
+      visibleEntries.map((entry) => entry.template),
+    );
 
     return SliverMainAxisGroup(
       slivers: [
@@ -224,8 +232,10 @@ class _TemplateFeedSliversState extends ConsumerState<_TemplateFeedSlivers> {
                         popularityCount: featured.popularityCount,
                         isNew: featured.isNew,
                       ),
-                      onPressed: () =>
-                          widget.onTemplateOfTheDaySelected(featured),
+                      onPressed: () => widget.onTemplateOfTheDaySelected(
+                        featured,
+                        previewItems,
+                      ),
                     );
                   }
                   final templateIdentity = _templateCardIdentity(
@@ -253,8 +263,11 @@ class _TemplateFeedSliversState extends ConsumerState<_TemplateFeedSlivers> {
                             isNew: featured.isNew,
                           ),
                     onPressed: () => featured != null
-                        ? widget.onTemplateOfTheDaySelected(featured)
-                        : widget.onTemplateSelected(template),
+                        ? widget.onTemplateOfTheDaySelected(
+                            featured,
+                            previewItems,
+                          )
+                        : widget.onTemplateSelected(template, previewItems),
                   );
                   if (index >= 6) {
                     return card;

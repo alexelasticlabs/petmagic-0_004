@@ -167,6 +167,40 @@ class TemplateItem {
 
   bool get isVideo => templateType == TemplateType.video;
 
+  bool get detailPreviewIsVideo {
+    final detailUrl = detailPreviewUrl?.trim() ?? '';
+    if (detailUrl.isEmpty) {
+      return previewAsset == null ? isVideo : isVideoPreview(previewAsset);
+    }
+
+    final normalizedKind = mediaKind?.trim().toLowerCase();
+    if (normalizedKind == 'video') {
+      return true;
+    }
+    if (normalizedKind == 'image') {
+      return false;
+    }
+
+    final asset = previewAsset;
+    if (asset != null && asset.url.trim() == detailUrl) {
+      final contentType = asset.contentType.trim().toLowerCase();
+      if (contentType.startsWith('video/')) {
+        return true;
+      }
+      if (contentType.startsWith('image/')) {
+        return false;
+      }
+    }
+
+    if (isVideoUrl(detailUrl)) {
+      return true;
+    }
+    if (_isImageUrl(detailUrl)) {
+      return false;
+    }
+    return isVideo;
+  }
+
   String get mediaIdentity {
     final thumbnail = thumbnailUrl?.trim() ?? '';
     final animated = animatedPreviewUrl?.trim() ?? '';
@@ -256,6 +290,26 @@ bool isVideoUrl(String? rawUrl) {
       query.contains('format=mp4') ||
       query.contains('ext=mp4') ||
       query.contains('contenttype=video');
+}
+
+bool _isImageUrl(String rawUrl) {
+  final normalized = rawUrl.trim().toLowerCase();
+  final uri = Uri.tryParse(normalized);
+  final path = (uri?.path ?? normalized).toLowerCase();
+  final query = (uri?.query ?? '').toLowerCase();
+  return path.endsWith('.jpg') ||
+      path.endsWith('.jpeg') ||
+      path.endsWith('.png') ||
+      path.endsWith('.webp') ||
+      path.endsWith('.gif') ||
+      path.endsWith('.avif') ||
+      path.endsWith('.heic') ||
+      path.endsWith('.heif') ||
+      query.contains('format=jpg') ||
+      query.contains('format=jpeg') ||
+      query.contains('format=png') ||
+      query.contains('format=webp') ||
+      query.contains('contenttype=image');
 }
 
 String formatDuration(double? durationSeconds) {

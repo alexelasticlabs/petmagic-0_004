@@ -241,6 +241,7 @@ class DefaultTemplatesRepository extends _TemplatesRepositoryBase
   Future<TemplateItem> fetchTemplate(
     String templateId, {
     bool forceRefresh = false,
+    String? analyticsSource,
   }) async {
     final normalizedId = templateId.trim();
     final cacheKey = normalizedId.isEmpty ? templateId : normalizedId;
@@ -263,7 +264,7 @@ class DefaultTemplatesRepository extends _TemplatesRepositoryBase
     final cacheGeneration = _templateDetailCacheGeneration;
     late final Future<TemplateItem> fetch;
     fetch = _remoteDataSource
-        .fetchTemplate(cacheKey)
+        .fetchTemplate(cacheKey, analyticsSource: analyticsSource)
         .then((dto) {
           final template = dto.toDomain();
           if (cacheGeneration == _templateDetailCacheGeneration) {

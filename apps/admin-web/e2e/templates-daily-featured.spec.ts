@@ -1,5 +1,9 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 
+import { captureFigmaState, installFigmaCaptureRouting } from "./figma-capture";
+
+test.beforeEach(async ({ page }) => installFigmaCaptureRouting(page));
+
 const apiOrigin = "https://api.petmagic.test";
 const adminUserId = "11111111-1111-1111-1111-111111111111";
 const imageTemplateId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
@@ -396,6 +400,7 @@ test("daily featured supports settings, manual schedule, auto-pick, edit and del
     scrollWidth: document.documentElement.scrollWidth,
   }));
   expect(desktopDimensions.scrollWidth).toBeLessThanOrEqual(desktopDimensions.clientWidth);
+  await captureFigmaState(page, "templates-daily-current");
   await page.screenshot({
     path: testInfo.outputPath("daily-featured-desktop.png"),
     fullPage: true,
@@ -445,6 +450,7 @@ test("daily featured supports settings, manual schedule, auto-pick, edit and del
   const autoPickDialog = page.getByRole("dialog", { name: "Run auto-pick?", exact: true });
   await expect(autoPickDialog).toBeVisible();
   await expect(autoPickDialog).toContainText("2030-03-01");
+  await captureFigmaState(page, "templates-daily-autopick-dialog");
   await autoPickDialog.getByRole("button", { name: "Run auto-pick", exact: true }).click();
   await expect.poll(api.getAutoPickRequest).toEqual({
     date: "2030-03-01",

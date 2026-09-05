@@ -50,9 +50,16 @@ void main() {
     final controllerSource = await File(
       'lib/core/performance/template_preview_video_controller.dart',
     ).readAsString();
-    final contentSource = await File(
+    final frameSource = await File(
       'lib/features/templates/presentation/widgets/template_flow_media_preview.part.dart',
     ).readAsString().then((source) => source.replaceAll('\r\n', '\n'));
+    final videoSource = await File(
+      'lib/features/templates/presentation/widgets/template_flow_video_preview.part.dart',
+    ).readAsString().then((source) => source.replaceAll('\r\n', '\n'));
+    final videoLifecycleSource = await File(
+      'lib/features/templates/presentation/widgets/template_flow_video_preview_lifecycle.part.dart',
+    ).readAsString().then((source) => source.replaceAll('\r\n', '\n'));
+    final contentSource = '$frameSource\n$videoSource\n$videoLifecycleSource';
 
     expect(fullCardSource, contains('VisibilityDetector('));
     expect(
@@ -122,12 +129,27 @@ void main() {
       sheetSource,
       contains("part 'template_flow_media_preview.part.dart';"),
     );
+    expect(
+      sheetSource,
+      contains("part 'template_flow_video_preview.part.dart';"),
+    );
+    expect(
+      sheetSource,
+      contains("part 'template_flow_video_preview_lifecycle.part.dart';"),
+    );
     expect(contentSource, contains('useSharedPreviewCache: true'));
     expect(contentSource, contains('VisibilityDetector('));
     expect(contentSource, contains('_loadVisibilityFraction'));
     expect(contentSource, contains('_playVisibilityFraction'));
     expect(contentSource, contains('_disposeVideoController()'));
-    expect(contentSource, contains('bool _hasPreviewSlot = false;'));
+    expect(
+      contentSource,
+      contains('_TemplateVideoPreviewControllerLease? _controllerLease;'),
+    );
+    expect(
+      contentSource,
+      contains('_TemplateVideoPreviewControllerLease.tryAcquire('),
+    );
     expect(
       contentSource,
       contains('MediaLifecyclePolicy.tryAcquireVideoPreviewSlot()'),
@@ -136,19 +158,37 @@ void main() {
       contentSource,
       contains('MediaLifecyclePolicy.releaseVideoPreviewSlot()'),
     );
-    expect(contentSource, contains('void _releasePreviewSlot()'));
+    expect(contentSource, contains('bool _slotReleased = false;'));
+    expect(contentSource, contains('await controller.dispose();'));
     expect(
       contentSource,
       contains('createCachedTemplatePreviewVideoController('),
     );
     expect(contentSource, contains('fallbackUri: safeUri'));
+    expect(contentSource, contains('url: preferredMediaUrl'));
+    expect(contentSource, contains('playbackIdentity: template.templateId'));
+    expect(contentSource, contains('mediaVersion: template.mediaVersion'));
+    expect(contentSource, contains('useSharedPreviewCache: true'));
+    expect(contentSource, contains('safeDetailPreviewUrl'));
+    expect(contentSource, contains('template.detailPreviewIsVideo'));
+    expect(contentSource, contains('TemplateMediaCache.fetchPreviewFile'));
+    expect(contentSource, contains('backdropUsesDetailCache'));
+    expect(contentSource, contains('fileLoader: backdropUsesDetailCache'));
+    expect(contentSource, contains('fileRemover: backdropUsesDetailCache'));
+    expect(contentSource, contains('class TemplateMediaFrame'));
+    expect(contentSource, contains('this.expand = false'));
+    expect(contentSource, contains('this.isActive = true'));
     expect(
-      RegExp(
-        r'_NetworkVideoPreview\(\s*url: safeAssetUrl,\s*useSharedPreviewCache: true,',
-        multiLine: true,
-      ).hasMatch(contentSource),
-      isTrue,
+      contentSource,
+      contains('return SizedBox.expand(child: clippedMedia)'),
     );
+    expect(contentSource, contains('isActive: isActive'));
+    expect(contentSource, contains('final poster = hasPoster'));
+    expect(
+      contentSource.indexOf('poster,\n'),
+      lessThan(contentSource.indexOf('if (isInitialized) ...[')),
+    );
+    expect(contentSource, contains('cacheWidth: widget.posterCacheWidth'));
     expect(
       contentSource,
       contains(

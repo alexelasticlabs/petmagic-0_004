@@ -1,5 +1,13 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 
+import {
+  captureFigmaState,
+  hasFigmaCaptureState,
+  installFigmaCaptureRouting,
+} from "./figma-capture";
+
+test.beforeEach(async ({ page }) => installFigmaCaptureRouting(page));
+
 const adminUserId = "11111111-1111-1111-1111-111111111111";
 
 function createAdminSession() {
@@ -377,6 +385,7 @@ test("dashboard switches commerce ranges and stays within the mobile viewport", 
     page.getByRole("heading", { name: "Operations problems", exact: true })
   ).toBeVisible();
   await expect(page.getByText("invalid_token", { exact: true })).toBeVisible();
+  await captureFigmaState(page, "operations-current");
   await page.screenshot({ path: testInfo.outputPath("operations-problems.png"), fullPage: true });
   await page.goBack();
   await expect(page.getByRole("heading", { name: "Dashboard", exact: true })).toBeVisible();
@@ -390,8 +399,36 @@ test("dashboard switches commerce ranges and stays within the mobile viewport", 
   await expect.poll(() => requestedPeriods.includes(30)).toBe(true);
   await expect(thirtyDays).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByText("Successful payments over 30 days", { exact: true })).toBeVisible();
+  await captureFigmaState(page, "dashboard-current");
   await page.screenshot({ path: testInfo.outputPath("dashboard-desktop-viewport.png") });
   await page.screenshot({ path: testInfo.outputPath("dashboard-desktop.png"), fullPage: true });
+
+  if (hasFigmaCaptureState("global-notifications-popover")) {
+    await page.getByRole("button", { name: "Open notifications", exact: true }).click();
+    await captureFigmaState(page, "global-notifications-popover");
+    await page.keyboard.press("Escape");
+  }
+
+  if (hasFigmaCaptureState("global-language-menu")) {
+    await page.getByRole("button", { name: "Choose interface language", exact: true }).click();
+    await captureFigmaState(page, "global-language-menu");
+    await page.keyboard.press("Escape");
+  }
+
+  if (hasFigmaCaptureState("global-logout-dialog")) {
+    await page.getByRole("button", { name: "Logout", exact: true }).click();
+    await expect(
+      page.getByRole("dialog", { name: "Log out of admin panel?", exact: true })
+    ).toBeVisible();
+    await captureFigmaState(page, "global-logout-dialog");
+    await page.keyboard.press("Escape");
+  }
+
+  if (hasFigmaCaptureState("global-sidebar-collapsed")) {
+    await page.getByRole("button", { name: "Close navigation", exact: true }).click();
+    await captureFigmaState(page, "global-sidebar-collapsed");
+    await page.getByRole("button", { name: "Open navigation", exact: true }).click();
+  }
 
   const darkThemeToggle = page.getByRole("button", {
     name: "Switch to dark theme",
@@ -400,6 +437,7 @@ test("dashboard switches commerce ranges and stays within the mobile viewport", 
   await expect(darkThemeToggle).toHaveCount(1);
   await darkThemeToggle.click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await captureFigmaState(page, "dashboard-dark");
   await page.screenshot({
     path: testInfo.outputPath("dashboard-desktop-dark-viewport.png"),
     animations: "disabled",

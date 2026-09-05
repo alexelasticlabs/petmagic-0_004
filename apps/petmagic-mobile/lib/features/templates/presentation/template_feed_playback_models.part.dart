@@ -56,15 +56,30 @@ class TemplateFeedPlaybackEnvironment {
 
 final templateFeedPlaybackEnvironmentProvider =
     Provider<TemplateFeedPlaybackEnvironment>((ref) {
-      final hasInternet = ref.watch(
-        networkStatusControllerProvider.select((state) => state.hasInternet),
+      final networkClass = ref.watch(
+        networkStatusControllerProvider.select(
+          templateFeedNetworkClassFromStatus,
+        ),
       );
-      return TemplateFeedPlaybackEnvironment(
-        networkClass: hasInternet
-            ? TemplateFeedNetworkClass.wifi
-            : TemplateFeedNetworkClass.offline,
-      );
+      return TemplateFeedPlaybackEnvironment(networkClass: networkClass);
     });
+
+TemplateFeedNetworkClass templateFeedNetworkClassFromStatus(
+  NetworkStatusState status,
+) {
+  if (!status.hasInternet) {
+    return TemplateFeedNetworkClass.offline;
+  }
+
+  return switch (status.transport) {
+    NetworkTransportKind.wifi => TemplateFeedNetworkClass.wifi,
+    NetworkTransportKind.ethernet => TemplateFeedNetworkClass.wifi,
+    NetworkTransportKind.cellular => TemplateFeedNetworkClass.cellular,
+    NetworkTransportKind.constrained => TemplateFeedNetworkClass.slow,
+    NetworkTransportKind.unknown => TemplateFeedNetworkClass.slow,
+    NetworkTransportKind.offline => TemplateFeedNetworkClass.offline,
+  };
+}
 
 final templateFeedPlaybackManagerProvider =
     Provider.autoDispose<TemplateFeedPlaybackManager>((ref) {

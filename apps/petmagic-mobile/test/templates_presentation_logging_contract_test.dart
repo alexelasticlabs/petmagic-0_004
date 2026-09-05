@@ -38,6 +38,8 @@ void main() {
       final templateFlowSource = _readSource(
         'lib/features/templates/presentation/widgets/template_flow_sheets.dart',
         'lib/features/templates/presentation/widgets/template_flow_media_preview.part.dart',
+        'lib/features/templates/presentation/widgets/template_flow_video_preview.part.dart',
+        'lib/features/templates/presentation/widgets/template_flow_video_preview_lifecycle.part.dart',
       );
       final templateCardSource = _readSource(
         'lib/features/templates/presentation/widgets/template_card.dart',

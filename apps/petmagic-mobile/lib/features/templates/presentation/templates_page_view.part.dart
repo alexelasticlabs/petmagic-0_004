@@ -241,10 +241,17 @@ extension _TemplatesPageView on _TemplatesPageState {
                   selectedType: headerState.query.type,
                   selectedCategory: headerState.query.category,
                   searchQuery: headerState.query.search,
-                  onTemplateSelected: (template) =>
-                      unawaited(_handleTemplateSelected(template)),
-                  onTemplateOfTheDaySelected: (featured) =>
-                      unawaited(_handleTemplateOfTheDaySelected(featured)),
+                  onTemplateSelected: (template, previewItems) => unawaited(
+                    _handleTemplateSelected(
+                      template,
+                      templateOfTheDay: templateOfTheDay,
+                      previewItems: previewItems,
+                    ),
+                  ),
+                  onTemplateOfTheDaySelected: (featured, previewItems) =>
+                      unawaited(
+                        _handleTemplateOfTheDaySelected(featured, previewItems),
+                      ),
                 ),
               ],
             ),

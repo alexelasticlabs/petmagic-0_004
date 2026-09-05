@@ -31,13 +31,48 @@ extension _TemplatesPageLifecycle on _TemplatesPageState {
       }
     }
 
-    final initialTemplate = widget.initialTemplate;
+    final previewSession = widget.initialPreviewSession;
+    final initialTemplate =
+        previewSession?.initialTemplate ?? widget.initialTemplate;
     if (initialTemplate == null || _initialTemplateHandled) {
       return;
     }
 
     _initialTemplateHandled = true;
-    unawaited(_handleTemplateSelected(initialTemplate));
+    unawaited(
+      _openInitialTemplatePreview(
+        initialTemplate,
+        previewSession: previewSession,
+      ),
+    );
+  }
+
+  Future<void> _openInitialTemplatePreview(
+    TemplateItem template, {
+    required TemplatePreviewSession? previewSession,
+  }) async {
+    final didContinueFromPreview = await _handleTemplateSelected(
+      template,
+      previewSession: previewSession,
+    );
+    if (!mounted ||
+        didContinueFromPreview ||
+        previewSession?.source != TemplatePreviewSource.discovery) {
+      return;
+    }
+
+    // The preview itself lives on the root navigator, while this temporary
+    // catalog bridge lives in the templates shell branch. Pop that nearest
+    // branch navigator directly so the existing discovery State (including
+    // scroll position) stays mounted. The typed destination is a defensive
+    // fallback for isolated hosts that do not provide a nested route stack.
+    final branchNavigator = Navigator.maybeOf(context);
+    if (branchNavigator?.canPop() ?? false) {
+      branchNavigator!.pop();
+      return;
+    }
+
+    context.appNavigator.go(const DiscoverDestination());
   }
 
   void _handleScroll() {

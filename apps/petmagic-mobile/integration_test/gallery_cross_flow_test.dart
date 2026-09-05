@@ -529,6 +529,7 @@ class _SingleTemplateRepository implements TemplatesRepository {
   Future<TemplateItem> fetchTemplate(
     String templateId, {
     bool forceRefresh = false,
+    String? analyticsSource,
   }) async {
     return template;
   }

@@ -9,6 +9,7 @@ import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
+import 'package:petmagic_mobile/core/performance/media_lifecycle_policy.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/application/profile_controller.dart';
 import 'package:petmagic_mobile/features/profile/domain/profile_models.dart';
@@ -16,11 +17,19 @@ import 'package:petmagic_mobile/features/templates/application/template_discover
 import 'package:petmagic_mobile/features/templates/application/template_discovery_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_discovery_models.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
+import 'package:petmagic_mobile/features/templates/presentation/template_feed_playback_manager.dart';
+import 'package:petmagic_mobile/features/templates/presentation/template_preview_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_discovery_page.dart';
+import 'package:petmagic_mobile/features/templates/presentation/widgets/template_card_playback_coordinator.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/template_category_carousel.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/template_discovery_rail.dart';
 import 'package:petmagic_mobile/features/wallet/application/wallet_controller.dart';
 import 'package:petmagic_mobile/features/wallet/domain/wallet_models.dart';
+import 'package:video_player/video_player.dart';
+import 'package:video_player_platform_interface/video_player_platform_interface.dart';
+import 'package:visibility_detector/visibility_detector.dart';
+
+import 'template_card_test_support.dart';
 
 void main() {
   testWidgets(
@@ -87,10 +96,12 @@ void main() {
         expect(searchDestination.payload, isNull);
 
         final premiumCardLabel =
-            '${_framesCard.title}, ${text.videoLabel}, '
+            '${_framesCard.title}, ${text.videoLabel}, 0:07, '
             '${text.premiumLabel}, 8 PawSpark';
         await tester.ensureVisible(find.text(_framesCard.title));
         await tester.pump();
+        expect(find.text('0:07'), findsOneWidget);
+        expect(tester.widget<Text>(find.text(_framesCard.title)).maxLines, 2);
         final templateAction = find.semantics.byLabel(premiumCardLabel);
         expect(templateAction.evaluate().single.label, premiumCardLabel);
         tester.semantics.performAction(templateAction, SemanticsAction.tap);
@@ -98,7 +109,10 @@ void main() {
         final cardDestination = navigator.pushes.last as TemplatesDestination;
         expect(cardDestination.category, 'Pawsome Frames');
         expect(cardDestination.autofocusSearch, isFalse);
-        expect(identical(cardDestination.payload, _framesCard), isTrue);
+        final previewSession =
+            cardDestination.payload! as TemplatePreviewSession;
+        expect(identical(previewSession.initialTemplate, _framesCard), isTrue);
+        expect(previewSession.source, TemplatePreviewSource.discovery);
         expect(navigator.pushes, hasLength(4));
       } finally {
         semantics.dispose();
@@ -148,6 +162,123 @@ void main() {
     expect(find.byIcon(Icons.workspace_premium_rounded), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('discovery pauses preview playback while a rail is scrolling', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final playbackManager = TemplateFeedPlaybackManager();
+    addTearDown(playbackManager.dispose);
+
+    await _pumpDiscoveryPage(
+      tester,
+      repository: _FakeDiscoveryRepository(_horizontalDiscoveryFixture()),
+      navigator: _RecordingNavigator(),
+      playbackManager: playbackManager,
+    );
+    final rail = find.byKey(const ValueKey('discovery-rail-Pet Mischief'));
+    final horizontalScroll = find.descendant(
+      of: rail,
+      matching: find.byWidgetPredicate(
+        (widget) =>
+            widget is Scrollable && widget.axisDirection == AxisDirection.right,
+      ),
+    );
+    expect(horizontalScroll, findsOneWidget);
+
+    await tester.drag(horizontalScroll, const Offset(-120, 0));
+    expect(playbackManager.isFastScrolling, isTrue);
+
+    await tester.pump(const Duration(milliseconds: 139));
+    expect(playbackManager.isFastScrolling, isTrue);
+    await tester.pump(const Duration(milliseconds: 1));
+    expect(playbackManager.isFastScrolling, isFalse);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'refreshing another section keeps an unchanged visible preview playing',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final originalPlatform = VideoPlayerPlatform.instance;
+      final fakePlatform = FakeVideoPlayerPlatform();
+      VideoPlayerPlatform.instance = fakePlatform;
+      VisibilityDetectorController.instance.updateInterval = Duration.zero;
+      MediaLifecyclePolicy.reset();
+      addTearDown(() {
+        VideoPlayerPlatform.instance = originalPlatform;
+        VisibilityDetectorController.instance.updateInterval = const Duration(
+          milliseconds: 500,
+        );
+        MediaLifecyclePolicy.reset();
+      });
+      const previewUrl = 'https://cdn.example.com/templates/refresh-video.mp4';
+      final video = videoTemplate(
+        id: 'refresh-video',
+        previewUrl: previewUrl,
+        thumbnailUrl: previewUrl,
+        feedLoopLowUrl: previewUrl,
+      );
+      final repository = _FakeDiscoveryRepository(
+        _discoveryRefreshFixture(video: video, otherCategory: 'Before'),
+      );
+      final playbackManager = TemplateFeedPlaybackManager();
+      addTearDown(playbackManager.dispose);
+
+      await _pumpDiscoveryPage(
+        tester,
+        repository: repository,
+        navigator: _RecordingNavigator(),
+        playbackManager: playbackManager,
+        networkTransport: NetworkTransportKind.cellular,
+        previewControllerFactory: (url) async =>
+            VideoPlayerController.networkUrl(Uri.parse(url)),
+      );
+      await tester.pump();
+      final detector = tester.widget<VisibilityDetector>(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is VisibilityDetector &&
+              widget.key.toString().contains('refresh-video'),
+        ),
+      );
+      detector.onVisibilityChanged?.call(
+        VisibilityInfo(
+          key: detector.key!,
+          size: const Size(132, 198),
+          visibleBounds: const Offset(0, 0) & const Size(132, 198),
+        ),
+      );
+      await _pumpUntil(tester, () => fakePlatform.playCalls > 0);
+      expect(playbackManager.activeVideoControllersCount, 1);
+      expect(fakePlatform.createCalls, 1);
+
+      repository.discovery = _discoveryRefreshFixture(
+        video: video,
+        otherCategory: 'After',
+      );
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(TemplatesDiscoveryPage)),
+        listen: false,
+      );
+      await container
+          .read(templateDiscoveryControllerProvider.notifier)
+          .loadInitial(forceRefresh: true);
+      await tester.pump();
+
+      expect(
+        find.byKey(const ValueKey('discovery-rail-After')),
+        findsOneWidget,
+      );
+      expect(playbackManager.activeVideoControllersCount, 1);
+      expect(fakePlatform.createCalls, 1);
+      expect(fakePlatform.disposeCalls, 0);
+      expect(find.byType(VideoPlayer), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('pinned discovery search stays below the top safe inset', (
     tester,
@@ -343,6 +474,7 @@ const _framesCard = TemplateItem(
   tags: ['portrait'],
   isPremium: true,
   tokenCost: 8,
+  durationMs: 6500,
 );
 
 TemplateDiscovery _discoveryFixture() {
@@ -389,12 +521,43 @@ TemplateDiscovery _scrollableDiscoveryFixture() {
   );
 }
 
+TemplateDiscovery _horizontalDiscoveryFixture() {
+  return TemplateDiscovery(
+    sections: const [
+      TemplateDiscoverySection(
+        category: 'Pet Mischief',
+        items: [_mischiefCard, _framesCard, _mischiefCard, _framesCard],
+      ),
+    ],
+    generatedAtUtc: DateTime.utc(2026, 9, 4),
+  );
+}
+
+TemplateDiscovery _discoveryRefreshFixture({
+  required TemplateItem video,
+  required String otherCategory,
+}) {
+  return TemplateDiscovery(
+    sections: [
+      TemplateDiscoverySection(category: 'Video', items: [video]),
+      TemplateDiscoverySection(
+        category: otherCategory,
+        items: const [_mischiefCard],
+      ),
+    ],
+    generatedAtUtc: DateTime.utc(2026, 9, 4),
+  );
+}
+
 Future<void> _pumpDiscoveryPage(
   WidgetTester tester, {
   required _FakeDiscoveryRepository repository,
   required _RecordingNavigator navigator,
   TextScaler textScaler = TextScaler.noScaling,
   double topPadding = 0,
+  TemplateFeedPlaybackManager? playbackManager,
+  NetworkTransportKind networkTransport = NetworkTransportKind.unknown,
+  TemplatePreviewControllerFactory? previewControllerFactory,
 }) async {
   await tester.pumpWidget(
     ProviderScope(
@@ -403,8 +566,12 @@ Future<void> _pumpDiscoveryPage(
         appLaunchControllerProvider.overrideWith(_GuestAppLaunchController.new),
         walletControllerProvider.overrideWith(_IdleWalletController.new),
         networkStatusControllerProvider.overrideWith(
-          _OnlineNetworkStatusController.new,
+          () => _OnlineNetworkStatusController(networkTransport),
         ),
+        if (playbackManager != null)
+          templateDiscoveryPlaybackManagerProvider.overrideWithValue(
+            playbackManager,
+          ),
       ],
       child: MaterialApp(
         builder: (context, child) => MediaQuery(
@@ -422,7 +589,11 @@ Future<void> _pumpDiscoveryPage(
         supportedLocales: AppLocalizations.supportedLocales,
         home: AppNavigationScope(
           navigator: navigator,
-          child: const Scaffold(body: TemplatesDiscoveryPage()),
+          child: Scaffold(
+            body: TemplatesDiscoveryPage(
+              previewControllerFactory: previewControllerFactory,
+            ),
+          ),
         ),
       ),
     ),
@@ -448,7 +619,7 @@ Future<void> _pumpUntil(WidgetTester tester, bool Function() condition) async {
 final class _FakeDiscoveryRepository implements TemplateDiscoveryRepository {
   _FakeDiscoveryRepository(this.discovery);
 
-  final TemplateDiscovery discovery;
+  TemplateDiscovery discovery;
   int fetchCalls = 0;
 
   @override
@@ -652,6 +823,13 @@ final class _TrackingProfileController extends ProfileController {
 }
 
 final class _OnlineNetworkStatusController extends NetworkStatusController {
+  _OnlineNetworkStatusController([
+    this.transport = NetworkTransportKind.unknown,
+  ]);
+
+  final NetworkTransportKind transport;
+
   @override
-  NetworkStatusState build() => const NetworkStatusState(hasInternet: true);
+  NetworkStatusState build() =>
+      NetworkStatusState(hasInternet: true, transport: transport);
 }

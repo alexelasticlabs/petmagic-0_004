@@ -10,6 +10,7 @@ class PetMagicInteractiveSurface extends StatelessWidget {
     this.enabled = true,
     this.haptic = PressableScaleHaptic.none,
     this.scaleDown = PetMotion.pressScale,
+    this.excludeFromSemantics = false,
     super.key,
   });
 
@@ -19,6 +20,7 @@ class PetMagicInteractiveSurface extends StatelessWidget {
   final bool enabled;
   final PressableScaleHaptic haptic;
   final double scaleDown;
+  final bool excludeFromSemantics;
 
   @override
   Widget build(BuildContext context) {
@@ -35,6 +37,7 @@ class PetMagicInteractiveSurface extends StatelessWidget {
         borderRadius: borderRadius,
         haptic: haptic,
         scaleDown: scaleDown,
+        excludeFromSemantics: excludeFromSemantics,
         child: child,
       ),
     );

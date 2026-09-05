@@ -24,6 +24,7 @@ import 'package:petmagic_mobile/features/templates/data/template_generation_repo
 import 'package:petmagic_mobile/features/templates/data/template_generation_pet_repository_adapter.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_repository.dart';
 import 'package:petmagic_mobile/features/templates/application/generation_history_controller.dart';
+import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generations_gallery_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_preview_page.dart';
@@ -136,7 +137,7 @@ void main() {
     expect(TemplatesPage.location(), TemplatesPage.routePath);
   });
 
-  testWidgets('template selection loads detail payload before preview', (
+  testWidgets('template selection defers detail fetch to the active preview', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 900));
@@ -154,7 +155,7 @@ void main() {
           builder: (context, state) => _templatesPageForState(state),
         ),
         GoRoute(
-          path: TemplatePreviewPage.routePath,
+          path: '${TemplatePreviewPage.routePath}/:templateId',
           builder: (context, state) {
             final args = state.extra! as TemplatePreviewRouteArgs;
             return Scaffold(body: Text('opened:${args.template.title}'));
@@ -212,9 +213,109 @@ void main() {
     await tester.tap(feedTemplate);
     await tester.pumpAndSettle();
 
-    expect(repository.fetchTemplateCalls, 1);
-    expect(find.text('opened:Detail payload'), findsOneWidget);
+    expect(repository.fetchTemplateCalls, 0);
+    expect(find.text('opened:Feed payload'), findsOneWidget);
   });
+
+  testWidgets(
+    'fallback Template of the Day defers its featured view to preview',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final detail = templateFixture(
+        'featured-remote',
+        'Featured detail payload',
+      );
+      final featured = TemplateOfTheDayItem(
+        templateId: detail.templateId,
+        title: 'Remote featured',
+        subtitle: 'Featured subtitle',
+        badgeText: 'Template of the Day',
+        templateType: TemplateType.image,
+        isPremium: false,
+        requiredPlan: 'free',
+        date: DateTime.utc(2026, 9, 4),
+        source: 'manual',
+      );
+      final repository = RandomTemplatesRepository(
+        items: [templateFixture('regular', 'Regular template')],
+        templateDetailsById: {detail.templateId: detail},
+      );
+      TemplatePreviewRouteArgs? capturedArgs;
+      final router = GoRouter(
+        routes: [
+          GoRoute(
+            path: '/',
+            builder: (context, state) => const Scaffold(body: TemplatesPage()),
+          ),
+          GoRoute(
+            path: '${TemplatePreviewPage.routePath}/:templateId',
+            builder: (context, state) {
+              capturedArgs = state.extra! as TemplatePreviewRouteArgs;
+              return const Scaffold(body: Text('featured-preview-open'));
+            },
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appLaunchControllerProvider.overrideWith(
+              AuthenticatedAppLaunchController.new,
+            ),
+            walletControllerProvider.overrideWith(IdleWalletController.new),
+            profileControllerProvider.overrideWith(FakeProfileController.new),
+            templatesControllerProvider.overrideWith(
+              () => FakeTemplatesController(
+                items: repository.items,
+                templateOfTheDay: featured,
+              ),
+            ),
+            templatesRepositoryProvider.overrideWithValue(repository),
+            generationHistoryControllerProvider.overrideWith(
+              IdleTemplatesGenerationHistoryController.new,
+            ),
+            realtimeClientProvider.overrideWith(
+              (ref) => const NoopRealtimeClient(),
+            ),
+          ],
+          child: MaterialApp.router(
+            builder: (context, child) => AppNavigationScope(
+              navigator: GoRouterAppNavigator(router),
+              child: child!,
+            ),
+            theme: AppTheme.light(),
+            locale: const Locale('en'),
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: AppLocalizations.supportedLocales,
+            routerConfig: router,
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      await tester.tap(find.text(featured.title).first);
+      await tester.pumpAndSettle();
+
+      expect(find.text('featured-preview-open'), findsOneWidget);
+      expect(repository.fetchTemplateCalls, 0);
+      expect(repository.fetchTemplateAnalyticsSources, isEmpty);
+      expect(capturedArgs?.effectiveSession.initialDetailResolved, isFalse);
+      expect(
+        capturedArgs?.effectiveSession.initialTemplate.title,
+        featured.title,
+      );
+    },
+  );
 
   testWidgets('templates gallery denial shows localized permission warning', (
     tester,
@@ -237,7 +338,7 @@ void main() {
           builder: (context, state) => _templatesPageForState(state),
         ),
         GoRoute(
-          path: TemplatePreviewPage.routePath,
+          path: '${TemplatePreviewPage.routePath}/:templateId',
           builder: (context, state) => Scaffold(
             body: Center(
               child: FilledButton(
@@ -346,7 +447,7 @@ void main() {
           builder: (context, state) => _templatesPageForState(state),
         ),
         GoRoute(
-          path: TemplatePreviewPage.routePath,
+          path: '${TemplatePreviewPage.routePath}/:templateId',
           builder: (context, state) => Scaffold(
             body: Center(
               child: FilledButton(
@@ -467,7 +568,7 @@ void main() {
           builder: (context, state) => _templatesPageForState(state),
         ),
         GoRoute(
-          path: TemplatePreviewPage.routePath,
+          path: '${TemplatePreviewPage.routePath}/:templateId',
           builder: (context, state) => Scaffold(
             body: Center(
               child: FilledButton(
@@ -654,7 +755,7 @@ void main() {
           builder: (context, state) => _templatesPageForState(state),
         ),
         GoRoute(
-          path: TemplatePreviewPage.routePath,
+          path: '${TemplatePreviewPage.routePath}/:templateId',
           builder: (context, state) => Scaffold(
             body: Center(
               child: FilledButton(
@@ -761,7 +862,7 @@ void main() {
           builder: (context, state) => _templatesPageForState(state),
         ),
         GoRoute(
-          path: TemplatePreviewPage.routePath,
+          path: '${TemplatePreviewPage.routePath}/:templateId',
           builder: (context, state) => Scaffold(
             body: Center(
               child: FilledButton(
@@ -899,7 +1000,7 @@ void main() {
           builder: (context, state) => _templatesPageForState(state),
         ),
         GoRoute(
-          path: TemplatePreviewPage.routePath,
+          path: '${TemplatePreviewPage.routePath}/:templateId',
           builder: (context, state) => Scaffold(
             body: Center(
               child: FilledButton(

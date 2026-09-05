@@ -189,9 +189,13 @@ void main() {
             builder: (context, state) => const Scaffold(body: TemplatesPage()),
           ),
           GoRoute(
-            path: TemplatePreviewPage.routePath,
+            path: '${TemplatePreviewPage.routePath}/:templateId',
             builder: (context, state) {
               final args = state.extra! as TemplatePreviewRouteArgs;
+              expect(
+                state.pathParameters['templateId'],
+                args.effectiveSession.initialTemplate.templateId,
+              );
               return Scaffold(body: Text('opened:${args.template.templateId}'));
             },
           ),
@@ -285,9 +289,13 @@ void main() {
           builder: (context, state) => const Scaffold(body: TemplatesPage()),
         ),
         GoRoute(
-          path: TemplatePreviewPage.routePath,
+          path: '${TemplatePreviewPage.routePath}/:templateId',
           builder: (context, state) {
             final args = state.extra! as TemplatePreviewRouteArgs;
+            expect(
+              state.pathParameters['templateId'],
+              args.effectiveSession.initialTemplate.templateId,
+            );
             return Scaffold(body: Text('opened:${args.template.templateId}'));
           },
         ),

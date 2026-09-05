@@ -1,5 +1,9 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 
+import { captureFigmaState, installFigmaCaptureRouting } from "./figma-capture";
+
+test.beforeEach(async ({ page }) => installFigmaCaptureRouting(page));
+
 const apiOrigin = "https://api.petmagic.test";
 
 const generationControlSnapshot = {
@@ -339,6 +343,7 @@ test("admin command palette searches users and safely queues a selected-user ema
   await expect(userCommandResult).toHaveAttribute("aria-selected", "true");
   await expect(userCommandResult).toContainText("al***@p***.test");
   await expect(commandDialog.getByText("alice@petmagic.test", { exact: true })).toHaveCount(0);
+  await captureFigmaState(page, "global-command-palette");
   await page.screenshot({
     path: testInfo.outputPath("command-palette-user-search-desktop.png"),
     fullPage: false,
@@ -363,6 +368,7 @@ test("admin command palette searches users and safely queues a selected-user ema
   await expect(
     userQuickActions.getByRole("link", { name: "Support: Alice Eligible" })
   ).toBeVisible();
+  await captureFigmaState(page, "users-current");
 
   const eligibleCheckbox = page.getByRole("checkbox", {
     name: "Select recipient: Alice Eligible",
@@ -391,6 +397,7 @@ test("admin command palette searches users and safely queues a selected-user ema
     exact: true,
   });
   await expect(composeDialog.getByRole("radio", { name: /Selected users/ })).toBeChecked();
+  await captureFigmaState(page, "users-bulk-email-dialog");
   await composeDialog.getByLabel("Email subject", { exact: true }).fill("Service update");
   await composeDialog
     .getByLabel("Email body", { exact: true })
@@ -676,6 +683,8 @@ test("admin assigns and revokes a moderator from the roles workspace", async ({ 
 
   await searchInput.fill("candidate");
 
+  await captureFigmaState(page, "roles-current");
+
   const assignButton = page.getByRole("button", {
     name: "Assign Moderator to Candidate User",
     exact: true,
@@ -685,6 +694,7 @@ test("admin assigns and revokes a moderator from the roles workspace", async ({ 
 
   const assignDialog = page.getByRole("dialog", { name: "Assign Moderator?", exact: true });
   await expect(assignDialog).toBeVisible();
+  await captureFigmaState(page, "roles-assign-dialog");
   await assignDialog.getByRole("button", { name: "Assign Moderator", exact: true }).click();
   await expect.poll(() => assignRequest).toEqual({ role: "Moderator" });
 
@@ -848,6 +858,11 @@ test("moderator RBAC and support claim/unassign ownership", async ({ page }) => 
   await login(page, "Moderator");
   await expect(page.locator('a[href="/en/users"]')).toHaveCount(0);
   await expect(page.locator('a[href="/en/economy"]')).toHaveCount(0);
+  await page.goto("/en/support");
+  await expect(
+    page.getByRole("banner").getByRole("heading", { name: "Support", exact: true })
+  ).toBeVisible();
+  await captureFigmaState(page, "support-inbox");
   await page.goto(`/en/support/${conversationId}`);
 
   for (const testId of ["support-queue-pane", "support-chat-pane", "support-info-panel"]) {
@@ -1009,6 +1024,7 @@ test("moderator RBAC and support claim/unassign ownership", async ({ page }) => 
   };
 
   await assertThreePaneLayout();
+  await captureFigmaState(page, "support-current");
   await expect(
     supportInfoPanel.getByRole("button", { name: "Claim ticket", exact: true })
   ).toBeVisible();
@@ -1056,6 +1072,7 @@ test("moderator RBAC and support claim/unassign ownership", async ({ page }) => 
   await expect(
     supportInfoPanel.getByRole("button", { name: "Claim ticket", exact: true })
   ).toBeVisible();
+  await captureFigmaState(page, "support-details-drawer");
   expect(await page.evaluate(() => document.body.style.overflow)).toBe("hidden");
 
   await page.keyboard.press("Escape");
@@ -1215,7 +1232,10 @@ test("running generation cancellation becomes pending and polls", async ({ page 
 
   await login(page, "Admin");
   await page.goto("/en/generations");
+  await captureFigmaState(page, "generations-current");
   await page.getByRole("button", { name: /Cancel:/ }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await captureFigmaState(page, "generations-cancel-dialog");
   await page.getByRole("button", { name: "Cancel generation", exact: true }).click();
   await expect(
     page.locator('[data-label="Status"]').getByText("Cancelling", { exact: true })
@@ -1325,6 +1345,7 @@ test("mobile login layout has no horizontal overflow", async ({ page }) => {
   }));
   expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth);
   await expect(page.locator("#login-email")).toBeVisible();
+  await captureFigmaState(page, "login-current");
 });
 
 test("Gamification workspace is responsive and keeps streak reset audited", async ({
@@ -1613,6 +1634,7 @@ test("Gamification workspace is responsive and keeps streak reset audited", asyn
   await expect.poll(() => resetRequest).toEqual({ reason: "Verified support incident PM-2042" });
   await expect(page.getByText("The user's streak was reset.", { exact: true })).toBeVisible();
 
+  await captureFigmaState(page, "gamification-current");
   await page.screenshot({
     path: testInfo.outputPath("gamification-desktop.png"),
     fullPage: true,
@@ -1790,6 +1812,7 @@ test("Feedback workspace keeps queue, details, filters, and themes responsive", 
   await expect
     .poll(() => page.evaluate(() => document.documentElement.dataset.theme))
     .toBe("light");
+  await captureFigmaState(page, "feedback-current");
   await page.screenshot({
     path: testInfo.outputPath("feedback-desktop-light.png"),
     fullPage: true,
@@ -1999,6 +2022,7 @@ test("Russian user dossier keeps profile context and opens the balance controls"
     "aria-current",
     "page"
   );
+  await captureFigmaState(page, "user-detail-overview");
   await page.screenshot({
     path: testInfo.outputPath("user-detail-overview.png"),
     fullPage: true,
@@ -2024,6 +2048,7 @@ test("Russian user dossier keeps profile context and opens the balance controls"
   await expect(adjustmentToggle).toHaveAttribute("aria-controls", "wallet-adjustment-fields");
   await expect(adjustmentToggle).toHaveAttribute("aria-expanded", "true");
   await expect(page.getByLabel("Количество PawSpark", { exact: true })).toBeFocused();
+  await captureFigmaState(page, "user-detail-wallet-panel");
   await page.screenshot({
     path: testInfo.outputPath("user-detail-wallet-adjustment.png"),
     fullPage: true,
@@ -2043,6 +2068,7 @@ test("Russian user dossier keeps profile context and opens the balance controls"
   await expect(
     page.getByText("Пользователь пока не создавал обращений.", { exact: true })
   ).toBeVisible();
+  await captureFigmaState(page, "user-detail-support");
   await page.screenshot({
     path: testInfo.outputPath("user-detail-support.png"),
     fullPage: true,
@@ -2052,6 +2078,7 @@ test("Russian user dossier keeps profile context and opens the balance controls"
   await expect(page).toHaveURL(new RegExp(`/ru/users/${inspectedUserId}\\?tab=content$`));
   await expect(page.getByText("Питомцы пока не добавлены.", { exact: true })).toBeVisible();
   await expect(page.getByText("Генераций пока нет.", { exact: true })).toBeVisible();
+  await captureFigmaState(page, "user-detail-content");
   await page.screenshot({
     path: testInfo.outputPath("user-detail-content.png"),
     fullPage: true,
@@ -2062,6 +2089,7 @@ test("Russian user dossier keeps profile context and opens the balance controls"
   await expect(page.getByRole("heading", { name: "Аккаунт", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Права доступа", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Подписка", exact: true })).toBeVisible();
+  await captureFigmaState(page, "user-detail-access");
   await page.screenshot({
     path: testInfo.outputPath("user-detail-access.png"),
     fullPage: true,

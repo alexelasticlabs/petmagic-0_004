@@ -1,5 +1,9 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 
+import { captureFigmaState, installFigmaCaptureRouting } from "./figma-capture";
+
+test.beforeEach(async ({ page }) => installFigmaCaptureRouting(page));
+
 const apiOrigin = "https://api.petmagic.test";
 const adminUserId = "11111111-1111-1111-1111-111111111111";
 const firstTemplateId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
@@ -290,6 +294,8 @@ test("admin operates template analytics hub filters, pagination, links and expor
   await expect
     .poll(() => hasAnalyticsQuery(analyticsRequests, { periodDays: "30", sort: "views" }))
     .toBe(true);
+
+  await captureFigmaState(page, "templates-analytics-current");
 
   const topTemplates = page
     .locator("section")

@@ -167,6 +167,19 @@ CustomTransitionPage<T> _buildFadeSlidePage<T>({
   );
 }
 
+CustomTransitionPage<T> _buildHorizontalRevealPage<T>({
+  required GoRouterState state,
+  required Widget child,
+}) {
+  return CustomTransitionPage<T>(
+    key: state.pageKey,
+    child: child,
+    transitionDuration: PetMotion.medium,
+    reverseTransitionDuration: const Duration(milliseconds: 220),
+    transitionsBuilder: petMagicHorizontalRevealTransition,
+  );
+}
+
 CustomTransitionPage<dynamic>? _buildTemplatePreviewPageFromState(
   GoRouterState state,
 ) {
@@ -195,12 +208,16 @@ CustomTransitionPage<dynamic> _buildTemplatePreviewPage({
   required GoRouterState state,
   required TemplatePreviewRouteArgs args,
 }) {
-  return _buildFadeSlidePage(
+  final session = args.effectiveSession;
+  final initialTemplateId = session.initialTemplate.templateId.trim();
+  return _buildHorizontalRevealPage(
     state: state,
     child: TemplatePreviewPage(
+      key: ValueKey<String>('template-preview:$initialTemplateId'),
       template: args.template,
       hasPremiumAccess: args.hasPremiumAccess,
       isAuthenticated: args.isAuthenticated,
+      session: session,
     ),
   );
 }

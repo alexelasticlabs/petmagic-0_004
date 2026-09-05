@@ -1,5 +1,9 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 
+import { captureFigmaState, installFigmaCaptureRouting } from "./figma-capture";
+
+test.beforeEach(async ({ page }) => installFigmaCaptureRouting(page));
+
 const apiOrigin = "https://api.petmagic.test";
 const adminUserId = "11111111-1111-4111-8111-111111111111";
 const moderationEventId = "22222222-2222-4222-8222-222222222222";
@@ -345,6 +349,8 @@ test("Admin reviews a moderation item with summary, keyboard focus and an audite
   ).toBe(true);
   expect(api.getModerationAuthorizationHeaders()).toContain("Bearer admin-access-token");
 
+  await captureFigmaState(page, "moderation-current");
+
   const reviewButton = queueTable.getByRole("button", {
     name: "Review item: Golden Hour Portrait",
     exact: true,
@@ -386,6 +392,7 @@ test("Admin reviews a moderation item with summary, keyboard focus and an audite
     .fill("  Reviewed complaint evidence; no restriction is required.  ");
   await expect(confirmButton).toBeEnabled();
 
+  await captureFigmaState(page, "moderation-review-dialog");
   await page.screenshot({
     path: testInfo.outputPath("moderation-desktop-review.png"),
     fullPage: false,

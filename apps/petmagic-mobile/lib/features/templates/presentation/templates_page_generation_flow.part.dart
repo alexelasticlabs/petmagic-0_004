@@ -21,12 +21,9 @@ extension _TemplatesPageGenerationFlow on _TemplatesPageState {
       if (!ref.read(appLaunchControllerProvider).isAuthenticated) {
         await showAuthRequiredSheet(
           context,
-          redirectPath: _templatesPageLocation(
-            currentPetId: widget.initialPetId,
-            currentPetPhotoId: widget.initialPetPhotoId,
-            category: widget.initialCategory,
-            autofocusSearch: widget.autofocusSearch,
-          ),
+          redirectPath: TemplatePreviewDestination(
+            templateId: template.templateId,
+          ).location,
         );
         return;
       }
@@ -117,12 +114,9 @@ extension _TemplatesPageGenerationFlow on _TemplatesPageState {
         if (_isAuthRequiredError(errorMessage)) {
           await showAuthRequiredSheet(
             context,
-            redirectPath: _templatesPageLocation(
-              currentPetId: widget.initialPetId,
-              currentPetPhotoId: widget.initialPetPhotoId,
-              category: widget.initialCategory,
-              autofocusSearch: widget.autofocusSearch,
-            ),
+            redirectPath: TemplatePreviewDestination(
+              templateId: template.templateId,
+            ).location,
           );
           return;
         }

@@ -2,13 +2,31 @@
 
 `Current` is a capture of the working UI. It is evidence, not an approved visual baseline. `Target` is the manually approved Figma frame that may drive a later implementation.
 
+Current Figma workspace: [PetMagic Admin UI](https://www.figma.com/design/xxJP2rlARhKutxBvE37kXu).
+
+Current reference frame: [Templates — Original PoC](https://www.figma.com/design/xxJP2rlARhKutxBvE37kXu?node-id=4-2).
+
+The editable current-state atlas is split by the production admin navigation:
+
+- `00 Global UI` — command palette, notification/language menus, logout confirmation and collapsed sidebar;
+- `01 Dashboard` — light and dark states;
+- `02 Customers & Access` — Users, Roles and User 360 tabs/panels;
+- `03 Operations` — Audit, Moderation, Support, Generations, Feedback, Notifications and Operations;
+- `04 Content Studio` — Templates catalogs, Video/Image editors, filters/menus, Analytics, Categories and Daily Featured;
+- `05 Revenue & Risk` — all Economy workspaces;
+- `06 Growth & Rewards` — Promo Codes and Gamification.
+
+Every captured state is a `1536px` editable Figma frame built from synthetic Playwright fixtures. Do not capture production user records into the design file.
+
 ## Existing UI to Figma
 
 1. Start the existing admin: `npm --prefix apps/admin-web run dev`.
-2. Open the real route, for example `http://localhost:3000/ru/templates`, and complete the existing Admin sign-in flow.
+2. Open the required local route and complete the existing Admin sign-in flow.
 3. In Codex, use the official Figma plugin to capture the live page into the existing `PetMagic Admin UI` design file.
-4. Keep the capture under `01 Templates` and name it `Templates — Current`.
-5. Duplicate `Templates — Current` as `Templates — Target`; edit only `Target` in Figma.
+4. Keep the capture on the matching atlas page and give the frame a state-specific name such as `Templates — Create Menu`.
+5. Duplicate the required `Current` frame as `Target`; edit only `Target` in Figma.
+
+For repeatable synthetic captures, `apps/admin-web/e2e/figma-capture.ts` reads single-use capture IDs from `FIGMA_CAPTURE_MAP_JSON`. Without that environment variable the helper is a no-op and the normal E2E behavior and timeout remain unchanged.
 
 Use the official remote Figma MCP (`https://mcp.figma.com/mcp`) through Codex OAuth. Do not add a Personal Access Token or an unofficial MCP server while that integration is available.
 

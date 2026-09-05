@@ -499,6 +499,7 @@ class FakeTemplatesRepository implements TemplatesRepository {
   Future<TemplateItem> fetchTemplate(
     String templateId, {
     bool forceRefresh = false,
+    String? analyticsSource,
   }) async {
     return items.firstWhere((item) => item.templateId == templateId);
   }

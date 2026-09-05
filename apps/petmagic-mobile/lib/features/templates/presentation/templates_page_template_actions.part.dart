@@ -1,80 +1,131 @@
 part of 'templates_page.dart';
 
 extension _TemplatesPageTemplateActions on _TemplatesPageState {
-  Future<void> _handleTemplateSelected(
+  Future<bool> _handleTemplateSelected(
     TemplateItem template, {
     TemplateOfTheDayItem? templateOfTheDay,
-    bool fetchLatestDetails = true,
+    TemplatePreviewSession? previewSession,
+    List<TemplateItem>? previewItems,
+    TemplatePreviewSource source = TemplatePreviewSource.catalog,
+    bool initialDetailResolved = false,
   }) async {
-    final previewTemplate = fetchLatestDetails
-        ? await _fetchTemplateDetailsOrFallback(template)
-        : template;
-    if (!mounted) {
-      return;
-    }
+    final session =
+        previewSession ??
+        (previewItems == null
+            ? TemplatePreviewSession.single(template, source: source)
+            : TemplatePreviewSession.fromSelection(
+                items: previewItems,
+                selectedTemplate: template,
+                source: source,
+                initialDetailResolved: initialDetailResolved,
+                loadMore:
+                    source == TemplatePreviewSource.catalog ||
+                        source == TemplatePreviewSource.featured
+                    ? _createTemplatePreviewPageLoader()
+                    : null,
+              ));
 
     final isAuthenticated = ref
         .read(appLaunchControllerProvider)
         .isAuthenticated;
     final hasPremiumAccess = ref.read(templatePremiumAccessProvider);
-    final action = await context.appNavigator.push<TemplateDetailAction>(
+    final rawResult = await context.appNavigator.push<Object?>(
       TemplatePreviewDestination(
+        templateId: session.initialTemplate.templateId,
         payload: TemplatePreviewRouteArgs(
-          template: previewTemplate,
+          template: session.initialTemplate,
           hasPremiumAccess: hasPremiumAccess,
           isAuthenticated: isAuthenticated,
+          session: session,
         ),
       ),
     );
-    if (!mounted || action != TemplateDetailAction.upload) {
-      return;
+    if (!mounted) {
+      return false;
     }
 
+    final TemplateItem selectedTemplate;
+    if (rawResult is TemplatePreviewResult &&
+        rawResult.action == TemplateDetailAction.upload) {
+      selectedTemplate = rawResult.selectedTemplate;
+    } else if (rawResult == TemplateDetailAction.upload) {
+      // Keep compatibility with older navigator fakes and any restored route.
+      selectedTemplate = template;
+    } else {
+      return false;
+    }
+
+    final selectedFeatured =
+        templateOfTheDay?.templateId == selectedTemplate.templateId
+        ? templateOfTheDay
+        : null;
     await _startTemplateUploadFlow(
-      previewTemplate,
-      templateOfTheDay: templateOfTheDay,
+      selectedTemplate,
+      templateOfTheDay: selectedFeatured,
     );
+    return true;
   }
 
-  Future<TemplateItem> _fetchTemplateDetailsOrFallback(
-    TemplateItem template,
-  ) async {
-    try {
-      return await ref
-          .read(templatesRepositoryProvider)
-          .fetchTemplate(template.templateId, forceRefresh: true);
-    } catch (error, stackTrace) {
-      AppLogger.warn(
-        feature: 'templates',
-        operation: 'fetch_template_detail_before_preview',
-        message:
-            'Failed to fetch template detail before preview; using feed payload.',
-        context: {'templateId': template.templateId},
-        error: error,
-        stackTrace: stackTrace,
-      );
-      return template;
+  TemplatePreviewPageLoader? _createTemplatePreviewPageLoader() {
+    final state = ref.read(templatesControllerProvider);
+    var nextCursor = state.nextCursor;
+    var currentPage = state.currentPage;
+    var hasMore = state.hasMore;
+    if (!hasMore || nextCursor == null || nextCursor.trim().isEmpty) {
+      return null;
     }
+
+    final baseQuery = state.query.copyWith(resetPage: true);
+    final repository = ref.read(templatesRepositoryProvider);
+    return () async {
+      final cursor = nextCursor;
+      if (!hasMore || cursor == null || cursor.trim().isEmpty) {
+        return const TemplatePreviewPageBatch(items: [], hasMore: false);
+      }
+
+      final page = await repository.fetchFeed(
+        baseQuery.copyWith(page: currentPage + 1, cursor: cursor),
+      );
+      currentPage = page.page;
+      final advancedCursor =
+          page.nextCursor != null &&
+          page.nextCursor!.trim().isNotEmpty &&
+          page.nextCursor != cursor;
+      nextCursor = page.nextCursor;
+      hasMore = page.hasMore && advancedCursor;
+      return TemplatePreviewPageBatch(items: page.items, hasMore: hasMore);
+    };
   }
 
   Future<void> _handleTemplateOfTheDaySelected(
     TemplateOfTheDayItem featured,
+    List<TemplateItem> previewItems,
   ) async {
     unawaited(_recordTemplateOfTheDayAnalytics(featured, 'clicked'));
 
-    final visibleTemplate = _findTemplateById(
-      ref.read(templatesControllerProvider).items,
-      featured.templateId,
-    );
+    final visibleTemplate =
+        _findTemplateById(previewItems, featured.templateId) ??
+        _findTemplateById(
+          ref.read(templatesControllerProvider).items,
+          featured.templateId,
+        );
     if (visibleTemplate != null) {
-      await _openTemplateOfTheDayTemplate(featured, visibleTemplate);
+      await _openTemplateOfTheDayTemplate(
+        featured,
+        visibleTemplate,
+        previewItems: previewItems,
+      );
       return;
     }
 
     try {
       final template = await ref
           .read(templatesRepositoryProvider)
-          .fetchTemplate(featured.templateId, forceRefresh: true);
+          .fetchTemplate(
+            featured.templateId,
+            forceRefresh: true,
+            analyticsSource: TemplatePreviewSource.featured.analyticsValue,
+          );
       if (!mounted) {
         return;
       }
@@ -82,7 +133,8 @@ extension _TemplatesPageTemplateActions on _TemplatesPageState {
       await _openTemplateOfTheDayTemplate(
         featured,
         template,
-        fetchLatestDetails: false,
+        previewItems: previewItems,
+        initialDetailResolved: true,
       );
     } catch (error, stackTrace) {
       AppLogger.warn(
@@ -101,7 +153,7 @@ extension _TemplatesPageTemplateActions on _TemplatesPageState {
       await _openTemplateOfTheDayTemplate(
         featured,
         featured.toFallbackTemplateItem(),
-        fetchLatestDetails: false,
+        previewItems: previewItems,
       );
     }
   }
@@ -109,13 +161,16 @@ extension _TemplatesPageTemplateActions on _TemplatesPageState {
   Future<void> _openTemplateOfTheDayTemplate(
     TemplateOfTheDayItem featured,
     TemplateItem template, {
-    bool fetchLatestDetails = true,
+    required List<TemplateItem> previewItems,
+    bool initialDetailResolved = false,
   }) async {
     unawaited(_recordTemplateOfTheDayAnalytics(featured, 'opened'));
     await _handleTemplateSelected(
       template,
       templateOfTheDay: featured,
-      fetchLatestDetails: fetchLatestDetails,
+      previewItems: previewItems,
+      source: TemplatePreviewSource.featured,
+      initialDetailResolved: initialDetailResolved,
     );
   }
 
@@ -137,7 +192,10 @@ extension _TemplatesPageTemplateActions on _TemplatesPageState {
       return;
     }
 
-    await _handleTemplateSelected(template, fetchLatestDetails: false);
+    await _handleTemplateSelected(
+      template,
+      source: TemplatePreviewSource.random,
+    );
   }
 
   Future<TemplateItem?> _findRandomTemplate(

@@ -557,6 +557,10 @@ void main() {
     expect(navigator.pushes, hasLength(1));
     final destination = navigator.pushes.single;
     expect(destination, isA<TemplatePreviewDestination>());
+    expect(
+      (destination as TemplatePreviewDestination).templateId,
+      initialTemplate.templateId,
+    );
     final args = destination.extra! as TemplatePreviewRouteArgs;
     expect(args.template.templateId, initialTemplate.templateId);
     expect(tester.takeException(), isNull);
@@ -1189,6 +1193,7 @@ class _RemoteBackedTemplatesRepository implements TemplatesRepository {
   Future<TemplateItem> fetchTemplate(
     String templateId, {
     bool forceRefresh = false,
+    String? analyticsSource,
   }) async {
     return (await _dataSource.fetchTemplate(templateId)).toDomain();
   }

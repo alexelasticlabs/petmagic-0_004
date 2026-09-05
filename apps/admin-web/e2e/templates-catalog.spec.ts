@@ -1,6 +1,14 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 
 import {
+  captureFigmaState,
+  hasFigmaCaptureState,
+  installFigmaCaptureRouting,
+} from "./figma-capture";
+
+test.beforeEach(async ({ page }) => installFigmaCaptureRouting(page));
+
+import {
   expectBoxContains,
   expectBoxesNotToIntersect,
   expectBoxInsideViewportHorizontally,
@@ -760,7 +768,7 @@ async function expectTemplatesDesktopLayout(page: Page) {
 }
 
 test("Templates structural layout at 1536x1024", async ({ page }, testInfo) => {
-  test.setTimeout(60_000);
+  test.setTimeout(process.env.FIGMA_CAPTURE_MAP_JSON ? 300_000 : 60_000);
   const authViolations: string[] = [];
   const apiState: CatalogApiState = {
     catalogRequests: [],
@@ -815,7 +823,7 @@ test("Templates structural layout at 1536x1024", async ({ page }, testInfo) => {
 test("unified templates catalog supports publishing filters and responsive cards/list workflow", async ({
   page,
 }, testInfo) => {
-  test.setTimeout(60_000);
+  test.setTimeout(process.env.FIGMA_CAPTURE_MAP_JSON ? 300_000 : 60_000);
   const authViolations: string[] = [];
   const apiState: CatalogApiState = {
     catalogRequests: [],
@@ -931,9 +939,19 @@ test("unified templates catalog supports publishing filters and responsive cards
   expect(desktopActionsGeometry.menuRight).toBeLessThanOrEqual(
     desktopActionsGeometry.viewportWidth
   );
+  await captureFigmaState(page, "templates-action-menu");
   await actionsButton.press("Escape");
   await expect(actionsMenu).toHaveCount(0);
 
+  if (hasFigmaCaptureState("templates-create-menu")) {
+    const createMenu = main.locator("details").filter({ hasText: "Создать шаблон" }).first();
+    await createMenu.locator("summary").click();
+    await expect(createMenu).toHaveAttribute("open", "");
+    await captureFigmaState(page, "templates-create-menu");
+    await createMenu.locator("summary").click();
+  }
+
+  await captureFigmaState(page, "templates-catalog-current");
   await page.screenshot({
     path: testInfo.outputPath("templates-catalog-desktop.png"),
   });
@@ -944,6 +962,7 @@ test("unified templates catalog supports publishing filters and responsive cards
     main.getByRole("heading", { name: "Preview Needed Motion", exact: true })
   ).toBeVisible();
   await expectCatalogCardGeometry(page, 1);
+  await captureFigmaState(page, "templates-video-current");
   await page.screenshot({
     path: testInfo.outputPath("templates-video-desktop.png"),
   });
@@ -954,9 +973,29 @@ test("unified templates catalog supports publishing filters and responsive cards
     main.getByRole("heading", { name: "Golden Studio Portrait", exact: true })
   ).toBeVisible();
   await expectCatalogCardGeometry(page, 2);
+  await captureFigmaState(page, "templates-image-current");
   await page.screenshot({
     path: testInfo.outputPath("templates-image-desktop.png"),
   });
+
+  if (
+    hasFigmaCaptureState("templates-video-editor") ||
+    hasFigmaCaptureState("templates-image-editor")
+  ) {
+    if (hasFigmaCaptureState("templates-video-editor")) {
+      await page.goto("/ru/templates/video/editor");
+      await expect(page).toHaveURL(/\/ru\/templates\/video\/editor$/);
+      await expect(page.locator("#template-basics")).toBeVisible();
+      await captureFigmaState(page, "templates-video-editor");
+    }
+
+    if (hasFigmaCaptureState("templates-image-editor")) {
+      await page.goto("/ru/templates/image/editor");
+      await expect(page).toHaveURL(/\/ru\/templates\/image\/editor$/);
+      await expect(page.locator("#template-basics")).toBeVisible();
+      await captureFigmaState(page, "templates-image-editor");
+    }
+  }
 
   await page.goto("/ru/templates");
   await expect(page).toHaveURL(/\/ru\/templates$/);
@@ -965,6 +1004,12 @@ test("unified templates catalog supports publishing filters and responsive cards
   ).toBeVisible();
 
   const readinessSelect = main.getByRole("button", { name: "Готовность", exact: true });
+  if (hasFigmaCaptureState("templates-filter-listbox")) {
+    await readinessSelect.click();
+    await expect(main.getByRole("listbox", { name: "Готовность", exact: true })).toBeVisible();
+    await captureFigmaState(page, "templates-filter-listbox");
+    await page.keyboard.press("Escape");
+  }
   await chooseCatalogSelectOption(page, "Готовность", "Без превью");
   await expect
     .poll(() =>

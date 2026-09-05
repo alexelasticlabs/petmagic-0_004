@@ -8,6 +8,7 @@ import 'package:petmagic_mobile/features/templates/data/templates_remote_error_p
 import 'package:petmagic_mobile/features/templates/domain/templates_query.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 part 'templates_remote_data_source_locale.part.dart';
+part 'templates_remote_data_source_detail.part.dart';
 
 final templatesRemoteDataSourceProvider = Provider<TemplatesRemoteDataSource>((
   ref,
@@ -89,33 +90,6 @@ class TemplatesRemoteDataSource {
       }
 
       return TemplatesFeedDto.fromJson(data);
-    } on DioException catch (error) {
-      if (TemplatesRemoteErrorPolicy.isCancelledRequest(error)) {
-        throw const RequestCancelledException();
-      }
-
-      throw AppException(
-        TemplatesRemoteErrorPolicy.mapMessage(error),
-        statusCode: error.response?.statusCode,
-        cause: error,
-      );
-    }
-  }
-
-  Future<TemplateItemDto> fetchTemplate(String templateId) async {
-    try {
-      final response = await _dio.get<Map<String, Object?>>(
-        '/api/templates/${encodeTemplatePathSegment(templateId)}',
-        queryParameters: _runtimeInfo.localizedQueryParameters(
-          const <String, Object?>{},
-        ),
-      );
-      final data = response.data;
-      if (data == null) {
-        throw const AppException('templates.template_response_empty');
-      }
-
-      return TemplateItemDto.fromJson(data);
     } on DioException catch (error) {
       if (TemplatesRemoteErrorPolicy.isCancelledRequest(error)) {
         throw const RequestCancelledException();

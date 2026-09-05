@@ -12,7 +12,12 @@ import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/application/profile_controller.dart';
 import 'package:petmagic_mobile/features/templates/application/template_discovery_controller.dart';
+import 'package:petmagic_mobile/features/templates/domain/template_discovery_models.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
+import 'package:petmagic_mobile/features/templates/presentation/template_feed_media_preload_queue.dart';
+import 'package:petmagic_mobile/features/templates/presentation/template_feed_playback_manager.dart';
+import 'package:petmagic_mobile/features/templates/presentation/template_preview_page.dart';
+import 'package:petmagic_mobile/features/templates/presentation/widgets/template_card_playback_coordinator.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/template_category_carousel.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/template_discovery_rail.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/templates_top_bar.dart';
@@ -25,11 +30,14 @@ import 'package:petmagic_mobile/shared/widgets/petmagic_interactive_surface.dart
 import 'package:petmagic_mobile/shared/widgets/petmagic_unavailable_view.dart';
 
 part 'templates_discovery_access.part.dart';
+part 'templates_discovery_chrome.part.dart';
+part 'templates_discovery_playback.part.dart';
 
 class TemplatesDiscoveryPage extends ConsumerStatefulWidget {
-  const TemplatesDiscoveryPage({super.key});
+  const TemplatesDiscoveryPage({this.previewControllerFactory, super.key});
 
   static const routePath = '/discover';
+  final TemplatePreviewControllerFactory? previewControllerFactory;
 
   @override
   ConsumerState<TemplatesDiscoveryPage> createState() =>
@@ -38,7 +46,10 @@ class TemplatesDiscoveryPage extends ConsumerStatefulWidget {
 
 class _TemplatesDiscoveryPageState extends ConsumerState<TemplatesDiscoveryPage>
     with WidgetsBindingObserver {
+  static const _scrollIdlePlaybackDelay = Duration(milliseconds: 140);
+
   late final TemplateDiscoveryController _discoveryController;
+  Timer? _playbackScrollIdleTimer;
   bool _isAppResumed = true;
   bool? _isTabActive;
   bool _isVerticalScrolling = false;
@@ -85,6 +96,11 @@ class _TemplatesDiscoveryPageState extends ConsumerState<TemplatesDiscoveryPage>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _isAppResumed = state == AppLifecycleState.resumed;
+    if (!_isAppResumed) {
+      ref
+          .read(templateDiscoveryPlaybackManagerProvider)
+          .disposeAll(reason: 'discovery_app_background');
+    }
     _syncControllerVisibility();
     if (_isAppResumed) {
       _refreshAccessForAuthenticatedUser(forceRefresh: true);
@@ -93,6 +109,7 @@ class _TemplatesDiscoveryPageState extends ConsumerState<TemplatesDiscoveryPage>
 
   @override
   void dispose() {
+    _playbackScrollIdleTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _discoveryController.setScreenVisible(false);
     super.dispose();
@@ -105,6 +122,11 @@ class _TemplatesDiscoveryPageState extends ConsumerState<TemplatesDiscoveryPage>
     _isTabActive = active;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
+        if (!active) {
+          ref
+              .read(templateDiscoveryPlaybackManagerProvider)
+              .disposeAll(reason: 'discovery_tab_hidden');
+        }
         _syncControllerVisibility();
       }
     });
@@ -120,12 +142,26 @@ class _TemplatesDiscoveryPageState extends ConsumerState<TemplatesDiscoveryPage>
   }
 
   bool _handleUserScroll(UserScrollNotification notification) {
-    if (notification.metrics.axis != Axis.vertical) {
-      return false;
+    final playbackManager = ref.read(templateDiscoveryPlaybackManagerProvider);
+    _playbackScrollIdleTimer?.cancel();
+    if (notification.direction == ScrollDirection.idle) {
+      _playbackScrollIdleTimer = Timer(_scrollIdlePlaybackDelay, () {
+        _playbackScrollIdleTimer = null;
+        if (mounted) {
+          playbackManager.updateScrollVelocity(0);
+        }
+      });
+    } else {
+      playbackManager.updateScrollVelocity(
+        TemplateFeedPlaybackManager.defaultFastScrollVelocityThreshold + 1,
+      );
     }
-    final scrolling = notification.direction != ScrollDirection.idle;
-    if (_isVerticalScrolling != scrolling && mounted) {
-      setState(() => _isVerticalScrolling = scrolling);
+
+    if (notification.metrics.axis == Axis.vertical) {
+      final scrolling = notification.direction != ScrollDirection.idle;
+      if (_isVerticalScrolling != scrolling && mounted) {
+        setState(() => _isVerticalScrolling = scrolling);
+      }
     }
     return false;
   }
@@ -134,9 +170,18 @@ class _TemplatesDiscoveryPageState extends ConsumerState<TemplatesDiscoveryPage>
     context.appNavigator.push<void>(TemplatesDestination(category: category));
   }
 
-  void _openTemplate(TemplateItem template, String category) {
+  void _openTemplate(
+    TemplateItem template,
+    String category,
+    List<TemplateItem> previewItems,
+  ) {
+    final session = TemplatePreviewSession.fromSelection(
+      items: previewItems,
+      selectedTemplate: template,
+      source: TemplatePreviewSource.discovery,
+    );
     context.appNavigator.push<void>(
-      TemplatesDestination(category: category, payload: template),
+      TemplatesDestination(category: category, payload: session),
     );
   }
 
@@ -298,21 +343,12 @@ class _TemplatesDiscoveryPageState extends ConsumerState<TemplatesDiscoveryPage>
                     ),
                   )
                 else
-                  SliverList.separated(
-                    itemCount: state.sections.length,
-                    separatorBuilder: (_, _) =>
-                        const SizedBox(height: PetMagicSpacing.lg),
-                    itemBuilder: (context, index) {
-                      final section = state.sections[index];
-                      return TemplateDiscoveryRail(
-                        section: section,
-                        sectionIndex: index,
-                        moreLabel: text.discoverMoreAction,
-                        onMorePressed: () => _openCategory(section.category),
-                        onTemplatePressed: (template) =>
-                            _openTemplate(template, section.category),
-                      );
-                    },
+                  _TemplateDiscoveryRails(
+                    sections: state.sections,
+                    moreLabel: text.discoverMoreAction,
+                    previewControllerFactory: widget.previewControllerFactory,
+                    onMorePressed: _openCategory,
+                    onTemplatePressed: _openTemplate,
                   ),
                 SliverToBoxAdapter(child: SizedBox(height: bottomInset)),
               ],
@@ -320,154 +356,6 @@ class _TemplatesDiscoveryPageState extends ConsumerState<TemplatesDiscoveryPage>
           ),
         ),
       ),
-    );
-  }
-}
-
-class _DiscoverySearchHeaderDelegate extends SliverPersistentHeaderDelegate {
-  const _DiscoverySearchHeaderDelegate({
-    required this.label,
-    required this.onPressed,
-  });
-
-  final String label;
-  final VoidCallback onPressed;
-
-  @override
-  double get minExtent => 62;
-
-  @override
-  double get maxExtent => 62;
-
-  @override
-  Widget build(
-    BuildContext context,
-    double shrinkOffset,
-    bool overlapsContent,
-  ) {
-    final colors = context.petMagicColors;
-    return SizedBox.expand(
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: Color.alphaBlend(
-            colors.backgroundTop.withValues(alpha: 0.94),
-            colors.backgroundBottom,
-          ),
-          boxShadow: overlapsContent
-              ? [
-                  BoxShadow(
-                    color: colors.shadow.withValues(alpha: 0.12),
-                    blurRadius: 12,
-                    offset: const Offset(0, 5),
-                  ),
-                ]
-              : null,
-        ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(
-            PetMagicSpacing.sm,
-            7,
-            PetMagicSpacing.sm,
-            7,
-          ),
-          child: Semantics(
-            container: true,
-            button: true,
-            label: label,
-            onTap: onPressed,
-            child: ExcludeSemantics(
-              child: PetMagicInteractiveSurface(
-                key: const ValueKey('discovery-search-launcher'),
-                onTap: onPressed,
-                borderRadius: BorderRadius.circular(PetMagicRadii.pill),
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: colors.surfaceGlass,
-                    borderRadius: BorderRadius.circular(PetMagicRadii.pill),
-                    border: Border.all(color: colors.border),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 17),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.search_rounded,
-                          color: colors.textSoft,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 9),
-                        Expanded(
-                          child: Text(
-                            label,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(
-                                  color: colors.textSoft,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                          ),
-                        ),
-                        Icon(
-                          Icons.arrow_forward_rounded,
-                          color: colors.accent,
-                          size: 18,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  @override
-  bool shouldRebuild(covariant _DiscoverySearchHeaderDelegate oldDelegate) =>
-      oldDelegate.label != label || oldDelegate.onPressed != onPressed;
-}
-
-class _DiscoveryStateView extends StatelessWidget {
-  const _DiscoveryStateView({
-    required this.icon,
-    required this.title,
-    required this.message,
-    required this.actionLabel,
-    required this.onAction,
-    required this.bottomInset,
-    this.unavailableKind,
-  });
-
-  final AppUnavailableKind? unavailableKind;
-  final IconData icon;
-  final String title;
-  final String message;
-  final String actionLabel;
-  final VoidCallback onAction;
-  final double bottomInset;
-
-  @override
-  Widget build(BuildContext context) {
-    final unavailable = unavailableKind;
-    if (unavailable != null) {
-      return PetMagicUnavailableView(
-        kind: unavailable,
-        onRetry: onAction,
-        padding: EdgeInsets.fromLTRB(28, 36, 28, bottomInset),
-      );
-    }
-
-    return PetMagicAsyncStateView(
-      icon: icon,
-      title: title,
-      message: message,
-      actionLabel: actionLabel,
-      onAction: onAction,
-      padding: EdgeInsets.fromLTRB(28, 36, 28, bottomInset),
     );
   }
 }

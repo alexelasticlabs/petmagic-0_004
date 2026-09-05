@@ -105,25 +105,27 @@ List<RouteBase> _buildAppRoutes(Ref ref) {
             ),
             GoRoute(
               path: TemplatesPage.routePath,
-              pageBuilder: (context, state) => NoTransitionPage(
-                child: TemplatesPage(
-                  initialPetId:
-                      state.uri.queryParameters[TemplatesPage.petIdQueryParam],
-                  initialPetPhotoId: state
-                      .uri
-                      .queryParameters[TemplatesPage.petPhotoIdQueryParam],
-                  initialCategory: state
-                      .uri
-                      .queryParameters[TemplatesPage.categoryQueryParam],
-                  autofocusSearch:
-                      state.uri.queryParameters[TemplatesPage
-                          .autofocusSearchQueryParam] ==
-                      '1',
-                  initialTemplate: state.extra is TemplateItem
-                      ? state.extra! as TemplateItem
-                      : null,
-                ),
-              ),
+              pageBuilder: (context, state) {
+                final extra = state.extra;
+                final query = state.uri.queryParameters;
+                final previewSession = extra is TemplatePreviewSession
+                    ? extra
+                    : null;
+                return NoTransitionPage(
+                  child: TemplatesPage(
+                    initialPetId: query[TemplatesPage.petIdQueryParam],
+                    initialPetPhotoId:
+                        query[TemplatesPage.petPhotoIdQueryParam],
+                    initialCategory: query[TemplatesPage.categoryQueryParam],
+                    autofocusSearch:
+                        query[TemplatesPage.autofocusSearchQueryParam] == '1',
+                    initialTemplate: state.extra is TemplateItem
+                        ? state.extra! as TemplateItem
+                        : previewSession?.initialTemplate,
+                    initialPreviewSession: previewSession,
+                  ),
+                );
+              },
             ),
           ],
         ),
@@ -231,7 +233,7 @@ List<RouteBase> _buildAppRoutes(Ref ref) {
           );
         } else {
           final templateId = state.pathParameters['templateId'] ?? '';
-          return _buildFadeSlidePage(
+          return _buildHorizontalRevealPage(
             state: state,
             child: TemplatePreviewLoaderPage(templateId: templateId),
           );

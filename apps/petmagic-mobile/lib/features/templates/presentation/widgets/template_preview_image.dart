@@ -6,6 +6,22 @@ import 'package:petmagic_mobile/core/performance/template_media_cache.dart';
 
 typedef TemplatePreviewImageFileLoader =
     Future<File> Function(String imageUrl, {int? mediaVersion});
+typedef TemplatePreviewImageFileRemover =
+    Future<void> Function(String imageUrl, {int? mediaVersion});
+
+class _ResolvedTemplatePreviewImage {
+  const _ResolvedTemplatePreviewImage({
+    required this.file,
+    required this.imageUrl,
+    required this.mediaVersion,
+    required this.remover,
+  });
+
+  final File file;
+  final String imageUrl;
+  final int? mediaVersion;
+  final TemplatePreviewImageFileRemover remover;
+}
 
 class TemplatePreviewImage extends StatefulWidget {
   const TemplatePreviewImage({
@@ -18,6 +34,8 @@ class TemplatePreviewImage extends StatefulWidget {
     this.filterQuality = FilterQuality.medium,
     this.mediaVersion,
     this.fileLoader,
+    this.fileRemover,
+    this.preserveOldImageOnUrlChange = false,
     super.key,
   });
 
@@ -30,13 +48,17 @@ class TemplatePreviewImage extends StatefulWidget {
   final FilterQuality filterQuality;
   final int? mediaVersion;
   final TemplatePreviewImageFileLoader? fileLoader;
+  final TemplatePreviewImageFileRemover? fileRemover;
+  final bool preserveOldImageOnUrlChange;
 
   @override
   State<TemplatePreviewImage> createState() => _TemplatePreviewImageState();
 }
 
 class _TemplatePreviewImageState extends State<TemplatePreviewImage> {
-  late Future<File> _imageFileFuture;
+  late Future<_ResolvedTemplatePreviewImage> _imageFileFuture;
+  _ResolvedTemplatePreviewImage? _lastResolvedImage;
+  int _loadRevision = 0;
 
   @override
   void initState() {
@@ -49,31 +71,57 @@ class _TemplatePreviewImageState extends State<TemplatePreviewImage> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.imageUrl != widget.imageUrl ||
         oldWidget.mediaVersion != widget.mediaVersion ||
-        oldWidget.fileLoader != widget.fileLoader) {
+        oldWidget.fileLoader != widget.fileLoader ||
+        oldWidget.fileRemover != widget.fileRemover) {
+      if (!widget.preserveOldImageOnUrlChange) {
+        _lastResolvedImage = null;
+      }
       _imageFileFuture = _loadImage();
     }
   }
 
-  Future<File> _loadImage() {
+  Future<_ResolvedTemplatePreviewImage> _loadImage() {
+    final revision = ++_loadRevision;
+    final imageUrl = widget.imageUrl;
+    final mediaVersion = widget.mediaVersion;
     final loader = widget.fileLoader ?? TemplateMediaCache.fetchThumbnailFile;
-    return loader(widget.imageUrl, mediaVersion: widget.mediaVersion);
+    final remover =
+        widget.fileRemover ?? TemplateMediaCache.removeThumbnailFile;
+    return loader(imageUrl, mediaVersion: mediaVersion).then((file) {
+      final resolved = _ResolvedTemplatePreviewImage(
+        file: file,
+        imageUrl: imageUrl,
+        mediaVersion: mediaVersion,
+        remover: remover,
+      );
+      if (revision == _loadRevision) {
+        _lastResolvedImage = resolved;
+      }
+      return resolved;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<File>(
+    return FutureBuilder<_ResolvedTemplatePreviewImage>(
       future: _imageFileFuture,
       builder: (context, snapshot) {
-        final file = snapshot.data;
-        if (file == null) {
+        final resolved =
+            snapshot.data ??
+            (widget.preserveOldImageOnUrlChange ? _lastResolvedImage : null);
+        if (resolved == null) {
           if (snapshot.hasError) {
             return widget.errorBuilder(context);
           }
           return widget.placeholder;
         }
 
+        final mediaQuery = MediaQuery.maybeOf(context);
+        final reduceMotion =
+            mediaQuery?.disableAnimations == true ||
+            mediaQuery?.accessibleNavigation == true;
         return Image.file(
-          file,
+          resolved.file,
           fit: widget.fit,
           alignment: widget.alignment,
           cacheWidth: widget.cacheWidth,
@@ -82,16 +130,18 @@ class _TemplatePreviewImageState extends State<TemplatePreviewImage> {
             final isReady = wasSynchronouslyLoaded || frame != null;
             return AnimatedOpacity(
               opacity: isReady ? 1 : 0,
-              duration: const Duration(milliseconds: 220),
+              duration: reduceMotion
+                  ? Duration.zero
+                  : const Duration(milliseconds: 220),
               curve: Curves.easeOut,
               child: child,
             );
           },
           errorBuilder: (context, error, stackTrace) {
             unawaited(
-              TemplateMediaCache.removeThumbnailFile(
-                widget.imageUrl,
-                mediaVersion: widget.mediaVersion,
+              resolved.remover(
+                resolved.imageUrl,
+                mediaVersion: resolved.mediaVersion,
               ),
             );
             return widget.errorBuilder(context);

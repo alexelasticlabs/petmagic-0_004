@@ -1,5 +1,9 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 
+import { captureFigmaState, installFigmaCaptureRouting } from "./figma-capture";
+
+test.beforeEach(async ({ page }) => installFigmaCaptureRouting(page));
+
 const apiOrigin = "https://api.petmagic.test";
 const adminUserId = "11111111-1111-1111-1111-111111111111";
 const actorUserId = "22222222-2222-4222-8222-222222222222";
@@ -240,6 +244,7 @@ test("Admin investigates audit events with server filters and safe detail contex
   ).toBe(true);
   expect(api.getAuthorizationHeaders()).toContain("Bearer admin-access-token");
 
+  await captureFigmaState(page, "audit-current");
   await page.screenshot({
     path: testInfo.outputPath("audit-desktop.png"),
     fullPage: true,
@@ -276,6 +281,7 @@ test("audit detail opens as a keyboard-closeable drawer without mobile overflow"
   expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth);
   expect(dimensions.inspectorWidth).toBeLessThanOrEqual(dimensions.viewportWidth);
 
+  await captureFigmaState(page, "audit-detail-drawer");
   await page.screenshot({
     path: testInfo.outputPath("audit-mobile-390.png"),
     fullPage: false,

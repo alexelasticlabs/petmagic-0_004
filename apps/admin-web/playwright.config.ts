@@ -18,6 +18,7 @@ const nextStartCommand = `"${process.execPath}" ./node_modules/next/dist/bin/nex
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: false,
+  timeout: process.env.FIGMA_CAPTURE_MAP_JSON ? 300_000 : 30_000,
   workers: 1,
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? [["github"], ["list"]] : "list",

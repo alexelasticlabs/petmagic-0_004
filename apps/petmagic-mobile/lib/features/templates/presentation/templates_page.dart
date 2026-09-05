@@ -60,6 +60,7 @@ class TemplatesPage extends ConsumerStatefulWidget {
     this.initialCategory,
     this.autofocusSearch = false,
     this.initialTemplate,
+    this.initialPreviewSession,
     super.key,
   });
 
@@ -68,6 +69,7 @@ class TemplatesPage extends ConsumerStatefulWidget {
   final String? initialCategory;
   final bool autofocusSearch;
   final TemplateItem? initialTemplate;
+  final TemplatePreviewSession? initialPreviewSession;
 
   static const routePath = '/templates';
   static const petIdQueryParam = 'petId';
@@ -172,14 +174,21 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
       oldWidget.initialTemplate,
       widget.initialTemplate,
     );
+    final previewSessionChanged = !identical(
+      oldWidget.initialPreviewSession,
+      widget.initialPreviewSession,
+    );
 
     if (autofocusChanged) {
       _searchAutofocusHandled = false;
     }
-    if (templateChanged) {
+    if (templateChanged || previewSessionChanged) {
       _initialTemplateHandled = false;
     }
-    if (categoryChanged || autofocusChanged || templateChanged) {
+    if (categoryChanged ||
+        autofocusChanged ||
+        templateChanged ||
+        previewSessionChanged) {
       _scheduleRouteEntryUpdate(refreshIfVisible: categoryChanged);
     }
   }

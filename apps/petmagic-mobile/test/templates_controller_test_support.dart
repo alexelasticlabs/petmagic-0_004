@@ -102,6 +102,7 @@ class FakeTemplatesControllerRepository implements TemplatesRepository {
   Future<TemplateItem> fetchTemplate(
     String templateId, {
     bool forceRefresh = false,
+    String? analyticsSource,
   }) async {
     fetchTemplateCalls++;
     final template = templatesById[templateId];

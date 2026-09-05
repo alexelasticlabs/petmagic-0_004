@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -12,6 +13,7 @@ import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/navigation/app_navigator.dart';
 import 'package:petmagic_mobile/core/performance/performance_guard.dart';
 import 'package:petmagic_mobile/core/performance/media_lifecycle_policy.dart';
+import 'package:petmagic_mobile/core/performance/template_media_cache.dart';
 import 'package:petmagic_mobile/core/performance/template_preview_video_controller.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
@@ -41,8 +43,10 @@ part 'template_flow_sheets_content.part.dart';
 part 'template_flow_sheets_generation.part.dart';
 part 'template_flow_sheets_helpers.part.dart';
 part 'template_flow_media_preview.part.dart';
+part 'template_flow_video_preview.part.dart';
+part 'template_flow_video_preview_lifecycle.part.dart';
 
-enum TemplateDetailAction { upload }
+enum TemplateDetailAction { upload, unlockPremium }
 
 enum TemplateBlockedAction { wallet, premium, chooseAnother }
 

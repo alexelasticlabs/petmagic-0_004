@@ -44,7 +44,18 @@ void main() {
           'a transient ConnectivityResult.none must be confirmed by the API probe',
     );
     expect(connectivityBody, contains(r"'${source}_route_unconfirmed'"));
+    expect(
+      connectivityBody,
+      contains('transport: classifyNetworkTransport('),
+      reason: 'connectivity updates must retain their transport classification',
+    );
     expect(applyBody, contains('if (!ref.mounted)'));
+    expect(
+      applyBody,
+      contains('transport != _lastKnownTransport'),
+      reason: 'transport-only changes must update playback policy',
+    );
+    expect(applyBody, contains('transport: transport'));
     expect(
       applyBody,
       contains('_currentOfflineProbeInterval = _offlineProbeInterval;'),

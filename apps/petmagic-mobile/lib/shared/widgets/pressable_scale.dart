@@ -10,6 +10,7 @@ class PressableScale extends StatefulWidget {
     this.scaleDown = PetMotion.pressScale,
     this.haptic = PressableScaleHaptic.none,
     this.enabled = true,
+    this.excludeFromSemantics = false,
     super.key,
   });
 
@@ -19,6 +20,7 @@ class PressableScale extends StatefulWidget {
   final double scaleDown;
   final PressableScaleHaptic haptic;
   final bool enabled;
+  final bool excludeFromSemantics;
 
   @override
   State<PressableScale> createState() => _PressableScaleState();
@@ -42,6 +44,7 @@ class _PressableScaleState extends State<PressableScale> {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: widget.borderRadius,
+          excludeFromSemantics: widget.excludeFromSemantics,
           onTap: isEnabled
               ? () {
                   _triggerHaptic(widget.haptic);

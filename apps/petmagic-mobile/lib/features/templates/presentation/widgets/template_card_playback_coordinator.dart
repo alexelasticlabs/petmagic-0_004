@@ -106,6 +106,13 @@ class TemplateCardPlaybackCoordinator {
       return;
     }
 
+    if (_videoLoadFailed) {
+      // A rebuild can emit the same visibility again. Do not turn that into
+      // an unbounded automatic retry loop; recovery is explicit via Retry.
+      _playbackManager?.unregisterCard(_playbackCardId);
+      return;
+    }
+
     _updateCardVisibility(visibleFraction);
     _syncWithPlaybackManager();
   }
@@ -142,8 +149,17 @@ class TemplateCardPlaybackCoordinator {
     _videoLoadFailed = false;
     _previewRetryToken += 1;
     _notifyChanged();
-    unawaited(_disposeVideoController());
-    unawaited(_ensureVideoController());
+    unawaited(_retryPreviewLoad());
+  }
+
+  Future<void> _retryPreviewLoad() async {
+    await _disposeVideoController();
+    if (_disposed || _lastVisibleFraction <= 0) {
+      return;
+    }
+
+    _updateCardVisibility(_lastVisibleFraction);
+    _syncWithPlaybackManager();
   }
 
   void dispose() {
@@ -296,8 +312,7 @@ class TemplateCardPlaybackCoordinator {
       snapshot?.videoPreviewUrl ?? _template.previewAsset?.url,
     );
     if (previewUrl == null) {
-      _videoLoadFailed = true;
-      _notifyChanged();
+      _markVideoLoadFailed();
       return;
     }
 
@@ -348,7 +363,6 @@ class TemplateCardPlaybackCoordinator {
       await controller?.dispose();
       if (_isCurrentRequest(requestVersion, templateId, previewUrl)) {
         _videoController = null;
-        _isPreviewActive = false;
         AppLogger.debug(
           feature: 'Templates.TemplateCard',
           operation: 'video_playback_fallback_to_thumbnail',
@@ -359,8 +373,7 @@ class TemplateCardPlaybackCoordinator {
                 normalizeTemplateMediaUrl(_template.thumbnailUrl) != null,
           },
         );
-        _videoLoadFailed = true;
-        _notifyChanged();
+        _markVideoLoadFailed();
       }
     } finally {
       if (requestVersion == _videoControllerRequestVersion) {
@@ -387,6 +400,16 @@ class TemplateCardPlaybackCoordinator {
       snapshot?.videoPreviewUrl ?? _template.previewAsset?.url,
     );
     return currentPreviewUrl == previewUrl;
+  }
+
+  void _markVideoLoadFailed() {
+    _isPreviewActive = false;
+    _videoLoadFailed = true;
+    // A failed controller must not occupy the constrained cellular/Wi-Fi
+    // budget. Keep the card out of arbitration until the user retries or its
+    // visibility changes.
+    _playbackManager?.unregisterCard(_playbackCardId);
+    _notifyChanged();
   }
 
   void _notifyChanged() {

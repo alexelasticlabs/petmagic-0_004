@@ -464,6 +464,7 @@ class RandomTemplatesRepository implements TemplatesRepository {
   int cancelPendingRandomTemplateRequestCalls = 0;
   int cancelPendingMetadataRequestsCalls = 0;
   int fetchTemplateCalls = 0;
+  final List<String?> fetchTemplateAnalyticsSources = <String?>[];
   TemplateRandomMode? lastRandomMode;
   String? lastRandomCategory;
   bool? lastIncludePremium;
@@ -515,8 +516,10 @@ class RandomTemplatesRepository implements TemplatesRepository {
   Future<TemplateItem> fetchTemplate(
     String templateId, {
     bool forceRefresh = false,
+    String? analyticsSource,
   }) async {
     fetchTemplateCalls++;
+    fetchTemplateAnalyticsSources.add(analyticsSource);
     final detail = templateDetailsById[templateId];
     if (detail != null) {
       return detail;

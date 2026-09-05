@@ -1,5 +1,13 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 
+import {
+  captureFigmaState,
+  hasFigmaCaptureState,
+  installFigmaCaptureRouting,
+} from "./figma-capture";
+
+test.beforeEach(async ({ page }) => installFigmaCaptureRouting(page));
+
 const adminUserId = "11111111-1111-4111-8111-111111111111";
 const operatorUserId = "22222222-2222-4222-8222-222222222222";
 
@@ -493,6 +501,7 @@ test("economy overview follows the compact operations hierarchy on desktop and m
   await expect(page.getByRole("heading", { name: "Recent activity", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Recent purchases", exact: true })).toBeVisible();
   await expectNoDocumentOverflow(page);
+  await captureFigmaState(page, "economy-overview");
   await page.screenshot({
     path: testInfo.outputPath("economy-desktop-light-1440.png"),
     fullPage: true,
@@ -507,6 +516,7 @@ test("economy overview follows the compact operations hierarchy on desktop and m
   ).toBeVisible();
   await expect(page.getByRole("table")).toHaveCount(2);
   await expectNoDocumentOverflow(page);
+  await captureFigmaState(page, "economy-premium");
   await page.screenshot({
     path: testInfo.outputPath("economy-premium-desktop-light-1440.png"),
     fullPage: true,
@@ -518,6 +528,7 @@ test("economy overview follows the compact operations hierarchy on desktop and m
   await expect(page.getByRole("heading", { name: "Payment incidents", exact: true })).toBeVisible();
   await expect(page.getByText("PremiumEntitlementMismatch", { exact: true }).first()).toBeVisible();
   await expectNoDocumentOverflow(page);
+  await captureFigmaState(page, "economy-incidents");
   await page.screenshot({
     path: testInfo.outputPath("economy-incidents-desktop-light-1440.png"),
     fullPage: true,
@@ -625,6 +636,7 @@ test("economy pack management becomes an action card on mobile", async ({ page }
   await expect(page.getByRole("heading", { name: "Top-up packs", exact: true })).toBeVisible();
   await expect(page.getByRole("table")).toContainText("PRO");
   await expectNoDocumentOverflow(page);
+  await captureFigmaState(page, "economy-catalog");
   await page.screenshot({
     path: testInfo.outputPath("economy-monetization-desktop-light-1440.png"),
     fullPage: true,
@@ -702,6 +714,29 @@ test("promo codes use compact semantic cards on narrow screens", async ({ page }
   expect(new Set(promoToolbarLayout.actionCenterPositions).size).toBe(1);
 
   await page.setViewportSize({ width: 1440, height: 960 });
+  await captureFigmaState(page, "promo-codes-current");
+
+  if (hasFigmaCaptureState("promo-action-menu") || hasFigmaCaptureState("promo-editor-drawer")) {
+    const actionsButton = page.getByRole("button", {
+      name: /Actions menu: PETMAGIC-SUMMER-2026/,
+    });
+    await actionsButton.click();
+    await captureFigmaState(page, "promo-action-menu");
+
+    if (hasFigmaCaptureState("promo-editor-drawer")) {
+      const actionsMenu = page.getByRole("menu");
+      if (!(await actionsMenu.isVisible())) {
+        await actionsButton.click();
+      }
+      await actionsMenu.getByRole("button", { name: /^Edit:/ }).click();
+      await expect(page.getByRole("dialog")).toBeVisible();
+      await captureFigmaState(page, "promo-editor-drawer");
+      await page.keyboard.press("Escape");
+    } else {
+      await page.keyboard.press("Escape");
+    }
+  }
+
   await page.screenshot({
     path: testInfo.outputPath("promo-codes-desktop-light-1440.png"),
     fullPage: true,
