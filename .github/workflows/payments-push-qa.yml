@@ -1,0 +1,37 @@
+name: payments-push-qa
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Test QA runner
+        run: python -m unittest discover -s scripts/qa -p test_payments_push_qa.py
+      - name: Store and notification contracts (no production credentials)
+        shell: python
+        run: |
+          import runpy, subprocess
+          qa = runpy.run_path('scripts/qa/payments_push_qa.py')
+          subprocess.run(['dotnet', 'test',
+            'tests/PetMagic.Modules.Identity.Tests/PetMagic.Modules.Identity.Tests.csproj',
+            '--filter', qa['CONTRACT_FILTER'], '--logger', 'trx;LogFileName=contracts.trx',
+            '--results-directory', 'artifacts/payments-push-ci'], check=True)
+          qa['passing_tests']('artifacts/payments-push-ci/contracts.trx')
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: payments-push-contracts
+          path: artifacts/payments-push-ci/*.trx

@@ -2,6 +2,10 @@
 
 This checklist defines evidence required before production release for token packs, subscriptions, store purchases and push notifications.
 
+Use the [resumable QA runner](payments-push-qa.md) for automated readiness,
+server contracts, exactly-once ledger checks, receipt replay and Android push
+observation. Its partial checks do not replace the physical store evidence below.
+
 ## Required credentials
 
 - Stripe test secret key and webhook secret.
