@@ -42,55 +42,55 @@ void main() {
       testWidgets(
         '$scene ${brightness.name} visual baseline',
         (tester) async {
-        _size(tester, const Size(390, 844));
-        await tester.pumpWidget(
-          _host(
-            brightness: brightness,
-            child: Builder(
-              builder: (context) {
-                final text = AppLocalizations.of(context);
-                if (scene == 'guest') {
-                  return ProtectedAuthGate(
-                    subtitle: text.authRequiredMessage,
-                    onSignIn: () {},
-                    onSignUp: () {},
-                  );
-                }
-                if (scene == 'empty') {
-                  return PetMagicAsyncStateView(
-                    icon: Icons.photo_library_outlined,
-                    title: text.generationStatusEmptyTitle,
-                    message: text.generationStatusEmptyMessage,
-                    actionLabel: text.createHubBrowseAction,
-                    actionIcon: Icons.auto_awesome_rounded,
-                    onAction: () {},
-                  );
-                }
-                return Center(
-                  child: FilledButton(
-                    onPressed: () => showAuthRequiredSheet(
-                      context,
-                      title: text.navCreations,
-                      redirectPath: '/creations',
-                      showSignUp: true,
+          _size(tester, const Size(390, 844));
+          await tester.pumpWidget(
+            _host(
+              brightness: brightness,
+              child: Builder(
+                builder: (context) {
+                  final text = AppLocalizations.of(context);
+                  if (scene == 'guest') {
+                    return ProtectedAuthGate(
+                      subtitle: text.authRequiredMessage,
+                      onSignIn: () {},
+                      onSignUp: () {},
+                    );
+                  }
+                  if (scene == 'empty') {
+                    return PetMagicAsyncStateView(
+                      icon: Icons.photo_library_outlined,
+                      title: text.generationStatusEmptyTitle,
+                      message: text.generationStatusEmptyMessage,
+                      actionLabel: text.createHubBrowseAction,
+                      actionIcon: Icons.auto_awesome_rounded,
+                      onAction: () {},
+                    );
+                  }
+                  return Center(
+                    child: FilledButton(
+                      onPressed: () => showAuthRequiredSheet(
+                        context,
+                        title: text.navCreations,
+                        redirectPath: '/creations',
+                        showSignUp: true,
+                      ),
+                      child: const Text('Open'),
                     ),
-                    child: const Text('Open'),
-                  ),
-                );
-              },
+                  );
+                },
+              ),
             ),
-          ),
-        );
-        await tester.pumpAndSettle();
-        if (scene == 'invitation') {
-          await tester.tap(find.text('Open'));
+          );
           await tester.pumpAndSettle();
-          expect(tester.getBottomRight(find.byType(BottomSheet)).dy, 844);
-        }
-        await expectLater(
-          find.byType(MaterialApp),
-          matchesGoldenFile('goldens/state_${scene}_${brightness.name}.png'),
-        );
+          if (scene == 'invitation') {
+            await tester.tap(find.text('Open'));
+            await tester.pumpAndSettle();
+            expect(tester.getBottomRight(find.byType(BottomSheet)).dy, 844);
+          }
+          await expectLater(
+            find.byType(MaterialApp),
+            matchesGoldenFile('goldens/state_${scene}_${brightness.name}.png'),
+          );
           expect(tester.takeException(), isNull);
         },
         tags: const ['platform-golden'],
