@@ -7,6 +7,7 @@ readonly ssh_config="/opt/petmagic/shared/git-deploy/ssh_config"
 readonly release_lock="/run/petmagic/release.lock"
 readonly expected_origin="git@github.com:alexelasticlabs/petmagic-0_004.git"
 readonly restart_timeout_seconds=480
+readonly minimum_release_free_bytes=$((12 * 1024 * 1024 * 1024))
 
 fail() {
   echo "Release failed: $*" >&2
@@ -40,10 +41,12 @@ read_env_value() {
 write_source_revision() {
   local revision="$1"
   local temporary_path
-  temporary_path="$(mktemp "${env_file}.tmp.XXXXXX")"
-  chmod 600 "$temporary_path"
+  temporary_path="$(mktemp "${env_file}.tmp.XXXXXX")" || return 1
+  chmod 600 "$temporary_path" || { rm -f "$temporary_path"; return 1; }
 
-  awk -v revision="$revision" '
+  # Explicit checks are required: rollback invokes this function in a conditional,
+  # where Bash disables errexit even when the script uses set -e.
+  if ! awk -v revision="$revision" '
     /^SOURCE_REVISION=/ {
       print "SOURCE_REVISION=" revision
       replaced = 1
@@ -53,9 +56,13 @@ write_source_revision() {
     END {
       if (!replaced) print "SOURCE_REVISION=" revision
     }
-  ' "$env_file" > "$temporary_path"
+  ' "$env_file" > "$temporary_path"; then
+    rm -f "$temporary_path"
+    return 1
+  fi
 
-  mv -f "$temporary_path" "$env_file"
+  [[ -s "$temporary_path" ]] || { rm -f "$temporary_path"; return 1; }
+  mv -f "$temporary_path" "$env_file" || { rm -f "$temporary_path"; return 1; }
 }
 
 wait_for_service() {
@@ -110,15 +117,24 @@ previous_source_revision="$(read_env_value SOURCE_REVISION)"
   || fail "SOURCE_REVISION does not match the current deployed checkout."
 
 rollback_needed=false
+rollback_reserve=""
+service_restart_attempted=false
 rollback() {
   local status=$?
   trap - EXIT INT TERM ERR
+  # Release reserved blocks before checkout/env restoration, including on ENOSPC.
+  [[ -z "$rollback_reserve" ]] || rm -f "$rollback_reserve"
   if [[ "$rollback_needed" == true ]]; then
     echo "Release did not complete; restoring $previous_revision." >&2
-    "${git_cmd[@]}" checkout --detach "$previous_revision" >&2 || true
-    write_source_revision "$previous_source_revision" || true
-    systemctl restart petmagic-compose.service >&2 || true
-    wait_for_service || true
+    if ! "${git_cmd[@]}" checkout --detach "$previous_revision" >&2 \
+      || ! write_source_revision "$previous_source_revision"; then
+      echo "Rollback could not restore checkout/configuration; refusing to restart running services." >&2
+      exit 1
+    fi
+    if [[ "$service_restart_attempted" == true ]]; then
+      systemctl restart petmagic-compose.service >&2 || true
+      wait_for_service || true
+    fi
   fi
   exit "$status"
 }
@@ -142,6 +158,16 @@ if [[ "$target_revision" == "$previous_revision" ]]; then
   exit 0
 fi
 
+available_bytes="$(df --output=avail -B1 "$deploy_root" | tail -n 1 | tr -d ' ')"
+[[ "$available_bytes" =~ ^[0-9]+$ ]] || fail "Could not determine available disk space."
+(( available_bytes >= minimum_release_free_bytes )) \
+  || fail "At least 12 GiB free disk space is required before building release images."
+rollback_reserve="$(mktemp "${env_file}.reserve.XXXXXX")"
+if ! fallocate -l 67108864 "$rollback_reserve"; then
+  rm -f "$rollback_reserve"
+  fail "Could not reserve disk space for rollback."
+fi
+
 rollback_needed=true
 trap rollback EXIT INT TERM
 "${git_cmd[@]}" checkout --detach "$target_revision"
@@ -150,10 +176,12 @@ bash deploy/vps/scripts/preflight.sh "$env_file"
 
 compose=(docker compose --env-file "$env_file" -f docker-compose.yml -f deploy/vps/compose.vps.yaml)
 "${compose[@]}" build --pull backend generation-worker admin-web
+service_restart_attempted=true
 systemctl restart petmagic-compose.service
 wait_for_service || fail "petmagic-compose.service did not become active."
 bash deploy/vps/scripts/runtime-preflight.sh
 
 rollback_needed=false
+rm -f "$rollback_reserve"
 trap - EXIT INT TERM
 echo "PetMagic release completed: $target_revision"

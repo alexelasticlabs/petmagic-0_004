@@ -100,6 +100,12 @@ sudo bash /opt/petmagic/current/deploy/vps/scripts/deploy-release.sh --revision 
 Do not use `git pull`, edit `SOURCE_REVISION`, or call `docker compose up` as a
 production deployment shortcut.
 
+Release builds require at least 12 GiB free before checkout/configuration changes.
+The release reserves 64 MiB for rollback, checks environment writes explicitly,
+and preserves the existing stack if image building fails before restart.
+Run `bash scripts/qa/test-deploy-release-safety.sh` to check failure handling of
+the environment writer without accessing production configuration.
+
 ## Environment and preflight
 
 The production configuration is root-only:
