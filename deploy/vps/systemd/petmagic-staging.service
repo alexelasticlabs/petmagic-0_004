@@ -1,0 +1,22 @@
+[Unit]
+Description=PetMagic isolated payment staging
+Requires=docker.service
+PartOf=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+ConditionPathExists=/opt/petmagic-staging/env/.env.staging
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/petmagic-staging/runtime
+# The runtime symlink pins the existing staging release independently of production.
+Environment=R2_PUBLIC_URL=https://media.staging.invalid
+ExecStartPre=/usr/bin/docker compose -p petmagic-staging --env-file /opt/petmagic-staging/env/.env.staging -f docker-compose.yml -f /opt/petmagic-staging/compose.vps.yaml config --quiet
+ExecStart=/usr/bin/docker compose -p petmagic-staging --env-file /opt/petmagic-staging/env/.env.staging -f docker-compose.yml -f /opt/petmagic-staging/compose.vps.yaml up -d --no-build --pull never --wait --wait-timeout 180 postgres mailpit backend
+ExecStop=/usr/bin/docker compose -p petmagic-staging --env-file /opt/petmagic-staging/env/.env.staging -f docker-compose.yml -f /opt/petmagic-staging/compose.vps.yaml stop -t 300 backend mailpit postgres
+TimeoutStartSec=240
+TimeoutStopSec=360
+
+[Install]
+WantedBy=multi-user.target

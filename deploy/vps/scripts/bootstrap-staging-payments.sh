@@ -33,6 +33,8 @@ compose=(
 )
 
 cd "$repo_root"
+# Compose interpolates the disabled admin service too. Staging has no R2 account.
+export R2_PUBLIC_URL=https://media.staging.invalid
 "${compose[@]}" config --quiet
 "${compose[@]}" up -d --no-build --wait --wait-timeout 180 postgres mailpit backend
 "${compose[@]}" ps

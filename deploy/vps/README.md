@@ -161,6 +161,36 @@ runtime uses `deploy/vps/compose.staging.vps.yaml`. Staging Mailpit is local-onl
 and its email dispatch worker remains disabled. It is valid for Stripe sandbox
 tests, not for customer email delivery or production acceptance.
 
+### Staging persistence and host maintenance
+
+Staging bind mounts use `!override`. Do not replace this with `!reset`: Compose
+discards the supplied mount values for a reset, leaving PostgreSQL on an anonymous
+volume and API files inside the container. Run
+`bash scripts/qa/test-staging-compose.sh` to validate the resolved Compose model.
+The test uses synthetic example settings and does not require a Docker daemon.
+
+The host installs `systemd/petmagic-staging.service` for boot and Docker restart
+recovery. `/opt/petmagic-staging/runtime` points to the pinned staging release;
+`/opt/petmagic-staging/compose.vps.yaml` is the installed staging override.
+This preserves the staging application revision independently of production.
+Before first enabling this unit on an existing host, compare actual container
+mounts with the intended bind mounts, back up PostgreSQL and API files, and move
+existing data while staging is stopped. Never recreate a legacy staging database
+against empty bind mounts. Verify table counts and health after the transfer.
+
+Repository host configuration templates are `ssh/00-petmagic.conf` (key-based
+SSH, no password or X11 forwarding) and `journald/60-petmagic.conf` (512 MiB /
+14-day journal retention). Verify a fresh operator key login before installing
+the SSH template, run `sshd -t`, reload SSH, and verify another fresh key login.
+Keep a timed rollback until that second login succeeds.
+
+Before OS/Docker maintenance, verify the off-site backup with an isolated restore,
+check active generations, download and review package updates, and validate both
+production and staging startup. Use systemd for planned stack stops/restarts.
+After a host reboot, verify all containers, public health endpoints, backup timer,
+kernel version, and production runtime preflight. OS maintenance does not change
+the application source revision.
+
 ## Provider configuration summary
 
 | Integration | Confirmed configuration | Still requires real acceptance |

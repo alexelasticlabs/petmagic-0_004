@@ -2,12 +2,18 @@ services:
   postgres:
     restart: "no"
     ports: !reset []
-    volumes: !reset
+    volumes: !override
       - /opt/petmagic-staging/shared/postgres:/var/lib/postgresql/data
+    logging: &staging-logging
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "5"
 
   mailpit:
     restart: "no"
     ports: !reset []
+    logging: *staging-logging
 
   backend:
     restart: "no"
@@ -25,14 +31,15 @@ services:
       ForwardedHeaders__ForwardLimit: "1"
       Email__DispatchWorkerEnabled: "${Email__DispatchWorkerEnabled:-false}"
       Cors__AllowedOrigins__0: "${CORS_ALLOWED_ORIGIN:?Set CORS_ALLOWED_ORIGIN to the staging HTTPS admin origin}"
-    volumes: !reset
+    volumes: !override
       - /opt/petmagic-staging/shared/api-data/DataProtection-Keys:/var/petmagic/DataProtection-Keys
       - /opt/petmagic-staging/shared/api-data/wwwroot:/var/petmagic/wwwroot
+    logging: *staging-logging
 
   generation-worker:
     profiles: ["generation"]
     restart: "no"
-    volumes: !reset
+    volumes: !override
       - /opt/petmagic-staging/shared/api-data/wwwroot/templates-media:/var/petmagic/wwwroot/templates-media
 
   admin-web:
