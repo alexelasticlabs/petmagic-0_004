@@ -15,6 +15,109 @@ namespace PetMagic.Modules.Identity.Tests.Economy;
 public sealed partial class EconomyServiceTests
 {
     [Fact]
+    public async Task RunEconomyReconciliationAsync_ShouldRespectReviewedMissingJobUntilLedgerChanges()
+    {
+        await using var dbContext = CreateDbContext();
+        var userId = Guid.NewGuid();
+        var generationId = Guid.NewGuid();
+        AddGenerationSpendLedger(dbContext, userId, generationId, 3);
+        var service = CreateService(dbContext,
+            generationBillingReconciliation: new FakeGenerationBillingReconciliationService());
+        Assert.True((await service.RunEconomyReconciliationAsync(CancellationToken.None)).IsSuccess);
+        var incident = await dbContext.EconomyIncidents.SingleAsync();
+        Assert.Equal("GenerationBillingJobMissing", incident.Type);
+        Assert.Equal("Critical", incident.Severity);
+
+        Assert.True((await service.ResolveAdminEconomyIncidentAsync(
+            incident.Id, "Verified terminal event and ledger; job removed by retention.", CancellationToken.None)).IsSuccess);
+        Assert.True((await service.RunEconomyReconciliationAsync(CancellationToken.None)).IsSuccess);
+        Assert.Equal("Resolved", incident.Status);
+        Assert.Single(await dbContext.EconomyIncidentAuditEntries.ToListAsync());
+
+        AddGenerationRefundLedger(dbContext, userId, generationId, 3);
+        Assert.True((await service.RunEconomyReconciliationAsync(CancellationToken.None)).IsSuccess);
+        Assert.Equal("Open", incident.Status);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("{}")]
+    [InlineData("not-json")]
+    [InlineData("{\"spendEntryIds\":1,\"refundEntryIds\":[]}")]
+    public async Task RunEconomyReconciliationAsync_ShouldReopenMissingJobWithoutValidReviewedEvidence(string? details)
+    {
+        await using var dbContext = CreateDbContext();
+        var userId = Guid.NewGuid();
+        var generationId = Guid.NewGuid();
+        AddGenerationSpendLedger(dbContext, userId, generationId, 3);
+        var service = CreateService(dbContext,
+            generationBillingReconciliation: new FakeGenerationBillingReconciliationService());
+        Assert.True((await service.RunEconomyReconciliationAsync(CancellationToken.None)).IsSuccess);
+        var incident = await dbContext.EconomyIncidents.SingleAsync();
+        incident.Status = "Resolved";
+        incident.ResolutionNote = "Reviewed";
+        incident.DetailsJson = details;
+        await dbContext.SaveChangesAsync();
+
+        Assert.True((await service.RunEconomyReconciliationAsync(CancellationToken.None)).IsSuccess);
+        Assert.Equal("Open", incident.Status);
+    }
+
+    [Theory]
+    [InlineData("Expired", "users.not_found", true)]
+    [InlineData("Active", "users.not_found", false)]
+    [InlineData("Expired", "identity.unavailable", false)]
+    public async Task RunEconomyReconciliationAsync_ShouldCloseObsoleteIdentityFailuresOnlyForExpiredMissingAccounts(
+        string subscriptionStatus, string identityError, bool shouldResolve)
+    {
+        await using var dbContext = CreateDbContext();
+        var now = DateTime.UtcNow;
+        var userId = Guid.NewGuid();
+        var subscriptionId = Guid.NewGuid();
+        var eventId = Guid.NewGuid();
+        dbContext.UserSubscriptions.Add(new UserSubscription
+        {
+            Id = subscriptionId,
+            UserId = userId,
+            Provider = "stripe",
+            Status = subscriptionStatus,
+            CurrentPeriodStartUtc = now.AddDays(-2),
+            CurrentPeriodEndUtc = subscriptionStatus == "Active" ? now.AddDays(2) : now.AddDays(-1),
+            CreatedAtUtc = now.AddDays(-2),
+            UpdatedAtUtc = now
+        });
+        dbContext.SubscriptionEventLogs.Add(new SubscriptionEventLog
+        {
+            Id = eventId, UserId = userId, UserSubscriptionId = subscriptionId,
+            Provider = "stripe", EventType = "PremiumIdentitySyncFailed", Status = "Inactive",
+            CreatedAtUtc = now.AddMinutes(-5)
+        });
+        var keys = new[] { $"premium_identity:read:{userId:D}", $"subscription_event:failed:{eventId:D}" };
+        foreach (var key in keys)
+        {
+            dbContext.EconomyIncidents.Add(new EconomyIncident
+            {
+                Id = Guid.NewGuid(), UserId = userId, UserSubscriptionId = subscriptionId,
+                Type = "PremiumEntitlementMismatch", Status = "Open", Severity = "Critical",
+                DeduplicationKey = key, FirstDetectedAtUtc = now.AddMinutes(-5), LastDetectedAtUtc = now,
+                LastError = identityError
+            });
+        }
+        await dbContext.SaveChangesAsync();
+        var identity = new FakeIdentityService { GetCurrentUserError = new Error(identityError, "Unavailable") };
+        var service = CreateService(dbContext, identityService: identity);
+
+        Assert.True((await service.RunEconomyReconciliationAsync(CancellationToken.None)).IsSuccess);
+        Assert.True((await service.RunEconomyReconciliationAsync(CancellationToken.None)).IsSuccess);
+
+        var incidents = await dbContext.EconomyIncidents.Where(x => keys.Contains(x.DeduplicationKey)).ToListAsync();
+        Assert.Equal(2, incidents.Count);
+        Assert.All(incidents, incident => Assert.Equal(shouldResolve ? "Resolved" : "Open", incident.Status));
+        Assert.Equal(shouldResolve ? 2 : 0, await dbContext.EconomyIncidentAuditEntries.CountAsync());
+        Assert.Empty(identity.SetPremiumStatusCalls);
+    }
+
+    [Fact]
     public async Task CancelPackPurchaseAsync_ShouldCancelPendingStripePaymentAndMarkOrderFailed()
     {
         await using var dbContext = CreateDbContext();

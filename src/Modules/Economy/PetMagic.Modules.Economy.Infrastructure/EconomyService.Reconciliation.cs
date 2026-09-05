@@ -793,6 +793,18 @@ public sealed partial class EconomyService
 
         if (snapshot is null && (spends.Count > 0 || refunds.Count > 0))
         {
+            // A reviewed retention incident stays closed until its immutable ledger evidence changes.
+            // Otherwise the next reconciliation immediately undoes an audited operator resolution.
+            var reviewedIncident = await dbContext.EconomyIncidents.AsNoTracking().FirstOrDefaultAsync(
+                x => x.DeduplicationKey == $"generation_billing:job_missing:{generationId:D}"
+                    && x.Status == "Resolved" && x.ResolutionNote != null,
+                cancellationToken);
+            if (reviewedIncident is not null
+                && HasSameReviewedGenerationLedger(reviewedIncident.DetailsJson, spends, refunds))
+            {
+                return;
+            }
+
             await UpsertEconomyIncidentAsync(
                 EconomyIncidentType.GenerationBillingJobMissing,
                 "Critical",
@@ -966,6 +978,28 @@ public sealed partial class EconomyService
         }
     }
 
+    private static bool HasSameReviewedGenerationLedger(
+        string? detailsJson, IReadOnlyList<WalletLedgerEntry> spends, IReadOnlyList<WalletLedgerEntry> refunds)
+    {
+        if (string.IsNullOrWhiteSpace(detailsJson))
+        {
+            return false;
+        }
+
+        try
+        {
+            using var details = JsonDocument.Parse(detailsJson);
+            return details.RootElement.TryGetProperty("spendEntryIds", out var spendIds)
+                && details.RootElement.TryGetProperty("refundEntryIds", out var refundIds)
+                && spendIds.EnumerateArray().Select(x => x.GetGuid()).ToHashSet().SetEquals(spends.Select(x => x.Id))
+                && refundIds.EnumerateArray().Select(x => x.GetGuid()).ToHashSet().SetEquals(refunds.Select(x => x.Id));
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException or FormatException)
+        {
+            return false;
+        }
+    }
+
     private async Task ReconcileSubscriptionsAsync(
         DateTime now,
         DateTime lookbackAfterUtc,
@@ -1108,6 +1142,15 @@ public sealed partial class EconomyService
         var profile = await identityService.GetCurrentUserAsync(subscription.UserId, cancellationToken);
         if (profile.IsFailure)
         {
+            if (!desiredPremium
+                && string.Equals(subscription.Status, "Expired", StringComparison.OrdinalIgnoreCase)
+                && profile.Error.Code == "users.not_found")
+            {
+                await ResolveObsoletePremiumIdentityIncidentAsync(
+                    $"premium_identity:read:{subscription.UserId:D}", stats, cancellationToken);
+                return;
+            }
+
             await UpsertEconomyIncidentAsync(
                 EconomyIncidentType.PremiumEntitlementMismatch,
                 "Critical",
@@ -1184,6 +1227,24 @@ public sealed partial class EconomyService
         foreach (var eventLog in failedEvents)
         {
             stats.ChecksRun++;
+            if (eventLog.EventType == "PremiumIdentitySyncFailed"
+                && eventLog.UserId is { } eventUserId && identityService is not null)
+            {
+                var subscription = await GetLatestUserSubscriptionAsync(eventUserId, cancellationToken);
+                if (subscription is not null
+                    && string.Equals(subscription.Status, "Expired", StringComparison.OrdinalIgnoreCase)
+                    && !IsActivePremiumSubscription(subscription))
+                {
+                    var profile = await identityService.GetCurrentUserAsync(eventUserId, cancellationToken);
+                    if (profile.IsFailure && profile.Error.Code == "users.not_found")
+                    {
+                        await ResolveObsoletePremiumIdentityIncidentAsync(
+                            $"subscription_event:failed:{eventLog.Id:D}", stats, cancellationToken);
+                        continue;
+                    }
+                }
+            }
+
             await UpsertEconomyIncidentAsync(
                 eventLog.EventType == "PremiumIdentitySyncFailed" || eventLog.EventType == "PremiumReconciliationIncident"
                     ? EconomyIncidentType.PremiumEntitlementMismatch
@@ -1199,6 +1260,29 @@ public sealed partial class EconomyService
                 details: new { eventLog.EventType, eventLog.Status, eventLog.ExternalEventId },
                 cancellationToken: cancellationToken);
         }
+    }
+
+    private async Task ResolveObsoletePremiumIdentityIncidentAsync(
+        string deduplicationKey,
+        ReconciliationStats stats,
+        CancellationToken cancellationToken)
+    {
+        var incident = await dbContext.EconomyIncidents.FirstOrDefaultAsync(
+            x => x.DeduplicationKey == deduplicationKey && x.Status == "Open", cancellationToken);
+        if (incident is null)
+        {
+            return;
+        }
+
+        incident.AutoFixApplied = true;
+        await ResolveIncidentWithAuditAsync(
+            incident,
+            "reconcile_expired_subscription_identity",
+            "The latest subscription is expired and Identity confirms the account no longer exists; no premium flag remains to synchronize.",
+            new { subscriptionStatus = "Expired", identityError = "users.not_found" },
+            cancellationToken);
+        stats.IncidentsResolved++;
+        stats.AutoFixesApplied++;
     }
 
     private async Task UpsertEconomyIncidentAsync(

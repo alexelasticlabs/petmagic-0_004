@@ -490,10 +490,15 @@ internal sealed partial class TemplateGenerationJobProcessor(
         }
 
         var cutoff = DateTime.UtcNow.AddDays(-options.GenerationRetentionDaysAfterCompletion);
+        // Media retention must not remove the evidence used by Economy ledger reconciliation.
+        // Keep potentially billed jobs even if a charge marker was not persisted after charging.
         var job = await dbContext.TemplateGenerationJobs
             .Where(x => x.CompletedAtUtc != null
                 && x.CompletedAtUtc <= cutoff
                 && x.UserMediaDeletedAtUtc != null
+                && x.TokenCost == 0
+                && x.ChargedAtUtc == null
+                && x.RefundedAtUtc == null
                 && (x.Status == TemplateGenerationStatus.Completed
                     || (x.Status == TemplateGenerationStatus.Failed
                         && (x.ChargedAtUtc == null || x.RefundedAtUtc != null))

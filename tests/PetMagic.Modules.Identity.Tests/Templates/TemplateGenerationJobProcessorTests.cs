@@ -273,7 +273,7 @@ public sealed class TemplateGenerationJobProcessorTests
     }
 
     [Fact]
-    public async Task CleanupNextExpiredGenerationAsync_ShouldRemoveJob_WhenUserMediaWasAlreadyDeleted()
+    public async Task CleanupNextExpiredGenerationAsync_ShouldRemoveUnbilledJob_WhenUserMediaWasAlreadyDeleted()
     {
         await using var dbContext = CreateDbContext();
         var template = CreateReadyTemplate();
@@ -283,6 +283,8 @@ public sealed class TemplateGenerationJobProcessorTests
         job.ReferenceMotionUrl = "http://localhost:5000/templates-media/reference.mp4";
         job.ResultUrl = "http://localhost:5000/templates-media/output.mp4";
         job.UserMediaDeletedAtUtc = DateTime.UtcNow.AddDays(-2);
+        job.TokenCost = 0;
+        job.ChargedAtUtc = null;
 
         dbContext.TemplateItems.Add(template);
         dbContext.TemplateGenerationJobs.Add(job);
@@ -294,6 +296,34 @@ public sealed class TemplateGenerationJobProcessorTests
 
         Assert.True(processed);
         Assert.False(await dbContext.TemplateGenerationJobs.AnyAsync(x => x.Id == job.Id));
+    }
+
+    [Theory]
+    [InlineData(TemplateGenerationStatus.Completed, 3, true, false)]
+    [InlineData(TemplateGenerationStatus.Failed, 3, true, true)]
+    [InlineData(TemplateGenerationStatus.Cancelled, 3, true, true)]
+    [InlineData(TemplateGenerationStatus.Completed, 3, false, false)]
+    [InlineData(TemplateGenerationStatus.Completed, 0, true, false)]
+    [InlineData(TemplateGenerationStatus.Failed, 0, false, true)]
+    public async Task CleanupNextExpiredGenerationAsync_ShouldPreserveBillingEvidence(
+        TemplateGenerationStatus status, int tokenCost, bool charged, bool refunded)
+    {
+        await using var dbContext = CreateDbContext();
+        var template = CreateReadyTemplate();
+        var completedAt = DateTime.UtcNow.AddDays(-10);
+        var job = CreateGenerationJob(template, status, completedAt);
+        job.UserMediaDeletedAtUtc = DateTime.UtcNow.AddDays(-2);
+        job.TokenCost = tokenCost;
+        job.ChargedAtUtc = charged ? completedAt.AddMinutes(-1) : null;
+        job.RefundedAtUtc = refunded ? completedAt : null;
+        dbContext.TemplateItems.Add(template);
+        dbContext.TemplateGenerationJobs.Add(job);
+        await dbContext.SaveChangesAsync();
+
+        var processor = CreateProcessor(dbContext, options: CreateOptions(retentionDays: 7));
+
+        Assert.False(await processor.CleanupNextExpiredGenerationAsync(CancellationToken.None));
+        Assert.True(await dbContext.TemplateGenerationJobs.AnyAsync(x => x.Id == job.Id));
     }
 
     [Fact]
